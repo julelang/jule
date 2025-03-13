@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use "std/internal/byteslite"
 use "std/internal/conv"
 use integ "std/jule/integrated"
+use "std/os/filepath"
+use "std/os/internal"
+use "std/os/internal/unix"
+use "std/strings"
 use "std/sys"
 
 cpp use "<signal.h>"
@@ -16,6 +19,7 @@ cpp unsafe fn waitpid(pid: int, mut status: *integ::Int, options: int): int
 cpp fn WEXITSTATUS(status: int): int
 cpp fn kill(pid: int, sig: int): int
 cpp unsafe fn setenv(*integ::Char, *integ::Char, int): int
+cpp fn dup2(old: integ::Int, new: integ::Int): int
 
 // Type of a process id.
 type pid = int
@@ -50,9 +54,9 @@ fn execvp(&file: str, &argv: []str): int {
 fn cmdsetenv(&envv: []str)! {
 	const Overwrite = 1
 	for _, env in envv {
-		i := byteslite::IndexByteStr(env, '=')
+		i := strings::IndexByte(env, '=')
 		if i == -1 {
-			error(sys::EINVAL)
+			error(sys::Errno(sys::EINVAL))
 		}
 		unsafe {
 			key := integ::StrToBytes(env[:i])
@@ -72,11 +76,14 @@ fn cmdsetenv(&envv: []str)! {
 }
 
 impl Cmd {
-	fn spawn(self)! {
-		if self.attrs.pid != invalidPid {
-			panic("process: command is already spawned")
-		}
-		path := self.path
+	fn spawn(self, path: str, stdin: &File, stdout: &File, stderr: &File)! {
+		// Setup all environment data.
+		args := self.args()
+		env := self.env() else { error(error) }
+		// Create communication pipe for error handling.
+		// Error codes will be sent using this pipe from child to parent.
+		// So any complex error handling must be done before this phase.
+		// Only system error should occur, with errno, after fork.
 		let pipe: [2]integ::Int
 		if unsafe { cpp.pipe(&pipe[0]) } == -1 {
 			error(sys::GetLastErrno())
@@ -92,23 +99,52 @@ impl Cmd {
 		self.attrs.pid = cpp.fork()
 		match self.attrs.pid {
 		| -1:
+			// Failed. We can return with error.
+			// Already in parent process.
 			error(sys::GetLastErrno())
 		| 0:
+			// We are in the child process.
 			sys::Close(pipe0)
-			mut args := make([]str, 1, 1+len(self.Args))
-			args[0] = path
-			args = append(args, self.Args...)
-			cmdsetenv(self.Env) else { error(error) }
+
+			writeErrAndExit := fn(errno: sys::Errno) {
+				code := conv::Itoa(int(errno))
+				unsafe { sys::Write(pipe1, &code[0], uint(len(code))) }
+				sys::Close(pipe1)
+				Exit(1)
+			}
+
+			if self.Dir != "" {
+				internal::Chdir(self.Dir) else {
+					writeErrAndExit(sys::Errno(error))
+				}
+			}
+
+			cmdsetenv(env) else {
+				writeErrAndExit(sys::Errno(error))
+			}
+
+			if cpp.dup2(unsafe { integ::Int(stdin.fd.File) }, unsafe { integ::Int(sys::STDIN) }) == -1 {
+				writeErrAndExit(sys::GetLastErrno())
+			}
+			if cpp.dup2(unsafe { integ::Int(stdout.fd.File) }, unsafe { integ::Int(sys::STDOUT) }) == -1 {
+				writeErrAndExit(sys::GetLastErrno())
+			}
+			if cpp.dup2(unsafe { integ::Int(stderr.fd.File) }, unsafe { integ::Int(sys::STDERR) }) == -1 {
+				writeErrAndExit(sys::GetLastErrno())
+			}
+
 			execvp(path, args)
-			code := conv::Itoa(int(sys::GetLastErrno()))
-			unsafe { sys::Write(pipe1, &code[0], uint(len(code))) }
-			sys::Close(pipe1)
-			Exit(1)
+			// If execvp was successful, this statement would not be reached.
+			writeErrAndExit(sys::GetLastErrno())
 		|:
+			// We are in the parent process.
 			sys::Close(pipe1)
+			// Read from pipe0, if any.
 			let mut buf: [16]byte
 			n := unsafe { sys::Read(pipe0, &buf[0], uint(len(buf))) }
 			sys::Close(pipe0)
+			// We received data from child process, this is an error code.
+			// Return error as sys::Errno.
 			if n != 0 {
 				self.attrs.pid = invalidPid
 				code, _ := unsafe { conv::AtoiBp(&buf[0], n) }
@@ -118,9 +154,6 @@ impl Cmd {
 	}
 
 	fn kill(self)! {
-		if self.attrs.pid == invalidPid {
-			panic("process: command is not spawned")
-		}
 		if cpp.kill(self.attrs.pid, 1) != 0 {
 			error(sys::GetLastErrno())
 		}
@@ -128,9 +161,6 @@ impl Cmd {
 	}
 
 	fn wait(self)!: int {
-		if self.attrs.pid == invalidPid {
-			panic("process: command is not spawned")
-		}
 		mut stat := 0
 		unsafe {
 			if cpp.waitpid(self.attrs.pid, (*integ::Int)(&stat), 0) == -1 {
@@ -141,3 +171,54 @@ impl Cmd {
 		ret cpp.WEXITSTATUS(stat)
 	}
 }
+
+fn findExecutable(file: str)! {
+	d := Stat(file) else { error(error) }
+	m := d.Mode()
+	if m.IsDir() {
+		error(sys::Errno(sys::EISDIR))
+	}
+	unix::Eaccess(file, unix::X_OK) else {
+		// ENOSYS means Eaccess is not available or not implemented.
+		// EPERM can be returned by Linux containers employing seccomp.
+		// In both cases, fall back to checking the permission bits.
+		if error != sys::ENOSYS && error != sys::EPERM {
+			error(error)
+		}
+		if m&0111 != 0 {
+			ret
+		}
+		error(sys::Errno(sys::EACCES))
+	}
+}
+
+// Searches for an executable named file in the
+// directories named by the PATH environment variable.
+// If file contains a slash, it is tried directly and the PATH is not consulted.
+// Otherwise, on success, the result is an absolute path.
+fn lookPath(file: str)!: str {
+	if strings::Contains(file, "/") {
+		findExecutable(file) else {
+			error(&lookpathError{file, error})
+		}
+		ret file
+	}
+	mut path := Getenv("PATH")
+	for (_, mut dir) in filepath::SplitList(path) {
+		if dir == "" {
+			// Unix shell semantics: path element "" means "."
+			dir = "."
+		}
+		path = filepath::Join(dir, file)
+		findExecutable(path) else { continue }
+		if !filepath::IsAbs(path) {
+			error(&lookpathError{file, errDot})
+		}
+		ret path
+	}
+	error(&lookpathError{file, errNotFound})
+}
+
+// This is a no-op on non-Windows platforms, since
+// they do not restrict executables to specific extensions.
+fn lookExtensions(path: str, dir: str)!: str { ret path }

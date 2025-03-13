@@ -2,54 +2,466 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-// Runs a command in the operating system.
-// There is no pipe for the output of the command,
-// so any output will appear on the standard output.
+use "std/conv"
+use "std/errors"
+use "std/io"
+use "std/os/filepath"
+use "std/runtime"
+use "std/strings"
+use "std/sync/atomic"
+
+// The error resulting if a path search failed to find an executable file.
+static mut errNotFound = errors::New("executable file not found in $PATH")
+
+// Indicates that a path lookup resolved to an executable
+// in the current directory due to ‘.’ being in the path, either
+// implicitly or explicitly. See the package documentation for details.
+static mut errDot = errors::New("cannot run executable found relative to current directory")
+
+// Returned by [lookPath] when it fails to classify a file as an executable.
+struct lookpathError {
+	// Name is the file name for which the error occurred.
+	Name: str
+
+	// Err is the underlying error.
+	Err: any
+}
+
+impl lookpathError {
+	fn Str(self): str {
+		ret "std/os: Cmd: " + conv::Quote(self.Name) + ": " + runtime::toStr(self.Err)
+	}
+}
+
+// Represents an external command being prepared or run.
 //
-// The Args stores command-line arguments. The first argument is not should to be
-// the path of the executable. Just pass necessary arguments.
-//
-// The Env stores environment variables. If Env is nil or len(Env) == 0, child process
-// will use copy of the parent process's environment variables. Environment variables
-// should be in the "KEY=value" format.
+// Once a Cmd has been executed, it is not recommended to reuse the same instance
+// multiple times. If you use a method that calls `Wait`, or explicitly call `Start`
+// followed by `Wait`, the Cmd instance will become reusable. However,
+// since data such as Stdout and Stdin will be reset, the command may need to be
+// reconfigured. Therefore, even after a `Wait` call, it is recommended to
+// configure a new Cmd instance for safety.
 struct Cmd {
-	mut attrs: cmdAttrs
+	mut attrs:   cmdAttrs
+	mut started: u32 // boolean
 
-	path: str
+	// The path of the command to run.
+	//
+	// This is the only field that must be set to a non-zero
+	// value. If it is relative, it is evaluated relative to Dir.
+	Path: str
 
+	// Specifies the working directory of the command.
+	// If it is the empty string, Cmd runs the command in the
+	// calling process's current directory.
+	Dir: str
+
+	// Holds command line arguments, including the command as Args[0].
+	// If it is empty or nil, Start uses {Path}.
+	//
+	// In typical use, both Path and Args are set by calling [Cmd.New].
 	Args: []str
-	Env:  []str
+
+	// Specifies the environment of the process.
+	// Each entry is of the form "key=value".
+	// If it is nil, the new process uses the current process's environment.
+	// If it contains duplicate environment keys, only the last
+	// value in the slice for each duplicate key is used.
+	// As a special case on Windows, SYSTEMROOT is always added if
+	// missing and not explicitly set to the empty string.
+	Env: []str
+
+	// Handles inherited by the process.
+	mut stdin:  &File // reader
+	mut stdout: &File // writer
+	mut stderr: &File // writer
+
+	// Holds files for any of the child process's stdin, stdout, and/or stderr
+	// files that were opened by the Cmd itself (not supplied by the caller).
+	// These should be closed as soon as they are inherited by the child process.
+	mut childIOFiles: []&File
+
+	// Holds files for the parent's end of any pipes connected to the child's
+	// stdin, stdout, and/or stderr streams that were opened by the Cmd itself
+	// (not supplied by the caller). These should be closed after Wait sees the
+	// command exit.
+	mut parentIOFiles: []&File
 }
 
 impl Cmd {
-	// Returns Cmd instance for path.
-	static fn New(path: str): &Cmd {
-		ret &Cmd{
-			path: path,
+	// Returns Cmd instance for path with arguments.
+	static fn New(path: str, mut args: ...str): &Cmd {
+		mut cmd := new(Cmd)
+		cmd.Path = path
+		cmd.Args = make([]str, 0, len(args)+1)
+		cmd.Args = append(cmd.Args, path)
+		cmd.Args = append(cmd.Args, args...)
+		ret cmd
+	}
+
+	// Sets reader that will be connected to the command's
+	// standard input when the command starts.
+	// The reader may be &File or &Stdio; all files will be accepted, if reader
+	// is a &Stdio, it should be stdin typically received from [Stdin] function.
+	// The reader will not be closed automatically after [Cmd.Wait] sees the command exit.
+	fn Stdin(self, mut r: io::Reader)! {
+		if self.stdin != nil {
+			error(errors::New("std/os: Cmd.Stdin used when stdin already assigned"))
+		}
+		if atomic::Load(self.started, atomic::Acquire) == 1 {
+			error(errors::New("std/os: Cmd.Stdin after process started"))
+		}
+		match type r {
+		| &File:
+			self.stdin = (&File)(r)
+		| &Stdio:
+			mut stdio := (&Stdio)(r)
+			if stdio.file != stdin {
+				error(errors::New("std/os: Cmd.Stdin: passed Stdio but it is not stdin"))
+			}
+			self.stdout = unsafe { stdio.File() }
+		|:
+			error(errors::New("std/os: Cmd.Stdin: passed io::Writer with invalid underliying type"))
 		}
 	}
 
-	// Spawns new child-process and executes command.
-	// Panics if command is already spawned.
-	// Use the [Wait] or [Kill] method to make respawnable.
-	// Exceptionals will always be CmdError.
-	fn Spawn(self)! {
-		self.spawn() else { error(error) }
+	// Sets writer that will be connected to the command's
+	// standard output when the command starts.
+	// The writer may be &File or &Stdio; all files will be accepted, if writer
+	// is a &Stdio, it should be stdout or stderr typically received from [Stdin] or [Stderr] function.
+	// The reader will not be closed automatically after [Cmd.Wait] sees the command exit.
+	fn Stdout(self, mut w: io::Writer)! {
+		if self.stdout != nil {
+			error(errors::New("std/os: Cmd.Stdout used when stdout already assigned"))
+		}
+		if atomic::Load(self.started, atomic::Acquire) == 1 {
+			error(errors::New("std/os: Cmd.Stdout after process started"))
+		}
+		match type w {
+		| &File:
+			self.stdout = (&File)(w)
+		| &Stdio:
+			mut stdio := (&Stdio)(w)
+			if stdio.file != stdout && stdio.file != stderr {
+				error(errors::New("std/os: Cmd.Stdout: passed Stdio but it is not stdout or stderr"))
+			}
+			self.stdout = unsafe { stdio.File() }
+		|:
+			error(errors::New("std/os: Cmd.Stdout: passed io::Writer with invalid underliying type"))
+		}
 	}
 
-	// Kills process.
-	// Fails if process is not alive.
-	// Panics if command is not spawned.
-	// Exceptionals will always be CmdError.
-	fn Kill(self)! {
-		self.kill() else { error(error) }
+	// Sets writer that will be connected to the command's
+	// standard error when the command starts.
+	// The writer may be &File or &Stdio; all files will be accepted, if writer
+	// is a &Stdio, it should be stdout or stderr typically received from [Stdin] or [Stderr] function.
+	// The reader will not be closed automatically after [Cmd.Wait] sees the command exit.
+	fn Stderr(self, mut w: io::Writer)! {
+		if self.stderr != nil {
+			error(errors::New("std/os: Cmd.Stderr used when stderr already assigned"))
+		}
+		if atomic::Load(self.started, atomic::Acquire) == 1 {
+			error(errors::New("std/os: Cmd.Stderr after process started"))
+		}
+		match type w {
+		| &File:
+			self.stderr = (&File)(w)
+		| &Stdio:
+			mut stdio := (&Stdio)(w)
+			if stdio.file != stdout && stdio.file != stderr {
+				error(errors::New("std/os: Cmd.Stdout: passed Stdio but it is not stdout or stderr"))
+			}
+			self.stdout = unsafe { stdio.File() }
+		|:
+			error(errors::New("std/os: Cmd.Stderr: passed io::Writer with invalid underliying type"))
+		}
 	}
 
-	// Waits complete for running of process.
-	// Returns exit code of process.
-	// Panics if command is not spawned.
-	// Exceptionals will always be CmdError.
+	// Returns a pipe that will be connected to the command's
+	// standard input when the command starts.
+	// The pipe will be closed automatically after [Cmd.Wait] sees the command exit.
+	// A caller need only call Close to force the pipe to close sooner.
+	// For example, if the command being run will not exit until standard input
+	// is closed, the caller must close the pipe.
+	fn StdinPipe(self)!: io::WriteCloser {
+		if self.stdin != nil {
+			error(errors::New("std/os: Cmd.StdinPipe used when stdin already assigned"))
+		}
+		if atomic::Load(self.started, atomic::Acquire) == 1 {
+			error(errors::New("std/os: Cmd.StdinPipe after process started"))
+		}
+		mut r, mut w := Pipe() else { error(error) }
+		self.stdin = r
+		self.childIOFiles = append(self.childIOFiles, r)
+		self.parentIOFiles = append(self.parentIOFiles, w)
+		ret w
+	}
+
+	// Returns a pipe that will be connected to the command's
+	// standard output when the command starts.
+	//
+	// [Cmd.Wait] will close the pipe after seeing the command exit, so most callers
+	// need not close the pipe themselves. It is thus incorrect to call Wait
+	// before all reads from the pipe have completed.
+	// For the same reason, it is incorrect to call [Cmd.Run] when using StdoutPipe.
+	fn StdoutPipe(self)!: io::ReadCloser {
+		if self.stdout != nil {
+			error(errors::New("std/os: Cmd.StdoutPipe used when stdout already assigned"))
+		}
+		if atomic::Load(self.started, atomic::Acquire) == 1 {
+			error(errors::New("std/os: Cmd.StdoutPipe after process started"))
+		}
+		mut r, mut w := Pipe() else { error(error) }
+		self.stdout = w
+		self.childIOFiles = append(self.childIOFiles, w)
+		self.parentIOFiles = append(self.parentIOFiles, r)
+		ret r
+	}
+
+	// Returns a pipe that will be connected to the command's
+	// standard error when the command starts.
+	//
+	// [Cmd.Wait] will close the pipe after seeing the command exit, so most callers
+	// need not close the pipe themselves. It is thus incorrect to call Wait
+	// before all reads from the pipe have completed.
+	// For the same reason, it is incorrect to use [Cmd.Run] when using StderrPipe.
+	fn StderrPipe(self)!: io::ReadCloser {
+		if self.stderr != nil {
+			error(errors::New("std/os: Cmd.StderrPipe used when stderr already assigned"))
+		}
+		if atomic::Load(self.started, atomic::Acquire) == 1 {
+			error(errors::New("std/os: Cmd.StderrPipe after process started"))
+		}
+		mut r, mut w := Pipe() else { error(error) }
+		self.stderr = w
+		self.childIOFiles = append(self.childIOFiles, w)
+		self.parentIOFiles = append(self.parentIOFiles, r)
+		ret r
+	}
+
+	fn childStdin(self)!: &File {
+		if self.stdin == nil {
+			mut f := Open(DevNull) else { error(error) }
+			self.childIOFiles = append(self.childIOFiles, f)
+			ret f
+		}
+		ret self.stdin
+	}
+
+	fn childStdout(self)!: &File {
+		ret self.writerDescriptor(self.stdout) else { error(error) }
+	}
+
+	fn childStderr(self)!: &File {
+		if self.stdout != nil && self.stderr != nil && self.stdout.fd.File == self.stderr.fd.File {
+			ret self.stdout
+		}
+		ret self.writerDescriptor(self.stdout) else { error(error) }
+	}
+
+	fn writerDescriptor(self, mut f: &File)!: &File {
+		if f == nil {
+			f = OpenFile(DevNull, O_WRONLY, 0) else { error(error) }
+			self.childIOFiles = append(self.childIOFiles, f)
+			ret f
+		}
+		ret f
+	}
+
+	// Starts the specified command but does not wait for it to complete.
+	// After a successful call to Start the [Cmd.Wait] method must be called in
+	// order to release associated system resources.
+	fn Start(self)! {
+		// Check for doubled Start calls before we defer failure cleanup. If the prior
+		// call to Start succeeded, we don't want to spuriously close its pipes.
+		if atomic::Load(self.started, atomic::Acquire) == 1 {
+			panic("std/os: Cmd.Spawn: command is already started")
+		}
+		mut started := false
+		&_started := started // For deferred scope, use reference.
+		defer {
+			for (_, mut f) in self.childIOFiles {
+				f.Close() else {}
+			}
+			self.childIOFiles = nil
+			if !_started {
+				for (_, mut f) in self.parentIOFiles {
+					f.Close() else {}
+				}
+				self.parentIOFiles = nil
+			}
+		}
+		mut path := self.Path
+		if filepath::Base(path) == path {
+			path = lookPath(self.Path) else { error(error) }
+		} else if runtime::OS == "windows" {
+			// We may need to add a filename extension from PATHEXT
+			// or verify an extension that is already present.
+			// Since the path is absolute, its extension should be unambiguous
+			// and independent of self.Dir, and we can go the lookup now.
+			path = lookExtensions(path, self.Dir) else { error(error) }
+		}
+		// Double-check existence of the directory we want
+		// to chdir into. We can make the error clearer this way.
+		if self.Dir != "" {
+			Stat(self.Dir) else {
+				error(errors::New("std/os: Cmd.Start: Dir is not empty and specified path is not exist: \"" + self.Dir + "\""))
+			}
+		}
+		stdin := self.childStdin() else { error(error) }
+		stdout := self.childStdout() else { error(error) }
+		stderr := self.childStderr() else { error(error) }
+		self.spawn(path, stdin, stdout, stderr) else { error(error) }
+		atomic::Store(self.started, 1, atomic::Relaxed)
+		started = true
+	}
+
+	// Starts the specified command and waits for it to complete.
+	fn Run(self)! {
+		self.Start() else { error(error) }
+		self.Wait() else { error(error) }
+	}
+
+	// Clean should call after process completed.
+	// It cleans resources and Cmd will be ready to reuse.
+	fn clean(self)! {
+		for (_, mut f) in self.parentIOFiles {
+			f.Close() else { error(error) }
+		}
+		self.parentIOFiles = nil
+		self.stdin, self.stdout, self.stderr = nil, nil, nil
+		atomic::Store(self.started, 0, atomic::Relaxed)
+	}
+
+	// Waits for the command to exit.
+	// The command must have been started by [Cmd.Start].
+	// It releases any resources associated with the [Cmd].
+	// After calling it, Cmd will be ready to reuse.
 	fn Wait(self)!: int {
-		ret self.wait() else { error(error) }
+		if atomic::Load(self.started, atomic::Acquire) == 0 {
+			panic("std/os: Cmd.Kill: command is not started")
+		}
+		c := self.wait() else { error(error) }
+		self.clean() else { error(error) }
+		ret c
 	}
+
+	// Returns command-line arguments to start command.
+	fn args(self): []str {
+		if len(self.Args) == 0 {
+			ret [self.Path]
+		}
+		ret unsafe { *(&self.Args) } // do not mutate content
+	}
+
+	// Returns environment variables to start command.
+	fn env(self)!: []str {
+		mut env := unsafe { *(&self.Env) } // do not mutate content
+		if env == nil {
+			env = Env()
+			if self.Dir != "" {
+				match runtime::OS {
+				| "windows":
+					// Windows do not use the PWD variable, so we don't need to
+					// keep it accurate.
+				|:
+					// On POSIX platforms, PWD represents “an absolute pathname of the
+					// current working directory.” Since we are changing the working
+					// directory for the command, we should also update PWD to reflect that.
+					//
+					// Unfortunately, we didn't always do that, so (as proposed in
+					// https://go.dev/issue/50599) to avoid unintended collateral damage we
+					// only implicitly update PWD when Env is nil. That way, we're much
+					// less likely to override an intentional change to the variable.
+					pwd := filepath::Abs(self.Dir) else { error(error) }
+					env = append(env, "PWD="+pwd)
+				}
+			}
+		}
+		env = dedupEnv(env) else { error(error) }
+		env = addCriticalEnv(env)
+		ret env
+	}
+}
+
+// Returns a copy of env with any duplicates removed, in favor of later values.
+// Items not of the normal environment "key=value" form are preserved unchanged.
+fn dedupEnv(mut env: []str)!: []str {
+	ret dedupEnvCase(runtime::OS == "windows", false, env) else { error(error) }
+}
+
+// This is dedupEnv with a case option.
+// If caseInsensitive is true, the case of keys is ignored.
+// If nulOK is false, items containing NUL characters are allowed.
+fn dedupEnvCase(caseInsensitive: bool, nulOK: bool, env: []str)!: []str {
+	// Construct the output in reverse order, to preserve the
+	// last occurrence of each key.
+	mut out := make([]str, 0, len(env))
+	mut saw := map[str]bool{}
+	mut n := len(env)
+	for n > 0; n-- {
+		kv := env[n-1]
+
+		// Reject NUL in environment variables to prevent security issues (See Go's #56284);
+		// except when !nulOK, which uses NUL as filepath::ListSeparator (See Go's #56544).
+		if !nulOK && strings::IndexByte(kv, 0) != -1 {
+			error(errors::New("std/os: environment variable contains NUL"))
+		}
+
+		mut i := strings::Index(kv, "=")
+		if i == 0 {
+			// We observe in practice keys with a single leading "=" on Windows.
+			// TODO(#49886): Should we consume only the first leading "=" as part
+			// of the key, or parse through arbitrarily many of them until a non-"="?
+			i = strings::Index(kv[1:], "=") + 1
+		}
+		if i < 0 {
+			if kv != "" {
+				// The entry is not of the form "key=value" (as it is required to be).
+				// Leave it as-is for now.
+				// TODO: should we strip or reject these bogus entries? (See Go's #52436)
+				out = append(out, kv)
+			}
+			continue
+		}
+		mut k := kv[:i]
+		if caseInsensitive {
+			k = strings::ToLower(k)
+		}
+		if saw[k] {
+			continue
+		}
+
+		saw[k] = true
+		out = append(out, kv)
+	}
+
+	// Now reverse the slice to restore the original order.
+	mut i := 0
+	for i < len(out)/2; i++ {
+		j := len(out) - i - 1
+		out[i], out[j] = out[j], out[i]
+	}
+
+	ret out
+}
+
+// Adds any critical environment variables that are required
+// (or at least almost always required) on the operating system.
+// Currently this is only used for Windows.
+fn addCriticalEnv(mut env: []str): []str {
+	if runtime::OS != "windows" {
+		ret env
+	}
+	for _, kv in env {
+		k, _, ok := strings::Cut(kv, "=")
+		if !ok {
+			continue
+		}
+		if strings::EqualFold(k, "SYSTEMROOT") {
+			// We already have it.
+			ret env
+		}
+	}
+	ret append(env, "SYSTEMROOT="+Getenv("SYSTEMROOT"))
 }
