@@ -69,6 +69,9 @@ cpp unsafe fn FlushFileBuffers(h: cpp.HANDLE): bool
 cpp unsafe fn CreatePipe(r: *cpp.HANDLE, w: *cpp.HANDLE, attrs: *cpp.SECURITY_ATTRIBUTES, size: cpp.DWORD): bool
 cpp unsafe fn SetFilePointerEx(h: cpp.HANDLE, toMove: cpp.LARGE_INTEGER, mut newPointer: *cpp.LARGE_INTEGER, moveMethod: cpp.DWORD): bool
 cpp unsafe fn GetFileAttributesW(name: *integ::Wchar): cpp.DWORD
+cpp unsafe fn SetHandleInformation(hObject: cpp.HANDLE, dwMask: cpp.DWORD, dwFlags: cpp.DWORD): bool
+cpp fn GetCurrentProcess(): cpp.HANDLE
+cpp unsafe fn DuplicateHandle(hSourceProcessHandle: cpp.HANDLE, hSourceHandle: cpp.HANDLE, hTargetProcessHandle: cpp.HANDLE, lpTargetHandle: *cpp.HANDLE, dwDesiredAccess: cpp.DWORD, bInheritHandle: bool, dwOptions: cpp.DWORD): bool
 
 #typedef
 cpp struct OVERLAPPED{}
@@ -245,6 +248,25 @@ unsafe fn GetFileAttributesEx(name: *u16, infoLevel: int, info: *unsafe): bool {
 // Windows's GetFileAttributes function.
 unsafe fn GetFileAttributesW(name: *u16): u32 {
 	ret u32(cpp.GetFileAttributesW((*integ::Wchar)(name)))
+}
+
+// Windows's SetHandleInformation function.
+unsafe fn SetHandleInformation(h: Handle, dwMask: u32, dwFlags: u32): bool {
+	ret cpp.SetHandleInformation(cpp.HANDLE(h), cpp.DWORD(dwMask), cpp.DWORD(dwFlags))
+}
+
+// Windows's GetCurrentProcess function.
+fn GetCurrentProcess(): Handle {
+	ret unsafe { Handle(cpp.GetCurrentProcess()) }
+}
+
+// Windows's DuplicateHandle function.
+unsafe fn DuplicateHandle(hSourceProcessHandle: Handle, hSourceHandle: Handle,
+	hTargetProcessHandle: Handle, mut lpTargetHandle: *Handle, dwDesiredAccess: u32,
+	bInheritHandle: bool, dwOptions: u32): bool {
+	ret cpp.DuplicateHandle(cpp.HANDLE(hSourceProcessHandle), cpp.HANDLE(hSourceHandle),
+		cpp.HANDLE(hTargetProcessHandle), (*cpp.HANDLE)(lpTargetHandle), cpp.DWORD(dwDesiredAccess),
+		bInheritHandle, cpp.DWORD(dwOptions))
 }
 
 // Calls SetFilePointerEx.
