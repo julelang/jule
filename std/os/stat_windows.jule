@@ -63,7 +63,7 @@ fn winstat(path: str, followSurrogates: bool)!: FileInfo {
 		// FileInfo with a known-accurate Mode, we must return an error.
 		error(sys::GetLastErrno())
 	}
-	mut d, mut info := statHandle(h) else { error(error) }
+	mut fs, mut d, mut info := statHandle(h) else { error(error) }
 	unsafe { sys::CloseHandle(h) }
 	if followSurrogates && win32FileAttributeDataIsReparseTagNameSurrogate(d, info) {
 		// To obtain information about the link target, we reopen the file without
@@ -73,14 +73,13 @@ fn winstat(path: str, followSurrogates: bool)!: FileInfo {
 		if h == sys::InvalidHandle {
 			error(sys::GetLastErrno())
 		}
-		d, info = statHandle(h) else { error(error) }
+		fs, _, _ = statHandle(h) else { error(error) }
 		unsafe { sys::CloseHandle(h) }
 	}
-	fs := newFileStatFromWin32FileAttributeData(d, info)
 	ret fs
 }
 
-fn statHandle(h: sys::Handle)!: (fi: sys::Win32FileAttributeData, info: winstatInfo) {
+fn statHandle(h: sys::Handle)!: (fs: FileInfo, fi: sys::Win32FileAttributeData, info: winstatInfo) {
 	ft, err := unsafe { sys::GetFileType(h) }
 	if err {
 		error(sys::GetLastErrno())
@@ -89,13 +88,18 @@ fn statHandle(h: sys::Handle)!: (fi: sys::Win32FileAttributeData, info: winstatI
 		info.filetype = ft
 		ret
 	}
-	fi, info = newFileInfoFromGetFileInformationByHandle(h) else { error(error) }
+	fs, fi, info = newFileInfoFromGetFileInformationByHandle(h) else { error(error) }
 	info.filetype = ft
 	ret
 }
 
 fn stat(path: str)!: FileInfo {
-	ret winstat(path, true) else { error(error) }
+	mut fi := winstat(path, true) else { error(error) }
+	// Assign path if it is not resolved.
+	if fi.sys.vol == 0 {
+		fi.sys.path = path
+	}
+	ret fi
 }
 
 fn lstat(path: str)!: FileInfo {
@@ -108,5 +112,10 @@ fn lstat(path: str)!: FileInfo {
 		// follow symlinks in the last path element.
 		followSurrogates = true
 	}
-	ret winstat(path, followSurrogates) else { error(error) }
+	mut fi := winstat(path, followSurrogates) else { error(error) }
+	// Assign path if it is not resolved.
+	if fi.sys.vol == 0 {
+		fi.sys.path = path
+	}
+	ret fi
 }

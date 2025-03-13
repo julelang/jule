@@ -118,7 +118,7 @@ fn newFileStatFromWin32FindData(&d: sys::Win32FindData): (f: FileInfo) {
 }
 
 // Calls GetFileInformationByHandle to gather all required information about the file handle h.
-fn newFileInfoFromGetFileInformationByHandle(h: sys::Handle)!: (d: sys::Win32FileAttributeData, info: winstatInfo) {
+fn newFileInfoFromGetFileInformationByHandle(h: sys::Handle)!: (fs: FileInfo, d: sys::Win32FileAttributeData, info: winstatInfo) {
 	let mut fd: sys::ByHandleFileInformation
 	mut ok := unsafe { sys::GetFileInformationByHandle(h, &fd) }
 	if !ok {
@@ -140,5 +140,9 @@ fn newFileInfoFromGetFileInformationByHandle(h: sys::Handle)!: (d: sys::Win32Fil
 	d.LastWriteTime = fd.LastWriteTime
 	d.FileSizeHigh = fd.FileSizeHigh
 	d.FileSizeLow = fd.FileSizeLow
+	fs = newFileStatFromWin32FileAttributeData(d, info)
+	fs.sys.vol = fd.VolumeSerialNumber
+	fs.sys.idxhi = fd.FileIndexHigh
+	fs.sys.idxlo = fd.FileIndexLow
 	ret
 }

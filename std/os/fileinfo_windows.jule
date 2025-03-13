@@ -1,0 +1,64 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use integ "std/jule/integrated"
+use "std/sync"
+use "std/sys"
+
+struct sysFileInfo {
+	mu:    sync::Mutex
+	path:  str
+	vol:   u32
+	idxhi: u32
+	idxlo: u32
+}
+
+fn loadFileId(mut &fi: FileInfo)! {
+	fi.sys.mu.Lock()
+	defer { fi.sys.mu.Unlock() }
+	if fi.sys.path == "" {
+		// already done
+		ret
+	}
+	utf16path := integ::UTF16FromStr(fi.sys.path)
+
+	// Per https://learn.microsoft.com/en-us/windows/win32/fileio/reparse-points-and-file-operations,
+	// “Applications that use the CreateFile function should specify the
+	// FILE_FLAG_OPEN_REPARSE_POINT flag when opening the file if it is a reparse
+	// point.”
+	//
+	// And per https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew,
+	// “If the file is not a reparse point, then this flag is ignored.”
+	//
+	// So we set FILE_FLAG_OPEN_REPARSE_POINT unconditionally, since we want
+	// information about the reparse point itself.
+	//
+	// If the file is a symlink, the symlink target should have already been
+	// resolved when the fileStat was created, so we don't need to worry about
+	// resolving symlink reparse points again here.
+	attrs := u32(sys::FILE_FLAG_BACKUP_SEMANTICS | sys::FILE_FLAG_OPEN_REPARSE_POINT)
+
+	h := unsafe { sys::CreateFile(&utf16path[0], 0, 0, nil, sys::OPEN_EXISTING, attrs, 0) }
+	if h == sys::InvalidHandle {
+		error(sys::GetLastErrno())
+	}
+	unsafe defer { sys::CloseHandle(h) }
+	let mut i: sys::ByHandleFileInformation
+	mut ok := unsafe { sys::GetFileInformationByHandle(h, &i) }
+	if !ok {
+		error(sys::GetLastErrno())
+	}
+	fi.sys.path = ""
+	fi.sys.vol = i.VolumeSerialNumber
+	fi.sys.idxhi = i.FileIndexHigh
+	fi.sys.idxlo = i.FileIndexLow
+}
+
+fn sameFile(fi1: FileInfo, fi2: FileInfo): bool {
+	loadFileId(unsafe { *(&fi1) }) else { ret false }
+	loadFileId(unsafe { *(&fi2) }) else { ret false }
+	ret fi1.sys.vol == fi2.sys.vol &&
+		fi1.sys.idxhi == fi2.sys.idxhi &&
+		fi1.sys.idxlo == fi2.sys.idxlo
+}
