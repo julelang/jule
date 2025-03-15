@@ -718,32 +718,43 @@ impl ObjectCoder {
 
 	// Writes location information of token as cstr bytes.
 	// Returns count of written bytes.
-	fn locInfo(mut &self, &t: &token::Token): int {
+	fn locInfo(mut &self, &t: &token::Token): (n: int) {
 		&loc := t.File.Path
 
-		n := self.Buf.Len()
 		// Normalize path if production compilation enabled.
 		if env::Production {
 			match {
 			| strings::HasPrefix(loc, build::PathStdlib):
 				// Remove absolute path prefix of standard library.
 				// Just keeps "std/" prefix.
-				cstrBytes(self.Buf, loc[len(filepath::Dir(build::PathStdlib))+1:])
+				path := loc[len(filepath::Dir(build::PathStdlib))+1:]
+				n = len(path)
+				cstrBytes(self.Buf, path)
 			| strings::HasPrefix(loc, self.ir.Root):
 				// Remove absolute path prefix of root package.
-				// Just keeps "[package_dir]/" prefix.
-				cstrBytes(self.Buf, loc[len(filepath::Dir(self.ir.Root))+1:])
+				// Just keeps "[PackageDirectory]/" prefix.
+				path := loc[len(filepath::Dir(self.ir.Root))+1:]
+				n = len(path)
+				cstrBytes(self.Buf, path)
 			|:
+				n = len(loc)
 				cstrBytes(self.Buf, loc)
 			}
 		} else {
+			n = len(loc)
 			cstrBytes(self.Buf, loc)
 		}
 		self.write(":")
-		self.write(conv::Itoa(t.Row))
+		n++
+		mut i := conv::Itoa(t.Row)
+		n += len(i)
+		self.write(i)
 		self.write(":")
-		self.write(conv::Itoa(t.Column))
-		ret self.Buf.Len() - n
+		n++
+		i = conv::Itoa(t.Column)
+		n += len(i)
+		self.write(i)
+		ret
 	}
 
 	fn head(mut &self) {
