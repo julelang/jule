@@ -358,19 +358,19 @@ fn printArray(mut &s: strings::Builder, a: Value) {
 	match type a {
 	| String:
 		s.WriteStr("\"")!
-		s.WriteStr(str(String(a)))!
+		s.WriteStr(str(a.(String)))!
 		s.WriteStr("\"")!
 	| Bool:
-		if Bool(a) {
+		if a.(Bool) {
 			s.WriteStr("true")!
 		} else {
 			s.WriteStr("false")!
 		}
 	| Number:
-		s.WriteStr(conv::FormatFloat(f64(Number(a)), 'f', -1, 64))!
+		s.WriteStr(conv::FormatFloat(f64(a.(Number)), 'f', -1, 64))!
 	| Array:
 		s.WriteByte('[')!
-		for _, e in Array(a) {
+		for _, e in a.(Array) {
 			printArray(s, e)
 			s.WriteByte(',')!
 		}
@@ -407,7 +407,7 @@ fn testDynDecode(t: &testing::T) {
 		ret
 	}
 	mut ok := false
-	mut m, ok := Object(*v)
+	mut m, ok := (*v).(Object)
 	if !ok {
 		t.Errorf("value is not object")
 		ret
@@ -416,7 +416,7 @@ fn testDynDecode(t: &testing::T) {
 	if !ok {
 		t.Errorf("key is not exist: foo")
 	} else {
-		s, (ok) := String(*v)
+		s, (ok) := (*v).(String)
 		if ok {
 			if s != "pi" {
 				t.Errorf("key foo is not `pi`")
@@ -429,7 +429,7 @@ fn testDynDecode(t: &testing::T) {
 	if !ok {
 		t.Errorf("key is not exist: bar")
 	} else {
-		s, (ok) := String(*v)
+		s, (ok) := (*v).(String)
 		if ok {
 			if s != "number" {
 				t.Errorf("key bar is not `number`")
@@ -442,11 +442,11 @@ fn testDynDecode(t: &testing::T) {
 	if !ok {
 		t.Errorf("key is not exist: baz")
 	} else {
-		mut sm, (ok) := Object(*v)
+		mut sm, (ok) := (*v).(Object)
 		if ok {
 			*v, ok = sm["foo2"]
 			if ok {
-				number, (ok) := Number(*v)
+				number, (ok) := (*v).(Number)
 				if ok {
 					if number != 123.456 {
 						t.Errorf("key bar2 is not 123.456")
@@ -471,7 +471,7 @@ fn testDynDecode(t: &testing::T) {
 	if !ok {
 		t.Errorf("key is not exist: fiz")
 	} else {
-		_, (ok) := Array(*v)
+		_, (ok) := (*v).(Array)
 		if ok {
 			mut s := strings::Builder{}
 			printArray(s, *v)
