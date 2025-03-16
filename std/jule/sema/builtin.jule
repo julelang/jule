@@ -364,7 +364,7 @@ fn builtinCallerPrintln(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Val
 	}
 
 	v.Model = &BuiltinPrintlnCallExpr{
-		Expr: (&BuiltinPrintCallExpr)(v.Model).Expr,
+		Expr: v.Model.(&BuiltinPrintCallExpr).Expr,
 	}
 	ret v
 }
@@ -581,7 +581,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Valu
 			e.pushErr(fc.Args[2].Token, build::LogMsg.MoreArgsWithVariadiced)
 		}
 
-		mut e1 := e.evalExpr((&ast::VariadicExpr)(secondArg.Kind).Expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+		mut e1 := e.evalExpr(secondArg.Kind.(&ast::VariadicExpr).Expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if e1 == nil {
 			ret nil
 		}
@@ -708,7 +708,7 @@ fn callerCopySlice(mut &dest: &Value, mut &e: &eval, mut &fc: &ast::FuncCallExpr
 		// So check this special case.
 		match type dest.Model {
 		| &SlicingExpr:
-			mut se := (&SlicingExpr)(dest.Model)
+			mut se := dest.Model.(&SlicingExpr)
 			if !se.Expr.Mutable && se.Expr.Type.Array() != nil {
 				e.pushErr(fc.Args[0].Token, build::LogMsg.MutOperationOnImmut)
 			}
@@ -1105,13 +1105,13 @@ fn builtinCallerStdComptimeTypeAlias(mut &e: &eval, mut &fc: &ast::FuncCallExpr,
 		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "type")
 		ret nil
 	}
-	mut ie, mut ok := (&ast::IdentExpr)(fc.Args[0].Kind)
+	mut ie, mut ok := fc.Args[0].Kind.(&ast::IdentExpr)
 	if !ok {
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidSyntax)
 		e.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 		ret nil
 	}
-	mut sc, ok := (&scopeChecker)(e.lookup)
+	mut sc, ok := e.lookup.(&scopeChecker)
 	if !ok {
 		e.pushErr(fc.Token, build::LogMsg.CalledOutOfScope, "TypeAlias")
 		ret nil

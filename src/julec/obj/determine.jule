@@ -12,7 +12,7 @@ fn IsForwarded(&s: &sema::Scope): bool {
 	last := s.Stmts[len(s.Stmts)-1]
 	match type last {
 	| &sema::Value:
-		match type (&sema::Value)(last).Model {
+		match type last.(&sema::Value).Model {
 		| &sema::BuiltinPanicCallExpr
 		| &sema::BuiltinErrorCallExpr:
 			ret true
@@ -29,9 +29,9 @@ fn IsForwarded(&s: &sema::Scope): bool {
 fn IsExprComesFromBind(&v: &sema::Value): bool {
 	match type v.Model {
 	| &sema::Var:
-		ret (&sema::Var)(v.Model).Binded
+		ret v.Model.(&sema::Var).Binded
 	| &sema::StructSubIdentExpr:
-		ret IsStructBinded((&sema::StructSubIdentExpr)(v.Model).Owner)
+		ret IsStructBinded(v.Model.(&sema::StructSubIdentExpr).Owner)
 	|:
 		ret false
 	}
@@ -87,7 +87,7 @@ fn IsStructBinded(s: &sema::StructIns): bool {
 	if s.Source != nil {
 		match type s.Source.Kind {
 		| &sema::StructIns:
-			ret IsStructBinded((&sema::StructIns)(s.Source.Kind))
+			ret IsStructBinded(s.Source.Kind.(&sema::StructIns))
 		}
 	}
 	ret false
@@ -102,7 +102,7 @@ fn IsHardDynamicType(mut &e: sema::Expr, mut &t: &sema::Type): (sema::Expr, &sem
 	if t.Trait() == nil && !IsAny(t) {
 		ret e, t
 	}
-	mut c, ok := (&sema::CastingExpr)(e)
+	mut c, ok := e.(&sema::CastingExpr)
 	if ok {
 		ret IsHardDynamicType(c.Expr.Model, c.Expr.Type)
 	}

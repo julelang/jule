@@ -43,7 +43,7 @@ impl Const {
 	// Reads integer data.
 	// Returns zero value if data is not integer.
 	fn ReadInt(self): big::Int {
-		mut i, _ := (big::Int)(self.data)
+		mut i, _ := self.data.(big::Int)
 		ret i
 	}
 
@@ -53,7 +53,7 @@ impl Const {
 		if !self.IsBool() {
 			ret false
 		}
-		ret bool(self.data)
+		ret self.data.(bool)
 	}
 
 	// Reads string data.
@@ -62,7 +62,7 @@ impl Const {
 		if !self.IsStr() {
 			ret ""
 		}
-		ret str(self.data)
+		ret self.data.(str)
 	}
 
 	// Reads 64-bit floating-point data.
@@ -71,7 +71,7 @@ impl Const {
 		if !self.IsF64() {
 			ret 0
 		}
-		ret f64(self.data)
+		ret self.data.(f64)
 	}
 
 	//
@@ -83,13 +83,13 @@ impl Const {
 	fn AsI64(self): i64 {
 		match type self.data {
 		| big::Int:
-			i := (big::Int)(self.data)
+			i := self.data.(big::Int)
 			if i.IsI64() {
 				ret i.I64()
 			}
 			ret i64(i.U64())
 		| f64:
-			ret i64(f64(self.data))
+			ret i64(self.data.(f64))
 		|:
 			ret 0
 		}
@@ -100,13 +100,13 @@ impl Const {
 	fn AsU64(self): u64 {
 		match type self.data {
 		| big::Int:
-			i := (big::Int)(self.data)
+			i := self.data.(big::Int)
 			if i.IsU64() {
 				ret i.U64()
 			}
 			ret u64(i.I64())
 		| f64:
-			ret u64(f64(self.data))
+			ret u64(self.data.(f64))
 		|:
 			ret 0
 		}
@@ -117,9 +117,9 @@ impl Const {
 	fn AsF64(self): f64 {
 		match type self.data {
 		| f64:
-			ret f64(self.data)
+			ret self.data.(f64)
 		| big::Int:
-			f, _ := (big::Int)(self.data).F64()
+			f, _ := self.data.(big::Int).F64()
 			ret f
 		|:
 			ret 0
@@ -157,25 +157,25 @@ impl Const {
 
 	// Reports whether data is integer.
 	fn IsInt(self): bool {
-		_, ok := (big::Int)(self.data)
+		_, ok := self.data.(big::Int)
 		ret ok
 	}
 
 	// Reports whether data is boolean.
 	fn IsBool(self): bool {
-		_, ok := bool(self.data)
+		_, ok := self.data.(bool)
 		ret ok
 	}
 
 	// Reports whether data is string.
 	fn IsStr(self): bool {
-		_, ok := str(self.data)
+		_, ok := self.data.(str)
 		ret ok
 	}
 
 	// Reports whether data is 64-bit floating-point.
 	fn IsF64(self): bool {
-		_, ok := f64(self.data)
+		_, ok := self.data.(f64)
 		ret ok
 	}
 
@@ -237,9 +237,9 @@ impl Const {
 		| self.IsStr():
 			ret x.IsStr() && self.ReadStr() == x.ReadStr()
 		| self.IsInt():
-			i := (big::Int)(self.data)
+			i := self.data.(big::Int)
 			if x.IsInt() {
-				ret i.Cmp((big::Int)(x.data)) == 0
+				ret i.Cmp(x.data.(big::Int)) == 0
 			}
 			if i.Sign() == -1 {
 				ret i.I64() == x.AsI64()
@@ -265,9 +265,9 @@ impl Const {
 		| self.IsStr():
 			ret x.IsStr() && self.ReadStr() < x.ReadStr()
 		| self.IsInt():
-			i := (big::Int)(self.data)
+			i := self.data.(big::Int)
 			if x.IsInt() {
-				ret i.Cmp((big::Int)(x.data)) == -1
+				ret i.Cmp(x.data.(big::Int)) == -1
 			}
 			if i.Sign() == -1 {
 				ret i.I64() < x.AsI64()
@@ -293,9 +293,9 @@ impl Const {
 		| self.IsStr():
 			ret x.IsStr() && self.ReadStr() <= x.ReadStr()
 		| self.IsInt():
-			i := (big::Int)(self.data)
+			i := self.data.(big::Int)
 			if x.IsInt() {
-				ret i.Cmp((big::Int)(x.data)) <= 0
+				ret i.Cmp(x.data.(big::Int)) <= 0
 			}
 			if i.Sign() == -1 {
 				ret i.I64() <= x.AsI64()
@@ -321,9 +321,9 @@ impl Const {
 		| self.IsStr():
 			ret x.IsStr() && self.ReadStr() > x.ReadStr()
 		| self.IsInt():
-			i := (big::Int)(self.data)
+			i := self.data.(big::Int)
 			if x.IsInt() {
-				ret i.Cmp((big::Int)(x.data)) > 0
+				ret i.Cmp(x.data.(big::Int)) > 0
 			}
 			if i.Sign() == -1 {
 				ret i.I64() > x.AsI64()
@@ -349,9 +349,9 @@ impl Const {
 		| self.IsStr():
 			ret x.IsStr() && self.ReadStr() >= x.ReadStr()
 		| self.IsInt():
-			i := (big::Int)(self.data)
+			i := self.data.(big::Int)
 			if x.IsInt() {
-				ret i.Cmp((big::Int)(x.data)) >= 0
+				ret i.Cmp(x.data.(big::Int)) >= 0
 			}
 			if i.Sign() == -1 {
 				ret i.I64() >= x.AsI64()
@@ -380,9 +380,9 @@ impl Const {
 		| self.IsF64():
 			self.SetF64(self.ReadF64() + x.AsF64())
 		| self.IsInt():
-			i := (big::Int)(self.data)
+			i := self.data.(big::Int)
 			if x.IsInt() {
-				self.SetInt(i.Add((big::Int)(x.data)))
+				self.SetInt(i.Add(x.data.(big::Int)))
 			} else {
 				// If x is not integer, it should be float.
 				if i.Sign() == -1 {
@@ -404,9 +404,9 @@ impl Const {
 		| self.IsF64():
 			self.SetF64(self.ReadF64() - x.AsF64())
 		| self.IsInt():
-			i := (big::Int)(self.data)
+			i := self.data.(big::Int)
 			if x.IsInt() {
-				self.SetInt(i.Sub((big::Int)(x.data)))
+				self.SetInt(i.Sub(x.data.(big::Int)))
 			} else {
 				// If x is not integer, it should be float.
 				if i.Sign() == -1 {
@@ -428,9 +428,9 @@ impl Const {
 		| self.IsF64():
 			self.SetF64(self.ReadF64() * x.AsF64())
 		| self.IsInt():
-			i := (big::Int)(self.data)
+			i := self.data.(big::Int)
 			if x.IsInt() {
-				self.SetInt(i.Mul((big::Int)(x.data)))
+				self.SetInt(i.Mul(x.data.(big::Int)))
 			} else {
 				// If x is not integer, it should be float.
 				if i.Sign() == -1 {
@@ -460,9 +460,9 @@ impl Const {
 			}
 			self.SetF64(self.ReadF64() / l)
 		| self.IsInt():
-			i := (big::Int)(self.data)
+			i := self.data.(big::Int)
 			if x.IsInt() {
-				j := (big::Int)(x.data)
+				j := x.data.(big::Int)
 				if j.Cmp(big::Int{}) == 0 {
 					ret false
 				}
@@ -486,11 +486,11 @@ impl Const {
 	// Reports whether operation is success.
 	// Reports false if divided-by-zero.
 	fn Mod(mut self, x: Const): bool {
-		i, mut ok := (big::Int)(self.data)
+		i, mut ok := self.data.(big::Int)
 		if !ok {
 			ret false
 		}
-		xi, ok := (big::Int)(x.data)
+		xi, ok := x.data.(big::Int)
 		if !ok {
 			ret false
 		}
@@ -502,11 +502,11 @@ impl Const {
 	// Bitwise and itself value to x's value.
 	// Reports whether operation is success.
 	fn BitwiseAnd(mut self, x: Const): bool {
-		i, mut ok := (big::Int)(self.data)
+		i, mut ok := self.data.(big::Int)
 		if !ok {
 			ret false
 		}
-		xi, ok := (big::Int)(x.data)
+		xi, ok := x.data.(big::Int)
 		if !ok {
 			ret false
 		}
@@ -517,11 +517,11 @@ impl Const {
 	// Bitwise or itself value to x's value.
 	// Reports whether operation is success.
 	fn BitwiseOr(mut self, x: Const): bool {
-		i, mut ok := (big::Int)(self.data)
+		i, mut ok := self.data.(big::Int)
 		if !ok {
 			ret false
 		}
-		xi, ok := (big::Int)(x.data)
+		xi, ok := x.data.(big::Int)
 		if !ok {
 			ret false
 		}
@@ -532,11 +532,11 @@ impl Const {
 	// Bitwise xor itself value to x's value.
 	// Reports whether operation is success.
 	fn Xor(mut self, x: Const): bool {
-		i, mut ok := (big::Int)(self.data)
+		i, mut ok := self.data.(big::Int)
 		if !ok {
 			ret false
 		}
-		xi, ok := (big::Int)(x.data)
+		xi, ok := x.data.(big::Int)
 		if !ok {
 			ret false
 		}
@@ -547,11 +547,11 @@ impl Const {
 	// Left shifts itself value to x's value.
 	// Reports whether operation is success.
 	fn Lshift(mut self, x: Const): bool {
-		i, mut ok := (big::Int)(self.data)
+		i, mut ok := self.data.(big::Int)
 		if !ok {
 			ret false
 		}
-		xi, ok := (big::Int)(x.data)
+		xi, ok := x.data.(big::Int)
 		if !ok {
 			ret false
 		}
@@ -562,11 +562,11 @@ impl Const {
 	// Right shifts itself value to x's value.
 	// Reports whether operation is success.
 	fn Rshift(mut self, x: Const): bool {
-		i, mut ok := (big::Int)(self.data)
+		i, mut ok := self.data.(big::Int)
 		if !ok {
 			ret false
 		}
-		xi, ok := (big::Int)(x.data)
+		xi, ok := x.data.(big::Int)
 		if !ok {
 			ret false
 		}
@@ -579,17 +579,17 @@ impl Const {
 		| self.IsNil():
 			ret "nil"
 		| self.IsBool():
-			if bool(self.data) {
+			if self.data.(bool) {
 				ret "true"
 			}
 			ret "false"
 		| self.IsStr():
-			ret str(self.data)
+			ret self.data.(str)
 		| self.IsInt():
-			i := (big::Int)(self.data)
+			i := self.data.(big::Int)
 			ret i.Format(10)
 		| self.IsF64():
-			ret conv::FormatFloat(f64(self.data), 'g', -1, 64)
+			ret conv::FormatFloat(self.data.(f64), 'g', -1, 64)
 		|:
 			panic("unreachable")
 		}

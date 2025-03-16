@@ -455,7 +455,7 @@ struct dynamicTypeAnnotation {
 
 impl dynamicTypeAnnotation {
 	fn annotateConstraintElem[T](mut self, mut &k: &Type): bool {
-		mut c, mut ok := (&T)(self.c.Kind)
+		mut c, mut ok := self.c.Kind.(&T)
 		if !ok {
 			ret false
 		}
@@ -482,7 +482,7 @@ impl dynamicTypeAnnotation {
 	}
 
 	fn annotateConstraintMap(mut self, mut &k: &Type): (ok: bool) {
-		mut m2, ok := (&ast::MapType)(self.c.Kind)
+		mut m2, ok := self.c.Kind.(&ast::MapType)
 		if !ok {
 			ret
 		}
@@ -496,7 +496,7 @@ impl dynamicTypeAnnotation {
 	}
 
 	fn annotateConstraintTuple(mut self, mut &k: &Type): (ok: bool) {
-		mut tup, ok := (&ast::TupleType)(self.c.Kind)
+		mut tup, ok := self.c.Kind.(&ast::TupleType)
 		if ok {
 			mut tup2 := k.Tuple()
 			for (_, mut t2) in tup2.Types {
@@ -512,7 +512,7 @@ impl dynamicTypeAnnotation {
 	}
 
 	fn annotateConstraintFunc(mut self, mut &k: &Type): (ok: bool) {
-		mut pf, ok := (&ast::Func)(self.c.Kind)
+		mut pf, ok := self.c.Kind.(&ast::Func)
 		if ok {
 			mut f := k.Func()
 			for (i, mut fp) in f.Params {
@@ -532,7 +532,7 @@ impl dynamicTypeAnnotation {
 	}
 
 	fn annotateConstraintIdent(mut self, mut &k: &Type): bool {
-		mut ident := (&ast::IdentType)(self.c.Kind)
+		mut ident := self.c.Kind.(&ast::IdentType)
 		mut s := k.Struct()
 		for i, g in self.f.Decl.Generics {
 			if g.Ident == ident.Ident {
@@ -966,7 +966,7 @@ impl fnCallArgChecker {
 				p.Type.Variadic = false
 				match type v.Model {
 				| &SliceExpr:
-					model = (&SliceExpr)(v.Model)
+					model = v.Model.(&SliceExpr)
 					model.ElemType = p.Type
 				|:
 					model = nil
@@ -1122,7 +1122,7 @@ impl structLitChecker {
 		// Check duplications.
 	dupLookup:
 		for (_, mut expr) in exprs {
-			mut dpair, ok := (&ast::FieldExprPair)(expr.Kind)
+			mut dpair, ok := expr.Kind.(&ast::FieldExprPair)
 			if ok {
 				match {
 				| pair == dpair:
@@ -1157,7 +1157,7 @@ impl structLitChecker {
 		for (i, mut expr) in exprs {
 			match type expr.Kind {
 			| &ast::KeyValPair:
-				mut pair := (&ast::KeyValPair)(expr.Kind)
+				mut pair := expr.Kind.(&ast::KeyValPair)
 				match type pair.Key.Kind {
 				| &ast::IdentExpr:
 					// Ok
@@ -1187,7 +1187,7 @@ impl structLitChecker {
 		for (i, mut expr) in exprs {
 			match type expr.Kind {
 			| &ast::FieldExprPair:
-				mut pair := (&ast::FieldExprPair)(expr.Kind)
+				mut pair := expr.Kind.(&ast::FieldExprPair)
 				if i > 0 && !paired {
 					self.pushErr(pair.Field, build::LogMsg.InvalidSyntax)
 				}
@@ -1462,7 +1462,7 @@ impl retTypeChecker {
 		}
 		match type e.Kind {
 		| &ast::TupleExpr:
-			self.exprDecls = (&ast::TupleExpr)(e.Kind).Expr
+			self.exprDecls = e.Kind.(&ast::TupleExpr).Expr
 		|:
 			self.exprDecls = [e]
 		}

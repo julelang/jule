@@ -18,10 +18,10 @@ fn isValidModelForRef(mut &m: Expr): bool {
 	| &Var:
 		ret true
 	| &StructSubIdentExpr:
-		mut model := (&StructSubIdentExpr)(m)
+		mut model := m.(&StructSubIdentExpr)
 		ret model.Field != nil && isValidModelForRef(model.Expr.Model)
 	| &UnaryExpr:
-		mut unary := (&UnaryExpr)(m)
+		mut unary := m.(&UnaryExpr)
 		if unary.Op.Id != token::Id.Star {
 			ret false
 		}
@@ -35,7 +35,7 @@ fn isValidModelForRef(mut &m: Expr): bool {
 		}
 		ret isValidModelForRef(unary.Expr.Model)
 	| &IndexingExpr:
-		mut indexing := (&IndexingExpr)(m)
+		mut indexing := m.(&IndexingExpr)
 		if indexing.Expr.Type.Array() == nil {
 			// allow only arrays, slice allocations will may be deallocated at runtime
 			// arrays always guaranteed to be have fixed size at runtime
@@ -611,7 +611,7 @@ impl sema {
 		}
 		match type l {
 		| &scopeChecker:
-			mut hard := (&scopeChecker)(l).getHardRoot()
+			mut hard := l.(&scopeChecker).getHardRoot()
 			tc.refers = hard.owner.Refers
 		}
 		ret tc
@@ -641,7 +641,7 @@ impl sema {
 		if tt == nil || !ta {
 			t.Type = tt
 		} else {
-			(&StructIns)(t.Type.Kind).setSource(tt)
+			t.Type.Kind.(&StructIns).setSource(tt)
 		}
 		ret t.checked()
 	}
@@ -707,7 +707,7 @@ impl sema {
 		}
 		match type l {
 		| &scopeChecker:
-			e.unsafety = (&scopeChecker)(l).isUnsafe()
+			e.unsafety = l.(&scopeChecker).isUnsafe()
 		}
 		e.prefix = p
 		ret e
@@ -1842,7 +1842,7 @@ impl sema {
 			| &sema:
 				refers = decl.Refers
 			| &scopeChecker:
-				refers = (&scopeChecker)(l).getOwnerRefers()
+				refers = l.(&scopeChecker).getOwnerRefers()
 			|:
 				panic("sema: checkVarDecl: unimplemented referencer")
 			}
@@ -1990,7 +1990,7 @@ impl sema {
 			if !ta.Strict {
 				continue
 			}
-			mut s := (&StructIns)(ta.TypeSym.Type.Kind).Decl
+			mut s := ta.TypeSym.Type.Kind.(&StructIns).Decl
 			match {
 			| !self.checkStructImpls(s):
 			| !self.checkFuncDeclsBy(s.Methods):
@@ -2384,7 +2384,7 @@ impl sema {
 				// Structure is comparable, so all array types should be comparable.
 				mut decl := runtimeFindFunc(self.meta.runtime, "arrayCmp")
 				pushArr := fn(mut t: Kind, mut token: &token::Token) {
-					mut arr, (ok) := (&Array)(t)
+					mut arr, (ok) := t.(&Array)
 					if !ok || arr == nil {
 						ret
 					}
@@ -2572,7 +2572,7 @@ impl sema {
 			ret
 		}
 
-		s, ok := (&StructIns)(sptr.Elem.Kind)
+		s, ok := sptr.Elem.Kind.(&StructIns)
 		if ok && s.Source == nil && isStdPackage(s.Decl.Token.File.Path, "testing") {
 			ret
 		}
@@ -2641,7 +2641,7 @@ impl sema {
 						mut ref := r.At(i)
 						match type ref {
 						| &StructIns:
-							mut s := (&StructIns)(ref)
+							mut s := ref.(&StructIns)
 							if r == s.Refers {
 								break
 							}
@@ -2650,7 +2650,7 @@ impl sema {
 								ret true
 							}
 						| &FuncIns:
-							mut f := (&FuncIns)(ref)
+							mut f := ref.(&FuncIns)
 							if r == f.Refers {
 								break
 							}
@@ -2659,7 +2659,7 @@ impl sema {
 								ret true
 							}
 						| &Var:
-							mut v2 := (&Var)(ref)
+							mut v2 := ref.(&Var)
 							pushIllegalCycleError(owner, v2.Ident) // Push trace.
 							if v2 == v {
 								ret true
@@ -2727,7 +2727,7 @@ impl sema {
 			self.setCurrentFile(f)
 			for (_, mut ta) in self.file.TypeAliases {
 				if ta.Strict {
-					mut s := (&StructIns)(ta.TypeSym.Type.Kind)
+					mut s := ta.TypeSym.Type.Kind.(&StructIns)
 					if !s.Checked {
 						s.Checked = true
 						ok := self.precheckStructIns(s, nil, nil)
@@ -2879,7 +2879,7 @@ impl missingRetChecker {
 				self.falled = true
 				ret false
 			| &Break:
-				addr := (&Break)(st).It
+				addr := st.(&Break).It
 				if addr != 0 {
 					self.breaked = append(self.breaked, addr)
 				}
@@ -2887,12 +2887,12 @@ impl missingRetChecker {
 			| &Continue:
 				ret false
 			| &InfIter:
-				mut ii := (&InfIter)(st)
+				mut ii := st.(&InfIter)
 				if self.checkInfIter(uintptr(ii), ii.Scope) {
 					ret true
 				}
 			| &WhileIter:
-				mut wn := (&WhileIter)(st)
+				mut wn := st.(&WhileIter)
 				if wn.IsWhileNext() && wn.Expr == nil {
 					// Condition is nil, possible infinite iteration.
 					if self.checkInfIter(uintptr(wn), wn.Scope) {
@@ -2902,21 +2902,21 @@ impl missingRetChecker {
 			| &Ret:
 				ret true
 			| &Scope:
-				if self.checkScope((&Scope)(st)) {
+				if self.checkScope(st.(&Scope)) {
 					ret true
 				}
 			| &Value:
-				match type (&Value)(st).Model {
+				match type st.(&Value).Model {
 				| &BuiltinPanicCallExpr
 				| &BuiltinErrorCallExpr:
 					ret true
 				}
 			| &Conditional:
-				if self.checkConditional((&Conditional)(st)) {
+				if self.checkConditional(st.(&Conditional)) {
 					ret true
 				}
 			| &Match:
-				if self.checkMatch((&Match)(st)) {
+				if self.checkMatch(st.(&Match)) {
 					ret true
 				}
 			}

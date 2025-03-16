@@ -108,17 +108,17 @@ fn fitsSize(mut e1: sema::Expr, mut e2: sema::Expr): bool {
 	}
 	match type e1 {
 	| &constant::Const:
-		exprConst := (&constant::Const)(e2)
-		ret exprConst.AsF64() >= 0 && (&constant::Const)(e1).GtEq(*exprConst)
+		exprConst := e2.(&constant::Const)
+		ret exprConst.AsF64() >= 0 && e1.(&constant::Const).GtEq(*exprConst)
 	| &sema::Var:
 		ret e1 == e2
 	| &sema::StructSubIdentExpr:
-		mut ssi1 := (&sema::StructSubIdentExpr)(e1)
-		mut ssi2 := (&sema::StructSubIdentExpr)(e2)
+		mut ssi1 := e1.(&sema::StructSubIdentExpr)
+		mut ssi2 := e2.(&sema::StructSubIdentExpr)
 		ret obj::EqualModels(ssi1.Expr.Model, ssi2.Expr.Model) && ssi1.Field == ssi2.Field
 	| &sema::UnaryExpr:
-		mut uem1 := (&sema::UnaryExpr)(e1)
-		mut uem2 := (&sema::UnaryExpr)(e2)
+		mut uem1 := e1.(&sema::UnaryExpr)
+		mut uem2 := e2.(&sema::UnaryExpr)
 		if uem1.Op.Id != token::Id.Star || uem1.Op.Id != uem2.Op.Id {
 			ret false
 		}
@@ -136,7 +136,7 @@ fn possibleBoundaryRemove(mut &b: &boundary, mut model: sema::Expr) {
 	// Because it changed and we don not know anything now.
 	match type model {
 	| &sema::Var:
-		if b.removeVar(uintptr((&sema::Var)(model))) {
+		if b.removeVar(uintptr(model.(&sema::Var))) {
 			ret
 		}
 	}
@@ -167,18 +167,18 @@ fn getBoundaryVar(m: sema::Expr): uintptr {
 	}
 	match type m {
 	| &sema::Var:
-		v := (&sema::Var)(m)
+		v := m.(&sema::Var)
 		if !v.Reference || v.ValueSym == nil || v.ValueSym.Value == nil {
 			// Variable is not reference (or points to unknown such as parameters), return address of it.
-			ret uintptr((&sema::Var)(m))
+			ret uintptr(m.(&sema::Var))
 		}
 		// Variable is reference, it should be initialized at source code.
 		// Investigate the initial expression for variable address.
 		ret getBoundaryVar(v.ValueSym.Value.Model)
 	| &sema::StructSubIdentExpr:
-		ret uintptr((&sema::StructSubIdentExpr)(m).Field)
+		ret uintptr(m.(&sema::StructSubIdentExpr).Field)
 	| &sema::UnaryExpr:
-		uem := (&sema::UnaryExpr)(m)
+		uem := m.(&sema::UnaryExpr)
 		if uem.Op.Id == token::Id.Star { // Dereferencing.
 			ret getBoundaryVar(uem.Expr.Model)
 		}

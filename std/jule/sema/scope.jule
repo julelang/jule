@@ -200,9 +200,9 @@ impl caseOwner {
 	fn asUintptr(self): uintptr {
 		match type self {
 		| &Match:
-			ret uintptr((&Match)(self))
+			ret uintptr(self.(&Match))
 		| &Select:
-			ret uintptr((&Select)(self))
+			ret uintptr(self.(&Select))
 		|:
 			panic("unreachable")
 		}
@@ -492,7 +492,7 @@ impl scopeChecker {
 	// Just lookups current scope.
 	fn findLabel(mut self, &ident: str): &Label {
 		for (_, mut st) in self.scope.Stmts {
-			mut label, ok := (&Label)(st)
+			mut label, ok := st.(&Label)
 			if ok && label.Ident == ident {
 				ret label
 			}
@@ -676,7 +676,7 @@ impl scopeChecker {
 
 		match type v.Model {
 		| &BuiltinErrorCallExpr:
-			mut m := (&BuiltinErrorCallExpr)(v.Model)
+			mut m := v.Model.(&BuiltinErrorCallExpr)
 			self.processErrorCall(m, expr.Token)
 			self.scope.Stmts = append(self.scope.Stmts, v)
 		| &BackendEmitExpr
@@ -762,7 +762,7 @@ impl scopeChecker {
 	}
 
 	fn checkWhileIter(mut &self, mut &it: &ast::Iter) {
-		mut wh := (&ast::WhileKind)(it.Kind)
+		mut wh := it.Kind.(&ast::WhileKind)
 		if wh.Expr == nil && wh.Next == nil {
 			self.checkInfIter(it)
 			ret
@@ -825,7 +825,7 @@ impl scopeChecker {
 			}
 		}
 
-		mut rang := (&ast::RangeKind)(it.Kind)
+		mut rang := it.Kind.(&ast::RangeKind)
 		makeComptimeRange(v, false)
 		if v.Decl {
 			self.s.pushErr(rang.Expr.Token, build::LogMsg.InvalidTypeForComptimeIter, v.Type.Str())
@@ -869,7 +869,7 @@ impl scopeChecker {
 	}
 
 	fn checkRangeIter(mut &self, mut &it: &ast::Iter) {
-		mut rang := (&ast::RangeKind)(it.Kind)
+		mut rang := it.Kind.(&ast::RangeKind)
 
 		// Evaluate expression as mutable. Because we can't know type of the expression,
 		// so we can't able to determine whether expression should be mutable by type.
@@ -1052,11 +1052,11 @@ impl scopeChecker {
 				mut st := label.node.Scope.Stmts[i]
 				match type st {
 				| &InfIter:
-					cont.It = uintptr((&InfIter)(st))
+					cont.It = uintptr(st.(&InfIter))
 				| &RangeIter:
-					cont.It = uintptr((&RangeIter)(st))
+					cont.It = uintptr(st.(&RangeIter))
 				| &WhileIter:
-					cont.It = uintptr((&WhileIter)(st))
+					cont.It = uintptr(st.(&WhileIter))
 				|:
 					self.s.pushErr(c.Label, build::LogMsg.InvalidLabel, c.Label.Kind)
 				}
@@ -1358,7 +1358,7 @@ impl scopeChecker {
 
 		match type a.Right.Kind {
 		| &ast::TupleExpr:
-			mut tup := (&ast::TupleExpr)(a.Right.Kind)
+			mut tup := a.Right.Kind.(&ast::TupleExpr)
 			parts = make([]exprPart, 0, len(tup.Expr))
 			i := 0
 			mut _i := unsafe { (&int)(&i) } // reference pointer for closure
@@ -1427,7 +1427,7 @@ impl scopeChecker {
 		if len(right) == 1 {
 			match type right[0].data.Model {
 			| &IndexingExpr:
-				mut iem := (&IndexingExpr)(right[0].data.Model)
+				mut iem := right[0].data.Model.(&IndexingExpr)
 				if iem.Expr.Type.Map() != nil { // Is map lookup.
 					strict = true
 					right = [
@@ -1436,7 +1436,7 @@ impl scopeChecker {
 					]
 				}
 			| &TypeAssertionExpr:
-				mut ce := (&TypeAssertionExpr)(right[0].data.Model)
+				mut ce := right[0].data.Model.(&TypeAssertionExpr)
 				prim := ce.Expr.Type.Prim()
 				if prim != nil && prim.IsAny() || ce.Expr.Type.TypeEnum() != nil || ce.Expr.Type.Trait() != nil {
 					strict = true
@@ -1467,7 +1467,7 @@ impl scopeChecker {
 					}
 				}
 			| &ChanRecv:
-				mut cr := (&ChanRecv)(right[0].data.Model)
+				mut cr := right[0].data.Model.(&ChanRecv)
 				strict = true
 				right = [
 					{&Value{Mutable: right[0].data.Mutable, Type: cr.Expr.Type.Chan().Elem}, right[0].expr},
@@ -1643,15 +1643,15 @@ impl scopeChecker {
 			ret
 		}
 		mut stmt := s.Stmts[0]
-		mut v, mut ok := (&Value)(stmt)
+		mut v, mut ok := stmt.(&Value)
 		if !ok {
 			ret
 		}
-		mut m, (ok) := (&BuiltinPanicCallExpr)(v.Model)
+		mut m, (ok) := v.Model.(&BuiltinPanicCallExpr)
 		if !ok {
 			ret
 		}
-		c, (ok) := (&constant::Const)(m.Expr)
+		c, (ok) := m.Expr.(&constant::Const)
 		if !ok || !c.IsStr() {
 			ret
 		}
@@ -1872,7 +1872,7 @@ impl scopeChecker {
 		mut case := unsafe { (*Case)(self.cse) }
 		match type unsafe { case.Owner } {
 		| &Match:
-			if unsafe { (&Match)(case.Owner).Comptime } {
+			if unsafe { case.Owner.(&Match).Comptime } {
 				self.s.pushErr(f.Token, build::LogMsg.ComptimeFallthrough)
 				ret
 			}
@@ -1922,15 +1922,15 @@ impl scopeChecker {
 			mut st := label.node.Scope.Stmts[i]
 			match type st {
 			| &InfIter:
-				brk.It = uintptr((&InfIter)(st))
+				brk.It = uintptr(st.(&InfIter))
 			| &RangeIter:
-				brk.It = uintptr((&RangeIter)(st))
+				brk.It = uintptr(st.(&RangeIter))
 			| &WhileIter:
-				brk.It = uintptr((&WhileIter)(st))
+				brk.It = uintptr(st.(&WhileIter))
 			| &Match:
-				brk.Match = uintptr((&Match)(st))
+				brk.Match = uintptr(st.(&Match))
 			| &Select:
-				brk.Select = uintptr((&Select)(st))
+				brk.Select = uintptr(st.(&Select))
 			|:
 				self.s.pushErr(b.Label, build::LogMsg.InvalidLabel, b.Label.Kind)
 			}
@@ -2036,37 +2036,37 @@ impl scopeChecker {
 	fn checkNode(mut &self, mut &node: ast::StmtData) {
 		match type node {
 		| &ast::ScopeTree:
-			self.checkAnonScope((&ast::ScopeTree)(node))
+			self.checkAnonScope(node.(&ast::ScopeTree))
 		| &ast::Var:
-			self.checkVarDecl((&ast::Var)(node))
+			self.checkVarDecl(node.(&ast::Var))
 		| &ast::TypeAlias:
-			self.checkTypeAliasDecl((&ast::TypeAlias)(node))
+			self.checkTypeAliasDecl(node.(&ast::TypeAlias))
 		| &ast::Expr:
-			self.checkExpr((&ast::Expr)(node))
+			self.checkExpr(node.(&ast::Expr))
 		| &ast::Conditional:
-			self.checkConditional((&ast::Conditional)(node))
+			self.checkConditional(node.(&ast::Conditional))
 		| &ast::Iter:
-			self.checkIter((&ast::Iter)(node))
+			self.checkIter(node.(&ast::Iter))
 		| &ast::Continue:
-			self.checkCont((&ast::Continue)(node))
+			self.checkCont(node.(&ast::Continue))
 		| &ast::Label:
-			self.checkLabel((&ast::Label)(node))
+			self.checkLabel(node.(&ast::Label))
 		| &ast::Goto:
-			self.pushGoto((&ast::Goto)(node))
+			self.pushGoto(node.(&ast::Goto))
 		| &ast::Assign:
-			self.checkAssign((&ast::Assign)(node))
+			self.checkAssign(node.(&ast::Assign))
 		| &ast::Match:
-			self.checkMatch((&ast::Match)(node))
+			self.checkMatch(node.(&ast::Match))
 		| &ast::Select:
-			self.checkSelect((&ast::Select)(node))
+			self.checkSelect(node.(&ast::Select))
 		| &ast::Fall:
-			self.checkFall((&ast::Fall)(node))
+			self.checkFall(node.(&ast::Fall))
 		| &ast::Break:
-			self.checkBreak((&ast::Break)(node))
+			self.checkBreak(node.(&ast::Break))
 		| &ast::Ret:
-			self.checkRet((&ast::Ret)(node))
+			self.checkRet(node.(&ast::Ret))
 		| &ast::UseExpr:
-			self.checkUseExpr((&ast::UseExpr)(node))
+			self.checkUseExpr(node.(&ast::UseExpr))
 		|:
 			println("error <unimplemented scope node>")
 		}
@@ -2076,7 +2076,7 @@ impl scopeChecker {
 		mut stmt := self.tree.Stmts[len(self.tree.Stmts)-1]
 		match type stmt.Data {
 		| &ast::UseExpr:
-			mut ue := (&ast::UseExpr)(stmt.Data)
+			mut ue := stmt.Data.(&ast::UseExpr)
 			// Do not unwrap untyped literals, type analysis will check overflows.
 			mut v := self.s.eval(self).evalExpr(ue.Expr, evalDefault)
 			if v == nil {
@@ -2091,7 +2091,7 @@ impl scopeChecker {
 			}
 			_ = rtc.check(ue.Expr)
 		| &ast::Expr:
-			mut expr := (&ast::Expr)(stmt.Data)
+			mut expr := stmt.Data.(&ast::Expr)
 			mut v := self.s.eval(self).evalExpr(expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 			if v == nil {
 				ret
@@ -2100,7 +2100,7 @@ impl scopeChecker {
 			| &BuiltinPanicCallExpr:
 				self.scope.Stmts = append(self.scope.Stmts, v)
 			| &BuiltinErrorCallExpr:
-				mut m := (&BuiltinErrorCallExpr)(v.Model)
+				mut m := v.Model.(&BuiltinErrorCallExpr)
 				self.processErrorCall(m, expr.Token)
 				self.scope.Stmts = append(self.scope.Stmts, v)
 			|:
@@ -2325,7 +2325,7 @@ fn makeComptimeRange(mut &v: &Value, onlyComptime: bool) {
 	| !onlyComptime && v.Type.Slice() != nil:
 		match type v.Model {
 		| &SliceExpr:
-			mut s := (&SliceExpr)(v.Model)
+			mut s := v.Model.(&SliceExpr)
 			for _, e in s.Elems {
 				if !e.IsConst() {
 					goto fail
@@ -2354,7 +2354,7 @@ fn stmtIsDef(&stmt: Stmt): bool {
 	| &Var:
 		ret true
 	| &MultiAssign:
-		ma := (&MultiAssign)(stmt)
+		ma := stmt.(&MultiAssign)
 		ret len(ma.Decls) > 0
 	|:
 		ret false
@@ -2374,7 +2374,7 @@ loop:
 			if expr == nil {
 				break loop
 			}
-			if t.Equal((&Type)(expr.Model)) {
+			if t.Equal(expr.Model.(&Type)) {
 				n++
 			}
 		}
@@ -2400,7 +2400,7 @@ fn findLabelParent(&ident: str, mut scope: &scopeChecker): &scopeLabel {
 fn getExprs(mut &m: ast::ExprData): []ast::ExprData {
 	match type m {
 	| &ast::TupleExpr:
-		mut tup := (&ast::TupleExpr)(m)
+		mut tup := m.(&ast::TupleExpr)
 		mut models := make([]ast::ExprData, 0, len(tup.Expr))
 		for (_, mut expr) in tup.Expr {
 			models = append(models, expr.Kind)
@@ -2445,7 +2445,7 @@ fn checkAssign(mut &s: &sema, mut &left: &Value, mut right: &Value, op: &token::
 		| &IndexingExpr:
 			// Type is map. We need to check special case for maps.
 			// Because map indexing is not considered lvalue.
-			mut i := (&IndexingExpr)(left.Model)
+			mut i := left.Model.(&IndexingExpr)
 			// Map type indexing. Map indexing is not considered lvalue.
 			// But we can assign, so it is ok.
 			if i.Expr.Type.Map() != nil {
@@ -2464,7 +2464,7 @@ fn checkAssign(mut &s: &sema, mut &left: &Value, mut right: &Value, op: &token::
 fn isValidAstStForNextSt(mut &n: ast::StmtData): bool {
 	match type n {
 	| &ast::Assign:
-		ret !(&ast::Assign)(n).Declarative
+		ret !n.(&ast::Assign).Declarative
 	| &ast::Expr:
 		ret true
 	|:
@@ -2479,7 +2479,7 @@ fn isValidStForNextSt(&st: Stmt): bool {
 	| &MultiAssign:
 		ret true
 	| &Value:
-		_, ok := (&FuncCallExpr)((&Value)(st).Model)
+		_, ok := st.(&Value).Model.(&FuncCallExpr)
 		ret ok
 	|:
 		ret false

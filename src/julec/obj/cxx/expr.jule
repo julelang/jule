@@ -557,7 +557,7 @@ impl exprCoder {
 	fn possibleRefExpr(mut &self, mut expr: compExpr) {
 		match type expr {
 		| &sema::Var:
-			v := (&sema::Var)(expr)
+			v := expr.(&sema::Var)
 			if v.Reference {
 				self.oc.write("(*(")
 				self.model(expr)
@@ -778,7 +778,7 @@ impl exprCoder {
 			if p.Decl != nil && p.Decl.Reference {
 				match type arg {
 				| &sema::Var:
-					v := (&sema::Var)(arg)
+					v := arg.(&sema::Var)
 					if v.Reference {
 						self.model(arg)
 						goto end
@@ -801,10 +801,10 @@ impl exprCoder {
 	fn modelForCall(mut &self, mut expr: compExpr) {
 		match type expr {
 		| &sema::FuncIns:
-			self.funcIns((&sema::FuncIns)(expr))
+			self.funcIns(expr.(&sema::FuncIns))
 			ret
 		| &sema::StructSubIdentExpr:
-			mut ssie := (&sema::StructSubIdentExpr)(expr)
+			mut ssie := expr.(&sema::StructSubIdentExpr)
 			if ssie.Method != nil {
 				self.funcIns(ssie.Method)
 				ret
@@ -821,7 +821,7 @@ impl exprCoder {
 		if m.Func.Anon {
 			match type m.Expr {
 			| &sema::StructSubIdentExpr:
-				if obj::IsStructBinded((&sema::StructSubIdentExpr)(m.Expr).Field.Owner) {
+				if obj::IsStructBinded(m.Expr.(&sema::StructSubIdentExpr).Field.Owner) {
 					self.oc.write("(")
 					ret
 				}
@@ -840,7 +840,7 @@ impl exprCoder {
 		if !m.Func.IsBuiltin() && len(m.Func.Decl.Params) > 0 && m.Func.Decl.Params[0].IsSelf() {
 			match type m.Expr {
 			| &sema::StructSubIdentExpr:
-				mut ssie := (&sema::StructSubIdentExpr)(m.Expr)
+				mut ssie := m.Expr.(&sema::StructSubIdentExpr)
 				if ssie.Expr.Lvalue {
 					ret false
 				}
@@ -868,10 +868,10 @@ impl exprCoder {
 	fn writeReceiver(mut &self, mut m: compExpr): (safeDeref: bool) {
 		match type m {
 		| &sema::UnaryExpr:
-			self.possibleRefExpr((&sema::UnaryExpr)(m).Expr.Model)
+			self.possibleRefExpr(m.(&sema::UnaryExpr).Expr.Model)
 			ret true
 		| &opt::UnsafeDerefExpr:
-			self.possibleRefExpr((&opt::UnsafeDerefExpr)(m).Base.Expr.Model)
+			self.possibleRefExpr(m.(&opt::UnsafeDerefExpr).Base.Expr.Model)
 			ret false
 		|:
 			self.possibleRefExpr(m)
@@ -910,7 +910,7 @@ impl exprCoder {
 		if !m.Func.IsBuiltin() && len(m.Func.Decl.Params) > 0 && m.Func.Decl.Params[0].IsSelf() {
 			match type m.Expr {
 			| &sema::StructSubIdentExpr:
-				mut ssie := (&sema::StructSubIdentExpr)(m.Expr)
+				mut ssie := m.Expr.(&sema::StructSubIdentExpr)
 				match {
 				| m.Func.Decl.Params[0].IsRef():
 					// Ignore dereferencing, use data directly to call method.
@@ -934,7 +934,7 @@ impl exprCoder {
 						| &sema::StructIns:
 							match type ssie.Expr.Model {
 							| &sema::Var:
-								v := (&sema::Var)(ssie.Expr.Model)
+								v := ssie.Expr.Model.(&sema::Var)
 								if v.Reference {
 									break
 								}
@@ -950,7 +950,7 @@ impl exprCoder {
 							self.model(ssie.Expr.Model)
 						} else {
 							// Ignore dereferencing, use data directly to call method.
-							self.possibleRefExpr((&sema::UnaryExpr)(ssie.Expr.Model).Expr.Model)
+							self.possibleRefExpr(ssie.Expr.Model.(&sema::UnaryExpr).Expr.Model)
 						}
 					}
 				}
@@ -958,7 +958,7 @@ impl exprCoder {
 					self.oc.write(", ")
 				}
 			| &sema::TraitSubIdentExpr:
-				self.possibleRefExpr((&sema::TraitSubIdentExpr)(m.Expr).Expr)
+				self.possibleRefExpr(m.Expr.(&sema::TraitSubIdentExpr).Expr)
 				self.oc.write(".data")
 				if len(m.Args) > 0 {
 					self.oc.write(", ")
@@ -1057,7 +1057,7 @@ impl exprCoder {
 			self.oc.write(";")
 			ret
 		}
-		mut tup := (&sema::TupleExpr)(val.Model)
+		mut tup := val.Model.(&sema::TupleExpr)
 		self.oc.tc.rc.tuple(self.oc.Buf, f.Result.Tuple())
 		self.oc.write("{")
 		for (i, mut tupval) in tup.Values {
@@ -1124,7 +1124,7 @@ impl exprCoder {
 					self.oc.sc.scopeStmts(m.Except)
 					self.oc.write("\n")
 					self.oc.indent()
-					mut v := (&sema::Value)(stmt)
+					mut v := stmt.(&sema::Value)
 					self.writeUseExpr(m.Func, v)
 					self.oc.write("\n")
 					self.oc.doneIndent()
@@ -1199,7 +1199,7 @@ impl exprCoder {
 				self.oc.write("\", ")
 			}
 			self.oc.write("reinterpret_cast<const " + typeU8 + "*>(")
-			s := (&constant::Const)(m.Expr.Model).ReadStr()
+			s := m.Expr.Model.(&constant::Const).ReadStr()
 			cstrLit(self.oc.Buf, s)
 			self.oc.write("), ")
 			self.oc.write(conv::Itoa(len(s)))
@@ -1498,7 +1498,7 @@ impl exprCoder {
 		if m.Func.Decl.IsVoid() {
 			match type m.Err.Model {
 			| &sema::Var:
-				v := (&sema::Var)(m.Err.Model)
+				v := m.Err.Model.(&sema::Var)
 				if v.Ident == token::Kind.Error {
 					if hasDefer {
 						self.oc.write(deferStackName + ".call();\n")
@@ -1514,7 +1514,7 @@ impl exprCoder {
 			self.oc.tc.rc.codeMut1(self.oc.Buf, m.Func.Result)
 			match type m.Err.Model {
 			| &sema::Var:
-				v := (&sema::Var)(m.Err.Model)
+				v := m.Err.Model.(&sema::Var)
 				if v.Ident == token::Kind.Error {
 					self.oc.write(">{.error=except.error}")
 					ret
@@ -1535,7 +1535,7 @@ impl exprCoder {
 	fn copyCall(mut &self, mut m: &sema::BuiltinCopyCallExpr) {
 		// We have to use mutable memory for the dest argument of copy due to lang spec.
 		if opt::IsZCopyArray(m.Dest.Model) {
-			mut ie := (&sema::SlicingExpr)(m.Dest.Model)
+			mut ie := m.Dest.Model.(&sema::SlicingExpr)
 			mut model := any(&opt::ArrayAsSlice{
 				Expr: ie.Expr.Model,
 			})
@@ -1652,7 +1652,7 @@ impl exprCoder {
 		// in the child scope to avoid potential repeated high-cost memory access overhead.
 		const destIdent = "__jule_push_dest"
 
-		mut s := (&sema::SliceExpr)(m.Base.Elements.Model)
+		mut s := m.Base.Elements.Model.(&sema::SliceExpr)
 
 		self.oc.write("{ ")
 		self.oc.tc.asSlice(self.oc.Buf, s.ElemType)
@@ -1661,7 +1661,7 @@ impl exprCoder {
 		match type m.Base.Dest.Model {
 		| &sema::UnaryExpr:
 			// Use raw pointer directly if exist.
-			mut u := (&sema::UnaryExpr)(m.Base.Dest.Model)
+			mut u := m.Base.Dest.Model.(&sema::UnaryExpr)
 			if u.Expr.Type.Ptr() != nil {
 				self.oc.write(" *" + destIdent + " = ")
 				self.possibleRefExpr(u.Expr.Model)
@@ -1943,115 +1943,115 @@ impl exprCoder {
 	fn model(mut &self, mut m: compExpr) {
 		match type m {
 		| str:
-			self.oc.write(str(m))
+			self.oc.write(m.(str))
 		| &str:
-			self.oc.write(*(&str)(m))
+			self.oc.write(*m.(&str))
 		| &constant::Const:
-			self.constant((&constant::Const)(m))
+			self.constant(m.(&constant::Const))
 		| &sema::Type:
-			self.oc.tc.kind(self.oc.Buf, (&sema::Type)(m))
+			self.oc.tc.kind(self.oc.Buf, m.(&sema::Type))
 		| &sema::Var:
-			self.var((&sema::Var)(m))
+			self.var(m.(&sema::Var))
 		| &sema::StructIns:
-			self.structureIns((&sema::StructIns)(m))
+			self.structureIns(m.(&sema::StructIns))
 		| &sema::FuncIns:
-			self.funcInsCommon((&sema::FuncIns)(m))
+			self.funcInsCommon(m.(&sema::FuncIns))
 		| &sema::BinaryExpr:
-			self.binary((&sema::BinaryExpr)(m))
+			self.binary(m.(&sema::BinaryExpr))
 		| &sema::UnaryExpr:
-			self.unary((&sema::UnaryExpr)(m))
+			self.unary(m.(&sema::UnaryExpr))
 		| &sema::StructLitExpr:
-			self.structureLit((&sema::StructLitExpr)(m))
+			self.structureLit(m.(&sema::StructLitExpr))
 		| &sema::AllocStructLitExpr:
-			self.allocStructure((&sema::AllocStructLitExpr)(m))
+			self.allocStructure(m.(&sema::AllocStructLitExpr))
 		| &sema::CastingExpr:
-			self.casting((&sema::CastingExpr)(m))
+			self.casting(m.(&sema::CastingExpr))
 		| &sema::FuncCallExpr:
-			self.funcCall((&sema::FuncCallExpr)(m), false)
+			self.funcCall(m.(&sema::FuncCallExpr), false)
 		| &sema::SliceExpr:
-			self.slice((&sema::SliceExpr)(m))
+			self.slice(m.(&sema::SliceExpr))
 		| &sema::ArrayExpr:
-			self.array((&sema::ArrayExpr)(m))
+			self.array(m.(&sema::ArrayExpr))
 		| &opt::UnsafeIndexingExpr:
-			self.unsafeIndexing((&opt::UnsafeIndexingExpr)(m))
+			self.unsafeIndexing(m.(&opt::UnsafeIndexingExpr))
 		| &sema::IndexingExpr:
-			self.indexing((&sema::IndexingExpr)(m))
+			self.indexing(m.(&sema::IndexingExpr))
 		| &sema::AnonFuncExpr:
-			self.anonFunc((&sema::AnonFuncExpr)(m))
+			self.anonFunc(m.(&sema::AnonFuncExpr))
 		| &sema::MapExpr:
-			self.mapExpr((&sema::MapExpr)(m))
+			self.mapExpr(m.(&sema::MapExpr))
 		| &sema::SlicingExpr:
-			self.slicing((&sema::SlicingExpr)(m))
+			self.slicing(m.(&sema::SlicingExpr))
 		| &sema::TraitSubIdentExpr:
-			self.traitSub((&sema::TraitSubIdentExpr)(m))
+			self.traitSub(m.(&sema::TraitSubIdentExpr))
 		| &sema::StructSubIdentExpr:
-			self.structureSub((&sema::StructSubIdentExpr)(m))
+			self.structureSub(m.(&sema::StructSubIdentExpr))
 		| &sema::TupleExpr:
-			self.tuple((&sema::TupleExpr)(m))
+			self.tuple(m.(&sema::TupleExpr))
 		| &sema::BuiltinPrintCallExpr:
-			self.printCall((&sema::BuiltinPrintCallExpr)(m))
+			self.printCall(m.(&sema::BuiltinPrintCallExpr))
 		| &sema::BuiltinPrintlnCallExpr:
-			self.printlnCall((&sema::BuiltinPrintlnCallExpr)(m))
+			self.printlnCall(m.(&sema::BuiltinPrintlnCallExpr))
 		| &sema::BuiltinNewCallExpr:
-			self.newCall((&sema::BuiltinNewCallExpr)(m))
+			self.newCall(m.(&sema::BuiltinNewCallExpr))
 		| &sema::BuiltinPanicCallExpr:
-			self.panicCall((&sema::BuiltinPanicCallExpr)(m))
+			self.panicCall(m.(&sema::BuiltinPanicCallExpr))
 		| &sema::BuiltinErrorCallExpr:
-			self.errorCall((&sema::BuiltinErrorCallExpr)(m))
+			self.errorCall(m.(&sema::BuiltinErrorCallExpr))
 		| &sema::BuiltinMakeCallExpr:
-			self.makeCall((&sema::BuiltinMakeCallExpr)(m))
+			self.makeCall(m.(&sema::BuiltinMakeCallExpr))
 		| &sema::BuiltinAppendCallExpr:
-			self.appendCall((&sema::BuiltinAppendCallExpr)(m))
+			self.appendCall(m.(&sema::BuiltinAppendCallExpr))
 		| &sema::BuiltinCopyCallExpr:
-			self.copyCall((&sema::BuiltinCopyCallExpr)(m))
+			self.copyCall(m.(&sema::BuiltinCopyCallExpr))
 		| &sema::BuiltinLenCallExpr:
-			self.lenCall((&sema::BuiltinLenCallExpr)(m))
+			self.lenCall(m.(&sema::BuiltinLenCallExpr))
 		| &sema::BuiltinCapCallExpr:
-			self.capCall((&sema::BuiltinCapCallExpr)(m))
+			self.capCall(m.(&sema::BuiltinCapCallExpr))
 		| &sema::BuiltinDeleteCallExpr:
-			self.deleteCall((&sema::BuiltinDeleteCallExpr)(m))
+			self.deleteCall(m.(&sema::BuiltinDeleteCallExpr))
 		| &sema::SizeofExpr:
-			self.sizeof((&sema::SizeofExpr)(m))
+			self.sizeof(m.(&sema::SizeofExpr))
 		| &sema::AlignofExpr:
-			self.alignof((&sema::AlignofExpr)(m))
+			self.alignof(m.(&sema::AlignofExpr))
 		| &sema::RuneExpr:
-			self.runeLit((&sema::RuneExpr)(m))
+			self.runeLit(m.(&sema::RuneExpr))
 		| &sema::StructStaticIdentExpr:
-			self.structureStatic((&sema::StructStaticIdentExpr)(m))
+			self.structureStatic(m.(&sema::StructStaticIdentExpr))
 		| &sema::BackendEmitExpr:
-			self.backendEmit((&sema::BackendEmitExpr)(m))
+			self.backendEmit(m.(&sema::BackendEmitExpr))
 		| &sema::FreeExpr:
-			self.free((&sema::FreeExpr)(m))
+			self.free(m.(&sema::FreeExpr))
 		| &sema::ChanRecv:
-			self.chanRecv((&sema::ChanRecv)(m), nil, false)
+			self.chanRecv(m.(&sema::ChanRecv), nil, false)
 		| &sema::ChanSend:
-			self.chanSend((&sema::ChanSend)(m), false)
+			self.chanSend(m.(&sema::ChanSend), false)
 		| &sema::BuiltinCloseCallExpr:
-			self.closeCall((&sema::BuiltinCloseCallExpr)(m))
+			self.closeCall(m.(&sema::BuiltinCloseCallExpr))
 		| &sema::TypeAssertionExpr:
-			self.typeAssertion((&sema::TypeAssertionExpr)(m))
+			self.typeAssertion(m.(&sema::TypeAssertionExpr))
 		| &opt::UnsafeBinaryExpr:
-			self.unsafeBinary((&opt::UnsafeBinaryExpr)(m).Node)
+			self.unsafeBinary(m.(&opt::UnsafeBinaryExpr).Node)
 		| &opt::StrCompExpr:
-			self.strComp((&opt::StrCompExpr)(m))
+			self.strComp(m.(&opt::StrCompExpr))
 		| &opt::RefExpr:
-			self.var((&opt::RefExpr)(m).Var)
+			self.var(m.(&opt::RefExpr).Var)
 		| &opt::EmptyCompareExpr:
-			self.emptyCompare((&opt::EmptyCompareExpr)(m))
+			self.emptyCompare(m.(&opt::EmptyCompareExpr))
 		| &opt::UnsafeDerefExpr:
-			self.unsafeDeref((&opt::UnsafeDerefExpr)(m))
+			self.unsafeDeref(m.(&opt::UnsafeDerefExpr))
 		| &opt::UnsafeTypeAssertionExpr:
-			self.unsafeTypeAssertion((&opt::UnsafeTypeAssertionExpr)(m))
+			self.unsafeTypeAssertion(m.(&opt::UnsafeTypeAssertionExpr))
 		| &opt::FuncCallIgnoreExceptionalExpr:
-			self.funcCall((&opt::FuncCallIgnoreExceptionalExpr)(m).Base, true)
+			self.funcCall(m.(&opt::FuncCallIgnoreExceptionalExpr).Base, true)
 		| &opt::StrConcatExpr:
-			self.strConcat((&opt::StrConcatExpr)(m))
+			self.strConcat(m.(&opt::StrConcatExpr))
 		| &opt::StrFromBytes:
-			self.strFromBytes((&opt::StrFromBytes)(m))
+			self.strFromBytes(m.(&opt::StrFromBytes))
 		| &opt::BytesFromStr:
-			self.bytesFromStr((&opt::BytesFromStr)(m))
+			self.bytesFromStr(m.(&opt::BytesFromStr))
 		| &opt::ArrayAsSlice:
-			self.arrayAsSlice((&opt::ArrayAsSlice)(m))
+			self.arrayAsSlice(m.(&opt::ArrayAsSlice))
 		|:
 			self.oc.write("<unimplemented_expression_model>")
 		}

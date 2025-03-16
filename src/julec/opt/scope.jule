@@ -217,7 +217,7 @@ impl scopeOptimizer {
 					ret false
 				}
 				last := case.Scope.Stmts[len(case.Scope.Stmts)-1]
-				_, ok := (&sema::Fall)(last)
+				_, ok := last.(&sema::Fall)
 				ret ok
 			}
 			if len(case.Exprs) == 1 && self.data.dynamic != nil &&
@@ -348,7 +348,7 @@ impl scopeOptimizer {
 		if Iter {
 			match type it.Expr.Model {
 			| &sema::CastingExpr:
-				mut cem := (&sema::CastingExpr)(it.Expr.Model)
+				mut cem := it.Expr.Model.(&sema::CastingExpr)
 				eprim := cem.Expr.Type.Prim()
 				if eprim == nil || !eprim.IsStr() {
 					break
@@ -379,7 +379,7 @@ impl scopeOptimizer {
 				}
 			| &sema::SliceExpr:
 				// make slice expression model iteration as array iteration
-				mut slc := (&sema::SliceExpr)(it.Expr.Model)
+				mut slc := it.Expr.Model.(&sema::SliceExpr)
 				mut arr := &sema::Array{
 					N: len(slc.Elems),
 					Elem: slc.ElemType,
@@ -406,7 +406,7 @@ impl scopeOptimizer {
 		}
 		match type a.Right.Model {
 		| &sema::SlicingExpr:
-			mut sem := (&sema::SlicingExpr)(a.Right.Model)
+			mut sem := a.Right.Model.(&sema::SlicingExpr)
 			if obj::EqualModels(a.Left.Model, sem.Expr.Model) {
 				self.setCurrentStmt(&MutSlicingExpr{
 					Token: sem.Token,
@@ -461,14 +461,14 @@ impl scopeOptimizer {
 		|:
 			ret false
 		}
-		mut fc := (&sema::FuncCallExpr)(assign.Right.Model)
+		mut fc := assign.Right.Model.(&sema::FuncCallExpr)
 		match type fc.Expr {
 		| &sema::StructSubIdentExpr:
 			break
 		|:
 			ret false
 		}
-		mut siem := (&sema::StructSubIdentExpr)(fc.Expr)
+		mut siem := fc.Expr.(&sema::StructSubIdentExpr)
 		if !obj::EqualModels(assign.Left.Model, siem.Expr.Model) {
 			ret false
 		}
@@ -598,7 +598,7 @@ impl scopeOptimizer {
 		if Append {
 			match type assign.Right.Model {
 			| &sema::BuiltinAppendCallExpr:
-				mut m := (&sema::BuiltinAppendCallExpr)(assign.Right.Model)
+				mut m := assign.Right.Model.(&sema::BuiltinAppendCallExpr)
 				if !areSameLvalueExpr(assign.Left.Model, m.Dest.Model) {
 					ret
 				}
@@ -658,7 +658,7 @@ impl scopeOptimizer {
 				// Also variable declarations are may suitable for normalization.
 				match type l.Model {
 				| &sema::Var:
-					mut v := (&sema::Var)(l.Model)
+					mut v := l.Model.(&sema::Var)
 					if obj::FindVar(v, assign.Decls) == -1 {
 						// expression is variable but it is not declaring now
 						break
@@ -787,7 +787,7 @@ impl scopeOptimizer {
 			// Insert assignment model for this one separately.
 			// Special case: if memory is a variable, it may be declared here.
 			// So handle them as variable declarations.
-			mut lv, ok := (&sema::Var)(l.Model)
+			mut lv, ok := l.Model.(&sema::Var)
 			mut j := -1
 			if ok {
 				j = slices::Index(assign.Decls, lv)
@@ -822,7 +822,7 @@ impl scopeOptimizer {
 		mut tup := (&sema::TupleExpr)(nil)
 		match type assign.Right {
 		| &sema::TupleExpr:
-			tup = (&sema::TupleExpr)(assign.Right)
+			tup = assign.Right.(&sema::TupleExpr)
 		}
 
 		// Do optimizations first, because statements may be simplified.
@@ -856,7 +856,7 @@ impl scopeOptimizer {
 				mut l := assign.Left[0]
 				match type l.Model {
 				| &sema::Var:
-					mut v := (&sema::Var)(l.Model)
+					mut v := l.Model.(&sema::Var)
 					if obj::FindVar(v, assign.Decls) >= 0 {
 						// variable declared now, do not handle it like a assignment
 						self.setCurrentStmt(v)
@@ -964,7 +964,7 @@ impl scopeOptimizer {
 		|:
 			ret
 		}
-		mut fc := (&sema::FuncCallExpr)(r.Expr)
+		mut fc := r.Expr.(&sema::FuncCallExpr)
 		if !fc.Func.Decl.Exceptional ||
 			fc.Except == nil ||
 			len(fc.Except.Stmts) != 1 ||
@@ -977,31 +977,31 @@ impl scopeOptimizer {
 	fn optimizeStmt(mut &self, mut stmt: sema::Stmt) {
 		match type stmt {
 		| &sema::Scope:
-			self.optimizeChildHard((&sema::Scope)(stmt))
+			self.optimizeChildHard(stmt.(&sema::Scope))
 		| &sema::Value:
-			self.optimizeValue((&sema::Value)(stmt))
+			self.optimizeValue(stmt.(&sema::Value))
 		| &sema::Var:
-			self.optimizeVar((&sema::Var)(stmt))
+			self.optimizeVar(stmt.(&sema::Var))
 		| &sema::Conditional:
-			self.optimizeConditional((&sema::Conditional)(stmt))
+			self.optimizeConditional(stmt.(&sema::Conditional))
 		| &sema::RangeIter:
-			self.optimizeRangeIter((&sema::RangeIter)(stmt))
+			self.optimizeRangeIter(stmt.(&sema::RangeIter))
 		| &sema::WhileIter:
-			self.optimizeWhileIter((&sema::WhileIter)(stmt))
+			self.optimizeWhileIter(stmt.(&sema::WhileIter))
 		| &sema::InfIter:
-			self.optimizeChildHard((&sema::InfIter)(stmt).Scope)
+			self.optimizeChildHard(stmt.(&sema::InfIter).Scope)
 		| &sema::Assign:
-			self.optimizeAssign((&sema::Assign)(stmt))
+			self.optimizeAssign(stmt.(&sema::Assign))
 		| &sema::MultiAssign:
-			self.optimizeMultiAssign((&sema::MultiAssign)(stmt))
+			self.optimizeMultiAssign(stmt.(&sema::MultiAssign))
 		| &sema::Match:
-			self.optimizeMatch((&sema::Match)(stmt))
+			self.optimizeMatch(stmt.(&sema::Match))
 		| &sema::Select:
-			self.optimizeSelect((&sema::Select)(stmt))
+			self.optimizeSelect(stmt.(&sema::Select))
 		| &sema::Ret:
-			self.optimizeRet((&sema::Ret)(stmt))
+			self.optimizeRet(stmt.(&sema::Ret))
 		| &sema::Postfix:
-			self.optimizePostfix((&sema::Postfix)(stmt))
+			self.optimizePostfix(stmt.(&sema::Postfix))
 		}
 	}
 
@@ -1069,7 +1069,7 @@ impl scopeOptimizer {
 fn isConstantValidConditionalCase(&i: &sema::If): bool {
 	match type i.Expr {
 	| &constant::Const:
-		c := (&constant::Const)(i.Expr)
+		c := i.Expr.(&constant::Const)
 		ret c.IsBool() && c.ReadBool()
 	}
 	ret false
@@ -1078,10 +1078,10 @@ fn isConstantValidConditionalCase(&i: &sema::If): bool {
 fn isUnreachableExpr(&expr: sema::Expr): bool {
 	match type expr {
 	| &constant::Const:
-		c := (&constant::Const)(expr)
+		c := expr.(&constant::Const)
 		ret c.IsBool() && !c.ReadBool()
 	| &sema::BinaryExpr:
-		m := (&sema::BinaryExpr)(expr)
+		m := expr.(&sema::BinaryExpr)
 		if m.Op.Id == token::Id.DblAmper {
 			ret isUnreachableExpr(m.Left.Model) ||
 				isUnreachableExpr(m.Right.Model)

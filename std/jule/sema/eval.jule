@@ -128,7 +128,7 @@ impl eval {
 
 	// Reports whether evaluated expression is in global scope.
 	fn isGlobal(self): bool {
-		_, ok := (&sema)(self.lookup)
+		_, ok := self.lookup.(&sema)
 		ret ok
 	}
 
@@ -325,17 +325,17 @@ impl eval {
 		if mod::IsPub(ident) {
 			match type self.lookup {
 			| &ImportInfo:
-				mut def := findBuiltinsImport(ident, (&ImportInfo)(self.lookup))
+				mut def := findBuiltinsImport(ident, self.lookup.(&ImportInfo))
 				if def != nil {
 					ret def
 				}
 			| &sema:
-				mut def := findBuiltinsSema(ident, (&sema)(self.lookup))
+				mut def := findBuiltinsSema(ident, self.lookup.(&sema))
 				if def != nil {
 					ret def
 				}
 			| &scopeChecker:
-				mut def := findBuiltinsSema(ident, (&scopeChecker)(self.lookup).s)
+				mut def := findBuiltinsSema(ident, self.lookup.(&scopeChecker).s)
 				if def != nil {
 					ret def
 				}
@@ -396,7 +396,7 @@ impl eval {
 	fn getOwnerRefers(mut self): &ReferenceStack {
 		match type self.lookup {
 		| &scopeChecker:
-			ret (&scopeChecker)(self.lookup).getOwnerRefers()
+			ret self.lookup.(&scopeChecker).getOwnerRefers()
 		|:
 			// Push reference to owner if global.
 			if self.owner != nil &&
@@ -539,7 +539,7 @@ impl eval {
 
 		match type self.lookup {
 		| &scopeChecker:
-			mut s := (&scopeChecker)(self.lookup)
+			mut s := self.lookup.(&scopeChecker)
 			mut root := s.getRoot()
 			if v.Scope != nil && !v.Constant && root.captured != nil && isVarCaptured(root, s, v) {
 				// Push variable if it is not constant and global.
@@ -655,13 +655,13 @@ impl eval {
 			//
 			// But, as far as tested, there is no risk for current implementation.
 			// Future implementations should pay attention for here.
-			mut s := (&StructIns)(kind)
+			mut s := kind.(&StructIns)
 			self.pushReference[&StructIns](s)
 			v = self._evalStruct(s)
 		| &Enum:
-			v = self._evalEnum((&Enum)(kind))
+			v = self._evalEnum(kind.(&Enum))
 		| &TypeEnum:
-			v = self._evalTypeEnum((&TypeEnum)(kind))
+			v = self._evalTypeEnum(kind.(&TypeEnum))
 		|:
 			v = &Value{
 				Decl: true,
@@ -687,24 +687,24 @@ impl eval {
 	fn evalDef(mut self, mut &def: any, mut ident: &token::Token): &Value {
 		match type def {
 		| &Var:
-			ret self.evalVar((&Var)(def), ident)
+			ret self.evalVar(def.(&Var), ident)
 		| &Enum:
-			ret self.evalEnum((&Enum)(def), ident)
+			ret self.evalEnum(def.(&Enum), ident)
 		| &TypeEnum:
-			ret self.evalTypeEnum((&TypeEnum)(def), ident)
+			ret self.evalTypeEnum(def.(&TypeEnum), ident)
 		| &Struct:
-			ret self.evalStruct((&Struct)(def), ident)
+			ret self.evalStruct(def.(&Struct), ident)
 		| &Func:
-			mut f := (&Func)(def)
+			mut f := def.(&Func)
 			if f.Ident != jule::InitFunc {
 				ret self.evalFunc(f, ident)
 			}
 		| &FuncIns:
-			ret self.evalFuncIns((&FuncIns)(def))
+			ret self.evalFuncIns(def.(&FuncIns))
 		| &TypeAlias:
-			ret self.evalTypeAlias((&TypeAlias)(def), ident)
+			ret self.evalTypeAlias(def.(&TypeAlias), ident)
 		| &Trait:
-			ret self.evalTrait((&Trait)(def))
+			ret self.evalTrait(def.(&Trait))
 		}
 		self.pushErr(ident, build::LogMsg.IdentNotExist, ident.Kind)
 		ret nil
@@ -763,7 +763,7 @@ impl eval {
 		mut filled := false
 
 		if len(s.Exprs) == 2 {
-			vr, ok := (&ast::VariadicExpr)(s.Exprs[1].Kind)
+			vr, ok := s.Exprs[1].Kind.(&ast::VariadicExpr)
 			if ok && vr.Expr == nil {
 				// Filled.
 				if pt.Auto {
@@ -1058,7 +1058,7 @@ impl eval {
 	fn pushGenericsFromData(mut &self, mut &generics: []&ast::Type, mut &expr: &ast::Expr): bool {
 		match type expr.Kind {
 		| &ast::UnaryExpr:
-			mut u := (&ast::UnaryExpr)(expr.Kind)
+			mut u := expr.Kind.(&ast::UnaryExpr)
 			match u.Op.Id {
 			| token::Id.Star:
 				mut kind := new(ast::PtrType)
@@ -1083,7 +1083,7 @@ impl eval {
 				ret false
 			}
 		| &ast::Type:
-			generics = append(generics, (&ast::Type)(expr.Kind))
+			generics = append(generics, expr.Kind.(&ast::Type))
 		| &ast::IndexingExpr:
 			mut v := self.eval(expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 			if v == nil {
@@ -1099,7 +1099,7 @@ impl eval {
 				Kind: unsafe { *(*ast::TypeKind)(&kind) },
 			})
 		| &ast::IdentExpr:
-			mut ident := (&ast::IdentExpr)(expr.Kind)
+			mut ident := expr.Kind.(&ast::IdentExpr)
 			generics = append(generics, &ast::Type{
 				Kind: &ast::IdentType{
 					Binded: ident.Binded,
@@ -1108,13 +1108,13 @@ impl eval {
 				},
 			})
 		| &ast::TupleExpr:
-			for (_, mut texpr) in (&ast::TupleExpr)(expr.Kind).Expr {
+			for (_, mut texpr) in expr.Kind.(&ast::TupleExpr).Expr {
 				if !self.pushGenericsFromData(generics, texpr) {
 					ret false
 				}
 			}
 		| &ast::NamespaceExpr:
-			mut ns := (&ast::NamespaceExpr)(expr.Kind)
+			mut ns := expr.Kind.(&ast::NamespaceExpr)
 			mut decl := &ast::IdentType{
 				Token: ns.Ident,
 				Ident: ns.Ident.Kind,
@@ -1147,14 +1147,14 @@ impl eval {
 		let mut decl: &ast::IdentType = nil
 		match type i.Expr.Kind {
 		| &ast::IdentExpr:
-			mut expr := (&ast::IdentExpr)(i.Expr.Kind)
+			mut expr := i.Expr.Kind.(&ast::IdentExpr)
 			decl = &ast::IdentType{
 				Binded: expr.Binded,
 				Token: expr.Token,
 				Ident: expr.Ident,
 			}
 		| &ast::NamespaceExpr:
-			mut expr := (&ast::NamespaceExpr)(i.Expr.Kind)
+			mut expr := i.Expr.Kind.(&ast::NamespaceExpr)
 			decl = &ast::IdentType{
 				Token: expr.Ident,
 				Ident: expr.Ident.Kind,
@@ -1871,7 +1871,7 @@ impl eval {
 
 		if !v.Decl && (v.Type.Enum() == nil || !v.Type.Enum().TypeSym.Type.Equal(t)) {
 			applyCastKind(self.s, v, t, errorToken, self.getOwnerRefers())
-			(&CastingExpr)(v.Model).Token = errorToken
+			v.Model.(&CastingExpr).Token = errorToken
 		} else {
 			v.Type = t
 		}
@@ -2019,14 +2019,14 @@ impl eval {
 		mut v := self.evalStructLitExplicit(s, t, lit.Lit, lit.Kind.Token)
 		match type t.Kind {
 		| &Sptr:
-			mut model := (&StructLitExpr)(v.Model)
+			mut model := v.Model.(&StructLitExpr)
 			makeStructLitAlloc(v, model)
 		}
 
 		if v != nil {
 			mut strct := t.SoftStruct()
 			if strct != nil && strct.Source != nil {
-				(&StructLitExpr)(v.Model).Strct = strct
+				v.Model.(&StructLitExpr).Strct = strct
 				v.Type = &Type{Kind: strct}
 			}
 		}
@@ -2135,11 +2135,11 @@ impl eval {
 		let mut csc: &scopeChecker = nil
 		let mut ch: &Scope = nil
 
-		mut model := (&FuncCallExpr)(v.Model)
+		mut model := v.Model.(&FuncCallExpr)
 
 		// self.lookup is always scopeChecker because exceptionals are
 		// not allowed in global scope.
-		mut sc := (&scopeChecker)(self.lookup)
+		mut sc := self.lookup.(&scopeChecker)
 		csc = sc.newChildChecker()
 		if resultNeeded {
 			csc.result = &result{func: f, mutable: self.target.mutable}
@@ -2413,7 +2413,7 @@ impl eval {
 			| &scopeChecker:
 				// Use hard root scope to handle interior mutability.
 				// To handle anonymous functions and closures too.
-				scope := (&scopeChecker)(self.lookup).getHardRoot()
+				scope := self.lookup.(&scopeChecker).getHardRoot()
 				v.Mutable = scope.owner != nil && scope.owner.Owner == s
 			}
 		}
@@ -2904,7 +2904,7 @@ impl eval {
 		mut kind := v.Type
 		match type v.Type.Kind {
 		| &Ptr:
-			mut ptr := (&Ptr)(v.Type.Kind)
+			mut ptr := v.Type.Kind.(&Ptr)
 			if ptr.IsUnsafe() {
 				break
 			}
@@ -2915,14 +2915,14 @@ impl eval {
 			kind = ptr.Elem
 			makeImplicitDeref(v, si.Ident)
 		| &Sptr:
-			mut sptr := (&Sptr)(v.Type.Kind)
+			mut sptr := v.Type.Kind.(&Sptr)
 			kind = sptr.Elem
 			makeImplicitDeref(v, si.Ident)
 		}
 
 		match type kind.Kind {
 		| &StructIns:
-			mut s := (&StructIns)(kind.Kind)
+			mut s := kind.Kind.(&StructIns)
 			if s.Source != nil || isInstancedStruct(s) {
 				mut usedReferenceElem := false
 				match type v.Type.Kind {
@@ -2997,7 +2997,7 @@ impl eval {
 
 		mut prefix := self.prefix
 		for (_, mut expr) in lit.Exprs {
-			mut pair, ok := (&ast::KeyValPair)(expr.Kind)
+			mut pair, ok := expr.Kind.(&ast::KeyValPair)
 			if !ok {
 				self.pushErr(lit.Token, build::LogMsg.InvalidSyntax)
 				ret nil
@@ -3068,7 +3068,7 @@ impl eval {
 		mut captured := make([]&Var, 0)
 		match type self.lookup {
 		| &scopeChecker:
-			mut sc := (&scopeChecker)(self.lookup)
+			mut sc := self.lookup.(&scopeChecker)
 			mut scc := sc.newChildChecker()
 			scc.labels = new([]&scopeLabel, nil)
 			scc.gotos = new([]&Goto, nil)
@@ -3166,7 +3166,7 @@ impl eval {
 		}
 		match type self.lookup {
 		| &scopeChecker:
-			mut sc := (&scopeChecker)(self.lookup)
+			mut sc := self.lookup.(&scopeChecker)
 			sc.removeInteriorMutRisk(r)
 		}
 		if l.Mutable && !r.Mutable && r.Type.Mutable() {
@@ -3254,50 +3254,50 @@ impl eval {
 	fn evalExprKind(mut &self, mut kind: ast::ExprData): &Value {
 		match type kind {
 		| &ast::RangeExpr:
-			mut e := (&ast::RangeExpr)(kind)
+			mut e := kind.(&ast::RangeExpr)
 			ret self.evalExprKind(e.Expr.Kind)
 		| &ast::LitExpr:
-			ret self.evalLit((&ast::LitExpr)(kind))
+			ret self.evalLit(kind.(&ast::LitExpr))
 		| &ast::IdentExpr:
-			ret self.evalIdent((&ast::IdentExpr)(kind))
+			ret self.evalIdent(kind.(&ast::IdentExpr))
 		| &ast::UnaryExpr:
-			ret self.evalUnary((&ast::UnaryExpr)(kind))
+			ret self.evalUnary(kind.(&ast::UnaryExpr))
 		| &ast::VariadicExpr:
-			ret self.evalVariadic((&ast::VariadicExpr)(kind))
+			ret self.evalVariadic(kind.(&ast::VariadicExpr))
 		| &ast::UnsafeExpr:
-			ret self.evalUnsafe((&ast::UnsafeExpr)(kind))
+			ret self.evalUnsafe(kind.(&ast::UnsafeExpr))
 		| &ast::SliceExpr:
-			ret self.evalSliceExpr((&ast::SliceExpr)(kind))
+			ret self.evalSliceExpr(kind.(&ast::SliceExpr))
 		| &ast::IndexingExpr:
-			ret self.evalIndexing((&ast::IndexingExpr)(kind))
+			ret self.evalIndexing(kind.(&ast::IndexingExpr))
 		| &ast::SlicingExpr:
-			ret self.evalSlicing((&ast::SlicingExpr)(kind))
+			ret self.evalSlicing(kind.(&ast::SlicingExpr))
 		| &ast::CastExpr:
-			ret self.evalCast((&ast::CastExpr)(kind))
+			ret self.evalCast(kind.(&ast::CastExpr))
 		| &ast::NamespaceExpr:
-			ret self.evalNamespace((&ast::NamespaceExpr)(kind))
+			ret self.evalNamespace(kind.(&ast::NamespaceExpr))
 		| &ast::TypedBraceLit:
-			ret self.evalTypedBraceLit((&ast::TypedBraceLit)(kind))
+			ret self.evalTypedBraceLit(kind.(&ast::TypedBraceLit))
 		| &ast::Type:
-			ret self.evalType((&ast::Type)(kind))
+			ret self.evalType(kind.(&ast::Type))
 		| &ast::FuncCallExpr:
-			ret self.evalFuncCall((&ast::FuncCallExpr)(kind))
+			ret self.evalFuncCall(kind.(&ast::FuncCallExpr))
 		| &ast::SubIdentExpr:
-			ret self.evalSubIdent((&ast::SubIdentExpr)(kind))
+			ret self.evalSubIdent(kind.(&ast::SubIdentExpr))
 		| &ast::TupleExpr:
-			ret self.evalTuple((&ast::TupleExpr)(kind))
+			ret self.evalTuple(kind.(&ast::TupleExpr))
 		| &ast::BraceLit:
-			ret self.evalBraceLit((&ast::BraceLit)(kind))
+			ret self.evalBraceLit(kind.(&ast::BraceLit))
 		| &ast::Func:
-			ret self.evalAnonFunc((&ast::Func)(kind))
+			ret self.evalAnonFunc(kind.(&ast::Func))
 		| &ast::BinaryExpr:
-			ret self.evalBinary((&ast::BinaryExpr)(kind))
+			ret self.evalBinary(kind.(&ast::BinaryExpr))
 		| &ast::ChanRecv:
-			ret self.evalChanRecv((&ast::ChanRecv)(kind))
+			ret self.evalChanRecv(kind.(&ast::ChanRecv))
 		| &ast::ChanSend:
-			ret self.evalChanSend((&ast::ChanSend)(kind))
+			ret self.evalChanSend(kind.(&ast::ChanSend))
 		| &ast::TypeAssertionExpr:
-			ret self.evalTypeAssertion((&ast::TypeAssertionExpr)(kind))
+			ret self.evalTypeAssertion(kind.(&ast::TypeAssertionExpr))
 		|:
 			ret nil
 		}
@@ -3737,7 +3737,7 @@ impl unaryEval {
 	fn amper(mut self) {
 		match type self.v.Model {
 		| &StructLitExpr:
-			mut lit := (&StructLitExpr)(self.v.Model)
+			mut lit := self.v.Model.(&StructLitExpr)
 			makeStructLitAlloc(self.v, lit)
 		|:
 			match {
@@ -5130,9 +5130,9 @@ fn updateModelToGenericIns(mut &m: Expr, mut &f: &FuncIns) {
 	| &FuncIns:
 		m = f
 	| &StructSubIdentExpr:
-		(&StructSubIdentExpr)(m).Method = f
+		m.(&StructSubIdentExpr).Method = f
 	| &StructStaticIdentExpr:
-		(&StructStaticIdentExpr)(m).Method = f
+		m.(&StructStaticIdentExpr).Method = f
 	}
 }
 
@@ -5157,14 +5157,14 @@ fn evalEnumStatic(mut &s: &sema, mut &enm: &Enum, mut &item: &EnumItem,
 fn isLitBased(mut &m: Expr): &StructLitExpr {
 	match type m {
 	| &StructLitExpr:
-		ret (&StructLitExpr)(m)
+		ret m.(&StructLitExpr)
 	| &AllocStructLitExpr:
-		ret (&AllocStructLitExpr)(m).Lit
+		ret m.(&AllocStructLitExpr).Lit
 	| &StructSubIdentExpr:
-		mut ssi := (&StructSubIdentExpr)(m)
+		mut ssi := m.(&StructSubIdentExpr)
 		ret isLitBased(ssi.Expr.Model)
 	| &CastingExpr:
-		mut c := (&CastingExpr)(m)
+		mut c := m.(&CastingExpr)
 		ret isLitBased(c.Expr.Model)
 	|:
 		ret nil

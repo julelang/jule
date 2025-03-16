@@ -59,7 +59,7 @@ impl scopeCoder {
 			ref = true
 			match type it.Expr.Model {
 			| &sema::Var:
-				v := (&sema::Var)(it.Expr.Model)
+				v := it.Expr.Model.(&sema::Var)
 				if v.Reference {
 					self.oc.ec.model(it.Expr.Model)
 					break
@@ -140,7 +140,7 @@ impl scopeCoder {
 			ref = true
 			match type it.Expr.Model {
 			| &sema::Var:
-				v := (&sema::Var)(it.Expr.Model)
+				v := it.Expr.Model.(&sema::Var)
 				if v.Reference {
 					self.oc.ec.model(it.Expr.Model)
 					break
@@ -349,7 +349,7 @@ impl scopeCoder {
 			ref = true
 			match type it.Expr.Model {
 			| &sema::Var:
-				v := (&sema::Var)(it.Expr.Model)
+				v := it.Expr.Model.(&sema::Var)
 				if v.Reference {
 					self.oc.ec.model(it.Expr.Model)
 					break
@@ -570,7 +570,7 @@ impl scopeCoder {
 	fn tryMapSet(mut &self, mut m: sema::Expr): (ok: bool) {
 		match type m {
 		| &sema::IndexingExpr:
-			mut iem := (&sema::IndexingExpr)(m)
+			mut iem := m.(&sema::IndexingExpr)
 			_map := iem.Expr.Type.Map()
 			if _map == nil {
 				break
@@ -666,7 +666,7 @@ impl scopeCoder {
 
 	fn mapLookupAssign(mut &self, mut &a: &sema::MultiAssign) {
 		// map lookup right expression always should be indexing
-		mut iem := (&sema::IndexingExpr)(a.Right)
+		mut iem := a.Right.(&sema::IndexingExpr)
 		mut _map := iem.Expr.Type.Map()
 
 		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Val)
@@ -706,7 +706,7 @@ impl scopeCoder {
 		// therefore do not generate temporary variable for references
 		// they should take pointer from the tuple data
 
-		mut tup := (&sema::TupleExpr)(a.Right)
+		mut tup := a.Right.(&sema::TupleExpr)
 
 		for (i, mut r) in tup.Values {
 			self.oc.indent()
@@ -714,7 +714,7 @@ impl scopeCoder {
 			if l != nil {
 				match type l.Model {
 				| &sema::Var:
-					mut v := (&sema::Var)(l.Model)
+					mut v := l.Model.(&sema::Var)
 					if !v.Reference {
 						break
 					}
@@ -771,7 +771,7 @@ impl scopeCoder {
 		self.oc.addIndent()
 		self.oc.indent()
 
-		mut f := (&sema::FuncCallExpr)(a.Right)
+		mut f := a.Right.(&sema::FuncCallExpr)
 		self.oc.tc.rc.codeMut1(self.oc.Buf, f.Func.Result)
 		self.oc.write(" " + assignResultName + " = ")
 		self.oc.ec.possibleRefExpr(a.Right)
@@ -830,7 +830,7 @@ impl scopeCoder {
 		if a.Left[0] == nil && a.Left[1] == nil {
 			// Expression is like: _, _ = <-c
 			// Handle as plain expression.
-			self.oc.ec.chanRecv((&sema::ChanRecv)(a.Right), nil, false)
+			self.oc.ec.chanRecv(a.Right.(&sema::ChanRecv), nil, false)
 			ret
 		}
 		if a.Left[0] != nil {
@@ -848,11 +848,11 @@ impl scopeCoder {
 				self.oc.write(")")
 			}
 		}
-		self.oc.ec.chanRecv((&sema::ChanRecv)(a.Right), ok, false)
+		self.oc.ec.chanRecv(a.Right.(&sema::ChanRecv), ok, false)
 	}
 
 	fn typeAssertionAssign(mut &self, mut a: &sema::MultiAssign) {
-		mut ce := (&sema::TypeAssertionExpr)(a.Right)
+		mut ce := a.Right.(&sema::TypeAssertionExpr)
 		mut f := obj::FindFuncGenericInstance(meta::Program.Runtime.DynAssertAssign, ce.Expr.Type, ce.Type)
 		identCoder.funcIns(self.oc.Buf, f)
 		self.oc.write("(")
@@ -910,7 +910,7 @@ impl scopeCoder {
 		| &opt::UnsafeTypeAssertionExpr:
 			// We avoiding misanalysis for assertion casting expressions here.
 			// Since we know the casting result, assign directly with no analysis.
-			mut uc := (&opt::UnsafeTypeAssertionExpr)(r)
+			mut uc := r.(&opt::UnsafeTypeAssertionExpr)
 			self.typeAssertionAssignUnsafe(a, uc)
 			ret
 		| &sema::ChanRecv:
@@ -945,7 +945,7 @@ impl scopeCoder {
 					self.oc.ec._unsafeBinary(self.oc.Buf, l, r, token::Id.Eqs, token::Kind.Eqs)
 				|:
 					self.oc.write(matchExpr)
-					mut tk := (&sema::Type)(expr.Model)
+					mut tk := expr.Model.(&sema::Type)
 					if m.Expr.Type.Trait() != nil { // Trait type.
 						t := m.Expr.Type.Trait()
 						self.oc.write(".type == (" + typeTrait + "::Type*)&")
@@ -1098,7 +1098,7 @@ impl scopeCoder {
 			match type val.Model {
 			| &sema::ChanRecv:
 				unsafe { _chans = append(_chans, chanCase{c, val}) }
-				mut cr := (&sema::ChanRecv)(val.Model)
+				mut cr := val.Model.(&sema::ChanRecv)
 				self.oc.ec.possibleRefExpr(cr.Expr.Model)
 				self.oc.write(".as<")
 				self.oc.write(hchan)
@@ -1110,7 +1110,7 @@ impl scopeCoder {
 			match type val.Model {
 			| &sema::ChanSend:
 				unsafe { _chans = append(_chans, chanCase{c, val}) }
-				mut cr := (&sema::ChanSend)(val.Model)
+				mut cr := val.Model.(&sema::ChanSend)
 				self.oc.ec.possibleRefExpr(cr.Chan.Model)
 				self.oc.write(".as<")
 				self.oc.write(hchan)
@@ -1149,7 +1149,7 @@ impl scopeCoder {
 			sb.WriteStr("].as<")!
 			match type c.Value.Model {
 			| &sema::ChanRecv:
-				mut cr := (&sema::ChanRecv)(c.Value.Model)
+				mut cr := c.Value.Model.(&sema::ChanRecv)
 				mut pchan := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, cr.Expr.Type.Chan().Elem)
 				self.oc.tc.structureIns(sb, pchan)
 				sb.WriteStr(">()")!
@@ -1157,7 +1157,7 @@ impl scopeCoder {
 				cr.Expr.Model = unsafe { *(*sema::Expr)(&model) }
 				self.oc.ec.chanRecv(cr, nil, true)
 			| &sema::ChanSend:
-				mut cs := (&sema::ChanSend)(c.Value.Model)
+				mut cs := c.Value.Model.(&sema::ChanSend)
 				mut pchan := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, cs.Chan.Type.Chan().Elem)
 				self.oc.tc.structureIns(sb, pchan)
 				sb.WriteStr(">()")!
@@ -1236,7 +1236,7 @@ impl scopeCoder {
 		}
 		match type r.Expr {
 		| &sema::TupleExpr:
-			mut values := (&sema::TupleExpr)(r.Expr).Values
+			mut values := r.Expr.(&sema::TupleExpr).Values
 			for (i, mut v) in values {
 				self.oc.write(resultName + "." + resultArgName)
 				self.oc.write(conv::Itoa(i))
@@ -1363,16 +1363,16 @@ impl scopeCoder {
 		}
 		match type st {
 		| &sema::Scope:
-			self.scope((&sema::Scope)(st))
+			self.scope(st.(&sema::Scope))
 		| &sema::Var:
-			self.var((&sema::Var)(st))
+			self.var(st.(&sema::Var))
 		| &sema::Value:
-			mut v := (&sema::Value)(st)
+			mut v := st.(&sema::Value)
 			// Catch anonymous functions created by defer scope.
 			// Push them to defer stack.
 			match type v.Model {
 			| &sema::AnonFuncExpr:
-				f := (&sema::AnonFuncExpr)(v.Model)
+				f := v.Model.(&sema::AnonFuncExpr)
 				if f.Func.Scope != nil && f.Func.Scope.Deferred {
 					self.oc.write(deferStackName + ".push(")
 					self.oc.ec.model(v.Model)
@@ -1382,45 +1382,45 @@ impl scopeCoder {
 			}
 			self.oc.ec.model(v.Model)
 		| &sema::Conditional:
-			self.conditional((&sema::Conditional)(st))
+			self.conditional(st.(&sema::Conditional))
 		| &sema::InfIter:
-			self.infIter((&sema::InfIter)(st))
+			self.infIter(st.(&sema::InfIter))
 		| &sema::WhileIter:
-			self.whileIter((&sema::WhileIter)(st))
+			self.whileIter(st.(&sema::WhileIter))
 		| &sema::RangeIter:
-			self.rangeIter((&sema::RangeIter)(st))
+			self.rangeIter(st.(&sema::RangeIter))
 		| &sema::Continue:
-			self.continueStmt((&sema::Continue)(st))
+			self.continueStmt(st.(&sema::Continue))
 		| &sema::Label:
-			self.label((&sema::Label)(st))
+			self.label(st.(&sema::Label))
 		| &sema::Goto:
-			self.gotoStmt((&sema::Goto)(st))
+			self.gotoStmt(st.(&sema::Goto))
 		| &sema::Postfix:
-			self.postfix((&sema::Postfix)(st))
+			self.postfix(st.(&sema::Postfix))
 		| &sema::Assign:
-			self.assign((&sema::Assign)(st))
+			self.assign(st.(&sema::Assign))
 		| &sema::MultiAssign:
-			self.multiAssign((&sema::MultiAssign)(st))
+			self.multiAssign(st.(&sema::MultiAssign))
 		| &sema::Match:
-			self.matchStmt((&sema::Match)(st))
+			self.matchStmt(st.(&sema::Match))
 		| &sema::Select:
-			self.selectStmt((&sema::Select)(st))
+			self.selectStmt(st.(&sema::Select))
 		| &sema::Fall:
-			self.fallStmt((&sema::Fall)(st))
+			self.fallStmt(st.(&sema::Fall))
 		| &sema::Break:
-			self.breakStmt((&sema::Break)(st))
+			self.breakStmt(st.(&sema::Break))
 		| &sema::Ret:
-			self.retStmt((&sema::Ret)(st))
+			self.retStmt(st.(&sema::Ret))
 		| &opt::PushToSliceExpr:
-			self.oc.ec.pushToSlice((&opt::PushToSliceExpr)(st))
+			self.oc.ec.pushToSlice(st.(&opt::PushToSliceExpr))
 		| &opt::MutSlicingExpr:
-			self.mutSlicing((&opt::MutSlicingExpr)(st))
+			self.mutSlicing(st.(&opt::MutSlicingExpr))
 		| &opt::SwapExpr:
-			self.swap((&opt::SwapExpr)(st))
+			self.swap(st.(&opt::SwapExpr))
 		| &opt::ExceptionalForwardingExpr:
-			self.exceptionalForwarding((&opt::ExceptionalForwardingExpr)(st))
+			self.exceptionalForwarding(st.(&opt::ExceptionalForwardingExpr))
 		| &opt::StrRuneIter:
-			mut sit := (&opt::StrRuneIter)(st)
+			mut sit := st.(&opt::StrRuneIter)
 			self.strRuneIter(*sit, false)
 		|:
 			self.oc.write("<unimplemented_stmt>")
@@ -1489,7 +1489,7 @@ impl scopeCoder {
 			| &sema::Ret:
 				ret
 			| &sema::Value:
-				v := (&sema::Value)(stmt)
+				v := stmt.(&sema::Value)
 				match type v.Model {
 				| &sema::BuiltinErrorCallExpr
 				| &sema::BuiltinPanicCallExpr:

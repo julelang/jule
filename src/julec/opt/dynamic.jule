@@ -94,7 +94,7 @@ fn isTypeGuaranteedDynamicValue(mut &dy: &dynamic, mut t: &sema::Type, mut m: se
 	}
 	match type m {
 	| &sema::CastingExpr:
-		mut cem := (&sema::CastingExpr)(m)
+		mut cem := m.(&sema::CastingExpr)
 		ret isTypeGuaranteedDynamicValue(dy, cem.Expr.Type, cem.Expr.Model)
 	}
 	var := getDynamicVar(m)
@@ -115,18 +115,18 @@ fn getDynamicVar(m: sema::Expr): uintptr {
 	}
 	match type m {
 	| &sema::Var:
-		v := (&sema::Var)(m)
+		v := m.(&sema::Var)
 		if !v.Reference || v.ValueSym == nil || v.ValueSym.Value == nil {
 			// Variable is not reference (or points to unknown such as parameters), return address of it.
-			ret uintptr((&sema::Var)(m))
+			ret uintptr(m.(&sema::Var))
 		}
 		// Variable is reference, it should be initialized at source code.
 		// Investigate the initial expression for variable address.
 		ret getDynamicVar(v.ValueSym.Value.Model)
 	| &sema::StructSubIdentExpr:
-		ret uintptr((&sema::StructSubIdentExpr)(m).Field)
+		ret uintptr(m.(&sema::StructSubIdentExpr).Field)
 	| &sema::UnaryExpr:
-		uem := (&sema::UnaryExpr)(m)
+		uem := m.(&sema::UnaryExpr)
 		if uem.Op.Id == token::Id.Star { // Dereferencing.
 			ret getDynamicVar(uem.Expr.Model)
 		}

@@ -1259,10 +1259,10 @@ impl comptimeValue {
 		mut s := (&StructIns)(nil)
 		match type self.v.Type.Kind {
 		| &Sptr:
-			s = (&Sptr)(self.v.Type.Kind).Elem.SoftStruct()
+			s = self.v.Type.Kind.(&Sptr).Elem.SoftStruct()
 			ref = true
 		| &StructIns:
-			s = (&StructIns)(self.v.Type.Kind)
+			s = self.v.Type.Kind.(&StructIns)
 		}
 		if s == nil {
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.v.Type.Str(), "Method")
@@ -1412,7 +1412,7 @@ impl comptimeRangeKind for comptimeFiles {
 		}
 		if keyB != nil {
 			// Kind should be assigned by caller.
-			(&comptimeFile)(keyB.TypeSym.Type.Kind).file = self.files[i]
+			keyB.TypeSym.Type.Kind.(&comptimeFile).file = self.files[i]
 		}
 	}
 
@@ -1549,7 +1549,7 @@ impl comptimeRangeKind for comptimeDecls {
 		}
 		if keyB != nil {
 			// Kind should be assigned by caller.
-			(&comptimeDecl)(keyB.TypeSym.Type.Kind).decl = self.decls[i].decl
+			keyB.TypeSym.Type.Kind.(&comptimeDecl).decl = self.decls[i].decl
 		}
 	}
 
@@ -1619,25 +1619,25 @@ impl comptimeDecl {
 		mut name := ""
 		match type self.decl {
 		| &Struct:
-			name = (&Struct)(self.decl).Ident
+			name = self.decl.(&Struct).Ident
 		| &Func:
-			name = (&Func)(self.decl).Ident
+			name = self.decl.(&Func).Ident
 		| &Enum:
-			name = (&Enum)(self.decl).Ident
+			name = self.decl.(&Enum).Ident
 		| &TypeEnum:
-			name = (&TypeEnum)(self.decl).Ident
+			name = self.decl.(&TypeEnum).Ident
 		| &Trait:
-			name = (&Trait)(self.decl).Ident
+			name = self.decl.(&Trait).Ident
 		| &Field:
-			name = (&Field)(self.decl).Ident
+			name = self.decl.(&Field).Ident
 		| &TypeAlias:
-			name = (&TypeAlias)(self.decl).Ident
+			name = self.decl.(&TypeAlias).Ident
 		| &Var:
-			name = (&Var)(self.decl).Ident
+			name = self.decl.(&Var).Ident
 		| &EnumItem:
-			name = (&EnumItem)(self.decl).Ident
+			name = self.decl.(&EnumItem).Ident
 		| &Param:
-			name = (&Param)(self.decl).Ident
+			name = self.decl.(&Param).Ident
 		|:
 			panic("sema: comptimeDecl.Name: unimplemented declaration kind")
 		}
@@ -1661,21 +1661,21 @@ impl comptimeDecl {
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Public")
 			ret nil
 		| &Struct:
-			public = (&Struct)(self.decl).Public
+			public = self.decl.(&Struct).Public
 		| &Func:
-			public = (&Func)(self.decl).Public
+			public = self.decl.(&Func).Public
 		| &Enum:
-			public = (&Enum)(self.decl).Public
+			public = self.decl.(&Enum).Public
 		| &TypeEnum:
-			public = (&TypeEnum)(self.decl).Public
+			public = self.decl.(&TypeEnum).Public
 		| &Trait:
-			public = (&Trait)(self.decl).Public
+			public = self.decl.(&Trait).Public
 		| &Field:
-			public = (&Field)(self.decl).Public
+			public = self.decl.(&Field).Public
 		| &TypeAlias:
-			public = (&TypeAlias)(self.decl).Public
+			public = self.decl.(&TypeAlias).Public
 		| &Var:
-			public = (&Var)(self.decl).Public
+			public = self.decl.(&Var).Public
 		|:
 			panic("sema: comptimeDecl.Public: unimplemented declaration kind")
 		}
@@ -1703,13 +1703,13 @@ impl comptimeDecl {
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Binded")
 			ret nil
 		| &Struct:
-			binded = (&Struct)(self.decl).Binded
+			binded = self.decl.(&Struct).Binded
 		| &Func:
-			binded = (&Func)(self.decl).Binded
+			binded = self.decl.(&Func).Binded
 		| &TypeAlias:
-			binded = (&TypeAlias)(self.decl).Binded
+			binded = self.decl.(&TypeAlias).Binded
 		| &Var:
-			binded = (&Var)(self.decl).Binded
+			binded = self.decl.(&Var).Binded
 		|:
 			panic("sema: comptimeDecl.Binded: unimplemented declaration kind")
 		}
@@ -1733,7 +1733,7 @@ impl comptimeDecl {
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Exceptional")
 			ret nil
 		}
-		mut f := (&Func)(self.decl)
+		mut f := self.decl.(&Func)
 		mut constant := constant::Const.NewBool(f.Exceptional)
 		ret &Value{
 			Type: primBool,
@@ -1759,11 +1759,11 @@ impl comptimeDecl {
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Mutable")
 			ret nil
 		| &Param:
-			mutable = (&Param)(self.decl).Mutable
+			mutable = self.decl.(&Param).Mutable
 		| &Field:
-			mutable = (&Field)(self.decl).Mutable
+			mutable = self.decl.(&Field).Mutable
 		| &Var:
-			mutable = (&Var)(self.decl).Mutable
+			mutable = self.decl.(&Var).Mutable
 		|:
 			panic("sema: comptimeDecl.Mutable: unimplemented declaration kind")
 		}
@@ -1794,7 +1794,7 @@ impl comptimeDecl {
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Variadic")
 			ret nil
 		| &Param:
-			variadic = (&Param)(self.decl).Variadic
+			variadic = self.decl.(&Param).Variadic
 		|:
 			panic("sema: comptimeDecl.Variadic: unimplemented declaration kind")
 		}
@@ -1824,9 +1824,9 @@ impl comptimeDecl {
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Reference")
 			ret nil
 		| &Var:
-			ref = (&Var)(self.decl).Reference
+			ref = self.decl.(&Var).Reference
 		| &Param:
-			ref = (&Param)(self.decl).Reference
+			ref = self.decl.(&Param).Reference
 		|:
 			panic("sema: comptimeDecl.Reference: unimplemented declaration kind")
 		}
@@ -1856,7 +1856,7 @@ impl comptimeDecl {
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Params")
 			ret nil
 		| &Func:
-			mut f := (&Func)(self.decl)
+			mut f := self.decl.(&Func)
 			mut params := make([]&comptimeDecl, len(f.Params))
 			for (i, mut param) in f.Params {
 				params[i] = &comptimeDecl{decl: param}
@@ -1891,13 +1891,13 @@ impl comptimeDecl {
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Fields")
 			ret nil
 		| &Enum:
-			mut enm := (&Enum)(self.decl)
+			mut enm := self.decl.(&Enum)
 			fields = make([]&comptimeDecl, len(enm.Items))
 			for (i, mut item) in enm.Items {
 				fields[i] = &comptimeDecl{decl: item}
 			}
 		| &Struct:
-			mut s := (&Struct)(self.decl)
+			mut s := self.decl.(&Struct)
 			fields = make([]&comptimeDecl, len(s.Fields))
 			for (i, mut field) in s.Fields {
 				fields[i] = &comptimeDecl{decl: field}
@@ -1932,13 +1932,13 @@ impl comptimeDecl {
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Methods")
 			ret nil
 		| &Trait:
-			mut t := (&Trait)(self.decl)
+			mut t := self.decl.(&Trait)
 			methods = make([]&comptimeDecl, len(t.Methods))
 			for (i, mut method) in t.Methods {
 				methods[i] = &comptimeDecl{decl: method}
 			}
 		| &Struct:
-			mut s := (&Struct)(self.decl)
+			mut s := self.decl.(&Struct)
 			methods = make([]&comptimeDecl, len(s.Methods))
 			for (i, mut method) in s.Methods {
 				methods[i] = &comptimeDecl{decl: method}
