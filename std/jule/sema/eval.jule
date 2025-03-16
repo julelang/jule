@@ -2393,29 +2393,6 @@ impl eval {
 		ret evalEnumStatic(self.s, enm, item, ident, self.getOwnerRefers())
 	}
 
-	fn evalTypeEnumStatic(mut self, mut enm: &TypeEnum, ident: &token::Token): &Value {
-		mut item := enm.FindItem(ident.Kind)
-		if item == nil {
-			self.pushErr(ident, build::LogMsg.ObjHaveNotIdent, enm.Ident, ident.Kind)
-			ret nil
-		}
-		match {
-		| item.TypeSym.Type.Enum() != nil:
-			ret self._evalEnum(item.TypeSym.Type.Enum())
-		| item.TypeSym.Type.TypeEnum() != nil:
-			ret self._evalTypeEnum(item.TypeSym.Type.TypeEnum())
-		| item.TypeSym.Type.Struct() != nil:
-			ret self._evalStruct(item.TypeSym.Type.Struct())
-		|:
-			mut v := &Value{
-				Decl: true,
-				Type: item.TypeSym.Type,
-			}
-			v.Model = v.Type
-			ret v
-		}
-	}
-
 	fn evalStructStatic(mut self, mut s: &StructIns, ident: &token::Token): &Value {
 		mut v := new(Value)
 		const Static = true
@@ -2913,8 +2890,6 @@ impl eval {
 			ret self.evalPrimStatic(v.Type, si.Ident)
 		| v.Type.Enum() != nil:
 			ret self.evalEnumStatic(v.Type.Enum(), si.Ident)
-		| v.Type.TypeEnum() != nil:
-			ret self.evalTypeEnumStatic(v.Type.TypeEnum(), si.Ident)
 		|:
 			self.pushErr(si.Ident, build::LogMsg.TypeNotSupportSubFields, v.Type.Str())
 			ret nil
