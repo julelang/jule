@@ -658,6 +658,15 @@ impl exprCoder {
 	//	Otherwise, code generation might be wrong because <any> the
 	//	uses special casting algorithms.
 	fn casting(mut &self, mut m: &sema::CastingExpr) {
+		// Return if actual types are equal.
+		// This is not only helps to reduce unnecessary castings of the object code.
+		// It also an important condition to generate good object code.
+		// It eliminates strict type alias unwrapping or wrapping castings for
+		// underliying type, for dynamic types it may be result as invalid casting.
+		if m.Type.ActualEqual(m.Expr.Type) {
+			self.possibleRefExpr(m.Expr.Model)
+			ret
+		}
 		if obj::IsAny(m.Type) {
 			if m.Expr.Type.IsNil() {
 				self.oc.write(typeAny + "()")
@@ -688,10 +697,6 @@ impl exprCoder {
 			self.oc.write(", &" + anyTypeIdent)
 			self.oc.write(conv::Itoa(i))
 			self.oc.write(")")
-			ret
-		}
-		if m.Type.ActualEqual(m.Expr.Type) {
-			self.possibleRefExpr(m.Expr.Model)
 			ret
 		}
 		if m.Expr.Type.Ptr() != nil || m.Type.Ptr() != nil {
