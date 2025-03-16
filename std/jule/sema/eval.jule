@@ -1055,17 +1055,6 @@ impl eval {
 		self.pushErr(i.Token, build::LogMsg.NotSupportsIndexing, v.Type.Str())
 	}
 
-	fn pushGenericsFromExprSubIdent(mut &self, mut &sexpr: &ast::SubIdentExpr,
-		mut &generics: []&ast::Type, mut &expr: &ast::Expr): bool {
-		mut t := new(ast::SubIdentType)
-		if !pushSubIdentFromExpr(sexpr, t) {
-			self.pushErr(expr.Token, build::LogMsg.InvalidSyntax)
-			ret false
-		}
-		generics = append(generics, &ast::Type{Kind: t})
-		ret true
-	}
-
 	fn pushGenericsFromData(mut &self, mut &generics: []&ast::Type, mut &expr: &ast::Expr): bool {
 		match type expr.Kind {
 		| &ast::UnaryExpr:
@@ -1109,9 +1098,6 @@ impl eval {
 			generics = append(generics, &ast::Type{
 				Kind: unsafe { *(*ast::TypeKind)(&kind) },
 			})
-		| &ast::SubIdentExpr:
-			mut sexpr := (&ast::SubIdentExpr)(expr.Kind)
-			ret self.pushGenericsFromExprSubIdent(sexpr, generics, expr)
 		| &ast::IdentExpr:
 			mut ident := (&ast::IdentExpr)(expr.Kind)
 			generics = append(generics, &ast::Type{
@@ -5157,29 +5143,6 @@ fn updateModelToGenericIns(mut &m: Expr, mut &f: &FuncIns) {
 	| &StructStaticIdentExpr:
 		(&StructStaticIdentExpr)(m).Method = f
 	}
-}
-
-fn pushSubIdentFromExpr(mut expr: ast::ExprData, mut &t: &ast::SubIdentType): bool {
-	match type expr {
-	| &ast::IdentExpr:
-		mut e := (&ast::IdentExpr)(expr)
-		t.Idents = append(t.Idents, &ast::IdentType{
-			Token: e.Token,
-			Ident: e.Ident,
-		})
-	| &ast::SubIdentExpr:
-		mut e := (&ast::SubIdentExpr)(expr)
-		if !pushSubIdentFromExpr(e.Expr.Kind, t) {
-			ret false
-		}
-		t.Idents = append(t.Idents, &ast::IdentType{
-			Token: e.Ident,
-			Ident: e.Ident.Kind,
-		})
-	|:
-		ret false
-	}
-	ret true
 }
 
 fn evalEnumStatic(mut &s: &sema, mut &enm: &Enum, mut &item: &EnumItem,

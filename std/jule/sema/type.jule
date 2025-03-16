@@ -1362,37 +1362,6 @@ impl typeChecker {
 		ret self.getDef(decl)
 	}
 
-	fn buildSubIdent(mut self, mut decl: &ast::SubIdentType): Kind {
-		mut ident := self.buildIdent(decl.Idents[0])
-		if ident == nil {
-			ret nil
-		}
-		mut t, ok := (&TypeEnum)(ident)
-		if !ok {
-			self.pushErr(self.errorToken, build::LogMsg.InvalidSyntax)
-			ret nil
-		}
-		mut idents := decl.Idents[1:]
-		for i, id in idents {
-			mut item := t.FindItem(id.Ident)
-			if item == nil {
-				self.pushErr(id.Token, build::LogMsg.ObjHaveNotIdent, t.Ident, id.Ident)
-				ret nil
-			}
-			if len(idents)-i == 1 {
-				self.pushReferenceByKind(item.TypeSym.Type)
-				ret item.TypeSym.Type
-			}
-			t = item.TypeSym.Type.TypeEnum()
-			if t == nil {
-				self.pushErr(self.errorToken, build::LogMsg.InvalidSyntax)
-				ret nil
-			}
-		}
-		// Should be unreachable.
-		ret nil
-	}
-
 	fn buildSptrFromType(mut self, mut &elem: &Type): &Sptr {
 		// Check special cases.
 		match {
@@ -1743,11 +1712,6 @@ impl typeChecker {
 			kind = (&Type)(declKind)
 		| &ast::IdentType:
 			mut t := self.buildIdent((&ast::IdentType)(declKind))
-			if t != nil {
-				kind = t
-			}
-		| &ast::SubIdentType:
-			mut t := self.buildSubIdent((&ast::SubIdentType)(declKind))
 			if t != nil {
 				kind = t
 			}

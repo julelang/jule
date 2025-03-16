@@ -963,15 +963,13 @@ impl parser {
 			mut t := tokens[i]
 			mut item := new(ast::TypeEnumItem)
 			item.Token = t
+			// For more describing error messages, handle ordinary enum cases.
+			// User may attempt to use named fields like ordinary enums for type enums.
 			if item.Token.Id == token::Id.Ident && len(tokens)-i > 2 {
 				t = tokens[i+1]
 				if t.Id == token::Id.Colon {
-					item.Ident = item.Token.Kind
-					i += 2
-					if i >= len(tokens) || tokens[i].Id == token::Id.Comma {
-						self.pushErr(t, build::LogMsg.MissingType)
-						continue
-					}
+					self.pushErr(t, build::LogMsg.InvalidEnumKindForNamedFields)
+					ret nil
 				}
 			}
 			item.Kind = self.buildTypeEnumItemKind(i, tokens)
