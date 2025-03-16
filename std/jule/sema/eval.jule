@@ -1497,13 +1497,11 @@ impl eval {
 	// The preStrict mode is useful to checking type and value is suitable for
 	// struct casting. It returns with no error and checked as false, if not suitable.
 	// Otherwise, logs errors and returns checked as true.
-	fn castStruct(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token, preStrict: bool): (checked: bool) {
-		mut s := t.SoftStruct()
-
+	fn castStruct(mut self, mut t: &Type, mut s: &StructIns, mut v: &Value, errorToken: &token::Token, preStrict: bool): (checked: bool) {
 		mut tr := v.Type.Trait()
 		if tr == nil {
 			if !preStrict {
-				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsTypeAssertionTo, v.Type.Str(), t.Str())
 			}
 			ret false
 		}
@@ -1515,7 +1513,7 @@ impl eval {
 		if !s.Decl.IsImplements(tr) {
 			// Log error but do not return false.
 			// We know type is trait, casting is not possible.
-			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsTypeAssertionTo, v.Type.Str(), t.Str())
 		}
 		ret true
 	}
@@ -1532,13 +1530,6 @@ impl eval {
 				self.pushSuggestion(build::LogMsg.WriteYourCodeInUnsafeJule)
 			}
 			// Ok.
-			ret
-		}
-
-		// For traits.
-		if sptr.Elem.SoftStruct() != nil {
-			const PreStrict = false
-			self.castStruct(sptr.Elem, v, errorToken, PreStrict)
 			ret
 		}
 
@@ -1749,56 +1740,12 @@ impl eval {
 		}
 	}
 
-	fn castTypeEnum(mut self, mut &t: &Type, mut &v: &Value, mut &errorToken: &token::Token) {
-		n := len(self.s.errors)
-		if !self.s.checkTypeCompatibility(v.Type, t, errorToken) {
-			self.s.errors = self.s.errors[:n] // Remove logges errors by checkTypeCompatibility.
-			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
-		}
-		v.Constant = nil
-		v.untyped = false
-	}
-
 	fn castTypeEnumT(mut self, mut &t: &Type, mut &v: &Value, mut &errorToken: &token::Token) {
 		n := len(self.s.errors)
 		// quick check: if type t and value type comparable.
 		if !self.s.checkTypeCompatibility(t, v.Type, errorToken) {
 			self.s.errors = self.s.errors[:n] // Remove logges errors by checkTypeCompatibility.
-			// We are in here. So something went wrong.
-			// We know the type t is a type-enum. We should check whether it a strict type alias.
-			// If it is not, there is nothing to do; inevitable compiler error.
-			// Otherwise, we can check by value type, so vice versa.
-			// This is works some cases.
-			//
-			// For example:
-			//
-			//		enum Foo: type {
-			//			int,
-			//			bool,
-			//		}
-			//
-			//		type Bar: Foo
-			//
-			//		enum Baz: type {
-			//			Bar,
-			//		}
-			//
-			//		fn main() {
-			//			a := Baz(Bar(20))
-			//			x := Bar(a)
-			//			println(x)
-			//		}
-			//
-			//	In the example code above, strict type alias Bar casted from type-enum Baz.
-			//	This is an error due to Baz does not supports type-enum Baz. But,
-			//	type-enum Baz supports Baz, so casting may be possible. To catch
-			//	such cases, also check by value type if type t is a strict type
-			//	alias and value is a type-enum.
-			if t.SoftStruct() == nil ||
-				v.Type.TypeEnum() != nil && !self.s.checkTypeCompatibility(v.Type, t, errorToken) {
-				self.s.errors = self.s.errors[:n] // Remove logges errors by checkTypeCompatibility.
-				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
-			}
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
 		}
 		v.Constant = nil
 		v.untyped = false
@@ -1848,32 +1795,7 @@ impl eval {
 				v.Constant = nil // Remove nil constant.
 				v.untyped = false
 			|:
-				// Check struct types first to handle strict type alias structures correctly.
-				{
-					ts := t.SoftStruct()
-					if ts != nil {
-						// PreStrict mode should always be enabled.
-						// It will check the possible strictTypeAlias(trait) casting
-						// expression with no error logging. Otherwise we fallback
-						// to ordinary checking algorithm, which is based source type.
-						// Thus, we can check by source type if structure is a
-						// strict type alias instance. Also, we still have to check
-						// special cases. For example, dynamic types (especially `any` type)
-						// may be used for casting and it will be successful probably.
-						const PreStrict = true
-						checked := self.castStruct(t, v, errorToken, PreStrict)
-						if checked {
-							break
-						}
-					}
-				}
 				match {
-				| v.Type.Prim() != nil && v.Type.Prim().IsAny():
-					if t.TypeEnum() != nil {
-						self.pushErr(errorToken, build::LogMsg.TypeEnumCastedFromAny)
-					}
-					v.Constant = nil
-					v.untyped = false
 				| t.Prim() != nil && t.Prim().IsAny():
 					// The any type supports casting to any data type.
 					v.Constant = nil
@@ -1908,8 +1830,6 @@ impl eval {
 					//	So type checker will expect the variable |x| should be
 					//	equal to any compatible type with str, which is not type-enum Bar.
 					self.castTypeEnumT(t, v, errorToken)
-				| v.Type.TypeEnum() != nil:
-					self.castTypeEnum(t, v, errorToken)
 				| t.Ptr() != nil:
 					self.castPtr(t, v, errorToken)
 				| t.Sptr() != nil:
@@ -3272,6 +3192,65 @@ impl eval {
 		ret v
 	}
 
+	fn evalTypeAssertion(mut &self, mut tae: &ast::TypeAssertionExpr): &Value {
+		mut t := self.evalType1(tae.Kind)
+		if t == nil {
+			ret nil
+		}
+		mut prefix := self.prefix
+		self.prefix = nil
+		defer { self.prefix = prefix }
+		flags := evalDefault | evalPhysicalMem | evalUnwrapUntyped
+		mut v := self.evalExpr(tae.Expr, flags)
+		if v == nil {
+			ret v
+		}
+		mut errorToken := tae.Expr.Token
+		if v != nil && v.Decl {
+			self.pushErr(errorToken, build::LogMsg.InvalidExpr)
+			ret nil
+		}
+		if v.Type.Prim() != nil && v.Type.Prim().IsAny() {
+			if t.SoftStruct() == nil && t.TypeEnum() != nil {
+				self.pushErr(errorToken, build::LogMsg.TypeEnumAssertedFromAny)
+				ret nil
+			}
+		} else if v.Type.TypeEnum() != nil {
+			n := len(self.s.errors)
+			if !self.s.checkTypeCompatibility(v.Type, t, errorToken) {
+				self.s.errors = self.s.errors[:n] // Remove logges errors by checkTypeCompatibility.
+				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsTypeAssertionTo, v.Type.Str(), t.Str())
+				ret nil
+			}
+		} else if v.Type.Trait() != nil {
+			mut ts := t.SoftStruct()
+			if ts == nil {
+				if t.Sptr() != nil {
+					ts = t.Sptr().Elem.SoftStruct()
+				}
+			}
+			if ts == nil {
+				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsTypeAssertionTo, v.Type.Str(), t.Str())
+				ret nil
+			} else {
+				const PreStrict = false
+				self.castStruct(t, ts, v, errorToken, PreStrict)
+			}
+		} else {
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsTypeAssertion, v.Type.Str())
+			ret nil
+		}
+		mut r := new(Value)
+		r.Type = t
+		r.Mutable = v.Mutable
+		r.Model = &TypeAssertionExpr{
+			Token: errorToken,
+			Expr: v,
+			Type: t,
+		}
+		ret r
+	}
+
 	fn evalExprKind(mut &self, mut kind: ast::ExprData): &Value {
 		match type kind {
 		| &ast::RangeExpr:
@@ -3317,6 +3296,8 @@ impl eval {
 			ret self.evalChanRecv((&ast::ChanRecv)(kind))
 		| &ast::ChanSend:
 			ret self.evalChanSend((&ast::ChanSend)(kind))
+		| &ast::TypeAssertionExpr:
+			ret self.evalTypeAssertion((&ast::TypeAssertionExpr)(kind))
 		|:
 			ret nil
 		}
@@ -4994,7 +4975,7 @@ fn applyImplicitCast(mut &s: &sema, mut &dest: &Type, mut &v: &Value,
 	destPrim := dest.Prim()
 	if destPrim != nil && destPrim.IsAny() {
 		prim := v.Type.Prim()
-		if prim == nil || !prim.IsAny() {
+		if prim == nil || !prim.IsAny() || v.Type.SoftStruct() != nil {
 			applyCastKind(s, v, dest, token, refers)
 		}
 		ret
@@ -5003,13 +4984,13 @@ fn applyImplicitCast(mut &s: &sema, mut &dest: &Type, mut &v: &Value,
 	dt := dest.Trait()
 	if dt != nil {
 		bt := v.Type.Trait()
-		if bt == nil || bt != dt {
+		if bt == nil || bt != dt || v.Type.SoftStruct() != nil {
 			applyCastKind(s, v, dest, token, refers)
 			ret
 		}
 	}
 
-	if dest.TypeEnum() != nil && v.Type.TypeEnum() == nil {
+	if dest.TypeEnum() != nil && (v.Type.SoftStruct() != nil || v.Type.TypeEnum() == nil) {
 		applyCastKind(s, v, dest, token, refers)
 		ret
 	}

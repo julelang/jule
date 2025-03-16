@@ -788,11 +788,11 @@ impl exprOptimizer {
 		}
 	}
 
-	fn casting(self, mut m: &sema::CastingExpr) {
+	fn typeAssertion(self, mut m: &sema::TypeAssertionExpr) {
 		valid := isDynamicValidType(m.Expr.Type)
 		var := getDynamicVar(m.Expr.Model)
 		if valid && self.data.dynamic != nil && self.data.dynamic.isFits(var, m.Type) {
-			mut model := any(&UnsafeCastingExpr{Base: m})
+			mut model := any(&UnsafeTypeAssertionExpr{Base: m})
 			*self.model = unsafe { *(*sema::Expr)(&model) }
 			self.inspector.SkipChild = true
 			ret
@@ -1024,8 +1024,8 @@ impl exprOptimizer {
 			self.unary((&sema::UnaryExpr)(m))
 		| &sema::StructLitExpr:
 			self.structureLit((&sema::StructLitExpr)(m))
-		| &sema::CastingExpr:
-			self.casting((&sema::CastingExpr)(m))
+		| &sema::TypeAssertionExpr:
+			self.typeAssertion((&sema::TypeAssertionExpr)(m))
 		| &sema::FuncCallExpr:
 			self.funcCall((&sema::FuncCallExpr)(m))
 		| &sema::BuiltinCopyCallExpr:

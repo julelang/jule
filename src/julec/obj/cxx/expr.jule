@@ -33,7 +33,7 @@ enum compExpr: type {
 	&opt::RefExpr,
 	&opt::EmptyCompareExpr,
 	&opt::UnsafeDerefExpr,
-	&opt::UnsafeCastingExpr,
+	&opt::UnsafeTypeAssertionExpr,
 	&opt::FuncCallIgnoreExceptionalExpr,
 	&opt::StrConcatExpr,
 	&opt::StrFromBytes,
@@ -575,50 +575,8 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
-	// Casting expression.
-	//
-	// Special cases:
-	//	The any type castings should be came first than others.
-	//	Otherwise, code generation might be wrong because <any> the
-	//	uses special casting algorithms.
-	fn casting(mut &self, mut m: &sema::CastingExpr) {
-		if m.Type.ActualEqual(m.Expr.Type) {
-			self.possibleRefExpr(m.Expr.Model)
-			ret
-		}
-
-		match {
-		| obj::IsAny(m.Type):
-			if m.Expr.Type.IsNil() {
-				self.oc.write(typeAny + "()")
-				ret
-			}
-			if m.Expr.Type.TypeEnum() != nil {
-				self.possibleRefExpr(m.Expr.Model)
-				ret
-			}
-			i := self.oc.pushAnyType(m.Expr.Type)
-			self.oc.write(typeAny + "(")
-			match type m.Expr.Model {
-			| &constant::Const:
-				prim := m.Expr.Type.Prim()
-				if prim != nil && types::IsInt(prim.Kind) {
-					self.oc.write("static_cast<")
-					self.oc.tc.prim(self.oc.Buf, prim)
-					self.oc.write(">(")
-					self.possibleRefExpr(m.Expr.Model)
-					self.oc.write(")")
-					break
-				}
-				fall
-			|:
-				self.possibleRefExpr(m.Expr.Model)
-			}
-			self.oc.write(", &" + anyTypeIdent)
-			self.oc.write(conv::Itoa(i))
-			self.oc.write(")")
-			ret
-		| obj::IsAny(m.Expr.Type):
+	fn typeAssertion(mut &self, mut m: &sema::TypeAssertionExpr) {
+		if obj::IsAny(m.Expr.Type) {
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write(".")
 			// We handling map and channel types as smart pointer,
@@ -652,19 +610,8 @@ impl exprCoder {
 			self.oc.write(conv::Itoa(self.oc.pushAnyType(m.Type)))
 			self.oc.write(")")
 			ret
-		| m.Expr.Type.Ptr() != nil
-		| m.Type.Ptr() != nil:
-			self.oc.write("((")
-			self.oc.tc.kind(self.oc.Buf, m.Type)
-			self.oc.write(")(")
-			self.possibleRefExpr(m.Expr.Model)
-			self.oc.write("))")
-			ret
-		| m.Expr.Type.Trait() != nil:
-			if m.Type.Trait() != nil {
-				self.castTraitFromTrait(m, m.Type.Trait(), m.Expr.Type.Trait())
-				ret
-			}
+		}
+		if m.Expr.Type.Trait() != nil {
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write(".")
 			// We handling map and channel types as smart pointer,
@@ -700,7 +647,62 @@ impl exprCoder {
 			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Expr.Type.Trait(), m.Type)))
 			self.oc.write(")")
 			ret
-		| m.Type.Trait() != nil:
+		}
+		panic("unreachable")
+	}
+
+	// Casting expression.
+	//
+	// Special cases:
+	//	The any type castings should be came first than others.
+	//	Otherwise, code generation might be wrong because <any> the
+	//	uses special casting algorithms.
+	fn casting(mut &self, mut m: &sema::CastingExpr) {
+		if obj::IsAny(m.Type) {
+			if m.Expr.Type.IsNil() {
+				self.oc.write(typeAny + "()")
+				ret
+			}
+			// Expression is not strict type alias and type-enum, no casting needed.
+			if m.Expr.Type.SoftStruct() == nil && m.Expr.Type.TypeEnum() != nil {
+				self.possibleRefExpr(m.Expr.Model)
+				ret
+			}
+			i := self.oc.pushAnyType(m.Expr.Type)
+			self.oc.write(typeAny + "(")
+			match type m.Expr.Model {
+			| &constant::Const:
+				prim := m.Expr.Type.Prim()
+				if prim != nil && types::IsInt(prim.Kind) {
+					self.oc.write("static_cast<")
+					self.oc.tc.prim(self.oc.Buf, prim)
+					self.oc.write(">(")
+					self.possibleRefExpr(m.Expr.Model)
+					self.oc.write(")")
+					break
+				}
+				fall
+			|:
+				self.possibleRefExpr(m.Expr.Model)
+			}
+			self.oc.write(", &" + anyTypeIdent)
+			self.oc.write(conv::Itoa(i))
+			self.oc.write(")")
+			ret
+		}
+		if m.Type.ActualEqual(m.Expr.Type) {
+			self.possibleRefExpr(m.Expr.Model)
+			ret
+		}
+		if m.Expr.Type.Ptr() != nil || m.Type.Ptr() != nil {
+			self.oc.write("((")
+			self.oc.tc.kind(self.oc.Buf, m.Type)
+			self.oc.write(")(")
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write("))")
+			ret
+		}
+		if m.Type.Trait() != nil {
 			if m.Expr.Type.IsNil() {
 				self.oc.write(typeTrait + "()")
 				ret
@@ -1865,7 +1867,7 @@ impl exprCoder {
 		}
 	}
 
-	fn unsafeCasting(mut &self, mut m: &opt::UnsafeCastingExpr) {
+	fn unsafeTypeAssertion(mut &self, mut m: &opt::UnsafeTypeAssertionExpr) {
 		match {
 		| obj::IsAny(m.Base.Expr.Type):
 			self.possibleRefExpr(m.Base.Expr.Model)
@@ -2026,6 +2028,8 @@ impl exprCoder {
 			self.chanSend((&sema::ChanSend)(m), false)
 		| &sema::BuiltinCloseCallExpr:
 			self.closeCall((&sema::BuiltinCloseCallExpr)(m))
+		| &sema::TypeAssertionExpr:
+			self.typeAssertion((&sema::TypeAssertionExpr)(m))
 		| &opt::UnsafeBinaryExpr:
 			self.unsafeBinary((&opt::UnsafeBinaryExpr)(m).Node)
 		| &opt::StrCompExpr:
@@ -2036,8 +2040,8 @@ impl exprCoder {
 			self.emptyCompare((&opt::EmptyCompareExpr)(m))
 		| &opt::UnsafeDerefExpr:
 			self.unsafeDeref((&opt::UnsafeDerefExpr)(m))
-		| &opt::UnsafeCastingExpr:
-			self.unsafeCasting((&opt::UnsafeCastingExpr)(m))
+		| &opt::UnsafeTypeAssertionExpr:
+			self.unsafeTypeAssertion((&opt::UnsafeTypeAssertionExpr)(m))
 		| &opt::FuncCallIgnoreExceptionalExpr:
 			self.funcCall((&opt::FuncCallIgnoreExceptionalExpr)(m).Base, true)
 		| &opt::StrConcatExpr:

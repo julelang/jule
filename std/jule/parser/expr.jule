@@ -310,6 +310,23 @@ impl exprBuilder {
 		}
 	}
 
+	fn buildTypeAssertion(mut self, mut &exprTokens: []&token::Token, mut &typeTokens: []&token::Token): &ast::TypeAssertionExpr {
+		exprTokens = exprTokens[:len(exprTokens)-1] // Remove trailing dot.
+		mut expr := self.buildFromTokens(exprTokens)
+		if expr == nil {
+			ret nil
+		}
+		typeTokens = typeTokens[1 : len(typeTokens)-1] // Remove parentheses.
+		mut t := self.buildType(typeTokens)
+		if t == nil {
+			ret nil
+		}
+		ret &ast::TypeAssertionExpr{
+			Expr: expr,
+			Kind: t,
+		}
+	}
+
 	fn buildParenthesesRange(mut self, mut &tokens: []&token::Token): ast::ExprData {
 		mut token := tokens[0]
 		if token.Id == token::Id.LParent {
@@ -324,8 +341,11 @@ impl exprBuilder {
 		if len(exprTokens) == 0 {
 			ret self.buildBetweenParentheses(argsTokens)
 		}
-
-		// Caught anonymous function types.
+		// Catch type assertions.
+		if exprTokens[len(exprTokens)-1].Id == token::Id.Dot {
+			ret self.buildTypeAssertion(exprTokens, argsTokens)
+		}
+		// Catch anonymous function types.
 		if isAnonFuncHead(exprTokens) {
 			ret self.buildType(tokens)
 		}

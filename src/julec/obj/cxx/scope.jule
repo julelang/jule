@@ -851,8 +851,8 @@ impl scopeCoder {
 		self.oc.ec.chanRecv((&sema::ChanRecv)(a.Right), ok, false)
 	}
 
-	fn castingAssertionAssign(mut &self, mut a: &sema::MultiAssign) {
-		mut ce := (&sema::CastingExpr)(a.Right)
+	fn typeAssertionAssign(mut &self, mut a: &sema::MultiAssign) {
+		mut ce := (&sema::TypeAssertionExpr)(a.Right)
 		mut f := obj::FindFuncGenericInstance(meta::Program.Runtime.DynAssertAssign, ce.Expr.Type, ce.Type)
 		identCoder.funcIns(self.oc.Buf, f)
 		self.oc.write("(")
@@ -875,12 +875,12 @@ impl scopeCoder {
 		self.oc.write(")")
 	}
 
-	fn castingAssertionAssignUnsafe(mut &self, mut a: &sema::MultiAssign, mut uc: &opt::UnsafeCastingExpr) {
+	fn typeAssertionAssignUnsafe(mut &self, mut a: &sema::MultiAssign, mut uc: &opt::UnsafeTypeAssertionExpr) {
 		if a.Left[0] != nil {
 			self.oc.ec.possibleRefExpr(a.Left[0].Model)
 			self.oc.write(" = ")
 		}
-		self.oc.ec.unsafeCasting(uc)
+		self.oc.ec.unsafeTypeAssertion(uc)
 		if a.Left[1] != nil {
 			self.oc.write(";\n")
 			self.oc.indent()
@@ -904,14 +904,14 @@ impl scopeCoder {
 		| &sema::IndexingExpr:
 			self.mapLookupAssign(a)
 			ret
-		| &sema::CastingExpr:
-			self.castingAssertionAssign(a)
+		| &sema::TypeAssertionExpr:
+			self.typeAssertionAssign(a)
 			ret
-		| &opt::UnsafeCastingExpr:
+		| &opt::UnsafeTypeAssertionExpr:
 			// We avoiding misanalysis for assertion casting expressions here.
 			// Since we know the casting result, assign directly with no analysis.
-			mut uc := (&opt::UnsafeCastingExpr)(r)
-			self.castingAssertionAssignUnsafe(a, uc)
+			mut uc := (&opt::UnsafeTypeAssertionExpr)(r)
+			self.typeAssertionAssignUnsafe(a, uc)
 			ret
 		| &sema::ChanRecv:
 			self.chanRecvAssign(a)
