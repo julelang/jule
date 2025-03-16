@@ -1761,9 +1761,44 @@ impl eval {
 
 	fn castTypeEnumT(mut self, mut &t: &Type, mut &v: &Value, mut &errorToken: &token::Token) {
 		n := len(self.s.errors)
+		// quick check: if type t and value type comparable.
 		if !self.s.checkTypeCompatibility(t, v.Type, errorToken) {
 			self.s.errors = self.s.errors[:n] // Remove logges errors by checkTypeCompatibility.
-			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+			// We are in here. So something went wrong.
+			// We know the type t is a type-enum. We should check whether it a strict type alias.
+			// If it is not, there is nothing to do; inevitable compiler error.
+			// Otherwise, we can check by value type, so vice versa.
+			// This is works some cases.
+			//
+			// For example:
+			//
+			//		enum Foo: type {
+			//			int,
+			//			bool,
+			//		}
+			//
+			//		type Bar: Foo
+			//
+			//		enum Baz: type {
+			//			Bar,
+			//		}
+			//
+			//		fn main() {
+			//			a := Baz(Bar(20))
+			//			x := Bar(a)
+			//			println(x)
+			//		}
+			//
+			//	In the example code above, strict type alias Bar casted from type-enum Baz.
+			//	This is an error due to Baz does not supports type-enum Baz. But,
+			//	type-enum Baz supports Baz, so casting may be possible. To catch
+			//	such cases, also check by value type if type t is a strict type
+			//	alias and value is a type-enum.
+			if t.SoftStruct() == nil ||
+				v.Type.TypeEnum() != nil && !self.s.checkTypeCompatibility(v.Type, t, errorToken) {
+				self.s.errors = self.s.errors[:n] // Remove logges errors by checkTypeCompatibility.
+				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+			}
 		}
 		v.Constant = nil
 		v.untyped = false
