@@ -695,6 +695,47 @@ impl exprCoder {
 			self.possibleRefExpr(m.Expr.Model)
 			ret
 		}
+		if m.Expr.Type.Trait() != nil {
+			if m.Type.Trait() != nil {
+				self.castTraitFromTrait(m, m.Type.Trait(), m.Expr.Type.Trait())
+				ret
+			}
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write(".")
+			// We handling map and channel types as smart pointer,
+			// because this kind types implemented as smart pointers
+			// at machine code level.
+			match {
+			| m.Type.Sptr() != nil:
+				self.oc.write("cast_ptr<")
+				self.oc.tc.kind(self.oc.Buf, m.Type.Sptr().Elem)
+			| m.Type.Map() != nil:
+				self.oc.write("cast_ptr<")
+				mp := m.Type.Map()
+				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Val)
+				self.oc.tc.structureIns(self.oc.Buf, mps)
+			| m.Type.Chan() != nil:
+				self.oc.write("cast_ptr<")
+				ch := m.Type.Chan()
+				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+				self.oc.tc.structureIns(self.oc.Buf, chs)
+			|:
+				self.oc.write("cast<")
+				self.oc.tc.kind(self.oc.Buf, m.Type)
+			}
+			self.oc.write(">(")
+			if !env::Production {
+				self.oc.write("\"")
+				self.oc.locInfo(m.Token)
+				self.oc.write("\", ")
+			}
+			self.oc.write("(" + typeTrait + "::Type*)&")
+			identCoder.traitDecl(self.oc.Buf, m.Expr.Type.Trait())
+			self.oc.write("_mptr_data")
+			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Expr.Type.Trait(), m.Type)))
+			self.oc.write(")")
+			ret
+		}
 		if m.Expr.Type.Ptr() != nil || m.Type.Ptr() != nil {
 			self.oc.write("((")
 			self.oc.tc.kind(self.oc.Buf, m.Type)
