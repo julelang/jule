@@ -51,7 +51,7 @@ impl EncodeError {
 
 const hex = "0123456789abcdef"
 
-// JSON encoder implementation flags.
+// JSON encoder implementation flags, by types.
 // This JSON encoding algorithm is based comptime and uses generics.
 // Since we do not want implement overhead of indentation handling for plain
 // encoding calls, we have to make separate implementations for plain and
@@ -62,27 +62,26 @@ const hex = "0123456789abcdef"
 // and use Jule's comptime power to determine Flag whether enables indentation
 // algorithms. Thus, we can have separated algorithms for plain and
 // indentation-based encoding algorithms.
-enum encodeFlagType: type {
-	// Flag type for plain JSON encoding without indentation.
-	// When this type used for Flag type, indentation algorithms will be excluded.
-	Plain: int,
 
-	// Flag type for JSON encoding with indentation.
-	// When this type used for Flag type, indentation algorithms will be included.
-	// Indentation algorithms does not appends indentation during encoding,
-	// because it is not efficient enough as far as tested. Probably causes too
-	// many reallocation. Therefore, just appends the newline when indentation needed,
-	// this newlines also part of the encoded JSON result. After encoding,
-	// bytes should be handled and indentation should be appended after each newline.
-	// Except indentations, it will append whitespace after colons and etc. to buffer.
-	// So, just newlines should be handled, minor whitespaces will be handled by encoder.
-	// The encoder also computes the total count of bytes for indentations. Thus,
-	// we can know the exact size of the buffer including indentations with
-	// calculation like this: len(encoder.buf.bytes()) + encoder.total
-	// So if needed to making new allocation to handle indentations after encoding,
-	// we can allocate new buffer with exact size without wasted memory.
-	Indent: uint,
-}
+// Flag type for plain JSON encoding without indentation.
+// When this type used for Flag type, indentation algorithms will be excluded.
+type encodePlain = int
+
+// Flag type for JSON encoding with indentation.
+// When this type used for Flag type, indentation algorithms will be included.
+// Indentation algorithms does not appends indentation during encoding,
+// because it is not efficient enough as far as tested. Probably causes too
+// many reallocation. Therefore, just appends the newline when indentation needed,
+// this newlines also part of the encoded JSON result. After encoding,
+// bytes should be handled and indentation should be appended after each newline.
+// Except indentations, it will append whitespace after colons and etc. to buffer.
+// So, just newlines should be handled, minor whitespaces will be handled by encoder.
+// The encoder also computes the total count of bytes for indentations. Thus,
+// we can know the exact size of the buffer including indentations with
+// calculation like this: len(encoder.buf.bytes()) + encoder.total
+// So if needed to making new allocation to handle indentations after encoding,
+// we can allocate new buffer with exact size without wasted memory.
+type encodeIndent = uint
 
 // JSON encoder with/without indentation.
 // For indentation, use Flag type logic.
@@ -225,7 +224,7 @@ impl jsonEncoder {
 
 	fn encodeStruct[T, Flag](mut self, &t: T)! {
 		const tt = comptime::TypeOf(T).Decl()
-		const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeFlagType.Indent)
+		const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeIndent)
 		self.buf.writeByte('{')
 		const match {
 		| useIndent:
@@ -247,7 +246,7 @@ impl jsonEncoder {
 				const fieldValue = vt.Field(field.Name())
 				comptime::TypeAlias(fieldType, fieldValue.Type())
 				const match type Flag {
-				| encodeFlagType.Indent:
+				| encodeIndent:
 					self.buf.writeByte(' ')
 				}
 				self.encode[fieldType, Flag](fieldValue.Unwrap()) else { error(error) }
@@ -292,7 +291,7 @@ impl jsonEncoder {
 			ret
 		}
 		const quoted = keyT.Kind() == comptime::Str
-		const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeFlagType.Indent)
+		const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeIndent)
 		self.buf.writeByte('{')
 		const match {
 		| useIndent:
@@ -341,7 +340,7 @@ impl jsonEncoder {
 	}
 
 	fn encodeArray[T, Flag](mut self, &t: T)! {
-		const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeFlagType.Indent)
+		const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeIndent)
 		self.buf.writeByte('[')
 		const match {
 		| useIndent:
@@ -541,7 +540,7 @@ fn encoder(): jsonEncoder {
 //	JSONEncoder, TextEncoder
 fn Encode[T](t: T)!: []byte {
 	mut encoder := encoder()
-	encoder.encode[T, encodeFlagType.Plain](t) else { error(error) }
+	encoder.encode[T, encodePlain](t) else { error(error) }
 	ret encoder.buf.bytes()
 }
 
@@ -549,13 +548,13 @@ fn Encode[T](t: T)!: []byte {
 fn EncodeIndent[T](t: T, indent: str)!: []byte {
 	mut encoder := encoder()
 	encoder.indent = len(indent)
-	encoder.encode[T, encodeFlagType.Indent](t) else { error(error) }
+	encoder.encode[T, encodeIndent](t) else { error(error) }
 	mut bytes := encoder.buf.bytes()
 	if encoder.total == 0 {
 		ret bytes
 	}
 	// Handle indentation.
-	// See documentation of [encodeFlagType.Indent].
+	// See documentation of [encodeIndent].
 	mut buf := make([]byte, len(bytes)+encoder.total)
 	mut depth := 0
 	mut p := &buf[0] // Use raw pointer to mutate buffer efficiently.
