@@ -1519,11 +1519,16 @@ impl sema {
 			ret
 		}
 
-		if f.Exceptional {
-			if f.IsEntryPoint() {
-				self.pushErr(f.Token, build::LogMsg.ExceptionalEntryPoint)
-			} else if f.IsInit() {
-				self.pushErr(f.Token, build::LogMsg.ExceptionalInit)
+		// Check special cases for reserved functions, ignore method ones.
+		if f.IsEntryPoint() && f.Owner == nil {
+			if !FuncPattern.Main(f) {
+				self.pushErr(f.Token, build::LogMsg.InvalidMainFunction)
+				self.pushSuggestion(build::LogMsg.ExpectedMainLike)
+			}
+		} else if f.IsInit() && f.Owner == nil {
+			if !FuncPattern.Init(f) {
+				self.pushErr(f.Token, build::LogMsg.InvalidInitializerFunction)
+				self.pushSuggestion(build::LogMsg.ExpectedInitializerLike)
 			}
 		}
 
