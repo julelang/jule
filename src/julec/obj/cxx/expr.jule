@@ -658,24 +658,14 @@ impl exprCoder {
 	//	Otherwise, code generation might be wrong because <any> the
 	//	uses special casting algorithms.
 	fn casting(mut &self, mut m: &sema::CastingExpr) {
+		// Return the expression with no casting if actual types are equal.
+		if m.Type.ActualEqual(m.Expr.Type) {
+			self.possibleRefExpr(m.Expr.Model)
+			ret
+		}
 		if obj::IsAny(m.Type) {
 			if m.Expr.Type.IsNil() {
 				self.oc.write(typeAny + "()")
-				ret
-			}
-			// If types are equal, no casting needed.
-			if m.Type.Equal(m.Expr.Type) {
-				self.possibleRefExpr(m.Expr.Model)
-				ret
-			}
-			// If expression is not a strict type alias and it is type <any>, no casting needed.
-			if m.Expr.Type.SoftStruct() == nil && obj::IsAny(m.Expr.Type) {
-				self.possibleRefExpr(m.Expr.Model)
-				ret
-			}
-			// If types are type-enum and equal, no casting needed.
-			if m.Type.TypeEnum() != nil && m.Type.ActualEqual(m.Expr.Type) {
-				self.possibleRefExpr(m.Expr.Model)
 				ret
 			}
 			i := self.oc.pushAnyType(m.Expr.Type)
@@ -698,11 +688,6 @@ impl exprCoder {
 			self.oc.write(", &" + anyTypeIdent)
 			self.oc.write(conv::Itoa(i))
 			self.oc.write(")")
-			ret
-		}
-		// Return the expression with no casting if actual types are equal.
-		if m.Type.ActualEqual(m.Expr.Type) {
-			self.possibleRefExpr(m.Expr.Model)
 			ret
 		}
 		if m.Expr.Type.Trait() != nil {
