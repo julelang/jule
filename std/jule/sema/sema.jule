@@ -1334,6 +1334,9 @@ impl sema {
 			self.pushErr(item.TypeSym.Decl.Token, build::LogMsg.ArrayAutoSized)
 			ok = false
 		}
+		if ok {
+			checkTypeEnumRefCycle(self, e, item)
+		}
 		ret
 	}
 
@@ -2615,7 +2618,6 @@ impl sema {
 	// Check initialization cycles for global variables.
 	fn checkInitializationCycles(mut &self) {
 		mut message := new(strings::Builder)
-		message.Grow(1 << 5)
 		pushIllegalCycleError := fn(v1: str, v2: str) {
 			const Padding = 7
 			refersTo := build::Logf(build::LogMsg.RefersTo, v1, v2)
@@ -3017,4 +3019,55 @@ fn isValidImpAlias(mut alias: str): (valid: bool) {
 		}
 	}
 	ret true
+}
+
+fn checkTypeEnumRefCycle(mut s: &sema, mut e: &TypeEnum, mut item: &TypeEnumItem) {
+	// If item type is a strict type alias (or structure type, does not matter in this case)
+	// return immediately, no risk for cross references.
+	// Strict type aliases will not be inherited.
+	if item.TypeSym.Type.SoftStruct() != nil {
+		ret
+	}
+	mut e2 := item.TypeSym.Type.TypeEnum()
+	// If item type is not type-enum, no risk for cross references.
+	if e2 == nil {
+		ret
+	}
+	if e == e2 {
+		s.pushErr(item.Token, build::LogMsg.IllegalCycleRefersItself, e.Ident)
+		ret
+	}
+	mut message := new(strings::Builder)
+	pushIllegalCycleError := fn(v1: str, v2: str) {
+		const Padding = 7
+		refersTo := build::Logf(build::LogMsg.RefersTo, v1, v2)
+		message.WriteStr(strings::Repeat(" ", Padding))!
+		message.WriteStr(refersTo)!
+		message.WriteByte('\n')!
+	}
+	mut checkCycles := (fn(mut e2: &TypeEnum): bool)(nil)
+	&_checkCycles := checkCycles // For closure.
+	checkCycles = fn(mut e2: &TypeEnum): bool {
+		n := message.Len()
+		for (_, mut item2) in e2.Items {
+			if item2.TypeSym.Type == nil {
+				continue
+			}
+			mut ie := item2.TypeSym.Type.TypeEnum()
+			if ie == nil {
+				continue
+			}
+			pushIllegalCycleError(e2.Ident, ie.Ident)
+			if ie == e || unsafe { !_checkCycles(ie) } {
+				ret false
+			}
+		}
+		unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
+		ret true
+	}
+	pushIllegalCycleError(e.Ident, e2.Ident)
+	ok := checkCycles(e2)
+	if !ok {
+		s.pushErr(e.Token, build::LogMsg.IllegalCrossCycle, message.Str())
+	}
 }
