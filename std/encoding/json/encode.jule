@@ -385,11 +385,9 @@ impl jsonEncoder {
 		}
 	}
 
-	fn encode[T, Flag](mut self, &t: T)! {
+	fn encodePlain[T, Flag](mut self, &t: T)! {
 		const tt = comptime::TypeOf(T)
 		const match {
-		| tt.Binded():
-			error(&UnsupportedTypeError{Type: tt.Str()})
 		| tt.Strict() || tt.Kind() == comptime::Struct:
 			// Before using the default encoding strategy, look for the custom encoder
 			// methods and use it, if any. If not exist any custom encoder method,
@@ -466,6 +464,19 @@ impl jsonEncoder {
 			self.encodeSlice[T, Flag](t) else { error(error) }
 		|:
 			error(&UnsupportedTypeError{Type: tt.Str()})
+		}
+	}
+
+	fn encode[T, Flag](mut self, &t: T)! {
+		// Handle bind types here to avoid compile-time error messages for types.
+		// The [encodePlain] should be compile-time safe for type T.
+		// Prevent any compilation errors from being triggered.
+		const tt = comptime::TypeOf(T)
+		const match {
+		| tt.Binded():
+			error(&UnsupportedTypeError{Type: tt.Str()})
+		|:
+			self.encodePlain[T, Flag](t) else { error(error) }
 		}
 	}
 }
