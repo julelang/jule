@@ -352,9 +352,11 @@ namespace jule
             auto buf = jule::Str::alloc(this->_len + str._len);
             std::copy(this->begin(), this->end(), buf);
             std::copy(str.begin(), str.end(), buf + this->_len);
+            auto len = this->_len + str._len;
+            this->dealloc();
             this->buffer = jule::Str::buffer_t::make(buf);
             this->_slice = buf;
-            this->_len += str._len;
+            this->_len = len;
             return *this;
         }
 
