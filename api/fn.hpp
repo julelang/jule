@@ -35,7 +35,7 @@ namespace jule
             this->f = f;
         }
 
-        ~Fn(void) noexcept
+        void dealloc(void) noexcept
         {
             this->f = nullptr;
             if (this->ctxHandler)
@@ -45,6 +45,11 @@ namespace jule
             }
             this->ctx.ref = nullptr; // Disable GC for allocation.
             this->ctx = nullptr;     // Assign to nullptr safely.
+        }
+
+        ~Fn(void) noexcept
+        {
+            this->dealloc();
         }
 
         template <typename... Arguments>
@@ -76,7 +81,32 @@ namespace jule
 
         inline Fn<Ret, Args...> &operator=(std::nullptr_t) noexcept
         {
-            this->f = nullptr;
+            this->dealloc();
+            return *this;
+        }
+
+        inline Fn<Ret, Args...> &operator=(const Fn<Ret, Args...> &f)
+        {
+            // Assignment to itself.
+            if (this->ctx.alloc == f.ctx.alloc)
+            {
+                this->f = f.f;
+                this->ctxHandler = f.ctxHandler;
+                return *this;
+            }
+            this->dealloc();
+            this->f = f.f;
+            this->ctx = f.ctx;
+            this->ctxHandler = f.ctxHandler;
+            return *this;
+        }
+
+        inline Fn<Ret, Args...> &operator=(Fn<Ret, Args...> &&f)
+        {
+            this->dealloc();
+            this->ctx = std::move(f.ctx);
+            this->f = f.f;
+            this->ctxHandler = f.ctxHandler;
             return *this;
         }
 
