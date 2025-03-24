@@ -1149,33 +1149,28 @@ impl exprCoder {
 			} else {
 				forwarded := obj::IsForwarded(m.Except)
 				self.oc.write("(except.ok()) ? (except.result) : (")
-				if forwarded {
-					self.oc.write("{")
-				}
 				mut stmt := m.Except.Stmts[len(m.Except.Stmts)-1]
+				self.oc.write("{")
+				self.oc.addIndent()
 				match type stmt {
 				| &sema::Value:
 					m.Except.Stmts = m.Except.Stmts[:len(m.Except.Stmts)-1]
-					self.oc.write("{\n")
-					self.oc.addIndent()
 					self.oc.sc.scopeStmts(m.Except)
 					self.oc.write("\n")
 					self.oc.indent()
 					mut v := stmt.(&sema::Value)
 					self.writeUseExpr(m.Func, v)
-					self.oc.write("\n")
-					self.oc.doneIndent()
-					self.oc.indent()
-					self.oc.write("}")
 				|:
-					self.oc.sc.scope(m.Except)
+					self.oc.sc.scopeStmts(m.Except)
 				}
+				self.oc.write("\n")
 				if forwarded {
-					self.oc.write(" ")
-					self.initExpr(m.Func.Result)
-					self.oc.write(";}")
+					self.oc.indent()
+					self.oc.write("except.result; // to prevent error, unreachable\n")
 				}
-				self.oc.write(");\n")
+				self.oc.doneIndent()
+				self.oc.indent()
+				self.oc.write("});\n")
 			}
 			self.oc.doneIndent()
 		} else {
