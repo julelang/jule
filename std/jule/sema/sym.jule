@@ -705,8 +705,25 @@ impl symBuilder {
 			mut t := buildTrait(node.Data.(&ast::Trait))
 			self.table.Traits = append(self.table.Traits, t)
 		| &ast::Var:
-			mut v := buildVar(node.Data.(&ast::Var))
-			self.table.Vars = append(self.table.Vars, v)
+			mut astv := node.Data.(&ast::Var)
+			// Grouped variables represented by the root variable of group.
+			// See developer reference (12).
+			// In the CAST, all variables of the group should be in the CAST.
+			// See developer reference (13).
+			if astv.Group == nil {
+				mut v := buildVar(astv)
+				self.table.Vars = append(self.table.Vars, v)
+			} else {
+				n := len(self.table.Vars)
+				for (_, mut gv) in astv.Group {
+					self.table.Vars = append(self.table.Vars, buildVar(gv))
+				}
+				mut group := self.table.Vars[n:len(self.table.Vars):len(self.table.Vars)]
+				for (i, mut v) in group {
+					v.GroupIndex = i
+					v.Group = group
+				}
+			}
 		| &ast::Enum:
 			mut e := buildEnum(node.Data.(&ast::Enum))
 			self.table.Enums = append(self.table.Enums, e)

@@ -546,12 +546,12 @@ impl scopeChecker {
 		ret false
 	}
 
-	fn checkVarDecl(mut &self, mut decl: &ast::Var) {
-		mut v := buildVar(decl)
-		v.Scope = self.scope
-
+	fn checkVarDecl1(mut &self, mut &v: &Var) {
 		defer {
-			self.table.Vars = append(self.table.Vars, v)
+			// Grouped variables will be added to table.
+			if v.Group == nil {
+				self.table.Vars = append(self.table.Vars, v)
+			}
 			self.scope.Stmts = append(self.scope.Stmts, v)
 		}
 
@@ -566,7 +566,7 @@ impl scopeChecker {
 		if !v.IsTypeInferred() && (v.TypeSym == nil || v.TypeSym.Type == nil) {
 			ret
 		}
-
+		v.Checked = true
 		self.s.evalVarValue(v, self)
 		if !v.IsInitialized() || v.ValueSym.Value == nil {
 			// Skip checks if error occurs when evaluated expression,
@@ -585,6 +585,12 @@ impl scopeChecker {
 				v.Refers.clear()
 			}
 		}
+	}
+
+	fn checkVarDecl(mut &self, mut decl: &ast::Var) {
+		mut v := buildVar(decl)
+		v.Scope = self.scope
+		self.checkVarDecl1(v)
 	}
 
 	fn checkTypeAlias(mut &self, mut &ta: &TypeAlias) {
@@ -2131,6 +2137,33 @@ impl scopeChecker {
 		}
 		for self.i < n; self.i++ {
 			mut stmt := self.tree.Stmts[self.i]
+			match type stmt.Data {
+			| &ast::Var:
+				// Handle group variables, if any.
+				// Grouped variables represented by the root variable of group.
+				// See developer reference (12).
+				// In the CAST, all variables of the group should be in the CAST.
+				// See developer reference (13).
+				mut astv := stmt.Data.(&ast::Var)
+				if astv.Group != nil {
+					tn := len(self.table.Vars)
+					for (_, mut gv) in astv.Group {
+						self.table.Vars = append(self.table.Vars, buildVar(gv))
+					}
+					mut group := self.table.Vars[tn:len(self.table.Vars):len(self.table.Vars)]
+					for (i, mut v) in group {
+						v.Scope = self.scope
+						v.GroupIndex = i
+						v.Group = group
+						self.checkVarDecl1(v)
+						if self.stopped() {
+							ret
+						}
+					}
+					// Skip this node, it is already checked.
+					continue
+				}
+			}
 			self.checkNode(stmt.Data)
 			if self.stopped() {
 				ret

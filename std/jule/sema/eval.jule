@@ -101,6 +101,12 @@ struct eval {
 	owner:      &Var      // Global variable, which is owner of this evaluation.
 	field:      &FieldIns // Field of this default expression. Used for checking cycles and dependency collection.
 	target:     target
+
+	// The built-in iota variable.
+	// The Used field is also a flag whether the iota variable used,
+	// therefore it should be set to the false to catch use cases.
+	// The default state is false for both flags.
+	varIota: &Var
 }
 
 impl eval {
@@ -390,6 +396,15 @@ impl eval {
 			ret s
 		}
 
+		// Special variables.
+		match ident {
+		| "iota":
+			if self.varIota == nil {
+				ret nil
+			}
+			ret self.varIota
+		}
+
 		ret self.findBuiltins(ident)
 	}
 
@@ -534,6 +549,7 @@ impl eval {
 
 		if v.Token == nil {
 			// Variable is built-in.
+			v.Used = true
 			goto data
 		}
 

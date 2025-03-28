@@ -1835,8 +1835,15 @@ impl sema {
 			self.pushErr(decl.Token, build::LogMsg.IgnoreIdent)
 		}
 
+		// If declaration is constant and have not a group, complain for initialize expression.
+		// Otherwise do not. Because it may be enumerated.
+		// It will be checked by the [checkVarValue] method.
+		// But if it has type annotation, complain, because enumerators
+		// should be plain, only identifier.
+		groupError := decl.Constant && (decl.Group == nil || !decl.IsTypeInferred())
+
 		if decl.IsTypeInferred() {
-			if !decl.IsInitialized() {
+			if !decl.IsInitialized() && groupError {
 				self.pushErr(decl.Token, build::LogMsg.MissingValueForTypeInference)
 			}
 		} else {
@@ -1862,7 +1869,7 @@ impl sema {
 		}
 
 		if !decl.IsInitialized() {
-			if decl.Constant {
+			if groupError {
 				self.pushErr(decl.Token, build::LogMsg.ConstVarNotHaveExpr)
 			}
 			if decl.Statically {
@@ -2166,9 +2173,78 @@ impl sema {
 	}
 
 	// Evaluates value of variable if initialized.
-	fn evalVarValue(mut &self, mut &v: &Var, mut l: Lookup) {
+	// Reports if value-check needed.
+	fn evalVarValue(mut &self, mut &v: &Var, mut l: Lookup): (valCheck: bool) {
 		if !v.IsInitialized() {
-			ret
+			// If variable is constant and grouped, we have to check previous
+			// constants due to possible enumeration.
+			if v.Constant && v.Group != nil {
+				if v.GroupIndex == 0 {
+					self.pushErr(v.Token, build::LogMsg.FirstGroupVarIsNotInitialized)
+					ret false
+				}
+				mut dv := v.Group[v.GroupIndex-1]
+				if !dv.Checked {
+					self.checkVar(dv, l)
+				}
+				if dv.ValueSym == nil || dv.ValueSym.Value == nil {
+					ret false
+				}
+				v.TypeSym = new(TypeSym, *dv.TypeSym)
+				if dv.TypeSym.Decl != nil {
+					v.TypeSym.Decl = new(ast::Type, *dv.TypeSym.Decl)
+					v.TypeSym.Decl.Token = v.Token
+				}
+				v.ValueSym = new(ValueSym)
+				v.ValueSym.Expr = new(ast::Expr)
+				v.ValueSym.Expr.Token = v.Token
+				if dv.Iota {
+					v.Iota = true
+					v.ValueSym.Value = new(Value, *dv.ValueSym.Value)
+					v.ValueSym.Value.Constant = constant::Const.NewI64(1)
+					v.ValueSym.Value.Constant.Add(*dv.ValueSym.Value.Constant)
+					v.ValueSym.Value.Constant.Kind = dv.ValueSym.Value.Constant.Kind // save the kind
+					// If computation result overflows the bitsize limit, log error,
+					// and set value to nil.
+					i := v.ValueSym.Value.Constant.ReadInt()
+					if i.BitLen() > bitLimit {
+						self.pushErr(v.Token, build::LogMsg.ConstantOverflowResult)
+						v.ValueSym.Value = nil
+						ret
+					}
+					// Check overflow cases if value is not untyped.
+					// In this case, enumeration uses an explicit type.
+					// We have to check overflows for the exact type.
+					// For example:
+					//	const (
+					//		A: byte = iota + 254
+					//		B
+					//		C
+					//		D
+					//	)
+					//	In the example above, C and D constants overflows the
+					//	type byte's maximum value.
+					if !v.ValueSym.Value.untyped {
+						match {
+						| types::IsFloat(v.ValueSym.Value.Constant.Kind):
+							if !floatAssignable(v.ValueSym.Value.Constant.Kind, v.ValueSym.Value) {
+								self.pushErr(v.Token, build::LogMsg.ConstantOverflowType, v.ValueSym.Value.Constant.Str(), v.TypeSym.Type.Str())
+								v.ValueSym.Value = nil
+								ret false
+							}
+						| types::IsInt(v.ValueSym.Value.Constant.Kind):
+							if !intAssignable(v.ValueSym.Value.Constant.Kind, v.ValueSym.Value) {
+								self.pushErr(v.Token, build::LogMsg.ConstantOverflowType, v.ValueSym.Value.Constant.Str(), v.TypeSym.Type.Str())
+								v.ValueSym.Value = nil
+								ret false
+							}
+						}
+					}
+				} else {
+					v.ValueSym.Value = dv.ValueSym.Value
+				}
+			}
+			ret false
 		}
 
 		mut eval := (&eval)(nil)
@@ -2178,16 +2254,31 @@ impl sema {
 			eval = self.evalpd(l, nil, v)
 		}
 		eval.target.mutable = v.Mutable
+
+		allowItoa := v.Group != nil && (v.GroupIndex == 0 ||
+			v.Group[0].TypeSym != nil && v.Group[0].TypeSym.Type != nil &&
+				v.Group[0].TypeSym.Type.Prim() != nil && types::IsNum(v.Group[0].TypeSym.Type.Str()))
+		if allowItoa {
+			eval.varIota = buildIota(i64(v.GroupIndex))
+			defer {
+				v.Iota = eval.varIota.Used
+			}
+		}
+
 		// Do not unwrap untyped literals, type analysis will check overflows.
 		v.ValueSym.Value = eval.evalExpr(v.ValueSym.Expr, evalDefault)
+		ret true
 	}
 
 	// Evaluateds value of variable and checks.
 	// Assumes the variable is global.
 	fn checkVar(mut &self, mut &v: &Var, mut l: Lookup) {
+		if v.Checked {
+			ret
+		}
 		v.Checked = true
-		self.evalVarValue(v, l)
-		if v.ValueSym.Value == nil {
+		valCheck := self.evalVarValue(v, l)
+		if !valCheck || v.IsInitialized() && v.ValueSym.Value == nil {
 			ret // Skip checks if error occurs.
 		}
 		self.checkVarValue(v)

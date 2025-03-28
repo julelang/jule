@@ -89,6 +89,10 @@ An example of a faulty analysis scenario:
 
 - **(11)** When constant values are cast, the expression model is not updated as a casting model. Only the type of the value and, if necessary, the `Kind` data of the `constant::Const` type are updated. Ultimately, it always remains a constant value, and the expression model never becomes a casting expression model in any way.
 
+- **(12)** Grouped variables represented by the root (first) variable of the group in the AST. For the all members of group, the `Group` field holds them including the root member. The `GroupIndex` field holds the index of the variable, counting starts from zero.
+
+- **(13)** Grouped variables represented by themselves (not only the root one) in the CAST, unlike AST. CAST declares variables in the same order of the group. For the all members of group, they still have the `Group` field holds them including the root member. The `GroupIndex` field holds the index of the variable, counting starts from zero.
+
 ### Implicit Imports
 
 Implicit imports are as described in developer reference (9). This section addresses which package is supported and what special behaviors it has.

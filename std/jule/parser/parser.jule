@@ -293,6 +293,34 @@ impl parser {
 		ret tad
 	}
 
+	fn buildConstVarGroup(mut &self, mut &tokens: []&token::Token): &ast::Var {
+		mut i := 1 // Point to open parentheses.
+		mut rangeTokens := range(i, token::Id.LParent, token::Id.RParent, tokens)
+		if i < len(tokens) {
+			self.pushErr(tokens[i], build::LogMsg.InvalidSyntax)
+		}
+		mut stmts := splitStmts(rangeTokens)
+		if len(stmts) == 0 {
+			self.pushErr(tokens[0], build::LogMsg.EmptyGroup)
+			ret nil
+		}
+		mut group := make([]&ast::Var, 0, len(stmts))
+		for (_, mut stmt) in stmts {
+			mut v := &ast::Var{
+				Constant: true,
+				Token: tokens[0],
+			}
+			self.buildVarCommon(v, stmt.tokens)
+			group = append(group, v)
+		}
+		// Setup group metadata.
+		for (j, mut v) in group {
+			v.GroupIndex = j
+			v.Group = group
+		}
+		ret group[0]
+	}
+
 	fn buildVarTypeAndExpr(mut &self, mut &v: &ast::Var, mut &tokens: []&token::Token) {
 		mut i := 0
 		mut tok := tokens[i]
@@ -371,6 +399,10 @@ impl parser {
 	}
 
 	fn buildVar(mut &self, mut tokens: []&token::Token): &ast::Var {
+		// Catch constant groups
+		if len(tokens) >= 2 && tokens[0].Id == token::Id.Const && tokens[1].Id == token::Id.LParent {
+			ret self.buildConstVarGroup(tokens)
+		}
 		mut v := &ast::Var{
 			Token: tokens[0],
 		}
