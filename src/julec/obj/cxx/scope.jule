@@ -55,7 +55,7 @@ impl scopeCoder {
 		self.oc.indent()
 		self.oc.write("auto expr = ")
 		mut ref := false
-		if opt::Copy && isCopyOptimizable(it.Expr) {
+		if opt::Copy && isCopyOptimizable(it.Expr, true) {
 			ref = true
 			match type it.Expr.Model {
 			| &sema::Var:
@@ -136,7 +136,7 @@ impl scopeCoder {
 		self.oc.addIndent()
 		self.oc.indent()
 		self.oc.write("auto expr = ")
-		if opt::Copy && isCopyOptimizable(it.Expr) {
+		if opt::Copy && isCopyOptimizable(it.Expr, true) {
 			ref = true
 			match type it.Expr.Model {
 			| &sema::Var:
@@ -345,7 +345,7 @@ impl scopeCoder {
 
 		mut ref := false
 		self.oc.write("auto expr = ")
-		if opt::Copy && isCopyOptimizable(it.Expr) {
+		if opt::Copy && isCopyOptimizable(it.Expr, true) {
 			ref = true
 			match type it.Expr.Model {
 			| &sema::Var:
@@ -1010,7 +1010,7 @@ impl scopeCoder {
 				mut matchExpr := compExpr(matchExprS)
 				l.Model = unsafe { *(*sema::Expr)(&matchExpr) }
 			} else {
-				if opt::Copy && isCopyOptimizable(m.Expr) {
+				if opt::Copy && isCopyOptimizable(m.Expr, false) {
 					self.oc.write("auto &_match_expr{ ")
 				} else {
 					self.oc.write("auto _match_expr{ ")
@@ -1559,8 +1559,13 @@ impl scopeCoder {
 	}
 }
 
-fn isCopyOptimizable(&v: &sema::Value): bool {
-	if !v.Lvalue {
+fn isCopyOptimizable(&v: &sema::Value, iter: bool): bool {
+	// Return false if value is not lvalue or iter && mutable.
+	// If the value is not lvalue, we have to copy it.
+	// If the value is mutable and optimized for iteration, we cannot optimize it.
+	// Because the value may be mutated in the iteration.
+	// Compiler will not analysis such cases yet, so we cannot know.
+	if !v.Lvalue || (iter && v.Mutable) {
 		ret false
 	}
 	match type v.Model {
