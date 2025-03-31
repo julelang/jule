@@ -257,7 +257,7 @@ impl comptimeRangeKind for comptimeStatics {
 
 // Compile-time field for enum.
 struct comptimeEnumField {
-	field: &EnumItem
+	field: &Var
 }
 
 impl Kind for comptimeEnumField {
@@ -295,7 +295,7 @@ impl comptimeEnumField {
 
 // Compile-time fields range for enum.
 struct comptimeEnumFields {
-	fields: []&EnumItem
+	fields: []&Var
 }
 
 impl Kind for comptimeEnumFields {
@@ -1581,7 +1581,6 @@ enum comptimeDeclType: type {
 	&TypeAlias,
 	&Var,
 	&Param,
-	&EnumItem,
 }
 
 // Compile-time declaration information wrapper.
@@ -1612,9 +1611,11 @@ impl comptimeDecl {
 		| &TypeAlias:
 			ret "<type alias>"
 		| &Var:
+			v := self.decl.(&Var)
+			if v.IsEnumField() {
+				ret "<enum field>"
+			}
 			ret "<var>"
-		| &EnumItem:
-			ret "<enum item>"
 		| &Param:
 			ret "<param>"
 		|:
@@ -1645,8 +1646,6 @@ impl comptimeDecl {
 			name = self.decl.(&TypeAlias).Ident
 		| &Var:
 			name = self.decl.(&Var).Ident
-		| &EnumItem:
-			name = self.decl.(&EnumItem).Ident
 		| &Param:
 			name = self.decl.(&Param).Ident
 		|:
@@ -1667,7 +1666,6 @@ impl comptimeDecl {
 		}
 		mut public := false
 		match type self.decl {
-		| &EnumItem
 		| &Param:
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Public")
 			ret nil
@@ -1686,7 +1684,12 @@ impl comptimeDecl {
 		| &TypeAlias:
 			public = self.decl.(&TypeAlias).Public
 		| &Var:
-			public = self.decl.(&Var).Public
+			v := self.decl.(&Var)
+			if v.IsEnumField() {
+				e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Public")
+				ret nil
+			}
+			public = v.Public
 		|:
 			panic("sema: comptimeDecl.Public: unimplemented declaration kind")
 		}
@@ -1710,7 +1713,6 @@ impl comptimeDecl {
 		| &TypeEnum
 		| &Trait
 		| &Field
-		| &EnumItem
 		| &Param:
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Binded")
 			ret nil
@@ -1721,7 +1723,12 @@ impl comptimeDecl {
 		| &TypeAlias:
 			binded = self.decl.(&TypeAlias).Binded
 		| &Var:
-			binded = self.decl.(&Var).Binded
+			v := self.decl.(&Var)
+			if v.IsEnumField() {
+				e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Binded")
+				ret nil
+			}
+			binded = v.Binded
 		|:
 			panic("sema: comptimeDecl.Binded: unimplemented declaration kind")
 		}
@@ -1768,8 +1775,7 @@ impl comptimeDecl {
 		| &Enum
 		| &TypeEnum
 		| &Trait
-		| &TypeAlias
-		| &EnumItem:
+		| &TypeAlias:
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Mutable")
 			ret nil
 		| &Param:
@@ -1777,7 +1783,12 @@ impl comptimeDecl {
 		| &Field:
 			mutable = self.decl.(&Field).Mutable
 		| &Var:
-			mutable = self.decl.(&Var).Mutable
+			v := self.decl.(&Var)
+			if v.IsEnumField() {
+				e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Mutable")
+				ret nil
+			}
+			mutable = v.Mutable
 		|:
 			panic("sema: comptimeDecl.Mutable: unimplemented declaration kind")
 		}
@@ -1803,7 +1814,6 @@ impl comptimeDecl {
 		| &TypeEnum
 		| &Trait
 		| &TypeAlias
-		| &EnumItem
 		| &Field
 		| &Var:
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Variadic")
@@ -1835,12 +1845,16 @@ impl comptimeDecl {
 		| &TypeEnum
 		| &Trait
 		| &TypeAlias
-		| &EnumItem
 		| &Field:
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Reference")
 			ret nil
 		| &Var:
-			ref = self.decl.(&Var).Reference
+			v := self.decl.(&Var)
+			if v.IsEnumField() {
+				e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Reference")
+				ret nil
+			}
+			ref = v.Reference
 		| &Param:
 			ref = self.decl.(&Param).Reference
 		|:
@@ -1866,7 +1880,6 @@ impl comptimeDecl {
 		| &TypeEnum
 		| &Trait
 		| &TypeAlias
-		| &EnumItem
 		| &Field
 		| &Var
 		| &Param:
@@ -1900,7 +1913,6 @@ impl comptimeDecl {
 		| &TypeEnum
 		| &Trait
 		| &TypeAlias
-		| &EnumItem
 		| &Field
 		| &Var
 		| &Param
@@ -1940,7 +1952,6 @@ impl comptimeDecl {
 		match type self.decl {
 		| &TypeEnum
 		| &TypeAlias
-		| &EnumItem
 		| &Field
 		| &Var
 		| &Param

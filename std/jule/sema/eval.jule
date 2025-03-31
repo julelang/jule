@@ -606,8 +606,10 @@ impl eval {
 		// variable guaranteed to be checked
 		// any missing information means analysis failed
 		// kind should not be nil because each variable must have a valid type
+		// we also have to check the value for enum variables
 		v.Used = true
-		if v.TypeSym == nil || v.TypeSym.Type == nil {
+		if v.TypeSym == nil || v.TypeSym.Type == nil ||
+			v.IsEnumField() && (v.ValueSym == nil || v.ValueSym.Value == nil) {
 			ret nil
 		}
 
@@ -2361,7 +2363,11 @@ impl eval {
 		if item == nil {
 			self.pushErr(ident, build::LogMsg.ObjHaveNotIdent, enm.Ident, ident.Kind)
 		}
-		ret evalEnumStatic(self.s, enm, item, ident, self.getOwnerRefers())
+		mut v := self.evalVar(item, ident)
+		if v != nil {
+			v.Type = &Type{Kind: enm}
+		}
+		ret v
 	}
 
 	fn evalStructStatic(mut self, mut s: &StructIns, ident: &token::Token): &Value {
@@ -5166,21 +5172,6 @@ fn updateModelToGenericIns(mut &m: Expr, mut &f: &FuncIns) {
 	| &StructStaticIdentExpr:
 		m.(&StructStaticIdentExpr).Method = f
 	}
-}
-
-fn evalEnumStatic(mut &s: &sema, mut &enm: &Enum, mut &item: &EnumItem,
-	mut &token: &token::Token, mut refers: &ReferenceStack): &Value {
-	mut v := &Value{
-		Type: &Type{
-			Kind: enm,
-		},
-	}
-	if item != nil {
-		v.Constant = new(constant::Const, *item.ValueSym.Value.Constant)
-		v.Model = v.Constant
-		applyCastModelByEnum(s, v, enm, token, refers)
-	}
-	ret v
 }
 
 // Reports whether expression model is literal-based.

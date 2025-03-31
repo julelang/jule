@@ -1147,177 +1147,6 @@ impl sema {
 		ret true
 	}
 
-	fn checkEnumItemsDup[T](mut self, items: []T) {
-		for _, item in items {
-			if item.Ident == "" {
-				continue
-			} else if token::IsIgnoreIdent(item.Ident) {
-				self.pushErr(item.Token, build::LogMsg.IgnoreIdent)
-			} else {
-				for _, citem in items {
-					if item == citem {
-						break
-					} else if item.Ident == citem.Ident {
-						self.pushErr(item.Token, build::LogMsg.DuplicatedIdent, item.Ident)
-						self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
-						break
-					}
-				}
-			}
-		}
-	}
-
-	fn checkEnumItemsStr(mut &self, mut &e: &Enum) {
-		mut eval := self.eval(self)
-		for (_, mut item) in e.Items {
-			if item.AutoExpr() {
-				item.ValueSym = &ValueSym{
-					Value: &Value{
-						Constant: constant::Const.NewStr(item.Ident),
-					},
-				}
-				item.ValueSym.Value.Model = item.ValueSym.Value.Constant
-			} else {
-				mut v := eval.evalExpr(item.ValueSym.Expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
-				if v == nil {
-					continue
-				}
-
-				if !v.IsConst() {
-					self.pushErr(item.ValueSym.Expr.Token, build::LogMsg.ExprNotConst)
-				}
-
-				mut refers := (&ReferenceStack)(nil) // constant expressions not uses
-				_ = self.checkAssignType(false, e.TypeSym.Type, v, item.Token, refers)
-				item.ValueSym.Value = v
-			}
-		}
-	}
-
-	fn checkEnumItemInt[Int](mut &self, mut &eval: &eval, mut &e: &Enum, &prim: &Prim, mut &item: &EnumItem, mut &n: Int) {
-		if item.AutoExpr() {
-			item.ValueSym = &ValueSym{
-				Value: new(Value),
-			}
-			const match type Int {
-			| i64:
-				item.ValueSym.Value.Constant = constant::Const.NewI64(n)
-			| u64:
-				item.ValueSym.Value.Constant = constant::Const.NewU64(n)
-			|:
-				panic("sema: unimplemented enum int type, this panic call should be unreachable")
-			}
-			item.ValueSym.Value.Model = item.ValueSym.Value.Constant
-		} else {
-			// Do not unwrap untyped literals, type analysis will check overflows.
-			mut v := eval.evalExpr(item.ValueSym.Expr, evalDefault)
-			if v == nil {
-				ret
-			}
-			if !v.IsConst() {
-				self.pushErr(item.ValueSym.Expr.Token, build::LogMsg.ExprNotConst)
-			}
-			mut refers := (&ReferenceStack)(nil) // constant expressions not uses
-			_ = self.checkAssignType(false, e.TypeSym.Type, v, item.Token, refers)
-			item.ValueSym.Value = v
-			i := item.ValueSym.Value.Constant.ReadInt()
-			const match type Int {
-			| i64:
-				n = i.I64()
-			| u64:
-				n = i.U64()
-			|:
-				panic("sema: unimplemented enum int type, this panic call should be unreachable")
-			}
-		}
-	}
-
-	fn checkEnumItemsInt1[Int](mut &self, &prim: &Prim, mut &e: &Enum) {
-		mut max := Int(0)
-		const match type Int {
-		| i64:
-			max = types::MaxI(prim.Str())
-		| u64:
-			max = types::MaxU(prim.Str())
-		|:
-			panic("sema: unimplemented enum int type, this panic call should be unreachable")
-		}
-
-		mut eval := self.eval(self)
-		mut n := Int(0)
-		mut first := e.Items[0]
-		self.checkEnumItemInt(eval, e, prim, first, n)
-		if first.ValueSym.Value != nil {
-			const match type Int {
-			| i64:
-				n = first.ValueSym.Value.Constant.AsI64()
-			| u64:
-				n = first.ValueSym.Value.Constant.AsU64()
-			|:
-				panic("sema: unimplemented enum int type, this panic call should be unreachable")
-			}
-		}
-		for (_, mut item) in e.Items[1:] {
-			if item.AutoExpr() && n > 0 && max-n <= 0 {
-				self.pushErr(item.Token, build::LogMsg.OverflowLimits)
-				break
-			}
-			n++
-			self.checkEnumItemInt(eval, e, prim, item, n)
-		}
-	}
-
-	fn checkEnumItemsInt(mut &self, mut &e: &Enum) {
-		prim := e.TypeSym.Type.Prim()
-		match {
-		| types::IsSigInt(prim.Kind):
-			self.checkEnumItemsInt1[i64](prim, e)
-		|:
-			self.checkEnumItemsInt1[u64](prim, e)
-		}
-	}
-
-	fn checkEnumDecl(mut &self, mut &e: &Enum) {
-		if token::IsIgnoreIdent(e.Ident) {
-			self.pushErr(e.Token, build::LogMsg.IgnoreIdent)
-		} else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
-			self.pushErr(e.Token, build::LogMsg.DuplicatedIdent, e.Ident)
-			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
-		}
-
-		if len(e.Items) == 0 {
-			self.pushErr(e.Token, build::LogMsg.NoMemberInEnum, e.Ident)
-			ret
-		}
-
-		self.checkEnumItemsDup[&EnumItem](e.Items)
-
-		if e.TypeSym != nil {
-			if !self.checkTypeSym(e.TypeSym, self) {
-				ret
-			}
-		} else {
-			// Set to default type.
-			e.TypeSym = findBuiltinTypeAlias(types::Int).TypeSym
-		}
-
-		mut t := e.TypeSym.Type.Prim()
-		if t == nil {
-			self.pushErr(e.Token, build::LogMsg.InvalidTypeSource)
-			ret
-		}
-
-		// Check items.
-		match {
-		| t.IsStr():
-			self.checkEnumItemsStr(e)
-		| types::IsInt(t.Str()):
-			self.checkEnumItemsInt(e)
-		|:
-			self.pushErr(e.Token, build::LogMsg.InvalidTypeSource)
-		}
-	}
-
 	fn checkTypeEnumItemType(mut &self, mut &e: &TypeEnum, mut &item: &TypeEnumItem): (ok: bool) {
 		mut old := self.file
 		defer {
@@ -1370,10 +1199,10 @@ impl sema {
 		}
 	}
 
-	// Checks current package file's enum declarations.
-	fn checkEnumDecls(mut &self): (ok: bool) {
-		for (_, mut e) in self.file.Enums {
-			self.checkEnumDecl(e)
+	// Checks current package file's type enum declarations.
+	fn checkTypeEnumDecls(mut &self): (ok: bool) {
+		for (_, mut e) in self.file.TypeEnums {
+			self.checkTypeEnumDecl(e)
 			// Break checking if type alias has error.
 			if len(self.errors) > 0 {
 				ret false
@@ -1382,10 +1211,107 @@ impl sema {
 		ret true
 	}
 
-	// Checks current package file's type enum declarations.
-	fn checkTypeEnumDecls(mut &self): (ok: bool) {
-		for (_, mut e) in self.file.TypeEnums {
-			self.checkTypeEnumDecl(e)
+	fn checkEnumItemsDup(mut self, items: []&Var) {
+		for _, item in items {
+			// The last item is nil.
+			// See developer reference (14).
+			if item == nil {
+				continue
+			}
+			if item.Ident == "" {
+				continue
+			} else if token::IsIgnoreIdent(item.Ident) {
+				self.pushErr(item.Token, build::LogMsg.IgnoreIdent)
+			} else {
+				for _, citem in items {
+					if item == citem {
+						break
+					} else if item.Ident == citem.Ident {
+						self.pushErr(item.Token, build::LogMsg.DuplicatedIdent, item.Ident)
+						self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+						break
+					}
+				}
+			}
+		}
+	}
+
+	fn precheckEnumDecl(mut &self, mut &e: &Enum) {
+		if token::IsIgnoreIdent(e.Ident) {
+			self.pushErr(e.Token, build::LogMsg.IgnoreIdent)
+		} else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
+			self.pushErr(e.Token, build::LogMsg.DuplicatedIdent, e.Ident)
+			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+		}
+
+		if len(e.Items) == 0 {
+			self.pushErr(e.Token, build::LogMsg.NoMemberInEnum, e.Ident)
+			ret
+		}
+
+		self.checkEnumItemsDup(e.Items)
+
+		if e.TypeSym != nil {
+			if !self.checkTypeSym(e.TypeSym, self) {
+				ret
+			}
+		} else {
+			// Set to default type.
+			e.TypeSym = findBuiltinTypeAlias(types::Int).TypeSym
+		}
+
+		mut t := e.TypeSym.Type.Prim()
+		if t == nil {
+			self.pushErr(e.Token, build::LogMsg.InvalidTypeSource)
+			ret
+		}
+
+		supportsIota := types::IsInt(t.Str())
+		if !t.IsStr() && !supportsIota {
+			self.pushErr(e.Token, build::LogMsg.InvalidTypeSource)
+			ret
+		}
+		for (_, mut item) in e.Items {
+			// The last item is nil.
+			// See developer reference (14).
+			if item == nil {
+				continue
+			}
+			item.TypeSym = new(TypeSym, *e.TypeSym)
+			if e.TypeSym.Decl != nil {
+				item.TypeSym.Decl = new(ast::Type, *e.TypeSym.Decl)
+				item.TypeSym.Decl.Token = item.Token
+			}
+			// If item's type supports iota, enable incremental enumeration
+			// for all members.
+			item.Iota = supportsIota
+		}
+	}
+
+	fn checkEnumDecl(mut &self, mut &e: &Enum) {
+		for (_, mut item) in e.Items {
+			// The last item is nil.
+			// See developer reference (14).
+			if item == nil {
+				continue
+			}
+			self.checkVar(item, self)
+		}
+	}
+
+	// Checks current package file's enum declarations.
+	fn checkEnumDecls(mut &self): (ok: bool) {
+		// Do "pre-check" explained in the developer reference (5).
+		// This part is mandatory, but the "check" phase does not have to be done here.
+		for (_, mut e) in self.file.Enums {
+			self.precheckEnumDecl(e)
+			// Break checking if type alias has error.
+			if len(self.errors) > 0 {
+				ret false
+			}
+		}
+		for (_, mut e) in self.file.Enums {
+			self.checkEnumDecl(e)
 			// Break checking if type alias has error.
 			if len(self.errors) > 0 {
 				ret false
@@ -2175,12 +2101,40 @@ impl sema {
 	// Evaluates value of variable if initialized.
 	// Reports if value-check needed.
 	fn evalVarValue(mut &self, mut &v: &Var, mut l: Lookup): (valCheck: bool) {
+		firstMemberSupportsIota := len(v.Group) > 0 && v.Group[0].TypeSym != nil && v.Group[0].TypeSym.Type != nil &&
+			v.Group[0].TypeSym.Type.Prim() != nil && types::IsNum(v.Group[0].TypeSym.Type.Str())
+
 		if !v.IsInitialized() {
 			// If variable is constant and grouped, we have to check previous
 			// constants due to possible enumeration.
 			if v.Constant && v.Group != nil {
 				if v.GroupIndex == 0 {
-					self.pushErr(v.Token, build::LogMsg.FirstGroupVarIsNotInitialized)
+					if v.IsEnumField() {
+						v.ValueSym = new(ValueSym)
+						v.ValueSym.Expr = new(ast::Expr)
+						v.ValueSym.Expr.Token = v.Token
+						v.ValueSym.Value = new(Value)
+						v.ValueSym.Value.Type = v.TypeSym.Type
+						prim := v.TypeSym.Type.Prim() // Enum fields must be primitive.
+						match {
+						| prim.IsStr():
+							v.ValueSym.Value.Constant = constant::Const.NewStr(v.Ident)
+						| types::IsSigInt(prim.Str()):
+							v.Iota = true
+							v.ValueSym.Value.Constant = constant::Const.NewI64(0)
+						| types::IsUnsigInt(prim.Str()):
+							v.Iota = true
+							v.ValueSym.Value.Constant = constant::Const.NewU64(0)
+						| types::IsFloat(prim.Str()):
+							v.Iota = true
+							v.ValueSym.Value.Constant = constant::Const.NewF64(0)
+						|:
+							panic("unreachable")
+						}
+						v.ValueSym.Value.Constant.Kind = prim.Kind
+					} else {
+						self.pushErr(v.Token, build::LogMsg.FirstGroupVarIsNotInitialized)
+					}
 					ret false
 				}
 				mut dv := v.Group[v.GroupIndex-1]
@@ -2241,7 +2195,26 @@ impl sema {
 						}
 					}
 				} else {
-					v.ValueSym.Value = dv.ValueSym.Value
+					// If this is an enum field, value must be handled without iota.
+					// Hande the special cases for enums.
+					// Otherwise, variable is just a plain group member,
+					// copy the value of the previous group member.
+					if v.IsEnumField() {
+						v.ValueSym = new(ValueSym)
+						v.ValueSym.Expr = new(ast::Expr)
+						v.ValueSym.Expr.Token = v.Token
+						v.ValueSym.Value = new(Value)
+						v.ValueSym.Value.Type = v.TypeSym.Type
+						prim := v.TypeSym.Type.Prim() // Enum fields must be primitive.
+						if prim.IsStr() {
+							v.ValueSym.Value.Constant = constant::Const.NewStr(v.Ident)
+						} else {
+							panic("unreachable")
+						}
+						v.ValueSym.Value.Constant.Kind = prim.Kind
+					} else {
+						v.ValueSym.Value = dv.ValueSym.Value
+					}
 				}
 			}
 			ret false
@@ -2255,13 +2228,11 @@ impl sema {
 		}
 		eval.target.mutable = v.Mutable
 
-		allowItoa := v.Group != nil && (v.GroupIndex == 0 ||
-			v.Group[0].TypeSym != nil && v.Group[0].TypeSym.Type != nil &&
-				v.Group[0].TypeSym.Type.Prim() != nil && types::IsNum(v.Group[0].TypeSym.Type.Str()))
-		if allowItoa {
+		allowIota := v.Group != nil && (v.GroupIndex == 0 && !v.IsEnumField() || firstMemberSupportsIota)
+		if allowIota {
 			eval.varIota = buildIota(i64(v.GroupIndex))
 			defer {
-				v.Iota = eval.varIota.Used
+				v.Iota = v.Iota || eval.varIota.Used
 			}
 		}
 

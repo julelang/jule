@@ -22,7 +22,7 @@ It is also used by the official reference compiler JuleC and is developed in par
 
 - **(4)** If the `referencer.owner` field of `sema::TypeChecker` structure is type alias which is uses `TypeChecker` instance to build it's own destination type kind. This is the hard reference to owner. Always points to root type alias of this build even in nested type builds. Used to collect generic dependencies (see (3)) and etc. of type aliaes.
 
-- **(5)** Check `enum` declarations first before using them or any using possibility appears. Enum fields should be evaluated before evaluate algorithms executed. Otherwise, probably program will panic because of unevaluated enum field(s) when tried to use.
+- **(5)** Enum types should be checked first. They handled like grouped constant variable declarations with minor differences. Enum types does not supports analysis during evaluation if needed. Therefore we need to check/set-up enums first. All enum items should be use type of enum. For circular references, this metadata should be assigned before evaluation. That's why we need to handle enums first before the analysis.
 
     - **(5.1)** This is not apply for type enums. Type enum's fields are type alias actually. They are should analysis like type aliases.
 
@@ -92,6 +92,10 @@ An example of a faulty analysis scenario:
 - **(12)** Grouped variables represented by the root (first) variable of the group in the AST. For the all members of group, the `Group` field holds them including the root member. The `GroupIndex` field holds the index of the variable, counting starts from zero.
 
 - **(13)** Grouped variables represented by themselves (not only the root one) in the CAST, unlike AST. CAST declares variables in the same order of the group. For the all members of group, they still have the `Group` field holds them including the root member. The `GroupIndex` field holds the index of the variable, counting starts from zero.
+
+- **(14)** For enums, all enum items handled like grouped constant variable declaration. To determine if the grouped variable is declared in the enum, the `Group` field is holds trailing `nil` pointer for the enum groups.
+
+  - **(14.1)** If enum's type supports the `iota`, so incremental enumeration, all members uses the `iota` variable by default. So, enables the incremental enumeration for the following fields.
 
 ### Implicit Imports
 

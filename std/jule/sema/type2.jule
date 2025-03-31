@@ -336,10 +336,24 @@ impl assignTypeChecker {
 		match {
 		| prim.IsStr():
 			prim = self.v.Type.Prim()
-			ret prim != nil && prim.IsStr()
+			ok := prim != nil && prim.IsStr()
+			// If type compatibility is ok, use the destination type and make
+			// literal untyped, a kind of brief implicit casting.
+			if ok {
+				self.v.Type = self.dest
+				self.v.untyped = false
+			}
+			ret ok
 		| prim.IsBool():
 			prim = self.v.Type.Prim()
-			ret prim != nil && prim.IsBool()
+			ok := prim != nil && prim.IsBool()
+			// If type compatibility is ok, use the destination type and make
+			// literal untyped, a kind of brief implicit casting.
+			if ok {
+				self.v.Type = self.dest
+				self.v.untyped = false
+			}
+			ret ok
 		}
 		// Should be numeric.
 		kind := prim.Kind
@@ -350,6 +364,7 @@ impl assignTypeChecker {
 				ret true // Return true to avoid more errors.
 			}
 			self.v.Constant.Kind = kind
+			self.v.Type = self.dest
 			self.v.untyped = false
 		| types::IsInt(kind):
 			if !intAssignable(kind, self.v) {
@@ -357,6 +372,7 @@ impl assignTypeChecker {
 				ret true // Return true to avoid more errors.
 			}
 			self.v.Constant.Kind = kind
+			self.v.Type = self.dest
 			self.v.untyped = false
 		|:
 			ret false
