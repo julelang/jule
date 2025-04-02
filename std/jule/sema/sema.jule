@@ -1282,9 +1282,6 @@ impl sema {
 				item.TypeSym.Decl = new(ast::Type, *e.TypeSym.Decl)
 				item.TypeSym.Decl.Token = item.Token
 			}
-			// If item's type supports iota, enable incremental enumeration
-			// for all members.
-			item.Iota = supportsIota
 		}
 	}
 
@@ -2101,38 +2098,32 @@ impl sema {
 	// Evaluates value of variable if initialized.
 	// Reports if value-check needed.
 	fn evalVarValue(mut &self, mut &v: &Var, mut l: Lookup): (valCheck: bool) {
-		firstMemberSupportsIota := len(v.Group) > 0 && v.Group[0].TypeSym != nil && v.Group[0].TypeSym.Type != nil &&
-			v.Group[0].TypeSym.Type.Prim() != nil && types::IsNum(v.Group[0].TypeSym.Type.Str())
-
+		isEnumField := v.IsEnumField()
 		if !v.IsInitialized() {
 			// If variable is constant and grouped, we have to check previous
 			// constants due to possible enumeration.
 			if v.Constant && v.Group != nil {
 				if v.GroupIndex == 0 {
-					if v.IsEnumField() {
+					if isEnumField {
 						v.ValueSym = new(ValueSym)
 						v.ValueSym.Expr = new(ast::Expr)
 						v.ValueSym.Expr.Token = v.Token
-						v.ValueSym.Value = new(Value)
-						v.ValueSym.Value.Type = v.TypeSym.Type
 						prim := v.TypeSym.Type.Prim() // Enum fields must be primitive.
 						match {
 						| prim.IsStr():
-							v.ValueSym.Value.Constant = constant::Const.NewStr(v.Ident)
-						| types::IsSigInt(prim.Str()):
-							v.Iota = true
-							v.ValueSym.Value.Constant = constant::Const.NewI64(0)
-						| types::IsUnsigInt(prim.Str()):
-							v.Iota = true
-							v.ValueSym.Value.Constant = constant::Const.NewU64(0)
-						| types::IsFloat(prim.Str()):
-							v.Iota = true
-							v.ValueSym.Value.Constant = constant::Const.NewF64(0)
+							v.ValueSym.Expr.Kind = &ast::LitExpr{
+								Token: v.Token,
+								Value: "\"" + v.Ident + "\"",
+							}
+						| types::IsNum(prim.Str()):
+							v.ValueSym.Expr.Kind = &ast::IdentExpr{
+								Token: v.Token,
+								Ident: "iota",
+							}
 						|:
 							panic("unreachable")
 						}
-						v.ValueSym.Value.Constant.Kind = prim.Kind
-						v.ValueSym.Value.Model = v.ValueSym.Value.Constant
+						goto Eval
 					} else {
 						self.pushErr(v.Token, build::LogMsg.FirstGroupVarIsNotInitialized)
 					}
@@ -2146,83 +2137,32 @@ impl sema {
 					ret false
 				}
 				v.TypeSym = new(TypeSym, *dv.TypeSym)
-				if dv.TypeSym.Decl != nil {
+				// If type is not declared explicitly, remove the derived type.
+				// Type should be inferred like the previous member. Otherwise,
+				// use the same type declaration. Note that if variable is an enum field,
+				// it may have not type declaration (used the implicit type) but
+				// they always have an exact type.
+				if isEnumField {
+					// no-op
+				} else if dv.TypeSym.Decl != nil {
 					v.TypeSym.Decl = new(ast::Type, *dv.TypeSym.Decl)
 					v.TypeSym.Decl.Token = v.Token
+				} else {
+					v.TypeSym.Type = nil
 				}
 				v.ValueSym = new(ValueSym)
-				v.ValueSym.Expr = new(ast::Expr)
-				v.ValueSym.Expr.Token = v.Token
 				if dv.Iota {
-					v.Iota = true
-					v.ValueSym.Value = new(Value, *dv.ValueSym.Value)
-					v.ValueSym.Value.Constant = constant::Const.NewI64(1)
-					v.ValueSym.Value.Constant.Add(*dv.ValueSym.Value.Constant)
-					v.ValueSym.Value.Constant.Kind = dv.ValueSym.Value.Constant.Kind // save the kind
-					v.ValueSym.Value.Model = v.ValueSym.Value.Constant
-					// If computation result overflows the bitsize limit, log error,
-					// and set value to nil.
-					i := v.ValueSym.Value.Constant.ReadInt()
-					if i.BitLen() > bitLimit {
-						self.pushErr(v.Token, build::LogMsg.ConstantOverflowResult)
-						v.ValueSym.Value = nil
-						ret
-					}
-					// Check overflow cases if value is not untyped.
-					// In this case, enumeration uses an explicit type.
-					// We have to check overflows for the exact type.
-					// For example:
-					//	const (
-					//		A: byte = iota + 254
-					//		B
-					//		C
-					//		D
-					//	)
-					//	In the example above, C and D constants overflows the
-					//	type byte's maximum value.
-					if !v.ValueSym.Value.untyped {
-						match {
-						| types::IsFloat(v.ValueSym.Value.Constant.Kind):
-							if !floatAssignable(v.ValueSym.Value.Constant.Kind, v.ValueSym.Value) {
-								self.pushErr(v.Token, build::LogMsg.ConstantOverflowType, v.ValueSym.Value.Constant.Str(), v.TypeSym.Type.Str())
-								v.ValueSym.Value = nil
-								ret false
-							}
-						| types::IsInt(v.ValueSym.Value.Constant.Kind):
-							if !intAssignable(v.ValueSym.Value.Constant.Kind, v.ValueSym.Value) {
-								self.pushErr(v.Token, build::LogMsg.ConstantOverflowType, v.ValueSym.Value.Constant.Str(), v.TypeSym.Type.Str())
-								v.ValueSym.Value = nil
-								ret false
-							}
-						}
-					}
+					v.ValueSym.Expr = new(ast::Expr, *dv.ValueSym.Expr)
+					v.ValueSym.Expr.Token = v.Token
+					goto Eval
 				} else {
-					// If this is an enum field, value must be handled without iota.
-					// Hande the special cases for enums.
-					// Otherwise, variable is just a plain group member,
-					// copy the value of the previous group member.
-					if v.IsEnumField() {
-						v.ValueSym = new(ValueSym)
-						v.ValueSym.Expr = new(ast::Expr)
-						v.ValueSym.Expr.Token = v.Token
-						v.ValueSym.Value = new(Value)
-						v.ValueSym.Value.Type = v.TypeSym.Type
-						prim := v.TypeSym.Type.Prim() // Enum fields must be primitive.
-						if prim.IsStr() {
-							v.ValueSym.Value.Constant = constant::Const.NewStr(v.Ident)
-						} else {
-							panic("unreachable")
-						}
-						v.ValueSym.Value.Constant.Kind = prim.Kind
-						v.ValueSym.Value.Model = v.ValueSym.Value.Constant
-					} else {
-						v.ValueSym.Value = dv.ValueSym.Value
-					}
+					v.ValueSym.Value = dv.ValueSym.Value
 				}
 			}
 			ret false
 		}
 
+	Eval:
 		mut eval := (&eval)(nil)
 		if v.TypeSym != nil {
 			eval = self.evalpd(l, v.TypeSym.Type, v)
@@ -2231,7 +2171,9 @@ impl sema {
 		}
 		eval.target.mutable = v.Mutable
 
-		allowIota := v.Group != nil && (v.GroupIndex == 0 && !v.IsEnumField() || firstMemberSupportsIota)
+		firstMemberSupportsIota := len(v.Group) > 0 && v.Group[0].TypeSym != nil && v.Group[0].TypeSym.Type != nil &&
+			v.Group[0].TypeSym.Type.Prim() != nil && types::IsNum(v.Group[0].TypeSym.Type.Prim().Str())
+		allowIota := len(v.Group) > 0 && (firstMemberSupportsIota || v.GroupIndex == 0 && !isEnumField)
 		if allowIota {
 			eval.varIota = buildIota(i64(v.GroupIndex))
 			defer {

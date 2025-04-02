@@ -95,7 +95,7 @@ An example of a faulty analysis scenario:
 
 - **(14)** For enums, all enum items handled like grouped constant variable declaration. To determine if the grouped variable is declared in the enum, the `Group` field is holds trailing `nil` pointer for the enum groups.
 
-  - **(14.1)** If enum's type supports the `iota`, so incremental enumeration, all members uses the `iota` variable by default. So, enables the incremental enumeration for the following fields.
+  - **(14.1)** If enum's type supports the `iota`, so incremental enumeration, the first member uses the `iota` variable as expression by default. So, it enables the incremental enumeration for the following fields.
 
 ### Implicit Imports
 
