@@ -548,10 +548,7 @@ impl scopeChecker {
 
 	fn checkVarDecl1(mut &self, mut &v: &Var) {
 		defer {
-			// Grouped variables will be added to table.
-			if v.Group == nil {
-				self.table.Vars = append(self.table.Vars, v)
-			}
+			self.table.Vars = append(self.table.Vars, v)
 			self.scope.Stmts = append(self.scope.Stmts, v)
 		}
 
@@ -2141,26 +2138,37 @@ impl scopeChecker {
 			match type stmt.Data {
 			| &ast::Var:
 				// Handle group variables, if any.
-				// Grouped variables represented by the root variable of group.
+				// Grouped variables represented by the root (first) variable of the group.
 				// See developer reference (12).
 				// In the CAST, all variables of the group should be in the CAST.
 				// See developer reference (13).
 				mut astv := stmt.Data.(&ast::Var)
-				if astv.Group != nil {
+				if len(astv.Group) > 0 {
+					// Save the length of variables in the table.
+					// Then add group variables one-by-one.
+					// This is safe because in the scope semantics,
+					// variables must be defined in order. So any group member
+					// cannot refer to following members, only already defined leading ones.
+					// Do not add all group members first, it may be result as
+					// wrong shadowing for global variables and even may point
+					// to itself.
 					tn := len(self.table.Vars)
-					for (_, mut gv) in astv.Group {
-						self.table.Vars = append(self.table.Vars, buildVar(gv))
-					}
-					mut group := self.table.Vars[tn:len(self.table.Vars):len(self.table.Vars)]
-					for (i, mut v) in group {
-						v.Scope = self.scope
-						v.GroupIndex = i
-						v.Group = group
-						self.checkVarDecl1(v)
+					for (i, mut v) in astv.Group {
+						mut cv := buildVar(v)
+						cv.Scope = self.scope
+						cv.GroupIndex = i
+						self.checkVarDecl1(cv)
 						if self.stopped() {
 							ret
 						}
 					}
+					// Select the all group members in the CAST using tn value.
+					// Then assign to all group members as group data.
+					mut group := self.table.Vars[tn:len(self.table.Vars):len(self.table.Vars)]
+					for (_, mut v) in group {
+						v.Group = group
+					}
+
 					// Skip this node, it is already checked.
 					continue
 				}
