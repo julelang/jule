@@ -2171,6 +2171,20 @@ impl sema {
 		}
 		eval.target.mutable = v.Mutable
 
+		// To evaluate firstMemberSupportsIota correctly,
+		// the first member of the group must be checked already.
+		// If v == v.Group[0], this is not a problem.
+		// Because the [checkVar] marks variable as checked immediately.
+		if len(v.Group) > 0 && !v.Group[0].Checked {
+			mut firstV := v.Group[0]
+			self.checkVar(firstV, l)
+			// Return nil if variable check failed.
+			// Any missing information means analysis failed.
+			// Type should not be nil because each variable must have a valid type.
+			if firstV.TypeSym == nil || firstV.TypeSym.Type == nil {
+				ret false
+			}
+		}
 		firstMemberSupportsIota := len(v.Group) > 0 && v.Group[0].TypeSym != nil && v.Group[0].TypeSym.Type != nil &&
 			v.Group[0].TypeSym.Type.Prim() != nil && types::IsNum(v.Group[0].TypeSym.Type.Prim().Str())
 		allowIota := len(v.Group) > 0 && (firstMemberSupportsIota || v.GroupIndex == 0 && !isEnumField)
