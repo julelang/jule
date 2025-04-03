@@ -2154,23 +2154,31 @@ impl scopeChecker {
 					// Do not add all group members first, it may be result as
 					// wrong shadowing for global variables and even may point
 					// to itself.
+					//
+					// To select group members, make sure the table slice have
+					// enough space to hold new variables defined by the group.
+					// Then select the required slice memory block for group.
+					// Following append calls will append the group members
+					// to slice's selected memory block.
 					tn := len(self.table.Vars)
+					self.table.Vars = growSlice(self.table.Vars, len(astv.Group))
+					mut group := self.table.Vars[tn : tn+len(astv.Group) : tn+len(astv.Group)]
 					for (i, mut v) in astv.Group {
 						mut cv := buildVar(v)
 						cv.Scope = self.scope
+						cv.Group = group
 						cv.GroupIndex = i
+						// Add itself as group member.
+						// The [sema.evalVarValue] assumes group members are not nil.
+						// Currently, only risk is the first member.
+						// If the first member is nil, program may panic.
+						// This assignment prevents this.
+						cv.Group[i] = cv
 						self.checkVarDecl1(cv)
 						if self.stopped() {
 							ret
 						}
 					}
-					// Select the all group members in the CAST using tn value.
-					// Then assign to all group members as group data.
-					mut group := self.table.Vars[tn:len(self.table.Vars):len(self.table.Vars)]
-					for (_, mut v) in group {
-						v.Group = group
-					}
-
 					// Skip this node, it is already checked.
 					continue
 				}
@@ -2528,4 +2536,19 @@ fn isValidStForNextSt(&st: Stmt): bool {
 	|:
 		ret false
 	}
+}
+
+// Increases the slice's capacity, if necessary, to guarantee space for
+// another n elements. After growSlice(n), at least n elements can be appended
+// to the slice without another allocation. If n is negative or too large to
+// allocate the memory, it panics.
+fn growSlice[S: []E, E](mut s: S, mut n: int): S {
+	if n < 0 {
+		panic("cannot be negative")
+	}
+	n -= cap(s) - len(s)
+	if n > 0 {
+		s = append(s[:cap(s)], make([]E, n)...)[:len(s)]
+	}
+	ret s
 }
