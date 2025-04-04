@@ -36,17 +36,19 @@
 // ====================================================
 
 // Bit masks for each code point under U+0100, for fast lookup.
-const __P_C = 1                // a control character.
-const __P_P = 2                // a punctuation character.
-const __P_N = 4                // a numeral.
-const __P_S = 8                // a symbolic character.
-const __P_Z = 16               // a spacing character.
-const __P_LU = 32              // an upper-case letter.
-const __P_LL = 64              // a lower-case letter.
-const __PP = 128               // a printable character according to Jule's definition.
-const __PG = __PP | __P_Z      // a graphical character according to the Unicode definition.
-const __P_LO = __P_LL | __P_LU // a letter that is neither upper nor lower case.
-const __P_L_MASK = __P_LO
+const (
+	pC = 1 << iota  // a control character.
+	pP              // a punctuation character.
+	pN              // a numeral.
+	pS              // a symbolic character.
+	pZ              // a spacing character.
+	pLu             // an upper-case letter.
+	pLl             // a lower-case letter.
+	pp              // a printable character according to Go's definition.
+	pg = pp | pZ    // a graphical character according to the Unicode definition.
+	pLo = pLl | pLu // a letter that is neither upper nor lower case.
+	pLmask = pLo
+)
 
 // Defines the set of graphic characters according to Unicode.
 static GraphicRanges = [L, M, N, P, S, ZS]
@@ -61,7 +63,7 @@ fn IsGraphic(r: rune): bool {
 	// We convert to u32 to avoid the extra test for negative,
 	// and in the index we convert to uint8 to avoid the range check.
 	if u32(r) <= MaxLatin1 {
-		ret _PROPERTIES[u8(r)]&__PG != 0
+		ret properties[u8(r)]&pg != 0
 	}
 	ret IsIn(r, GraphicRanges...)
 }
@@ -79,7 +81,7 @@ fn IsIn(r: rune, ranges: ...&RangeTable): bool {
 // Reports whether the rune is a letter (category L).
 fn IsLetter(r: rune): bool {
 	if u32(r) <= MaxLatin1 {
-		ret _PROPERTIES[u8(r)]&(__P_L_MASK) != 0
+		ret properties[u8(r)]&pLmask != 0
 	}
 	ret isExcludingLatin(Letter, r)
 }
@@ -87,7 +89,7 @@ fn IsLetter(r: rune): bool {
 // Reports whether the rune is a number (category N).
 fn IsNumber(r: rune): bool {
 	if u32(r) <= MaxLatin1 {
-		ret _PROPERTIES[u8(r)]&__P_N != 0
+		ret properties[u8(r)]&pN != 0
 	}
 	ret isExcludingLatin(Number, r)
 }
@@ -95,7 +97,7 @@ fn IsNumber(r: rune): bool {
 // Reports whether the rune is a Unicode punctuation character (category P).
 fn IsPunct(r: rune): bool {
 	if u32(r) <= MaxLatin1 {
-		ret _PROPERTIES[u8(r)]&__P_P != 0
+		ret properties[u8(r)]&pP != 0
 	}
 	ret Is(Punct, r)
 }
@@ -127,7 +129,7 @@ fn IsSpace(r: rune): bool {
 // only spacing character is ASCII space, U+0020.
 fn IsPrint(r: rune): bool {
 	if u32(r) <= MaxLatin1 {
-		ret _PROPERTIES[u8(r)]&__PP != 0
+		ret properties[u8(r)]&pp != 0
 	}
 	ret In(r, PrintRanges...)
 }

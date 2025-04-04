@@ -154,20 +154,23 @@
 //
 // Very large values overflow to -1 or +Inf.
 fn Expm1(mut x: f64): f64 {
-	const OTHRESHOLD = 7.09782712893383973096e+02  // 0x40862E42FEFA39EF
-	const LN2_X56 = 3.88162421113569373274e+01     // 0x4043687a9f1af2b1
-	const LN2_HALF_X3 = 1.03972077083991796413e+00 // 0x3ff0a2b23f3bab73
-	const LN2_HALF = 3.46573590279972654709e-01    // 0x3fd62e42fefa39ef
-	const LN2_HI = 6.93147180369123816490e-01      // 0x3fe62e42fee00000
-	const LN2_LO = 1.90821492927058770002e-10      // 0x3dea39ef35793c76
-	const INV_LN2 = 1.44269504088896338700e+00     // 0x3ff71547652b82fe
-	const TINY = 5.551115123125783e-17             // 2**-54 = 0x3c90000000000000
-	// scaled coefficients related to expm1
-	const Q1 = -3.33333333333331316428e-02 // 0xBFA11111111110F4
-	const Q2 = 1.58730158725481460165e-03  // 0x3F5A01A019FE5585
-	const Q3 = -7.93650757867487942473e-05 // 0xBF14CE199EAADBB7
-	const Q4 = 4.00821782732936239552e-06  // 0x3ED0CFCA86E65239
-	const Q5 = -2.01099218183624371326e-07 // 0xBE8AFDB76E09C32D
+	const (
+		OThreshold = 7.09782712893383973096e+02 // 0x40862E42FEFA39EF
+		Ln2X56 = 3.88162421113569373274e+01     // 0x4043687a9f1af2b1
+		Ln2HalfX3 = 1.03972077083991796413e+00  // 0x3ff0a2b23f3bab73
+		Ln2Half = 3.46573590279972654709e-01    // 0x3fd62e42fefa39ef
+		Ln2Hi = 6.93147180369123816490e-01      // 0x3fe62e42fee00000
+		Ln2Lo = 1.90821492927058770002e-10      // 0x3dea39ef35793c76
+		InvLn2 = 1.44269504088896338700e+00     // 0x3ff71547652b82fe
+		Tiny = 5.551115123125783e-17            // 2**-54 = 0x3c90000000000000
+
+		// scaled coefficients related to expm1
+		Q1 = -3.33333333333331316428e-02 // 0xBFA11111111110F4
+		Q2 = 1.58730158725481460165e-03  // 0x3F5A01A019FE5585
+		Q3 = -7.93650757867487942473e-05 // 0xBF14CE199EAADBB7
+		Q4 = 4.00821782732936239552e-06  // 0x3ED0CFCA86E65239
+		Q5 = -2.01099218183624371326e-07 // 0xBE8AFDB76E09C32D
+	)
 
 	// special cases
 	match {
@@ -185,44 +188,44 @@ fn Expm1(mut x: f64): f64 {
 	}
 
 	// filter out huge argument
-	if absx >= LN2_X56 { // if |x| >= 56 * ln2
+	if absx >= Ln2X56 { // if |x| >= 56 * ln2
 		if sign {
 			ret -1 // x < -56*ln2, return -1
 		}
-		if absx >= OTHRESHOLD { // if |x| >= 709.78...
+		if absx >= OThreshold { // if |x| >= 709.78...
 			ret Inf(1)
 		}
 	}
 
 	// argument reduction
-	mut c := 0.
+	mut c := f64(0)
 	mut k := 0
-	if absx > LN2_HALF { // if  |x| > 0.5 * ln2
+	if absx > Ln2Half { // if  |x| > 0.5 * ln2
 		mut hi := 0.
 		mut lo := 0.
-		if absx < LN2_HALF_X3 { // and |x| < 1.5 * ln2
+		if absx < Ln2HalfX3 { // and |x| < 1.5 * ln2
 			if !sign {
-				hi = x - LN2_HI
-				lo = LN2_LO
+				hi = x - Ln2Hi
+				lo = Ln2Lo
 				k = 1
 			} else {
-				hi = x + LN2_HI
-				lo = -LN2_LO
+				hi = x + Ln2Hi
+				lo = -Ln2Lo
 				k = -1
 			}
 		} else {
 			if !sign {
-				k = int(INV_LN2*x + 0.5)
+				k = int(InvLn2*x + 0.5)
 			} else {
-				k = int(INV_LN2*x - 0.5)
+				k = int(InvLn2*x - 0.5)
 			}
 			t := f64(k)
-			hi = x - t*LN2_HI // t * LN2_HI is exact here
-			lo = t * LN2_LO
+			hi = x - t*Ln2Hi // t * Ln2Hi is exact here
+			lo = t * Ln2Lo
 		}
 		x = hi - lo
 		c = (hi - x) - lo
-	} else if absx < TINY { // when |x| < 2**-54, return x
+	} else if absx < Tiny { // when |x| < 2**-54, return x
 		ret x
 	} else {
 		k = 0

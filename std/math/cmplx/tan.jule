@@ -157,7 +157,7 @@ fn Cot(x: Cmplx): Cmplx {
 // "ARGUMENT REDUCTION FOR HUGE ARGUMENTS: Good to the Last Bit"
 // K. C. Ng et al, March 24, 1992.
 fn reducePi(mut x: f64): f64 {
-	// reduce_threshold is the maximum value of x where the reduction using
+	// The maximum value of x where the reduction using
 	// Cody-Waite reduction still gives accurate results. This threshold
 	// is set by t*PIn being representable as a f64 without error
 	// where t is given by t = floor(x * (1 / PI)) and PIn are the leading partial
@@ -165,9 +165,9 @@ fn reducePi(mut x: f64): f64 {
 	// trailing zero bits respectively, t should have less than 30 significant bits.
 	//	t < 1<<30  -> floor(x*(1/PI)+0.5) < 1<<30 -> x < (1<<30-1) * PI - 0.5
 	// So, conservatively we can take x < 1<<30.
-	const REDUCE_THRESHOLD: f64 = 1 << 30
+	const ReduceThreshold: f64 = 1 << 30
 
-	if math::Abs(x) < REDUCE_THRESHOLD {
+	if math::Abs(x) < ReduceThreshold {
 		// Use Cody-Waite reduction in three parts.
 
 		// PI1, PI2 and PI3 comprise an extended precision value of PI
@@ -177,27 +177,31 @@ fn reducePi(mut x: f64): f64 {
 		// large integer values of t. The full precision PI3 ensures the
 		// approximation of PI is accurate to 102 bits to handle cancellation
 		// during subtraction.
-		const PI1 = 3.141592502593994      // 0x400921fb40000000
-		const PI2 = 1.5099578831723193e-07 // 0x3e84442d00000000
-		const PI3 = 1.0780605716316238e-14 // 0x3d08469898cc5170
+		const (
+			Pi1 = 3.141592502593994      // 0x400921fb40000000
+			Pi2 = 1.5099578831723193e-07 // 0x3e84442d00000000
+			Pi3 = 1.0780605716316238e-14 // 0x3d08469898cc5170
+		)
 
 		mut t := x / math::Pi
 		t += 0.5
 		t = f64(i64(t)) // i64(t) = the multiple
-		ret ((x - t*PI1) - t*PI2) - t*PI3
+		ret ((x - t*Pi1) - t*Pi2) - t*Pi3
 	}
 	// Must apply Payne-Hanek range reduction
-	const MASK = 0x7FF
-	const SHIFT = 64 - 11 - 1
-	const BIAS = 1023
-	const FRAC_MASK = 1<<SHIFT - 1
+	const (
+		Mask = 0x7FF
+		Shift = 64 - 11 - 1
+		Bias = 1023
+		FracMask = 1<<Shift - 1
+	)
 
 	// Extract out the integer and exponent such that,
 	// x = ix * 2 ** exp.
 	mut ix := math::F64bits(x)
-	exp := int(ix>>SHIFT&MASK) - BIAS - SHIFT
-	ix &= FRAC_MASK
-	ix |= 1 << SHIFT
+	exp := int(ix>>Shift&Mask) - Bias - Shift
+	ix &= FracMask
+	ix |= 1 << Shift
 
 	// m_pi is the binary digits of 1/PI as a u64 array,
 	// that is, 1/PI = Sum mPI[i]*2^(-64*i).
@@ -240,12 +244,12 @@ fn reducePi(mut x: f64): f64 {
 	mut hi, _ := bits::Add64(z0lo, z1hi, c)
 	// Find the magnitude of the fraction.
 	lz := uint(bits::LeadingZeros64(hi))
-	e := u64(BIAS - (lz + 1))
+	e := u64(Bias - (lz + 1))
 	// Clear implicit mantissa bit and shift into place.
 	hi = (hi << (lz + 1)) | (lo >> (64 - (lz + 1)))
-	hi >>= 64 - SHIFT
+	hi >>= 64 - Shift
 	// Include the exponent and convert to a float.
-	hi |= e << SHIFT
+	hi |= e << Shift
 	x = math::F64frombits(hi)
 	// map to (-PI/2, PI/2]
 	if x > 0.5 {
@@ -256,7 +260,7 @@ fn reducePi(mut x: f64): f64 {
 
 // Taylor series expansion for cosh(2y) - cos(2x)
 fn tanSeries(z: Cmplx): f64 {
-	const MACHEP = 1.0 / (1 << 53)
+	const Machep = 1.0 / (1 << 53)
 
 	mut x := reducePi(math::Abs(2 * z.Real()))
 	x = x * x
@@ -287,7 +291,7 @@ fn tanSeries(z: Cmplx): f64 {
 		t = y2 - x2
 		t /= f
 		d += t
-		if !(math::Abs(t/d) > MACHEP) {
+		if !(math::Abs(t/d) > Machep) {
 			// Caution: Use ! and > instead of <= for correct behavior if t/d is NaN.
 			// See Go's issue 17577.
 			break

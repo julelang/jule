@@ -91,12 +91,12 @@
 //   moshier@na-net.ornl.gov
 
 // tan coefficients
-static _TAN_P: [...]f64 = [
+static tanP: [...]f64 = [
 	-1.30936939181383777646e4, // 0xc0c992d8d24f3f38
 	1.15351664838587416140e6,  // 0x413199eca5fc9ddd
 	-1.79565251976484877988e7, // 0xc1711fead3299176
 ]
-static _TAN_Q: [...]f64 = [
+static tanQ: [...]f64 = [
 	1.00000000000000000000e0,
 	1.36812963470692954678e4,  // 0x40cab8a5eeb36572
 	-1.32089234440210967447e6, // 0xc13427bc582abc96
@@ -111,9 +111,11 @@ static _TAN_Q: [...]f64 = [
 //	Tan(±Inf) = NaN
 //	Tan(NaN) = NaN
 fn Tan(mut x: f64): f64 {
-	const PI4A = 7.85398125648498535156e-1  // 0x3fe921fb40000000, PI/4 split into three parts
-	const PI4B = 3.77489470793079817668e-8  // 0x3e64442d00000000,
-	const PI4C = 2.69515142907905952645e-15 // 0x3ce8469898cc5170,
+	const (
+		Pi4A = 7.85398125648498535156e-1  // 0x3fe921fb40000000, PI/4 split into three parts
+		Pi4B = 3.77489470793079817668e-8  // 0x3e64442d00000000,
+		Pi4C = 2.69515142907905952645e-15 // 0x3ce8469898cc5170,
+	)
 	// special cases
 	match {
 	| x == 0 | IsNaN(x):
@@ -143,12 +145,12 @@ fn Tan(mut x: f64): f64 {
 			y++
 		}
 
-		z = ((x - y*PI4A) - y*PI4B) - y*PI4C
+		z = ((x - y*Pi4A) - y*Pi4B) - y*Pi4C
 	}
 	zz := z * z
 
 	if zz > 1e-14 {
-		y = z + z*(zz*(((_TAN_P[0]*zz)+_TAN_P[1])*zz+_TAN_P[2])/((((zz+_TAN_Q[1])*zz+_TAN_Q[2])*zz+_TAN_Q[3])*zz+_TAN_Q[4]))
+		y = z + z*(zz*(((tanP[0]*zz)+tanP[1])*zz+tanP[2])/((((zz+tanQ[1])*zz+tanQ[2])*zz+tanQ[3])*zz+tanQ[4]))
 	} else {
 		y = z
 	}

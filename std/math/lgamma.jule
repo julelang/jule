@@ -203,14 +203,17 @@ static _LGAM_W: [...]f64 = [
 //	Lgamma(-Inf) = -Inf
 //	Lgamma(NaN) = NaN
 fn Lgamma(mut x: f64): (lgamma: f64, sign: int) {
-	const YMIN = 1.461632144968362245
-	const TWO52 = 4.503599627370496e+15    // 0x4330000000000000 ~4.5036e+15
-	const TWO58 = 2.8823037615171174e+17   // 0x4390000000000000 ~2.8823e+17
-	const TINY = 8.470329472543003e-22     // 1.0 / (1 << 70) // 0x3b90000000000000 ~8.47033e-22
-	const TC = 1.46163214496836224576e+00  // 0x3FF762D86356BE3F
-	const TF = -1.21486290535849611461e-01 // 0xBFBF19B9BCC38A42
-	//    TT = -(tail of TF)
-	const TT = -3.63867699703950536541e-18 // 0xBC50C7CAA48A971F
+	const (
+		YMin = 1.461632144968362245
+		Two52 = 4.503599627370496e+15    // 0x4330000000000000 ~4.5036e+15
+		Two58 = 2.8823037615171174e+17   // 0x4390000000000000 ~2.8823e+17
+		Tiny = 8.470329472543003e-22     // 1.0 / (1 << 70) // 0x3b90000000000000 ~8.47033e-22
+		TC = 1.46163214496836224576e+00  // 0x3FF762D86356BE3F
+		TF = -1.21486290535849611461e-01 // 0xBFBF19B9BCC38A42
+
+		//    TT = -(tail of TF)
+		TT = -3.63867699703950536541e-18 // 0xBC50C7CAA48A971F
+	)
 	// special cases
 	sign = 1
 	match {
@@ -231,7 +234,7 @@ fn Lgamma(mut x: f64): (lgamma: f64, sign: int) {
 		neg = true
 	}
 
-	if x < TINY { // if |x| < 2**-70, ret -log(|x|)
+	if x < Tiny { // if |x| < 2**-70, ret -log(|x|)
 		if neg {
 			sign = -1
 		}
@@ -240,7 +243,7 @@ fn Lgamma(mut x: f64): (lgamma: f64, sign: int) {
 	}
 	mut nadj := 0.
 	if neg {
-		if x >= TWO52 { // |x| >= 2**52, must be -integer
+		if x >= Two52 { // |x| >= 2**52, must be -integer
 			lgamma = Inf(1)
 			ret
 		}
@@ -265,10 +268,10 @@ fn Lgamma(mut x: f64): (lgamma: f64, sign: int) {
 		if x <= 0.9 {
 			lgamma = -Log(x)
 			match {
-			| x >= (YMIN-1+0.27): // 0.7316 <= x <=  0.9
+			| x >= (YMin-1+0.27): // 0.7316 <= x <=  0.9
 				y = 1 - x
 				i = 0
-			| x >= (YMIN-1-0.27): // 0.2316 <= x < 0.7316
+			| x >= (YMin-1-0.27): // 0.2316 <= x < 0.7316
 				y = x - (TC - 1)
 				i = 1
 			|:
@@ -279,10 +282,10 @@ fn Lgamma(mut x: f64): (lgamma: f64, sign: int) {
 		} else {
 			lgamma = 0
 			match {
-			| x >= (YMIN+0.27): // 1.7316 <= x < 2
+			| x >= (YMin+0.27): // 1.7316 <= x < 2
 				y = 2 - x
 				i = 0
-			| x >= (YMIN-0.27): // 1.2316 <= x < 1.7316
+			| x >= (YMin-0.27): // 1.2316 <= x < 1.7316
 				y = x - TC
 				i = 1
 			|:
@@ -335,7 +338,7 @@ fn Lgamma(mut x: f64): (lgamma: f64, sign: int) {
 			z *= (y + 2)
 			lgamma += Log(z)
 		}
-	| x < TWO58: // 8 <= x < 2**58
+	| x < Two58: // 8 <= x < 2**58
 		t := Log(x)
 		z := 1 / x
 		y := z * z
