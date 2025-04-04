@@ -1457,6 +1457,11 @@ impl ObjectCoder {
 
 	fn globalDecls(mut &self) {
 		for (_, mut v) in self.ir.Ordered.Globals {
+			// Skip blank identifiers, do not declare them.
+			// Initialization expressions will be executed when variables initializing.
+			if token::IsIgnoreIdent(v.Ident) {
+				continue
+			}
 			self.tc.kind(self.Buf, v.TypeSym.Type)
 			self.write(" ")
 			identCoder.var(self.Buf, v)
@@ -1576,6 +1581,12 @@ impl ObjectCoder {
 				continue
 			}
 			self.Buf.WriteByte(indentKind)!
+			// If variable have blank identifier, just execute the initialization expression.
+			if token::IsIgnoreIdent(v.Ident) {
+				self.ec.model(v.ValueSym.Value.Model)
+				self.write(";\n")
+				continue
+			}
 			identCoder.var(self.Buf, v)
 			self.write(" = ")
 			self.ec.model(v.ValueSym.Value.Model)

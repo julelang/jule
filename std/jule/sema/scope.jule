@@ -552,7 +552,7 @@ impl scopeChecker {
 			self.scope.Stmts = append(self.scope.Stmts, v)
 		}
 
-		if self.isDuplicatedIdent(uintptr(v), v.Ident) {
+		if !token::IsIgnoreIdent(v.Ident) && self.isDuplicatedIdent(uintptr(v), v.Ident) {
 			self.s.pushErr(v.Token, build::LogMsg.DuplicatedIdent, v.Ident)
 			self.s.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 			self.stop()
@@ -587,6 +587,10 @@ impl scopeChecker {
 	}
 
 	fn checkVarDecl(mut &self, mut decl: &ast::Var) {
+		if token::IsIgnoreIdent(decl.Ident) {
+			self.s.pushErr(decl.Token, build::LogMsg.IgnoreIdent)
+			ret
+		}
 		mut v := buildVar(decl)
 		v.Scope = self.scope
 		self.checkVarDecl1(v)
