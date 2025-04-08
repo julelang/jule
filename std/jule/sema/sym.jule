@@ -408,7 +408,7 @@ impl symBuilder {
 			ret ""
 		}
 		filepath = filepath[len("std")+1:] // cut "std" + pathsep prefix
-		filepath = filepath::Join(build::PathStdlib, filepath)
+		filepath = filepath::Join(build::PathStdlib(), filepath)
 		filepath = filepath::Abs(filepath) else {
 			self.pushErr(decl.Path, build::LogMsg.UseNotFound, decl.Path.Kind)
 			ret ""
@@ -513,8 +513,9 @@ impl symBuilder {
 	fn getAsLinkPath(mut &self, mut path: str): str {
 		mut sb := strings::Builder{}
 		sb.Grow(len(path))
-		if strings::HasPrefix(path, build::PathStdlib) {
-			path = path[len(build::PathStdlib):] // cut absolute path prefix
+		stdlib := build::PathStdlib()
+		if strings::HasPrefix(path, stdlib) {
+			path = path[len(stdlib):] // cut absolute path prefix
 			sb.WriteStr(`"std`)!
 			sb.WriteStr(strings::ReplaceAll(path, str(filepath::Separator), jule::ImportPathSep))!
 			sb.WriteByte('"')!
@@ -639,7 +640,7 @@ impl symBuilder {
 			oldMod := self.importer.GetModPath()
 			defer { self.importer.SetModPath(oldMod) }
 			if imp.Std {
-				self.importer.SetModPath(build::PathStdlib)
+				self.importer.SetModPath(build::PathStdlib())
 			}
 			mut asts, mut errors := self.importer.ImportPackage(imp.Path, !imp.Std)
 			if len(errors) > 0 {
