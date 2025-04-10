@@ -121,6 +121,19 @@ impl eval {
 		self.s.pushSuggestion(fmt, args...)
 	}
 
+	// Pushes error if value is uses exceptional function call result.
+	// Uses the token for error logging.
+	// Reports whether the error logged.
+	fn errorExceptionalUse(mut self, v: &Value, token: &token::Token): (log: bool) {
+		fc, ok := v.Model.(&FuncCallExpr)
+		if ok && fc.Func.Decl.Exceptional {
+			self.pushErr(token, build::LogMsg.ExceptionalNotPlain)
+			self.pushSuggestion(build::LogMsg.AssignExceptionalResultToVariable)
+			log = true
+		}
+		ret
+	}
+
 	fn allowBuiltin(mut self) {
 		self.disBuiltin = false
 	}
@@ -3858,6 +3871,7 @@ impl unaryEval {
 			ret self.v
 		}
 
+		self.e.errorExceptionalUse(self.v, self.u.Expr.Token)
 		// NOTE
 		// The self.v.Decl is false now.
 		// Any function may be set to true.
@@ -4800,16 +4814,17 @@ impl binaryEval {
 		applyCastModelByEnum(self.e.s, v, v.Type.Enum(), self.op, self.e.getOwnerRefers())
 	}
 
-	fn checkValue(mut self, mut &v: &Value) {
+	fn checkValue(mut self, mut &v: &Value, token: &token::Token) {
 		f := v.Type.Func()
 		if f != nil && f.Decl != nil && f.Decl.IsMethod() {
-			self.e.pushErr(self.op, build::LogMsg.InvalidExprForBinary)
+			self.e.pushErr(token, build::LogMsg.InvalidExprForBinary)
 		}
+		self.e.errorExceptionalUse(v, token)
 	}
 
 	fn checkValues(mut self) {
-		self.checkValue(self.l)
-		self.checkValue(self.r)
+		self.checkValue(self.l, self.lt)
+		self.checkValue(self.r, self.rt)
 	}
 
 	fn setModel(mut self, mut &v: &Value) {
