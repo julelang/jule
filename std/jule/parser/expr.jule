@@ -957,7 +957,7 @@ fn splitDelim(mut &tokens: []&token::Token, delim: token::Id): ([]&token::Token,
 
 // Finds index of priority operator and returns index of operator
 // if found, returns -1 if not.
-fn findLowestPrecOp(&tokens: []&token::Token): int {
+fn findLowestPrecOp(tokens: []&token::Token): int {
 	// Set to max byte value, there is nothing for precedence it.
 	// It's provides optimization, avoid prec != -1 (if not set) checking.
 	// Always greater than actual precedences.
@@ -969,7 +969,34 @@ fn findLowestPrecOp(&tokens: []&token::Token): int {
 
 	mut braceN := 0
 	mut skipToNextBraceOpen := false
-	for i, token in tokens {
+
+	// Skips all unary operators of tokens by i and increases the i for each token.
+	// At the end, i will point to last skipped unary operator, if any.
+	// Reports whether any token skipped.
+	skipunary := fn(mut &i: int): bool {
+		mut inc := false
+		for i < len(tokens) {
+			if token::IsUnaryOp(tokens[i].Id) {
+				i++
+				inc = true
+			} else {
+				if inc {
+					i--
+				}
+				break
+			}
+		}
+		ret inc
+	}
+
+	mut i := 0
+	// Skip the unary operators of the beginning.
+	// If skipped any operator, point to correct start token.
+	if skipunary(i) {
+		i++
+	}
+	for i < len(tokens); i++ {
+		token := tokens[i]
 		match token.Id {
 		| token::Id.LBrace:
 			op = true
@@ -979,9 +1006,22 @@ fn findLowestPrecOp(&tokens: []&token::Token): int {
 		| token::Id.LBracket:
 			op = true
 			braceN++
+			skipunary(i) // Skip the unary expressions of the range's beginning.
 			continue
+		| token::Id.RParent:
+			// For the closing parentheses range, it might be a function call.
+			// Therefore, we need to handle ! operators.
+			// Allow multiple EXCL operator here,
+			// error logging should be handled by expression parser.
+			i++ // Skip the range closer token.
+			for i < len(tokens); i++ {
+				if tokens[i].Id != token::Id.Excl {
+					break
+				}
+			}
+			i-- // Fallback to the range closer token or last skipped unary operator.
+			fall // Fallback to ordinary range closing algorithm.
 		| token::Id.RBrace
-		| token::Id.RParent
 		| token::Id.RBracket:
 			op = true
 			braceN--
@@ -1004,13 +1044,11 @@ fn findLowestPrecOp(&tokens: []&token::Token): int {
 			continue
 		}
 
+		// Skip type annotations.
 		left := tokens[i-1]
-
-		// Skip unary operator or type annotation.
-		if token::IsUnaryOp(left.Id) || left.Id == token::Id.Colon {
+		if left.Id == token::Id.Colon {
 			continue
 		}
-
 		if i > 1 && left.Id == token::Id.RBracket {
 			lleft := tokens[i-2]
 			if lleft.Id == token::Id.LBracket {
@@ -1027,6 +1065,9 @@ fn findLowestPrecOp(&tokens: []&token::Token): int {
 			prec = p
 			precPos = i
 		}
+
+		// After binary expression, skip the unary operators of the following operand.
+		skipunary(i)
 	}
 	ret precPos
 }
