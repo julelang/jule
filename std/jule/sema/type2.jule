@@ -1487,12 +1487,17 @@ impl retTypeChecker {
 		ok = true
 		mut eval := self.sc.s.eval(self.sc)
 		eval.target.mutable = self.mutable
+		// Do not unwrap untyped literals, type analysis will check overflows.
+		// Allow using of exceptional function result if value is single.
+		mut flags := evalDefault
+		if len(self.exprDecls) == 1 {
+			flags |= evalExceptional
+		}
 		for (i, mut expr) in self.exprDecls {
 			if i < len(self.types) {
 				eval.prefix = self.types[i]
 			}
-			// Do not unwrap untyped literals, type analysis will check overflows.
-			mut v := eval.evalExpr(expr, evalDefault|evalExceptional)
+			mut v := eval.evalExpr(expr, flags)
 			ok = ok && v != nil
 			if ok {
 				self.exprs = append(self.exprs, v)
