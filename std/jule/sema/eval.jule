@@ -91,6 +91,7 @@ const (
 	evalDefault = 0             // Default evaluation mode.
 	evalPhysicalMem = 1 << iota // Checks whether the value is sutaible for physical memory.
 	evalUnwrapUntyped           // Unwraps untyped literal value to physical memory with default type.
+	evalExceptional             // Allows calling exceptional functions.
 )
 
 // Evaluator.
@@ -119,19 +120,6 @@ impl eval {
 	// Push suggestion to last log.
 	fn pushSuggestion(mut self, fmt: build::LogMsg, args: ...any) {
 		self.s.pushSuggestion(fmt, args...)
-	}
-
-	// Pushes error if value is uses exceptional function call result.
-	// Uses the token for error logging.
-	// Reports whether the error logged.
-	fn errorExceptionalUse(mut self, v: &Value, token: &token::Token): (log: bool) {
-		fc, ok := v.Model.(&FuncCallExpr)
-		if ok && fc.Func.Decl.Exceptional {
-			self.pushErr(token, build::LogMsg.ExceptionalNotPlain)
-			self.pushSuggestion(build::LogMsg.AssignExceptionalResultToVariable)
-			log = true
-		}
-		ret
 	}
 
 	fn allowBuiltin(mut self) {
@@ -2965,7 +2953,6 @@ impl eval {
 				ret compData
 			}
 		}
-		self.errorExceptionalUse(v, si.Ident)
 		mut kind := v.Type
 		match type v.Type.Kind {
 		| &Ptr:
@@ -3872,7 +3859,6 @@ impl unaryEval {
 			ret self.v
 		}
 
-		self.e.errorExceptionalUse(self.v, self.u.Expr.Token)
 		// NOTE
 		// The self.v.Decl is false now.
 		// Any function may be set to true.
@@ -4820,7 +4806,6 @@ impl binaryEval {
 		if f != nil && f.Decl != nil && f.Decl.IsMethod() {
 			self.e.pushErr(token, build::LogMsg.InvalidExprForBinary)
 		}
-		self.e.errorExceptionalUse(v, token)
 	}
 
 	fn checkValues(mut self) {
@@ -5297,6 +5282,14 @@ fn findNamespace(mut lookup: Lookup, namespace: str): &ImportInfo {
 
 // Checks value by flags.
 fn checkValue(mut v: &Value, mut s: &sema, mut token: &token::Token, flags: int): (ok: bool) {
+	if flags&evalExceptional != evalExceptional {
+		fc, (ok) := v.Model.(&FuncCallExpr)
+		if ok && fc.Func.Decl.Exceptional {
+			s.pushErr(token, build::LogMsg.ExceptionalNotPlain)
+			s.pushSuggestion(build::LogMsg.AssignExceptionalResultToVariable)
+			ret false
+		}
+	}
 	// Catch arbitrary integers with no type, they should be fit in int.
 	if flags&evalUnwrapUntyped == evalUnwrapUntyped {
 		if v.untyped && v.IsConst() && v.Constant.IsInt() {

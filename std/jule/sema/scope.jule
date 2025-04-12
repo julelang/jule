@@ -676,7 +676,7 @@ impl scopeChecker {
 	fn checkExpr(mut &self, mut expr: &ast::Expr) {
 		mut eval := self.s.eval(self)
 		eval.target.ignored = true
-		mut v := eval.evalExpr(expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+		mut v := eval.evalExpr(expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped|evalExceptional)
 		if v == nil || v.Model == nil {
 			// Skip nil data, because evaluation failed and error documented (it should be) already.
 			// Skip nil modeled data, this return only caused by built-in functions and it should be safe.
@@ -1200,7 +1200,7 @@ impl scopeChecker {
 		eval.unsafety = self.isUnsafe()
 		// Eval with evalUnwrapUntyped if l == nil, otherwise type will be checked.
 		// So, do not unwrap untyped values.
-		mut flags := evalDefault
+		mut flags := evalDefault | evalExceptional
 		if l == nil {
 			flags |= evalUnwrapUntyped
 		}
@@ -1394,7 +1394,7 @@ impl scopeChecker {
 			// It is mutability safe even if map stored in immutable memory and have mutable type value.
 			// Because mutability will be checked by assignment analysis.
 			updateMut(0)
-			right = eval.evalExpr(a.Right, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+			right = eval.evalExpr(a.Right, evalDefault|evalPhysicalMem|evalUnwrapUntyped|evalExceptional)
 			if right == nil {
 				ret
 			}
@@ -2088,7 +2088,7 @@ impl scopeChecker {
 		| &ast::UseExpr:
 			mut ue := stmt.Data.(&ast::UseExpr)
 			// Do not unwrap untyped literals, type analysis will check overflows.
-			mut v := self.s.eval(self).evalExpr(ue.Expr, evalDefault)
+			mut v := self.s.eval(self).evalExpr(ue.Expr, evalDefault|evalExceptional)
 			if v == nil {
 				ret
 			}
@@ -2102,7 +2102,7 @@ impl scopeChecker {
 			_ = rtc.check(ue.Expr)
 		| &ast::Expr:
 			mut expr := stmt.Data.(&ast::Expr)
-			mut v := self.s.eval(self).evalExpr(expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+			mut v := self.s.eval(self).evalExpr(expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped|evalExceptional)
 			if v == nil {
 				ret
 			}
