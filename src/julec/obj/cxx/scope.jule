@@ -638,6 +638,29 @@ impl scopeCoder {
 	}
 
 	fn assign(mut &self, mut a: &sema::Assign) {
+		// optimize may optimize multi-assign statements
+		// it uses common tokens of normalized statement
+		// so it may be := assignment token, it is not a bug
+		// handle it like the equal operator
+		mut op := a.Op.Id
+		mut kind := a.Op.Kind
+		if a.Op.Id == token::Id.ColonEq {
+			op = token::Id.Eq
+			kind = token::Kind.Eq
+		}
+
+		mut fc, ok := a.Right.Model.(&sema::FuncCallExpr)
+		if ok && fc.Func.Decl != nil && fc.Func.Decl.Exceptional {
+			self.oc.ec.handleExceptionalCallWithData(fc, useExprMemory{
+				DestType: a.Left.Type,
+				Model: a.Left.Model,
+				Type: useExprAssignment,
+				OpId: op,
+				OpKind: kind,
+			})
+			ret
+		}
+
 		match a.Op.Id {
 		| token::Id.SolidusEq | token::Id.PercentEq:
 			if env::Safety {
@@ -650,17 +673,6 @@ impl scopeCoder {
 		| token::Id.ShrEq:
 			self.shr(a)
 			ret
-		}
-
-		// optimize may optimize multi-assign statements
-		// it uses common tokens of normalized statement
-		// so it may be := assignment token, it is not a bug
-		// handle it like the equal operator
-		mut op := a.Op.Id
-		mut kind := a.Op.Kind
-		if a.Op.Id == token::Id.ColonEq {
-			op = token::Id.Eq
-			kind = token::Kind.Eq
 		}
 
 		self.assignLeft(a.Left.Model)
@@ -775,13 +787,30 @@ impl scopeCoder {
 		self.oc.addIndent()
 		self.oc.indent()
 
-		mut f := a.Right.(&sema::FuncCallExpr)
-		self.oc.tc.rc.codeMut1(self.oc.Buf, f.Func.Result)
-		self.oc.write(" " + assignResultName + " = ")
-		self.oc.ec.possibleRefExpr(a.Right)
-		self.oc.write(";\n")
+		mut fc := a.Right.(&sema::FuncCallExpr)
+		self.oc.tc.rc.codeMut1(self.oc.Buf, fc.Func.Result)
+		if fc.Func.Decl != nil && fc.Func.Decl.Exceptional {
+			static mut dest = useExprMemory{
+				DestType: nil, // Should not be required in this case.
+				Model: &sema::Var{
+					Binded: true, // to use identifier directly
+					Ident: assignResultName,
+				},
+				Type: useExprPlain,
+				OpId: token::Id.Eq,
+				OpKind: token::Kind.Eq,
+			}
+			self.oc.write(" " + assignResultName + ";\n")
+			self.oc.indent()
+			self.oc.ec.handleExceptionalCallWithData(fc, dest)
+			self.oc.write("\n")
+		} else {
+			self.oc.write(" " + assignResultName + " = ")
+			self.oc.ec.possibleRefExpr(a.Right)
+			self.oc.write(";\n")
+		}
 
-		mut tup := f.Func.Result.Tuple()
+		mut tup := fc.Func.Result.Tuple()
 		for (i, mut l) in a.Left {
 			if l == nil {
 				continue
@@ -1231,6 +1260,24 @@ impl scopeCoder {
 	}
 
 	fn setResult(mut &self, mut r: &sema::Ret) {
+		mut fc, ok := r.Expr.(&sema::FuncCallExpr)
+		if ok && fc.Func.Decl != nil && fc.Func.Decl.Exceptional {
+			static mut dest = useExprMemory{
+				DestType: nil, // Should not be required in this case.
+				Model: &sema::Var{
+					Binded: true, // to use identifier directly
+					Ident: resultName,
+				},
+				Type: useExprPlain,
+				OpId: token::Id.Eq,
+				OpKind: token::Kind.Eq,
+			}
+			self.oc.ec.handleExceptionalCallWithData(fc, dest)
+			self.oc.write("\n")
+			self.oc.indent()
+			ret
+		}
+
 		if len(r.Func.Decl.Result.Idents) == 1 {
 			self.oc.write(resultName + " = ")
 			self.oc.ec.possibleRefExpr(r.Expr)
@@ -1253,6 +1300,7 @@ impl scopeCoder {
 			self.oc.write(resultName + " = std::move(")
 			self.oc.ec.model(r.Expr)
 			self.oc.write(");\n")
+			self.oc.indent()
 		|:
 			panic("cxx: implementation mistake, this panic call should be unreachable")
 		}
@@ -1272,35 +1320,90 @@ impl scopeCoder {
 			self.oc.write("return;")
 			ret
 		} else if len(r.Func.Decl.Result.Idents) == 0 {
+			mut fc, ok := r.Expr.(&sema::FuncCallExpr)
+			exceptionalResult := ok && fc.Func.Decl != nil && fc.Func.Decl.Exceptional
 			if r.Func.Decl.Exceptional {
 				// Use scope to prevent "goto" errors about declarations.
-				self.oc.write("{ jule::Exceptional<")
+				self.oc.write("{\n")
+				self.oc.addIndent()
+				self.oc.indent()
+				self.oc.write("jule::Exceptional<")
 				self.oc.tc.kind(self.oc.Buf, r.Func.Result)
-				self.oc.write("> result = jule::Exceptional<")
-				self.oc.tc.kind(self.oc.Buf, r.Func.Result)
-				self.oc.write(">{.result=")
-				if hasDefer {
-					self.oc.write("({ ")
-					self.oc.tc.kind(self.oc.Buf, r.Func.Result)
-					self.oc.write(" __result = ")
+				self.oc.write("> result;\n")
+				self.oc.indent()
+				if exceptionalResult {
+					static mut dest = useExprMemory{
+						DestType: nil, // Should not be required in this case.
+						Model: &sema::Var{
+							Binded: true, // to use identifier directly
+							Ident: "result.result",
+						},
+						Type: useExprPlain,
+						OpId: token::Id.Eq,
+						OpKind: token::Kind.Eq,
+					}
+					self.oc.ec.handleExceptionalCallWithData(fc, dest)
+					self.oc.write("\n")
+				} else {
+					self.oc.write("result.result = ")
+					self.oc.ec.possibleRefExpr(r.Expr)
+					self.oc.write(";\n")
 				}
-				self.oc.ec.possibleRefExpr(r.Expr)
+				self.oc.indent()
 				if hasDefer {
-					self.oc.write("; " + deferStackName + ".call(); __result; })")
+					self.oc.write(deferStackName + ".call();\n")
+					self.oc.indent()
 				}
-				self.oc.write("}; return result; }")
+				self.oc.write("return result;\n")
+				self.oc.doneIndent()
+				self.oc.indent()
+				self.oc.write("}")
 			} else {
-				self.oc.write("return ")
-				if hasDefer {
-					self.oc.write("({ ")
+				self.oc.write("{\n")
+				self.oc.addIndent()
+				self.oc.indent()
+				if hasDefer || exceptionalResult {
 					self.oc.tc.kind(self.oc.Buf, r.Func.Result)
-					self.oc.write(" __result = ")
+					self.oc.write(" __result")
+					if !exceptionalResult {
+						self.oc.write(" = ")
+					} else {
+						self.oc.write(";\n")
+						self.oc.indent()
+					}
+				} else {
+					self.oc.write("return ")
 				}
-				self.oc.ec.possibleRefExpr(r.Expr)
+				if exceptionalResult {
+					static mut dest = useExprMemory{
+						DestType: nil, // Should not be required in this case.
+						Model: &sema::Var{
+							Binded: true, // to use identifier directly
+							Ident: "__result",
+						},
+						Type: useExprPlain,
+						OpId: token::Id.Eq,
+						OpKind: token::Kind.Eq,
+					}
+					self.oc.ec.handleExceptionalCallWithData(fc, dest)
+					self.oc.write("\n")
+				} else {
+					self.oc.ec.possibleRefExpr(r.Expr)
+				}
 				if hasDefer {
-					self.oc.write(";" + deferStackName + ".call(); __result; })")
+					self.oc.write(";\n")
+					self.oc.indent()
+					self.oc.write(deferStackName + ".call();\n")
 				}
-				self.oc.write(";")
+				if hasDefer || exceptionalResult {
+					self.oc.indent()
+					self.oc.write("return __result;\n")
+				} else {
+					self.oc.write(";\n")
+				}
+				self.oc.doneIndent()
+				self.oc.indent()
+				self.oc.write("}")
 			}
 			ret
 		}

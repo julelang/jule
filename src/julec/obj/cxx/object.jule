@@ -1154,6 +1154,24 @@ impl ObjectCoder {
 		self.write(";")
 	}
 
+	fn commonVarInit(mut &self, mut v: &sema::Var) {
+		mut fc, ok := v.ValueSym.Value.Model.(&sema::FuncCallExpr)
+		if ok && fc.Func.Decl != nil && fc.Func.Decl.Exceptional {
+			self.ec.handleExceptionalCallWithData(fc, useExprMemory{
+				DestType: v.TypeSym.Type,
+				Model: v,
+				Type: useExprPlain,
+				OpId: token::Id.Eq,
+				OpKind: token::Kind.Eq,
+			})
+		} else {
+			identCoder.var(self.Buf, v)
+			self.write(" = ")
+			self.ec.possibleRefExpr(v.ValueSym.Value.Model)
+			self.write(";")
+		}
+	}
+
 	fn var(mut &self, mut v: &sema::Var) {
 		if token::IsIgnoreIdent(v.Ident) {
 			ret
@@ -1177,7 +1195,13 @@ impl ObjectCoder {
 						self.write(")")
 					})
 				} else {
-					self.varInitExpr(v, fn() { self.ec.possibleRefExpr(v.ValueSym.Value.Model) })
+					if v.Statically {
+						self.varInitExpr(v, fn() { self.ec.possibleRefExpr(v.ValueSym.Value.Model) })
+					} else {
+						self.varInitExpr(v, nil)
+						self.write(" ")
+						self.commonVarInit(v)
+					}
 				}
 				ret
 			}
@@ -1593,9 +1617,7 @@ impl ObjectCoder {
 				self.write(";\n")
 				continue
 			}
-			identCoder.var(self.Buf, v)
-			self.write(" = ")
-			self.ec.model(v.ValueSym.Value.Model)
+			self.commonVarInit(v)
 			self.write(";\n")
 		}
 	}
@@ -1611,6 +1633,7 @@ impl ObjectCoder {
 	}
 
 	fn end(mut &self) {
+		self.addIndent()
 		self.write(`int main(int argc, char *argv[], char *envp[]) {
 	__jule_argc = static_cast<jule::Int>(argc);
 	__jule_argv = reinterpret_cast<jule::U8**>(argv);
@@ -1664,6 +1687,8 @@ impl ObjectCoder {
 
 		self.insertBuf(self.coSpawnObj, self.declPos)
 		self.declPos += self.coSpawnObj.Len()
+
+		self.doneIndent()
 	}
 
 	fn buildTraitHash(mut &self, mut &t: &sema::Trait) {

@@ -1096,7 +1096,23 @@ impl exprCoder {
 		self.oc.write("}")
 	}
 
-	fn writeUseExpr(mut &self, mut &f: &sema::FuncIns, mut val: &sema::Value) {
+	fn writeUseExpr(mut &self, mut &f: &sema::FuncIns, mut val: &sema::Value, mut dest: useExprMemory) {
+		if dest.Model != nil {
+			mut fc, ok := val.Model.(&sema::FuncCallExpr)
+			if ok && fc.Func.Decl != nil && fc.Func.Decl.Exceptional {
+				self.handleExceptionalCallWithData(fc, dest)
+				ret
+			}
+			// If value is not tuple, handle directly with the write method.
+			// This is required to handle += like assignment expressions.
+			if val.Type.Tuple() == nil {
+				dest.write(self, val.Model, val.Type)
+				self.oc.write(";")
+				ret
+			}
+			dest.write(self, nil, nil)
+			self.oc.write(" = ")
+		}
 		if val.Type.Tuple() == nil {
 			self.possibleRefExpr(val.Model)
 			self.oc.write(";")
@@ -1117,32 +1133,14 @@ impl exprCoder {
 		self.oc.write("};")
 	}
 
-	fn funcCall(mut &self, mut m: &sema::FuncCallExpr, ignoreExceptional: bool) {
-		if m.IsCo {
-			// Do not check for exceptionals,
-			// exceptional functions cannot be called with co.
-			self.coFuncCall(m)
-			ret
-		}
-		if m.Func.IsBuiltin() ||
-			!m.Func.Decl.Exceptional ||
-			m.Except != nil && len(m.Except.Stmts) == 0 {
-			self.pureFuncCall(m)
-			ret
-		}
-
-		if ignoreExceptional {
-			// Ignore exceptional mode is on.
-			// Just call function purely and use return value of exceptional if exist.
-			self.pureFuncCall(m)
-			if m.Func.Result != nil {
-				self.oc.write(".result")
-			}
-			ret
+	fn handleExceptionalCallWithData(mut &self, mut m: &sema::FuncCallExpr, mut dest: useExprMemory) {
+		static mut destData: sema::Expr = &sema::Var{
+			Binded: true, // to use identifier directly
+			Ident: "except.result",
 		}
 
 		// Generate code for exceptional.
-		self.oc.write("({\n")
+		self.oc.write("{\n")
 		self.oc.addIndent()
 		self.oc.indent()
 		self.oc.write("auto except = ")
@@ -1150,35 +1148,34 @@ impl exprCoder {
 		self.oc.write(";\n")
 		self.oc.indent()
 		if m.Except != nil {
-			if m.Func.Result == nil || !m.Assigned {
+			if m.Func.Result == nil || dest.Model == nil {
 				self.oc.write("if (!except.ok()) ")
 				self.oc.sc.scope(m.Except)
 				self.oc.write("\n")
 			} else {
-				forwarded := obj::IsForwarded(m.Except)
-				self.oc.write("(except.ok()) ? (except.result) : (")
+				self.oc.write("if (except.ok()) ")
+				dest.write(self, destData, m.Func.Result)
+				self.oc.write(";\n")
+				self.oc.indent()
+				self.oc.write("else ")
 				mut stmt := m.Except.Stmts[len(m.Except.Stmts)-1]
-				self.oc.write("{")
+				self.oc.write("{\n")
 				self.oc.addIndent()
 				match type stmt {
-				| &sema::Value:
+				| &sema::Use:
 					m.Except.Stmts = m.Except.Stmts[:len(m.Except.Stmts)-1]
 					self.oc.sc.scopeStmts(m.Except)
 					self.oc.write("\n")
 					self.oc.indent()
-					mut v := stmt.(&sema::Value)
-					self.writeUseExpr(m.Func, v)
+					mut v := stmt.(&sema::Use).Value
+					self.writeUseExpr(m.Func, v, dest)
 				|:
 					self.oc.sc.scopeStmts(m.Except)
 				}
 				self.oc.write("\n")
-				if forwarded {
-					self.oc.indent()
-					self.oc.write("except.result; // to prevent error, unreachable\n")
-				}
 				self.oc.doneIndent()
 				self.oc.indent()
-				self.oc.write("});\n")
+				self.oc.write("}\n")
 			}
 			self.oc.doneIndent()
 		} else {
@@ -1193,15 +1190,46 @@ impl exprCoder {
 				ret len
 			})
 			self.oc.write(");\n")
-			if !m.Func.Decl.IsVoid() {
+			if dest.Model != nil {
 				self.oc.indent()
-				self.oc.write("(except.result);\n")
+				dest.write(self, destData, m.Func.Result)
+				self.oc.write(";\n")
 			}
 			self.oc.doneIndent()
 		}
 
 		self.oc.indent()
-		self.oc.write("})")
+		self.oc.write("}")
+	}
+
+	fn funcCall(mut &self, mut m: &sema::FuncCallExpr, ignoreExceptional: bool) {
+		if m.IsCo {
+			// Do not check for exceptionals,
+			// exceptional functions cannot be called with co.
+			self.coFuncCall(m)
+			ret
+		}
+		if m.Func.IsBuiltin() ||
+			!m.Func.Decl.Exceptional ||
+			m.Except != nil && len(m.Except.Stmts) == 0 {
+			self.pureFuncCall(m)
+			ret
+		}
+
+		// Ignore exceptional mode is on.
+		// Just call function purely and use return value of exceptional if exist.
+		if ignoreExceptional {
+			self.pureFuncCall(m)
+			if m.Func.Result != nil {
+				self.oc.write(".result")
+			}
+			ret
+		}
+
+		// Code for exceptional.
+		// Result must be not assigned in this case.
+		// For result needed cases, use the handleExceptionalCallWithData method instead.
+		self.handleExceptionalCallWithData(m, useExprMemory{})
 	}
 
 	fn slice(mut &self, mut m: &sema::SliceExpr) {
@@ -2415,4 +2443,54 @@ fn writeAndReadFromBuf(mut &buf: strings::Builder, f: fn()): str {
 	s := str(unsafe { buf.Buf()[i:] })
 	unsafe { buf.SetBuf(buf.Buf()[:i]) }
 	ret s
+}
+
+// Use expression model type.
+const (
+	useExprPlain = 1 << iota
+	useExprAssignment
+)
+
+struct useExprMemory {
+	DestType: &sema::Type
+	Model:    sema::Expr
+	Type:     int
+	OpId:     token::Id
+	OpKind:   str
+}
+
+impl useExprMemory {
+	fn write(mut self, mut e: &exprCoder, mut src: sema::Expr, mut srcType: &sema::Type) {
+		match self.Type {
+		| useExprPlain:
+			e.possibleRefExpr(self.Model)
+			if src != nil {
+				e.oc.write(" ")
+				e.oc.write(self.OpKind)
+				e.oc.write(" ")
+				e.possibleRefExpr(src)
+			}
+		| useExprAssignment:
+			if src == nil {
+				e.oc.sc.assignLeft(self.Model)
+				ret
+			}
+			mut assign := new(sema::Assign)
+			assign.Op = &token::Token{
+				Id: self.OpId,
+				Kind: self.OpKind,
+			}
+			assign.Left = &sema::OperandExpr{
+				Type: self.DestType,
+				Model: self.Model,
+			}
+			assign.Right = &sema::OperandExpr{
+				Type: srcType,
+				Model: src,
+			}
+			e.oc.sc.assign(assign)
+		|:
+			panic("unreachable")
+		}
+	}
 }
