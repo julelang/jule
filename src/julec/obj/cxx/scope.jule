@@ -782,15 +782,15 @@ impl scopeCoder {
 		self.oc.write("})")
 	}
 
-	fn assignWithPossibleCast(mut &self, mut l: &sema::Value, r: str, mut rt: &sema::Type) {
-		self.assignLeft(l.Model)
+	fn assignWithPossibleCast(mut &self, mut l: sema::Expr, mut lt: &sema::Type, mut r: sema::Expr, mut rt: &sema::Type) {
+		self.assignLeft(l)
 		match {
-		| rt.Equal(l.Type):
+		| rt.IsNil() || rt.Equal(lt):
 			self.oc.write(" = ")
-			self.oc.write(r)
-		| obj::IsAny(l.Type):
+			self.oc.ec.possibleRefExpr(r)
+		| obj::IsAny(lt):
 			self.oc.write(" = " + typeAny + "(")
-			self.oc.write(r)
+			self.oc.ec.possibleRefExpr(r)
 			self.oc.write(", &" + anyTypeIdent)
 			self.oc.write(conv::Itoa(self.oc.pushAnyType(rt)))
 			self.oc.write(")")
@@ -798,17 +798,17 @@ impl scopeCoder {
 			// It should be trait.
 			if rt.Trait() != nil { // Different traits, cast.
 				self.oc.write(" = ")
-				mut t1 := l.Type.Trait()
+				mut t1 := lt.Trait()
 				mut t2 := rt.Trait()
-				self.oc.write(r)
+				self.oc.ec.possibleRefExpr(r)
 				self.oc.write(".map(")
 				self.oc.pushAndWriteMaskMapper(t1, t2)
 				self.oc.write(")")
 				break
 			}
-			t := l.Type.Trait()
+			t := lt.Trait()
 			self.oc.write(" = " + typeTrait + "(")
-			self.oc.write(r)
+			self.oc.ec.possibleRefExpr(r)
 			self.oc.write(", (" + typeTrait + "::Type*)&")
 			identCoder.traitDecl(self.oc.Buf, t)
 			self.oc.write("_mptr_data")
@@ -847,13 +847,16 @@ impl scopeCoder {
 		}
 
 		mut tup := fc.Func.Result.Tuple()
+		mut r := &sema::Var{
+			Binded: true, // to use identifier directly
+		}
 		for (i, mut l) in a.Left {
 			if l == nil {
 				continue
 			}
-			r := assignResultName + "." + resultArgName + conv::Itoa(i)
+			r.Ident = assignResultName + "." + resultArgName + conv::Itoa(i)
 			self.oc.indent()
-			self.assignWithPossibleCast(l, r, tup.Types[i])
+			self.assignWithPossibleCast(l.Model, l.Type, r, tup.Types[i])
 			self.oc.write("\n")
 		}
 
@@ -1326,46 +1329,18 @@ impl scopeCoder {
 		mut tup := r.Func.Result.Tuple()
 		if tup == nil {
 			// Single type, handle like an single assignment.
-			// First read the exceptional function call result.
-			// Then assign received value to the left operand with possible casting.
-			// Because if the handling falling here, probably need to be casted.
-			// Because function result types are not equal.
-			const exceptionalAssignResultIdent = "__jule_exceptionalAssignResultIdent"
 			static mut rv = &sema::Var{
-				Binded: true, // to use identifier directly
-				Ident: exceptionalAssignResultIdent,
-			}
-			static mut rv2 = &sema::Var{
 				Binded: true, // to use identifier directly
 				Ident: resultName,
 			}
 			mut dest := useExprMemory{
-				DestType: nil, // Should not be required in this case.
+				DestType: r.Func.Result,
 				Model: rv,
 				Type: useExprPlain,
 				OpId: token::Id.Eq,
 				OpKind: token::Kind.Eq,
 			}
-			self.oc.write("{\n")
-			self.oc.addIndent()
-			self.oc.indent()
-			self.oc.tc.rc.codeMut1(self.oc.Buf, fc.Func.Result)
-			self.oc.write(" ")
-			self.oc.write(exceptionalAssignResultIdent)
-			self.oc.write(";\n")
-			self.oc.indent()
 			self.oc.ec.handleExceptionalCallWithData(fc, dest)
-			self.oc.write(";\n")
-			self.oc.indent()
-			mut l := &sema::Value{
-				Type: r.Func.Result,
-				Model: rv2,
-			}
-			self.assignWithPossibleCast(l, exceptionalAssignResultIdent, fc.Func.Result)
-			self.oc.doneIndent()
-			self.oc.write("\n")
-			self.oc.indent()
-			self.oc.write("}")
 		} else {
 			mut a := new(sema::MultiAssign)
 			a.Decls = nil // not needed

@@ -1153,9 +1153,9 @@ impl exprCoder {
 				self.oc.sc.scope(m.Except)
 				self.oc.write("\n")
 			} else {
-				self.oc.write("if (except.ok()) ")
+				self.oc.write("if (except.ok()) { ")
 				dest.write(self, destData, m.Func.Result)
-				self.oc.write(";\n")
+				self.oc.write("; }\n")
 				self.oc.indent()
 				self.oc.write("else ")
 				mut stmt := m.Except.Stmts[len(m.Except.Stmts)-1]
@@ -2463,12 +2463,16 @@ impl useExprMemory {
 	fn write(mut self, mut e: &exprCoder, mut src: sema::Expr, mut srcType: &sema::Type) {
 		match self.Type {
 		| useExprPlain:
-			e.possibleRefExpr(self.Model)
-			if src != nil {
-				e.oc.write(" ")
-				e.oc.write(self.OpKind)
-				e.oc.write(" ")
-				e.possibleRefExpr(src)
+			if src != nil && self.DestType != nil {
+				e.oc.sc.assignWithPossibleCast(self.Model, self.DestType, src, srcType)
+			} else {
+				e.possibleRefExpr(self.Model)
+				if src != nil {
+					e.oc.write(" ")
+					e.oc.write(self.OpKind)
+					e.oc.write(" ")
+					e.possibleRefExpr(src)
+				}
 			}
 		| useExprAssignment:
 			if src == nil {
