@@ -649,8 +649,8 @@ impl scopeCoder {
 			kind = token::Kind.Eq
 		}
 
-		mut fc, ok := a.Right.Model.(&sema::FuncCallExpr)
-		if ok && fc.Func.Decl != nil && fc.Func.Decl.Exceptional {
+		mut fc := isExceptionalResult(a.Right.Model)
+		if fc != nil {
 			self.oc.ec.handleExceptionalCallWithData(fc, useExprMemory{
 				DestType: a.Left.Type,
 				Model: a.Left.Model,
@@ -782,6 +782,42 @@ impl scopeCoder {
 		self.oc.write("})")
 	}
 
+	fn assignWithPossibleCast(mut &self, mut l: &sema::Value, r: str, mut rt: &sema::Type) {
+		self.assignLeft(l.Model)
+		match {
+		| rt.Equal(l.Type):
+			self.oc.write(" = ")
+			self.oc.write(r)
+		| obj::IsAny(l.Type):
+			self.oc.write(" = " + typeAny + "(")
+			self.oc.write(r)
+			self.oc.write(", &" + anyTypeIdent)
+			self.oc.write(conv::Itoa(self.oc.pushAnyType(rt)))
+			self.oc.write(")")
+		|:
+			// It should be trait.
+			if rt.Trait() != nil { // Different traits, cast.
+				self.oc.write(" = ")
+				mut t1 := l.Type.Trait()
+				mut t2 := rt.Trait()
+				self.oc.write(r)
+				self.oc.write(".map(")
+				self.oc.pushAndWriteMaskMapper(t1, t2)
+				self.oc.write(")")
+				break
+			}
+			t := l.Type.Trait()
+			self.oc.write(" = " + typeTrait + "(")
+			self.oc.write(r)
+			self.oc.write(", (" + typeTrait + "::Type*)&")
+			identCoder.traitDecl(self.oc.Buf, t)
+			self.oc.write("_mptr_data")
+			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(t, rt)))
+			self.oc.write(")")
+		}
+		self.oc.write(";")
+	}
+
 	fn multiAssignFunc(mut &self, mut &a: &sema::MultiAssign) {
 		self.oc.write("{\n")
 		self.oc.addIndent()
@@ -815,42 +851,10 @@ impl scopeCoder {
 			if l == nil {
 				continue
 			}
-			const r = assignResultName + "." + resultArgName
+			r := assignResultName + "." + resultArgName + conv::Itoa(i)
 			self.oc.indent()
-			self.assignLeft(l.Model)
-			match {
-			| tup.Types[i].Equal(l.Type):
-				self.oc.write(" = " + r)
-				self.oc.write(conv::Itoa(i))
-			| obj::IsAny(l.Type):
-				self.oc.write(" = " + typeAny + "(" + r)
-				self.oc.write(conv::Itoa(i))
-				self.oc.write(", &" + anyTypeIdent)
-				self.oc.write(conv::Itoa(self.oc.pushAnyType(tup.Types[i])))
-				self.oc.write(")")
-			|:
-				// It should be trait.
-				if tup.Types[i].Trait() != nil { // Different traits, cast.
-					self.oc.write(" = ")
-					mut t1 := l.Type.Trait()
-					mut t2 := tup.Types[i].Trait()
-					self.oc.write(r)
-					self.oc.write(conv::Itoa(i))
-					self.oc.write(".map(")
-					self.oc.pushAndWriteMaskMapper(t1, t2)
-					self.oc.write(")")
-					break
-				}
-				t := l.Type.Trait()
-				self.oc.write(" = " + typeTrait + "(" + r)
-				self.oc.write(conv::Itoa(i))
-				self.oc.write(", (" + typeTrait + "::Type*)&")
-				identCoder.traitDecl(self.oc.Buf, t)
-				self.oc.write("_mptr_data")
-				self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(t, tup.Types[i])))
-				self.oc.write(")")
-			}
-			self.oc.write(";\n")
+			self.assignWithPossibleCast(l, r, tup.Types[i])
+			self.oc.write("\n")
 		}
 
 		self.oc.doneIndent()
@@ -1260,8 +1264,13 @@ impl scopeCoder {
 	}
 
 	fn setResult(mut &self, mut r: &sema::Ret) {
-		mut fc, ok := r.Expr.(&sema::FuncCallExpr)
-		if ok && fc.Func.Decl != nil && fc.Func.Decl.Exceptional {
+		mut fc := isExceptionalResult(r.Expr)
+		if fc != nil {
+			// If result types are not equal, must be handled like an assign.
+			// See the documentation of the &FuncCallExpr case below.
+			if !r.Func.Result.Equal(fc.Func.Result) {
+				goto assignFC
+			}
 			static mut dest = useExprMemory{
 				DestType: nil, // Should not be required in this case.
 				Model: &sema::Var{
@@ -1296,45 +1305,93 @@ impl scopeCoder {
 				self.oc.write(";\n")
 				self.oc.indent()
 			}
+			ret
 		| &sema::FuncCallExpr:
 			// If result types are equal, assignt directly.
 			// Otherwise, we probably need casting due to dynamic types.
-			if r.Func.Result.Equal(fc.Func.Result) {
+			if fc == nil || r.Func.Result.Equal(fc.Func.Result) {
 				self.oc.write(resultName + " = std::move(")
 				self.oc.ec.model(r.Expr)
 				self.oc.write(");\n")
 				self.oc.indent()
-			} else {
-				// Handle like an multi-assignment.
-				// The multi-assignment handler back-end will do the task.
-				mut tup := r.Func.Result.Tuple()
-				mut a := &sema::MultiAssign{}
-				a.Decls = nil // not needed
-				a.Op = nil    // not needed
-				a.Right = r.Expr
-				a.Left = make([]&sema::Value, len(tup.Types))
-				for i in a.Left {
-					mut ident := resultName + "." + resultArgName
-					ident += conv::Itoa(i)
-					a.Left[i] = &sema::Value{
-						Type: tup.Types[i],
-						Model: &sema::Var{
-							Binded: true, // to use identifier directly
-							Ident: ident,
-						},
-					}
-				}
-				self.multiAssign(a)
-				self.oc.write("\n")
-				self.oc.indent()
+				ret
 			}
+			goto assignFC
 		|:
 			panic("cxx: implementation mistake, this panic call should be unreachable")
 		}
+	assignFC:
+		// Handle like an assignment.
+		// The assignment handler will do the task.
+		mut tup := r.Func.Result.Tuple()
+		if tup == nil {
+			// Single type, handle like an single assignment.
+			// First read the exceptional function call result.
+			// Then assign received value to the left operand with possible casting.
+			// Because if the handling falling here, probably need to be casted.
+			// Because function result types are not equal.
+			const exceptionalAssignResultIdent = "__jule_exceptionalAssignResultIdent"
+			static mut rv = &sema::Var{
+				Binded: true, // to use identifier directly
+				Ident: exceptionalAssignResultIdent,
+			}
+			static mut rv2 = &sema::Var{
+				Binded: true, // to use identifier directly
+				Ident: resultName,
+			}
+			mut dest := useExprMemory{
+				DestType: nil, // Should not be required in this case.
+				Model: rv,
+				Type: useExprPlain,
+				OpId: token::Id.Eq,
+				OpKind: token::Kind.Eq,
+			}
+			self.oc.write("{\n")
+			self.oc.addIndent()
+			self.oc.indent()
+			self.oc.tc.rc.codeMut1(self.oc.Buf, fc.Func.Result)
+			self.oc.write(" ")
+			self.oc.write(exceptionalAssignResultIdent)
+			self.oc.write(";\n")
+			self.oc.indent()
+			self.oc.ec.handleExceptionalCallWithData(fc, dest)
+			self.oc.write(";\n")
+			self.oc.indent()
+			mut l := &sema::Value{
+				Type: r.Func.Result,
+				Model: rv2,
+			}
+			self.assignWithPossibleCast(l, exceptionalAssignResultIdent, fc.Func.Result)
+			self.oc.doneIndent()
+			self.oc.write("\n")
+			self.oc.indent()
+			self.oc.write("}")
+		} else {
+			mut a := new(sema::MultiAssign)
+			a.Decls = nil // not needed
+			a.Op = nil    // not needed
+			a.Right = r.Expr
+			a.Left = make([]&sema::Value, len(tup.Types))
+			for i in a.Left {
+				mut ident := resultName + "." + resultArgName
+				ident += conv::Itoa(i)
+				a.Left[i] = &sema::Value{
+					Type: tup.Types[i],
+					Model: &sema::Var{
+						Binded: true, // to use identifier directly
+						Ident: ident,
+					},
+				}
+			}
+			self.multiAssign(a)
+		}
+		self.oc.write("\n")
+		self.oc.indent()
 	}
 
 	fn retStmt(mut &self, mut r: &sema::Ret) {
 		hasDefer := r.Func.Decl != nil && r.Func.Decl.HasDefer
+		mut fc := isExceptionalResult(r.Expr) // Exceptional functions should be handled with setResult.
 		if r.Func.Decl.IsVoid() {
 			if hasDefer {
 				self.oc.write(deferStackName + ".call();\n")
@@ -1346,9 +1403,7 @@ impl scopeCoder {
 			}
 			self.oc.write("return;")
 			ret
-		} else if len(r.Func.Decl.Result.Idents) == 0 {
-			mut fc, ok := r.Expr.(&sema::FuncCallExpr)
-			exceptionalResult := ok && fc.Func.Decl != nil && fc.Func.Decl.Exceptional
+		} else if len(r.Func.Decl.Result.Idents) == 0 && fc == nil {
 			if r.Func.Decl.Exceptional {
 				// Use scope to prevent "goto" errors about declarations.
 				self.oc.write("{\n")
@@ -1358,24 +1413,9 @@ impl scopeCoder {
 				self.oc.tc.kind(self.oc.Buf, r.Func.Result)
 				self.oc.write("> result;\n")
 				self.oc.indent()
-				if exceptionalResult {
-					static mut dest = useExprMemory{
-						DestType: nil, // Should not be required in this case.
-						Model: &sema::Var{
-							Binded: true, // to use identifier directly
-							Ident: "result.result",
-						},
-						Type: useExprPlain,
-						OpId: token::Id.Eq,
-						OpKind: token::Kind.Eq,
-					}
-					self.oc.ec.handleExceptionalCallWithData(fc, dest)
-					self.oc.write("\n")
-				} else {
-					self.oc.write("result.result = ")
-					self.oc.ec.possibleRefExpr(r.Expr)
-					self.oc.write(";\n")
-				}
+				self.oc.write("result.result = ")
+				self.oc.ec.possibleRefExpr(r.Expr)
+				self.oc.write(";\n")
 				self.oc.indent()
 				if hasDefer {
 					self.oc.write(deferStackName + ".call();\n")
@@ -1389,40 +1429,17 @@ impl scopeCoder {
 				self.oc.write("{\n")
 				self.oc.addIndent()
 				self.oc.indent()
-				if hasDefer || exceptionalResult {
+				if hasDefer {
 					self.oc.tc.kind(self.oc.Buf, r.Func.Result)
-					self.oc.write(" __result")
-					if !exceptionalResult {
-						self.oc.write(" = ")
-					} else {
-						self.oc.write(";\n")
-						self.oc.indent()
-					}
+					self.oc.write(" __result = ")
 				} else {
 					self.oc.write("return ")
 				}
-				if exceptionalResult {
-					static mut dest = useExprMemory{
-						DestType: nil, // Should not be required in this case.
-						Model: &sema::Var{
-							Binded: true, // to use identifier directly
-							Ident: "__result",
-						},
-						Type: useExprPlain,
-						OpId: token::Id.Eq,
-						OpKind: token::Kind.Eq,
-					}
-					self.oc.ec.handleExceptionalCallWithData(fc, dest)
-					self.oc.write("\n")
-				} else {
-					self.oc.ec.possibleRefExpr(r.Expr)
-				}
+				self.oc.ec.possibleRefExpr(r.Expr)
 				if hasDefer {
 					self.oc.write(";\n")
 					self.oc.indent()
 					self.oc.write(deferStackName + ".call();\n")
-				}
-				if hasDefer || exceptionalResult {
 					self.oc.indent()
 					self.oc.write("return __result;\n")
 				} else {
@@ -1433,6 +1450,25 @@ impl scopeCoder {
 				self.oc.write("}")
 			}
 			ret
+		}
+
+		// If function have not explicit result variables, push to stack temporarily.
+		// We need to allocate just one variable, because this is the only possible case.
+		// Probably needed for implicit casting.
+		needResultVar := len(r.Func.Decl.Result.Idents) != 1 && r.Func.Result.Tuple() == nil
+		if needResultVar {
+			self.oc.write("{\n")
+			self.oc.addIndent()
+			self.oc.indent()
+
+			self.oc.tc.kind(self.oc.Buf, r.Func.Result)
+			self.oc.write(" " + resultName)
+			if shouldInitialized(r.Func.Result) {
+				self.oc.write(" = ")
+				self.oc.ec.initExpr(r.Func.Result)
+			}
+			self.oc.write(";\n")
+			self.oc.indent()
 		}
 
 		if r.Expr != nil {
@@ -1450,6 +1486,14 @@ impl scopeCoder {
 			self.oc.write(">{.result=" + resultName + "};")
 		} else {
 			self.oc.write("return " + resultName + ";")
+		}
+
+		// Close the result variable scope.
+		if needResultVar {
+			self.oc.write("\n")
+			self.oc.doneIndent()
+			self.oc.indent()
+			self.oc.write("}")
 		}
 	}
 
