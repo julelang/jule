@@ -783,7 +783,7 @@ impl scopeCoder {
 	}
 
 	fn multiAssignFunc(mut &self, mut &a: &sema::MultiAssign) {
-		self.oc.write("({\n")
+		self.oc.write("{\n")
 		self.oc.addIndent()
 		self.oc.indent()
 
@@ -855,7 +855,7 @@ impl scopeCoder {
 
 		self.oc.doneIndent()
 		self.oc.indent()
-		self.oc.write("})")
+		self.oc.write("}")
 	}
 
 	// Handles channel receive expression assignments like; data, ok := <-c
@@ -1297,10 +1297,37 @@ impl scopeCoder {
 				self.oc.indent()
 			}
 		| &sema::FuncCallExpr:
-			self.oc.write(resultName + " = std::move(")
-			self.oc.ec.model(r.Expr)
-			self.oc.write(");\n")
-			self.oc.indent()
+			// If result types are equal, assignt directly.
+			// Otherwise, we probably need casting due to dynamic types.
+			if r.Func.Result.Equal(fc.Func.Result) {
+				self.oc.write(resultName + " = std::move(")
+				self.oc.ec.model(r.Expr)
+				self.oc.write(");\n")
+				self.oc.indent()
+			} else {
+				// Handle like an multi-assignment.
+				// The multi-assignment handler back-end will do the task.
+				mut tup := r.Func.Result.Tuple()
+				mut a := &sema::MultiAssign{}
+				a.Decls = nil // not needed
+				a.Op = nil    // not needed
+				a.Right = r.Expr
+				a.Left = make([]&sema::Value, len(tup.Types))
+				for i in a.Left {
+					mut ident := resultName + "." + resultArgName
+					ident += conv::Itoa(i)
+					a.Left[i] = &sema::Value{
+						Type: tup.Types[i],
+						Model: &sema::Var{
+							Binded: true, // to use identifier directly
+							Ident: ident,
+						},
+					}
+				}
+				self.multiAssign(a)
+				self.oc.write("\n")
+				self.oc.indent()
+			}
 		|:
 			panic("cxx: implementation mistake, this panic call should be unreachable")
 		}
