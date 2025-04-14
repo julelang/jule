@@ -1310,9 +1310,14 @@ impl scopeCoder {
 			}
 			ret
 		| &sema::FuncCallExpr:
+			// If function call could not returned by isExceptionalResult,
+			// the use the pure function call.
+			if fc == nil {
+				fc = r.Expr.(&sema::FuncCallExpr)
+			}
 			// If result types are equal, assign directly.
 			// Otherwise, we probably need casting due to dynamic types.
-			if fc == nil || r.Func.Result.Equal(fc.Func.Result) {
+			if r.Func.Result.Equal(fc.Func.Result) {
 				self.oc.write(resultName + " = std::move(")
 				self.oc.ec.model(r.Expr)
 				self.oc.write(");\n")
