@@ -1460,6 +1460,7 @@ struct retTypeChecker {
 	sc:         &scopeChecker
 	f:          &FuncIns
 	types:      []&Type  // Return types.
+	expr:       &Value   // Return expressin single value.
 	exprs:      []&Value // Return expressions.
 	exprDecls:  []&ast::Expr
 	errorToken: &token::Token
@@ -1501,6 +1502,18 @@ impl retTypeChecker {
 			ok = ok && v != nil
 			if ok {
 				self.exprs = append(self.exprs, v)
+			}
+		}
+		if ok {
+			if len(self.exprs) == 1 {
+				self.expr = self.exprs[0]
+			} else {
+				self.expr = &Value{
+					Type: self.f.Result,
+					Model: &TupleExpr{
+						Values: self.exprs,
+					},
+				}
 			}
 		}
 		ret

@@ -2093,19 +2093,14 @@ impl scopeChecker {
 		match type stmt.Data {
 		| &ast::UseExpr:
 			mut ue := stmt.Data.(&ast::UseExpr)
-			// Do not unwrap untyped literals, type analysis will check overflows.
-			mut v := self.s.eval(self).evalExpr(ue.Expr, evalDefault|evalExceptional)
-			if v == nil {
-				ret
-			}
-			self.scope.Stmts = append(self.scope.Stmts, &Use{Value: v})
 			mut rtc := &retTypeChecker{
 				sc: self,
+				f: self.result.func,
 				errorToken: ue.Expr.Token,
-				types: self.result.func.Types(),
 				mutable: self.result.mutable,
 			}
 			_ = rtc.check(ue.Expr)
+			self.scope.Stmts = append(self.scope.Stmts, &Use{Value: rtc.expr})
 		| &ast::Expr:
 			mut expr := stmt.Data.(&ast::Expr)
 			mut v := self.s.eval(self).evalExpr(expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped|evalExceptional)
