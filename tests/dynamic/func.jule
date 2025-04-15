@@ -1,0 +1,94 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+fn single(): int {
+	ret 90
+}
+
+fn singleAny(): any {
+	ret single()
+}
+
+fn multi(): (int, int) {
+	ret 90, 12
+}
+
+fn multiAny(): (any, any) {
+	ret multi()
+}
+
+fn exceptionalSingle()!: int {
+	error("foo")
+}
+
+fn singleAny1(): any {
+	ret exceptionalSingle()!
+}
+
+fn singleAny2(): any {
+	ret exceptionalSingle() else {
+		use 90
+	}
+}
+
+fn exceptionalMulti()!: (int, int) {
+	error("foo")
+}
+
+fn multiAny1(): (any, any) {
+	ret exceptionalMulti()!
+}
+
+fn multiAny2(): (any, any) {
+	ret exceptionalMulti() else {
+		use 90, 12
+	}
+}
+
+fn init() {
+	{
+		exceptionalSingle() else {
+			goto ES
+		}
+		panic("exceptionalSingle did not return exception")
+	ES:
+	}
+	{
+		exceptionalMulti() else {
+			goto EM
+		}
+		panic("exceptionalMulti did not return exception")
+	EM:
+	}
+	{
+		x := singleAny()
+		if x != 90 {
+			panic("x != 90")
+		}
+	}
+	{
+		x, y := multiAny()
+		if x != 90 {
+			panic("x != 90")
+		}
+		if y != 12 {
+			panic("x != 12")
+		}
+	}
+	{
+		x := singleAny2()
+		if x != 90 {
+			panic("x != 90")
+		}
+	}
+	{
+		x, y := multiAny2()
+		if x != 90 {
+			panic("x != 90")
+		}
+		if y != 12 {
+			panic("x != 12")
+		}
+	}
+}
