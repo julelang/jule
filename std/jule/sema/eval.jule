@@ -2166,8 +2166,12 @@ impl eval {
 		mut model := v.Model.(&FuncCallExpr)
 
 		// self.lookup is always scopeChecker because exceptionals are
-		// not allowed in global scope.
-		mut sc := self.lookup.(&scopeChecker)
+		// not allowed in global scope due to static varaibles are not allowed.
+		// Therefore, if lookup is not scopeChecker, return immediately.
+		mut sc, ok := self.lookup.(&scopeChecker)
+		if !ok {
+			ret
+		}
 		csc = sc.newChildChecker()
 		if resultNeeded {
 			csc.result = &result{func: f, mutable: self.target.mutable}
