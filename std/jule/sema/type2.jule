@@ -150,8 +150,14 @@ impl typeCompatibilityChecker {
 		mut trt := self.dest.Trait()
 		mut ref := false
 		match {
+		| self.src.Sptr() != nil:
+			ref = true
+			self.src = self.src.Sptr().Elem
+			if self.src.SoftStruct() == nil {
+				ret false
+			}
+			fall
 		| self.src.SoftStruct() != nil:
-		strct:
 			s := self.src.SoftStruct()
 			if !s.Decl.IsImplements(trt) {
 				ret false
@@ -161,13 +167,6 @@ impl typeCompatibilityChecker {
 				ret false
 			}
 			ret true
-		| self.src.Sptr() != nil:
-			ref = true
-			self.src = self.src.Sptr().Elem
-			if self.src.SoftStruct() == nil {
-				ret false
-			}
-			goto strct
 		| self.src.Trait() != nil:
 			mut base := self.src.Trait()
 			if trt == base {
