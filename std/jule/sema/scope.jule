@@ -2210,28 +2210,58 @@ impl scopeChecker {
 			n = gt.Index
 		} else if gt.Scope.ChildIndex > label.node.Scope.ChildIndex {
 			// Label owned by a parent scope.
-			// Find parent scope of goto scope based on label.
+			// Find the parent scope of goto scope based on label.
 			// So we can evaluate by same scope conditions.
+			// This selected parent scope must be nearest child scope to the label's scope.
+			// This child scope is equals to `label.node.Scope.ChildIndex+1`.
+			//
+			// Scheme on pseudo AST
+			//	╭────────────────────────╮
+			//	│ fn example() {         │ > scope of label
+			//	│ Label:                 │
+			//	│     if foo {           │ > nearest child scope to scope of label, to be selected
+			//	│         if bar {       │ > scope of goto
+			//	│             goto Label │
+			//	│         }              │
+			//	│     }                  │
+			//	│ }                      │
+			//	╰────────────────────────╯
 			mut gtsc := gt.Scope
 			for gtsc.ChildIndex-1 > label.node.Scope.ChildIndex {
 				gtsc = gtsc.Parent
 			}
-			if gtsc.StmtIndex > label.node.Index {
-				// Scopes are same and label at above, so it is safe.
+			// To make sure parent scopes are common of goto and label,
+			// also check the label's parent scope. If they are not equal,
+			// goto jumps into scope.
+			//
+			// NOTE:
+			// Compare with the gtsc.Parent. For correct scope comparison,
+			// we have to use parent scope of gtsc.
+			// See documentation about getting parent scope of goto.
+			if gtsc.Parent != label.node.Scope {
+				self.s.pushErr(gt.Token, build::LogMsg.GotoJumpsIntoScope)
 				ret
 			}
-			// Limit controlling to goto's position.
-			// Label and goto is in same scope.
-			// If same scope condition is not met,
-			// we have zero offset because of root scope.
+			// Scopes are same and label at above, so it is safe.
+			if gtsc.StmtIndex > label.node.Index {
+				ret
+			}
+			// Cap analysis statement position limit to goto's position.
+			// Label and goto is in same scope.  If same scope condition is not met,
+			// we will have zero offset because of root scope.
 			// So algorithm will check all statements without limitation,
 			// so any declaration will cause an error.
 			n = gtsc.StmtIndex
 		} else {
-			// Label owned by a child scope. Set limit offset to zero.
-			// Thus algorithm will check all statements without limitation,
-			// so any declaration will cause an error.
-			n = 0
+			// Condition is;
+			//	gt.Scope != nil label.node.Scope &&
+			//	gt.Scope.ChildIndex <= label.node.Scope.ChildIndex
+			//
+			// Label owned by a more deepter child scope than goto's scope or equal.
+			// But scopes are not equal, so equal case does not works.
+			// In final case; goto jumps into scope, which is not allowed.
+			self.s.pushErr(gt.Token, build::LogMsg.GotoJumpsIntoScope)
+			ret
 		}
 
 		mut s := label.node.Scope     // Start checking at scope of label.
