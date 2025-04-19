@@ -4,6 +4,7 @@
 
 use "std/jule/ast"
 use "std/jule/build"
+use "std/jule/directive"
 use "std/jule/token"
 
 struct directiveChecker {
@@ -82,16 +83,16 @@ impl directiveChecker {
 		}
 
 		// remove quotes
-		d.Args[0].Kind = arg.Kind[1:len(arg.Kind)-1]
+		d.Args[0].Kind = arg.Kind[1 : len(arg.Kind)-1]
 
 		// Push relevant directives.
 		match type self.o {
 		| &Struct:
-			if findDirective(*self.d, build::Directive.Typedef) == nil {
+			if findDirective(*self.d, directive::Typedef) == nil {
 				mut typedef := &ast::Directive{
 					Tag: new(token::Token, *d.Tag),
 				}
-				typedef.Tag.Kind = build::Directive.Typedef
+				typedef.Tag.Kind = directive::Typedef
 				*self.d = append(*self.d, typedef)
 			}
 		}
@@ -153,23 +154,23 @@ impl directiveChecker {
 			ret
 		}
 		// remove quotes
-		d.Args[0].Kind = arg.Kind[1:len(arg.Kind)-1]
+		d.Args[0].Kind = arg.Kind[1 : len(arg.Kind)-1]
 	}
 
 	fn checkDirective(mut self, mut &d: &ast::Directive) {
 		match d.Tag.Kind {
-		| build::Directive.Cdef:
+		| directive::Cdef:
 			self.checkCdef(d)
-		| build::Directive.Typedef:
+		| directive::Typedef:
 			self.checkTypedef(d)
-		| build::Directive.Namespace:
+		| directive::Namespace:
 			self.checkNamespace(d)
-		| build::Directive.Test:
+		| directive::Test:
 			self.checkTest(d)
-		| build::Directive.Export:
+		| directive::Export:
 			self.checkExport(d)
-		| build::Directive.Build
-		| build::Directive.Pass:
+		| directive::Build
+		| directive::Pass:
 			self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
 		|:
 			self.s.pushErr(d.Tag, build::LogMsg.InvalidLabel, d.Tag.Kind)

@@ -8,6 +8,7 @@ use "obj/meta"
 use "std/jule"
 use "std/jule/ast"
 use "std/jule/build"
+use "std/jule/directive"
 use "std/jule/sema"
 
 struct liveTable {
@@ -177,7 +178,7 @@ impl ObjectDeadCode {
 		// collect api defines as live
 		obj::IterFiles(pkg, fn(mut &file: &sema::SymTab) {
 			for (_, mut v) in file.Vars {
-				if obj::HasDirective(v.Directives, build::Directive.Export) {
+				if obj::HasDirective(v.Directives, directive::Export) {
 					if !self.isLive[&sema::Var](v) {
 						self.pushLive[&sema::Var](v)
 						self.setReferencesAsLive(v.Refers)
@@ -185,7 +186,7 @@ impl ObjectDeadCode {
 				}
 			}
 			for (_, mut f) in file.Funcs {
-				if obj::HasDirective(f.Directives, build::Directive.Export) {
+				if obj::HasDirective(f.Directives, directive::Export) {
 					for (_, mut ins) in f.Instances {
 						if !self.isLive[&sema::FuncIns](ins) {
 							self.pushLive[&sema::FuncIns](ins)
@@ -215,7 +216,7 @@ impl ObjectDeadCode {
 			}
 			for (_, mut file) in pkg.Files {
 				for (_, mut f) in file.Funcs {
-					if obj::HasDirective(f.Directives, build::Directive.Test) {
+					if obj::HasDirective(f.Directives, directive::Test) {
 						mut ins := f.Instances[0]
 						if !self.isLive[&sema::FuncIns](ins) {
 							self.pushLive[&sema::FuncIns](ins)
