@@ -13,6 +13,7 @@ use "std/fmt"
 use "std/jule"
 use "std/jule/build"
 use integ "std/jule/integrated"
+use "std/jule/log"
 use "std/jule/sema"
 use "std/jule/types"
 use "std/os"
@@ -413,7 +414,7 @@ fn buildIr(&args: []str): &obj::IR {
 	setupSemaFlags(semaFlags)
 
 	if len(content) == 0 {
-		handle::Throw(build::Logf(build::LogMsg.MissingCompilePath))
+		handle::Throw(log::Logf(log::MissingCompilePath))
 	} else if len(content) > 1 {
 		handle::Throw("undefined content: " + content[1])
 	}
@@ -424,17 +425,17 @@ fn buildIr(&args: []str): &obj::IR {
 
 	// Check standard library.
 	inf := os::Stat(build::PathStdlib()) else {
-		handle::Throw(build::Logf(build::LogMsg.StdlibNotExist))
+		handle::Throw(log::Logf(log::StdlibNotExist))
 		ret nil // Avoid error.
 	}
 	if !inf.IsDir() {
-		handle::Throw(build::Logf(build::LogMsg.StdlibNotExist))
+		handle::Throw(log::Logf(log::StdlibNotExist))
 	}
 
 	mut ir, logs := obj::IR.Build(path, semaFlags)
 
 	if ir == nil && logs == nil {
-		handle::Throw(build::Logf(build::LogMsg.NoFileInEntryPackage, path))
+		handle::Throw(log::Logf(log::NoFileInEntryPackage, path))
 	}
 
 	if logs != nil {
@@ -461,7 +462,7 @@ fn compileCommand(mut &args: []str) {
 		const Binded = false
 		meta::Program.EntryPoint = ir.Main.FindFunc(jule::EntryPoint, Binded)
 		if meta::Program.EntryPoint == nil {
-			handle::Throw(build::Logf(build::LogMsg.NoEntryPoint))
+			handle::Throw(log::Logf(log::NoEntryPoint))
 		}
 	}
 

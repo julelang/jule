@@ -8,6 +8,7 @@ use "std/jule/build"
 use "std/jule/constant"
 use "std/jule/directive"
 use "std/jule/internal/mod"
+use "std/jule/log"
 use "std/jule/token"
 use "std/jule/types"
 use "std/slices"
@@ -48,13 +49,13 @@ fn isValidModelForRef(mut &m: Expr): bool {
 	}
 }
 
-fn compilerErr(&token: &token::Token, line: bool, fmt: build::LogMsg, args: ...any): build::Log {
-	mut log := build::Log{
-		Kind: build::LogKind.Error,
+fn compilerErr(&token: &token::Token, line: bool, fmt: str, args: ...any): log::Log {
+	mut log := log::Log{
+		Kind: log::Error,
 		Row: token.Row,
 		Column: token.Column,
 		Path: token.File.Path,
-		Text: build::Logf(fmt, args...),
+		Text: log::Logf(fmt, args...),
 	}
 	if line {
 		log.Line = token.File.GetRow(token.Row)
@@ -199,8 +200,8 @@ fn findFile(mut &files: []&SymTab, &handler: &token::Fileset): &SymTab {
 	ret nil
 }
 
-unsafe fn pushSuggestion(mut log: *build::Log, fmt: build::LogMsg, args: ...any) {
-	log.Suggestion = build::Logf(fmt, args...)
+unsafe fn pushSuggestion(mut log: *log::Log, fmt: str, args: ...any) {
+	log.Suggestion = log::Logf(fmt, args...)
 }
 
 // Flags for commonSemaMeta flag.
@@ -238,7 +239,7 @@ enum stepFlag {
 // Semantic analyzer for tables.
 // Accepts tables as files of package.
 struct sema {
-	errors: []build::Log
+	errors: []log::Log
 	files:  []&SymTab // Package files.
 	file:   &SymTab   // Current package file.
 	flags:  int
@@ -370,12 +371,12 @@ impl sema {
 	fn getCurrentFile(mut self): &SymTab { ret self.file }
 	fn setCurrentFile(mut self, mut f: &SymTab) { self.file = f }
 
-	fn pushErr(mut self, token: &token::Token, fmt: build::LogMsg, args: ...any) {
+	fn pushErr(mut self, token: &token::Token, fmt: str, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, true, fmt, args...))
 	}
 
 	// Push suggestion to last log.
-	fn pushSuggestion(mut self, fmt: build::LogMsg, args: ...any) {
+	fn pushSuggestion(mut self, fmt: str, args: ...any) {
 		unsafe { pushSuggestion(&self.errors[len(self.errors)-1], fmt, args...) }
 	}
 
@@ -425,16 +426,16 @@ impl sema {
 	fn checkGenericQuantity(mut self, required: int, given: int, token: &token::Token): (ok: bool) {
 		match {
 		| required == 0 && given > 0:
-			self.pushErr(token, build::LogMsg.NotHasGenerics)
+			self.pushErr(token, log::NotHasGenerics)
 			ret false
 		| required > 0 && given == 0:
-			self.pushErr(token, build::LogMsg.HasGenerics)
+			self.pushErr(token, log::HasGenerics)
 			ret false
 		| required < given:
-			self.pushErr(token, build::LogMsg.GenericsOverflow)
+			self.pushErr(token, log::GenericsOverflow)
 			ret false
 		| required > given:
-			self.pushErr(token, build::LogMsg.MissingGenerics)
+			self.pushErr(token, log::MissingGenerics)
 			ret false
 		|:
 			ret true
@@ -458,13 +459,13 @@ impl sema {
 
 	fn checkImportSelection[T](mut self, &ident: &token::Token, &s: T): bool {
 		if !self.isAccessibleDefine(s.Public, s.Token) {
-			self.pushErr(ident, build::LogMsg.IdentIsNotAccessible, ident.Kind)
-			self.pushSuggestion(build::LogMsg.MakePubToAccess)
+			self.pushErr(ident, log::IdentIsNotAccessible, ident.Kind)
+			self.pushSuggestion(log::MakePubToAccess)
 			ret false
 		}
 		const Binded = false // Exported defines cannot be binded.
 		if defByIdentPackage(self.files, s.Ident, Binded) != nil {
-			self.pushErr(ident, build::LogMsg.SelectedImportExistInPackage, s.Ident)
+			self.pushErr(ident, log::SelectedImportExistInPackage, s.Ident)
 			ret false
 		}
 		ret true
@@ -500,12 +501,12 @@ impl sema {
 		valid := isValidImpAlias(imp.Alias)
 		if valid {
 			if self.isUseAliasDuplication(imp) {
-				self.pushErr(imp.Decl.Path, build::LogMsg.DuplicatedUseAlias, imp.Alias)
-				self.pushSuggestion(build::LogMsg.GiveAnAliasManually, imp.Decl.Path.Kind)
+				self.pushErr(imp.Decl.Path, log::DuplicatedUseAlias, imp.Alias)
+				self.pushSuggestion(log::GiveAnAliasManually, imp.Decl.Path.Kind)
 			}
 		} else {
-			self.pushErr(imp.Decl.Path, build::LogMsg.AutoAliasFail, imp.Decl.Path.Kind)
-			self.pushSuggestion(build::LogMsg.GiveAnAliasManually, imp.Decl.Path.Kind)
+			self.pushErr(imp.Decl.Path, log::AutoAliasFail, imp.Decl.Path.Kind)
+			self.pushSuggestion(log::GiveAnAliasManually, imp.Decl.Path.Kind)
 		}
 		ret valid
 	}
@@ -517,15 +518,15 @@ impl sema {
 
 		if imp.Decl.Alias != nil { // custom alias found
 			if token::IsIgnoreIdent(imp.Alias) {
-				self.pushErr(imp.Decl.Token, build::LogMsg.IgnoreIdent)
+				self.pushErr(imp.Decl.Token, log::IgnoreIdent)
 			} else if self.isUseAliasDuplication(imp) {
-				self.pushErr(imp.Decl.Token, build::LogMsg.DuplicatedUseAlias, imp.Alias)
-				self.pushSuggestion(build::LogMsg.RenameUseAliasAvoidDuplication)
+				self.pushErr(imp.Decl.Token, log::DuplicatedUseAlias, imp.Alias)
+				self.pushSuggestion(log::RenameUseAliasAvoidDuplication)
 			}
 
 			// Check special cases for the "std/unsafe" package.
 			if imp.LinkPath == "std/unsafe" {
-				self.pushErr(imp.Decl.Alias, build::LogMsg.ExpectedPlainUseDecl, `use "std/unsafe"`)
+				self.pushErr(imp.Decl.Alias, log::ExpectedPlainUseDecl, `use "std/unsafe"`)
 				ret false
 			}
 		} else if !isImplicitImport(imp) && !self.checkAutoAlias(imp) {
@@ -729,12 +730,12 @@ impl sema {
 	fn checkAssignType(mut &self, destIsRef: bool, mut &dest: &Type,
 		mut &v: &Value, mut errorToken: &token::Token, mut refers: &ReferenceStack): bool {
 		if v.Decl {
-			self.pushErr(errorToken, build::LogMsg.InvalidExpr)
+			self.pushErr(errorToken, log::InvalidExpr)
 			ret false
 		}
 		if destIsRef {
 			if !dest.Equal(v.Type) {
-				self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), v.Type.Str())
+				self.pushErr(errorToken, log::IncompatibleTypes, dest.Str(), v.Type.Str())
 				ret false
 			}
 		} else {
@@ -792,7 +793,7 @@ impl sema {
 		if self._checkTypeCompatibility(dest, src, errorToken) {
 			ret true
 		}
-		self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), src.Str())
+		self.pushErr(errorToken, log::IncompatibleTypes, dest.Str(), src.Str())
 		ret false
 	}
 
@@ -801,14 +802,14 @@ impl sema {
 		if src.untyped && src.IsConst() {
 			match {
 			| src.Constant.IsInt():
-				self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), "untyped integer ("+src.Constant.Str()+")")
+				self.pushErr(errorToken, log::IncompatibleTypes, dest.Str(), "untyped integer ("+src.Constant.Str()+")")
 				ret
 			| src.Constant.IsF64():
-				self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), "untyped float ("+src.Constant.Str()+")")
+				self.pushErr(errorToken, log::IncompatibleTypes, dest.Str(), "untyped float ("+src.Constant.Str()+")")
 				ret
 			}
 		}
-		self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), src.Type.Str())
+		self.pushErr(errorToken, log::IncompatibleTypes, dest.Str(), src.Type.Str())
 	}
 
 	fn checkTypeCompatibility1(mut &self, mut &dest: &Type, mut &src: &Value,
@@ -999,11 +1000,11 @@ impl sema {
 
 	fn checkRefValidityForInitExpr(mut &self, leftMut: bool, mut &v: &Value, mut &errorToken: &token::Token): bool {
 		if !isValidModelForRef(v.Model) {
-			self.pushErr(errorToken, build::LogMsg.RefAssignNonVar)
+			self.pushErr(errorToken, log::RefAssignNonVar)
 			ret false
 		}
 		if leftMut && !v.Mutable {
-			self.pushErr(errorToken, build::LogMsg.MutRefPointsImmut)
+			self.pushErr(errorToken, log::MutRefPointsImmut)
 			ret false
 		}
 		ret true
@@ -1046,13 +1047,13 @@ impl sema {
 		if leftMut && !v.Mutable {
 			// Check classical assignment mutability.
 			if v.Type.Mutable() || v.Type.Variadic {
-				self.pushErr(errorToken, build::LogMsg.AssignNonMutToMut, v.Type.Str())
+				self.pushErr(errorToken, log::AssignNonMutToMut, v.Type.Str())
 				ret false
 			}
 			// Check interior mutability risk for the struct copy.
 			s := v.Type.Struct()
 			if s != nil && self.isMutRiskyStruct(s) {
-				self.pushErr(errorToken, build::LogMsg.CopyWithMutableData, v.Type.Str())
+				self.pushErr(errorToken, log::CopyWithMutableData, v.Type.Str())
 				ret false
 			}
 		}
@@ -1092,7 +1093,7 @@ impl sema {
 		referencer.tains = ta.Strict
 		ok = self.checkTypeSymWithRefers(ta.TypeSym, l, referencer)
 		if ok && ta.TypeSym.Type.Array() != nil && ta.TypeSym.Type.Array().Auto {
-			self.pushErr(ta.TypeSym.Decl.Token, build::LogMsg.ArrayAutoSized)
+			self.pushErr(ta.TypeSym.Decl.Token, log::ArrayAutoSized)
 			ok = false
 		}
 		ret
@@ -1100,7 +1101,7 @@ impl sema {
 
 	fn checkTypeAliasDecl(mut &self, mut &ta: &TypeAlias, mut prev: &referencer, mut l: Lookup): (ok: bool) {
 		if token::IsIgnoreIdent(ta.Ident) {
-			self.pushErr(ta.Token, build::LogMsg.IgnoreIdent)
+			self.pushErr(ta.Token, log::IgnoreIdent)
 		}
 		if ta.TypeSym.Type != nil {
 			// already checked
@@ -1121,8 +1122,8 @@ impl sema {
 			ret false
 		}
 		if !ta.Strict && ta.Binded {
-			self.pushErr(ta.Token, build::LogMsg.BindedAsSoftType)
-			self.pushSuggestion(build::LogMsg.DefineAsStrictAlias, ta.Ident)
+			self.pushErr(ta.Token, log::BindedAsSoftType)
+			self.pushSuggestion(log::DefineAsStrictAlias, ta.Ident)
 		}
 		ret true
 	}
@@ -1130,8 +1131,8 @@ impl sema {
 	// Checks type alias declaration with duplicated identifiers.
 	fn checkTypeAliasDeclDup(mut &self, mut &ta: &TypeAlias) {
 		if self.isDuplicatedIdent(uintptr(ta), ta.Ident, ta.Binded) {
-			self.pushErr(ta.Token, build::LogMsg.DuplicatedIdent, ta.Ident)
-			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+			self.pushErr(ta.Token, log::DuplicatedIdent, ta.Ident)
+			self.pushSuggestion(log::RenameForAvoidDuplication)
 		}
 		self.checkTypeAliasDecl(ta, nil, self)
 	}
@@ -1162,7 +1163,7 @@ impl sema {
 		}
 		ok = self.checkTypeSym(item.TypeSym, self)
 		if ok && item.TypeSym.Type.Array() != nil && item.TypeSym.Type.Array().Auto {
-			self.pushErr(item.TypeSym.Decl.Token, build::LogMsg.ArrayAutoSized)
+			self.pushErr(item.TypeSym.Decl.Token, log::ArrayAutoSized)
 			ok = false
 		}
 		if ok {
@@ -1173,20 +1174,20 @@ impl sema {
 
 	fn checkTypeEnumDecl(mut &self, mut &e: &TypeEnum) {
 		if token::IsIgnoreIdent(e.Ident) {
-			self.pushErr(e.Token, build::LogMsg.IgnoreIdent)
+			self.pushErr(e.Token, log::IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
-			self.pushErr(e.Token, build::LogMsg.DuplicatedIdent, e.Ident)
-			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+			self.pushErr(e.Token, log::DuplicatedIdent, e.Ident)
+			self.pushSuggestion(log::RenameForAvoidDuplication)
 		}
 
 		if len(e.Items) == 0 {
-			self.pushErr(e.Token, build::LogMsg.NoMemberInEnum, e.Ident)
+			self.pushErr(e.Token, log::NoMemberInEnum, e.Ident)
 			ret
 		}
 
 		for (_, mut item) in e.Items {
 			if item.TypeSym == nil {
-				self.pushErr(item.Token, build::LogMsg.MissingType)
+				self.pushErr(item.Token, log::MissingType)
 				continue
 			}
 			ok := self.checkTypeEnumItemType(e, item)
@@ -1196,7 +1197,7 @@ impl sema {
 			// Disallow plain <any> type, but allow strict type aliases to type <any>.
 			p := item.TypeSym.Type.Prim()
 			if item.TypeSym.Type.SoftStruct() == nil && p != nil && p.IsAny() {
-				self.pushErr(item.Token, build::LogMsg.AnyWithTypeEnum)
+				self.pushErr(item.Token, log::AnyWithTypeEnum)
 			}
 		}
 	}
@@ -1223,14 +1224,14 @@ impl sema {
 			if item.Ident == "" {
 				continue
 			} else if token::IsIgnoreIdent(item.Ident) {
-				self.pushErr(item.Token, build::LogMsg.IgnoreIdent)
+				self.pushErr(item.Token, log::IgnoreIdent)
 			} else {
 				for _, citem in items {
 					if item == citem {
 						break
 					} else if item.Ident == citem.Ident {
-						self.pushErr(item.Token, build::LogMsg.DuplicatedIdent, item.Ident)
-						self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+						self.pushErr(item.Token, log::DuplicatedIdent, item.Ident)
+						self.pushSuggestion(log::RenameForAvoidDuplication)
 						break
 					}
 				}
@@ -1240,14 +1241,14 @@ impl sema {
 
 	fn precheckEnumDecl(mut &self, mut &e: &Enum) {
 		if token::IsIgnoreIdent(e.Ident) {
-			self.pushErr(e.Token, build::LogMsg.IgnoreIdent)
+			self.pushErr(e.Token, log::IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
-			self.pushErr(e.Token, build::LogMsg.DuplicatedIdent, e.Ident)
-			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+			self.pushErr(e.Token, log::DuplicatedIdent, e.Ident)
+			self.pushSuggestion(log::RenameForAvoidDuplication)
 		}
 
 		if len(e.Items) == 0 {
-			self.pushErr(e.Token, build::LogMsg.NoMemberInEnum, e.Ident)
+			self.pushErr(e.Token, log::NoMemberInEnum, e.Ident)
 			ret
 		}
 
@@ -1264,13 +1265,13 @@ impl sema {
 
 		mut t := e.TypeSym.Type.Prim()
 		if t == nil {
-			self.pushErr(e.Token, build::LogMsg.InvalidTypeSource)
+			self.pushErr(e.Token, log::InvalidTypeSource)
 			ret
 		}
 
 		supportsIota := types::IsInt(t.Str())
 		if !t.IsStr() && !supportsIota {
-			self.pushErr(e.Token, build::LogMsg.InvalidTypeSource)
+			self.pushErr(e.Token, log::InvalidTypeSource)
 			ret
 		}
 		for (_, mut item) in e.Items {
@@ -1323,7 +1324,7 @@ impl sema {
 		ok = true
 		for i, g in generics {
 			if token::IsIgnoreIdent(g.Ident) {
-				self.pushErr(g.Token, build::LogMsg.IgnoreIdent)
+				self.pushErr(g.Token, log::IgnoreIdent)
 				ok = false
 				continue
 			}
@@ -1336,8 +1337,8 @@ impl sema {
 					// Skip current and following generics.
 					break duplicationLookup
 				| g.Ident == ct.Ident:
-					self.pushErr(g.Token, build::LogMsg.DuplicatedIdent, g.Ident)
-					self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+					self.pushErr(g.Token, log::DuplicatedIdent, g.Ident)
+					self.pushSuggestion(log::RenameForAvoidDuplication)
 					ok = false
 					break duplicationLookup
 				}
@@ -1354,8 +1355,8 @@ impl sema {
 			for _, g in f.Generics {
 				if p.Ident == g.Ident {
 					ok = false
-					self.pushErr(p.Token, build::LogMsg.DuplicatedIdent, p.Ident)
-					self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+					self.pushErr(p.Token, log::DuplicatedIdent, p.Ident)
+					self.pushSuggestion(log::RenameForAvoidDuplication)
 					continue check
 				}
 			}
@@ -1374,8 +1375,8 @@ impl sema {
 					break paramsLookup
 				| p.Ident == jp.Ident:
 					ok = false
-					self.pushErr(p.Token, build::LogMsg.DuplicatedIdent, p.Ident)
-					self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+					self.pushErr(p.Token, log::DuplicatedIdent, p.Ident)
+					self.pushSuggestion(log::RenameForAvoidDuplication)
 					continue check
 				}
 			}
@@ -1420,8 +1421,8 @@ impl sema {
 			}
 			continue
 		exist:
-			self.pushErr(v, build::LogMsg.DuplicatedIdent, v.Kind)
-			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+			self.pushErr(v, log::DuplicatedIdent, v.Kind)
+			self.pushSuggestion(log::RenameForAvoidDuplication)
 			ok = false
 		}
 
@@ -1434,7 +1435,7 @@ impl sema {
 		}
 		mut param := f.Params[len(f.Params)-1]
 		if param.Variadic && param.Reference {
-			self.pushErr(param.Token, build::LogMsg.VariadicReference)
+			self.pushErr(param.Token, log::VariadicReference)
 		}
 		ret true
 	}
@@ -1443,20 +1444,20 @@ impl sema {
 	// Not checks scope, and other things.
 	fn checkFuncDeclPrototype(mut &self, mut &f: &Func) {
 		if f.Exceptional && f.Binded {
-			self.pushErr(f.Token, build::LogMsg.BindedExceptional)
+			self.pushErr(f.Token, log::BindedExceptional)
 			ret
 		}
 
 		// Check special cases for reserved functions, ignore method ones.
 		if f.IsEntryPoint() && f.Owner == nil {
 			if !FuncPattern.Main(f) {
-				self.pushErr(f.Token, build::LogMsg.InvalidMainFunction)
-				self.pushSuggestion(build::LogMsg.ExpectedMainLike)
+				self.pushErr(f.Token, log::InvalidMainFunction)
+				self.pushSuggestion(log::ExpectedMainLike)
 			}
 		} else if f.IsInit() && f.Owner == nil {
 			if !FuncPattern.Init(f) {
-				self.pushErr(f.Token, build::LogMsg.InvalidInitializerFunction)
-				self.pushSuggestion(build::LogMsg.ExpectedInitializerLike)
+				self.pushErr(f.Token, log::InvalidInitializerFunction)
+				self.pushSuggestion(log::ExpectedInitializerLike)
 			}
 		}
 
@@ -1496,7 +1497,7 @@ impl sema {
 			}
 			mut t2 := it.Type.Trait()
 			if t2 == nil {
-				self.pushErr(it.Decl.Token, build::LogMsg.InheritedNonTrait, t.Ident, it.Type.Str())
+				self.pushErr(it.Decl.Token, log::InheritedNonTrait, t.Ident, it.Type.Str())
 				ok = false
 				continue
 			}
@@ -1505,13 +1506,13 @@ impl sema {
 					break
 				}
 				if it2.Type != nil && it.Type.Equal(it2.Type) {
-					self.pushErr(it.Decl.Token, build::LogMsg.DuplicatedIdent, t2.Ident)
+					self.pushErr(it.Decl.Token, log::DuplicatedIdent, t2.Ident)
 					ok = false
 					break
 				}
 			}
 			if t == t2 {
-				self.pushErr(it.Decl.Token, build::LogMsg.IllegalCycleRefersItself, t.Ident)
+				self.pushErr(it.Decl.Token, log::IllegalCycleRefersItself, t.Ident)
 				ok = false
 			} else {
 				mut message := strings::Builder{}
@@ -1522,7 +1523,7 @@ impl sema {
 					message.Clear()
 					self.pushCycleError(t.Ident, t2.Ident, message)
 					errMsg += message.Str()
-					self.pushErr(it.Decl.Token, build::LogMsg.IllegalCrossCycle, errMsg)
+					self.pushErr(it.Decl.Token, log::IllegalCrossCycle, errMsg)
 				}
 			}
 		}
@@ -1545,7 +1546,7 @@ impl sema {
 					t1f := self.getTraitCheckFuncKind(t1m)
 					t2f := self.getTraitCheckFuncKind(t2m)
 					if !t1f.equalTrait(t2f) {
-						self.pushErr(it.Decl.Token, build::LogMsg.IncompatibleInherit,
+						self.pushErr(it.Decl.Token, log::IncompatibleInherit,
 							t.Ident, t2.Ident, t1f.GetKindStr(true), t2f.GetKindStr(true))
 						ret
 					}
@@ -1556,9 +1557,9 @@ impl sema {
 
 	fn checkTraitDeclMethod(mut &self, mut &f: &Func) {
 		if token::IsIgnoreIdent(f.Ident) {
-			self.pushErr(f.Token, build::LogMsg.IgnoreIdent)
+			self.pushErr(f.Token, log::IgnoreIdent)
 		} else if token::IsAnonIdent(f.Ident) {
-			self.pushErr(f.Token, build::LogMsg.AnonFunc)
+			self.pushErr(f.Token, log::AnonFunc)
 		}
 		f.sema = self
 		self.checkFuncDeclPrototype(f)
@@ -1578,8 +1579,8 @@ impl sema {
 			}
 
 			if t.findMethodInherit(f.Ident) != nil {
-				self.pushErr(f.Token, build::LogMsg.DuplicatedIdent, f.Ident)
-				self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+				self.pushErr(f.Token, log::DuplicatedIdent, f.Ident)
+				self.pushSuggestion(log::RenameForAvoidDuplication)
 				continue
 			}
 
@@ -1596,8 +1597,8 @@ impl sema {
 					// Skip current and following methods.
 					break duplicateLookup
 				| f.Ident == jf.Ident:
-					self.pushErr(f.Token, build::LogMsg.DuplicatedIdent, f.Ident)
-					self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+					self.pushErr(f.Token, log::DuplicatedIdent, f.Ident)
+					self.pushSuggestion(log::RenameForAvoidDuplication)
 					break duplicateLookup
 				}
 			}
@@ -1606,10 +1607,10 @@ impl sema {
 
 	fn checkTraitDecl(mut &self, mut &t: &Trait) {
 		if token::IsIgnoreIdent(t.Ident) {
-			self.pushErr(t.Token, build::LogMsg.IgnoreIdent)
+			self.pushErr(t.Token, log::IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(t), t.Ident, false) {
-			self.pushErr(t.Token, build::LogMsg.DuplicatedIdent, t.Ident)
-			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+			self.pushErr(t.Token, log::DuplicatedIdent, t.Ident)
+			self.pushSuggestion(log::RenameForAvoidDuplication)
 		}
 
 		self.checkTraitDeclInherits(t)
@@ -1632,7 +1633,7 @@ impl sema {
 		ok = true
 		for _, f in ipl.Methods {
 			if base.FindMethod(f.Ident) == nil {
-				self.pushErr(f.Token, build::LogMsg.TraitHaveNotIdent, base.Ident, f.Ident)
+				self.pushErr(f.Token, log::TraitHaveNotIdent, base.Ident, f.Ident)
 				ok = false
 			}
 		}
@@ -1645,7 +1646,7 @@ impl sema {
 		// Methods.
 		for (_, mut f) in ipl.Methods {
 			if dest.FindMethod(f.Ident, f.Statically) != nil || dest.FindField(f.Ident) != nil {
-				self.pushErr(f.Token, build::LogMsg.StructAlreadyHaveIdent, dest.Ident, f.Ident)
+				self.pushErr(f.Token, log::StructAlreadyHaveIdent, dest.Ident, f.Ident)
 				ok = false
 				continue
 			}
@@ -1654,7 +1655,7 @@ impl sema {
 				for _, fg in f.Generics {
 					for _, dg in dest.Generics {
 						if fg.Ident == dg.Ident {
-							self.pushErr(fg.Token, build::LogMsg.MethodHasGenericWithSameIdent)
+							self.pushErr(fg.Token, log::MethodHasGenericWithSameIdent)
 							ok = false
 						}
 					}
@@ -1688,8 +1689,8 @@ impl sema {
 		}
 		mut base := baseT.Trait()
 		if base == nil {
-			self.pushErr(decl.Base.Token, build::LogMsg.ImplInvalidBase, baseT.Str())
-			self.pushSuggestion(build::LogMsg.ExpectedTrait)
+			self.pushErr(decl.Base.Token, log::ImplInvalidBase, baseT.Str())
+			self.pushSuggestion(log::ExpectedTrait)
 			ret
 		}
 
@@ -1699,15 +1700,15 @@ impl sema {
 		}
 		mut destS := destT.SoftStruct()
 		if destS == nil {
-			self.pushErr(decl.Dest.Token, build::LogMsg.ImplInvalidDest, destT.Str())
-			self.pushSuggestion(build::LogMsg.ExpectedStruct)
+			self.pushErr(decl.Dest.Token, log::ImplInvalidDest, destT.Str())
+			self.pushSuggestion(log::ExpectedStruct)
 			ret
 		}
 
 		mut dest := destS.Decl
 
 		if dest.Token.File.Dir() != self.file.File.Dir() {
-			self.pushErr(decl.Dest.Token, build::LogMsg.IllegalImplOutOfPackage)
+			self.pushErr(decl.Dest.Token, log::IllegalImplOutOfPackage)
 			ret
 		}
 
@@ -1727,14 +1728,14 @@ impl sema {
 		}
 		mut destS := destT.SoftStruct()
 		if destS == nil {
-			self.pushErr(decl.Dest.Token, build::LogMsg.ImplInvalidDest, destT.Str())
-			self.pushSuggestion(build::LogMsg.ExpectedStruct)
+			self.pushErr(decl.Dest.Token, log::ImplInvalidDest, destT.Str())
+			self.pushSuggestion(log::ExpectedStruct)
 			ret
 		}
 
 		mut dest := destS.Decl
 		if dest.Token.File.Dir() != self.file.File.Dir() {
-			self.pushErr(decl.Dest.Token, build::LogMsg.IllegalImplOutOfPackage)
+			self.pushErr(decl.Dest.Token, log::IllegalImplOutOfPackage)
 			ret
 		}
 
@@ -1765,7 +1766,7 @@ impl sema {
 
 		if decl.IsTypeInferred() {
 			if !decl.IsInitialized() && groupError {
-				self.pushErr(decl.Token, build::LogMsg.MissingValueForTypeInference)
+				self.pushErr(decl.Token, log::MissingValueForTypeInference)
 			}
 		} else {
 			mut refers := (&ReferenceStack)(nil)
@@ -1782,22 +1783,22 @@ impl sema {
 
 		if decl.Reference {
 			if decl.Constant {
-				self.pushErr(decl.Token, build::LogMsg.ConstRef)
+				self.pushErr(decl.Token, log::ConstRef)
 			}
 			if decl.Statically {
-				self.pushErr(decl.Token, build::LogMsg.StaticReference)
+				self.pushErr(decl.Token, log::StaticReference)
 			}
 		}
 
 		if !decl.IsInitialized() {
 			if groupError {
-				self.pushErr(decl.Token, build::LogMsg.ConstVarNotHaveExpr)
+				self.pushErr(decl.Token, log::ConstVarNotHaveExpr)
 			}
 			if decl.Statically {
-				self.pushErr(decl.Token, build::LogMsg.StaticNotHaveExpr)
+				self.pushErr(decl.Token, log::StaticNotHaveExpr)
 			}
 			if decl.Reference {
-				self.pushErr(decl.Token, build::LogMsg.RefNotInited)
+				self.pushErr(decl.Token, log::RefNotInited)
 			}
 		}
 	}
@@ -1806,15 +1807,15 @@ impl sema {
 	// Checks duplicated identifiers by Sema.
 	fn checkGlobalVarDecl(mut &self, mut &decl: &Var) {
 		if self.isDuplicatedIdent(uintptr(decl), decl.Ident, decl.Binded) {
-			self.pushErr(decl.Token, build::LogMsg.DuplicatedIdent, decl.Ident)
-			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+			self.pushErr(decl.Token, log::DuplicatedIdent, decl.Ident)
+			self.pushSuggestion(log::RenameForAvoidDuplication)
 		}
 		if decl.Binded && decl.Constant {
-			self.pushErr(decl.Token, build::LogMsg.BindedVarIsConst)
+			self.pushErr(decl.Token, log::BindedVarIsConst)
 		}
 		if !decl.Binded && !decl.Constant && !decl.Statically {
-			self.pushErr(decl.Token, build::LogMsg.GlobalNotStatic)
-			self.pushSuggestion(build::LogMsg.UseStaticKeywordToDef)
+			self.pushErr(decl.Token, log::GlobalNotStatic)
+			self.pushSuggestion(log::UseStaticKeywordToDef)
 		}
 		self.checkDirectives(decl.Directives, decl)
 		self.checkVarDecl(decl, self)
@@ -1846,7 +1847,7 @@ impl sema {
 			}
 			if !exist {
 				const Ident = true
-				self.pushErr(strct.Token, build::LogMsg.NotImplTraitDef, trt.Ident, tfK.GetKindStr(Ident))
+				self.pushErr(strct.Token, log::NotImplTraitDef, trt.Ident, tfK.GetKindStr(Ident))
 				ok = false
 			}
 		}
@@ -1873,8 +1874,8 @@ impl sema {
 				if f == cf {
 					break
 				} else if f.Ident == cf.Ident {
-					self.pushErr(f.Token, build::LogMsg.DuplicatedIdent, f.Ident)
-					self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+					self.pushErr(f.Token, log::DuplicatedIdent, f.Ident)
+					self.pushSuggestion(log::RenameForAvoidDuplication)
 					ok = false
 				}
 			}
@@ -1884,10 +1885,10 @@ impl sema {
 
 	fn checkStructDecl(mut &self, mut &s: &Struct) {
 		if token::IsIgnoreIdent(s.Ident) {
-			self.pushErr(s.Token, build::LogMsg.IgnoreIdent)
+			self.pushErr(s.Token, log::IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(s), s.Ident, s.Binded) {
-			self.pushErr(s.Token, build::LogMsg.DuplicatedIdent, s.Ident)
-			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+			self.pushErr(s.Token, log::DuplicatedIdent, s.Ident)
+			self.pushSuggestion(log::RenameForAvoidDuplication)
 		}
 
 		self.checkDirectives(s.Directives, s)
@@ -1941,9 +1942,9 @@ impl sema {
 
 	fn checkFuncDecl(mut &self, mut &f: &Func) {
 		if token::IsIgnoreIdent(f.Ident) {
-			self.pushErr(f.Token, build::LogMsg.IgnoreIdent)
+			self.pushErr(f.Token, log::IgnoreIdent)
 		} else if f.IsAnon() {
-			self.pushErr(f.Token, build::LogMsg.AnonFunc)
+			self.pushErr(f.Token, log::AnonFunc)
 		}
 
 		self.checkDirectives(f.Directives, f)
@@ -1956,8 +1957,8 @@ impl sema {
 					ret
 				}
 			}
-			self.pushErr(f.Token, build::LogMsg.DuplicatedIdent, f.Ident)
-			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+			self.pushErr(f.Token, log::DuplicatedIdent, f.Ident)
+			self.pushSuggestion(log::RenameForAvoidDuplication)
 		}
 	}
 
@@ -1979,7 +1980,7 @@ impl sema {
 
 	fn pushCycleError(self, &st1: str, &st2: str, mut &message: strings::Builder) {
 		const Padding = 7
-		refersTo := build::Logf(build::LogMsg.RefersTo, st1, st2)
+		refersTo := log::Logf(log::RefersTo, st1, st2)
 		m := message.Str()
 		message.WriteStr(strings::Repeat(" ", Padding))!
 		message.WriteStr(refersTo)!
@@ -2026,13 +2027,13 @@ impl sema {
 	fn checkDataForTypeInference(mut self, &v: &Value, &errToken: &token::Token): bool {
 		match {
 		| v.IsNil():
-			self.pushErr(errToken, build::LogMsg.NilForTypeInference)
+			self.pushErr(errToken, log::NilForTypeInference)
 			ret false
 		| v.IsVoid():
-			self.pushErr(errToken, build::LogMsg.VoidForTypeInference)
+			self.pushErr(errToken, log::VoidForTypeInference)
 			ret false
 		| v.Type.Variadic:
-			self.pushErr(errToken, build::LogMsg.InvalidExprForTypeInference)
+			self.pushErr(errToken, log::InvalidExprForTypeInference)
 			ret false
 		|:
 			ret true
@@ -2080,7 +2081,7 @@ impl sema {
 
 		if v.Constant {
 			if !v.ValueSym.Value.IsConst() && !v.ValueSym.Value.Type.comptime() {
-				self.pushErr(v.ValueSym.Expr.Token, build::LogMsg.ExprNotConst)
+				self.pushErr(v.ValueSym.Expr.Token, log::ExprNotConst)
 			}
 		} else {
 			v.ValueSym.Value.Constant = nil
@@ -2127,7 +2128,7 @@ impl sema {
 						}
 						goto Eval
 					} else {
-						self.pushErr(v.Token, build::LogMsg.FirstGroupVarIsNotInitialized)
+						self.pushErr(v.Token, log::FirstGroupVarIsNotInitialized)
 					}
 					ret false
 				}
@@ -2370,7 +2371,7 @@ impl sema {
 			}
 
 			if !f.Default.IsConst() {
-				self.pushErr(f.Decl.Default.Token, build::LogMsg.ExprNotConst)
+				self.pushErr(f.Decl.Default.Token, log::ExprNotConst)
 				continue
 			}
 
@@ -2508,7 +2509,7 @@ impl sema {
 		mrc := missingRetChecker.new()
 		ok := mrc.check(f.Scope)
 		if !ok {
-			self.pushErr(f.Decl.Token, build::LogMsg.MissingRet)
+			self.pushErr(f.Decl.Token, log::MissingRet)
 		}
 	}
 
@@ -2563,8 +2564,8 @@ impl sema {
 
 	fn checkTestFunc(mut self, mut &f: &FuncIns) {
 		if f.Decl.Public {
-			self.pushErr(f.Decl.Token, build::LogMsg.PubTestFunc)
-			self.pushSuggestion(build::LogMsg.RemovePubModifier)
+			self.pushErr(f.Decl.Token, log::PubTestFunc)
+			self.pushSuggestion(log::RemovePubModifier)
 			ret
 		}
 
@@ -2574,15 +2575,15 @@ impl sema {
 			len(f.Params) != 1 ||
 			f.Decl.Params[0].Mutable ||
 			f.Decl.Params[0].Reference {
-			self.pushErr(f.Decl.Token, build::LogMsg.WrongTestFuncDecl)
-			self.pushSuggestion(build::LogMsg.UseExpectedTestFuncDecl)
+			self.pushErr(f.Decl.Token, log::WrongTestFuncDecl)
+			self.pushSuggestion(log::UseExpectedTestFuncDecl)
 			ret
 		}
 
 		mut sptr := f.Params[0].Type.Sptr()
 		if sptr == nil {
-			self.pushErr(f.Decl.Token, build::LogMsg.WrongTestFuncDecl)
-			self.pushSuggestion(build::LogMsg.UseExpectedTestFuncDecl)
+			self.pushErr(f.Decl.Token, log::WrongTestFuncDecl)
+			self.pushSuggestion(log::UseExpectedTestFuncDecl)
 			ret
 		}
 
@@ -2590,8 +2591,8 @@ impl sema {
 		if ok && s.Source == nil && isStdPackage(s.Decl.Token.File.Path, "testing") {
 			ret
 		}
-		self.pushErr(f.Decl.Token, build::LogMsg.WrongTestFuncDecl)
-		self.pushSuggestion(build::LogMsg.UseExpectedTestFuncDecl)
+		self.pushErr(f.Decl.Token, log::WrongTestFuncDecl)
+		self.pushSuggestion(log::UseExpectedTestFuncDecl)
 	}
 
 	fn precheckFunc(mut &self, mut &f: &Func) {
@@ -2631,7 +2632,7 @@ impl sema {
 		mut message := new(strings::Builder)
 		pushIllegalCycleError := fn(v1: str, v2: str) {
 			const Padding = 7
-			refersTo := build::Logf(build::LogMsg.RefersTo, v1, v2)
+			refersTo := log::Logf(log::RefersTo, v1, v2)
 			message.WriteStr(strings::Repeat(" ", Padding))!
 			message.WriteStr(refersTo)!
 			message.WriteByte('\n')!
@@ -2691,7 +2692,7 @@ impl sema {
 					ret false
 				}
 				if refCheck(cached, v.Refers, v.Ident) {
-					self.pushErr(v.Token, build::LogMsg.IllegalCrossCycle, message.Str())
+					self.pushErr(v.Token, log::IllegalCrossCycle, message.Str())
 					ret
 				}
 			}
@@ -3045,13 +3046,13 @@ fn checkTypeEnumRefCycle(mut s: &sema, mut e: &TypeEnum, mut item: &TypeEnumItem
 		ret
 	}
 	if e == e2 {
-		s.pushErr(item.Token, build::LogMsg.IllegalCycleRefersItself, e.Ident)
+		s.pushErr(item.Token, log::IllegalCycleRefersItself, e.Ident)
 		ret
 	}
 	mut message := new(strings::Builder)
 	pushIllegalCycleError := fn(v1: str, v2: str) {
 		const Padding = 7
-		refersTo := build::Logf(build::LogMsg.RefersTo, v1, v2)
+		refersTo := log::Logf(log::RefersTo, v1, v2)
 		message.WriteStr(strings::Repeat(" ", Padding))!
 		message.WriteStr(refersTo)!
 		message.WriteByte('\n')!
@@ -3079,6 +3080,6 @@ fn checkTypeEnumRefCycle(mut s: &sema, mut e: &TypeEnum, mut item: &TypeEnumItem
 	pushIllegalCycleError(e.Ident, e2.Ident)
 	ok := checkCycles(e2)
 	if !ok {
-		s.pushErr(e.Token, build::LogMsg.IllegalCrossCycle, message.Str())
+		s.pushErr(e.Token, log::IllegalCrossCycle, message.Str())
 	}
 }

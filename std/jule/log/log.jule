@@ -1,0 +1,393 @@
+// Copyright 2023-2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/strings"
+
+// Compiler log messages with formatting.
+const (
+	StdlibNotExist = `standard library not found`
+	FileNotUseable = `file is not usable for this operating system or architecture`
+	FileNotJule = `@ is not a Jule source file`
+	NoEntryPoint = `missing entry point: (main) is not defined`
+	DuplicatedIdent = `duplicate "@" identifier in this scope`
+	ExtraClosedParent = `extra closing parentheses`
+	ExtraClosedBrace = `extra closing brace`
+	ExtraClosedBracket = `extra closing bracket`
+	WaitCloseParent = `parentheses open but not closed`
+	WaitCloseBrace = `braces open but not closed`
+	WaitCloseBracket = `brackets open but not closed`
+	ExpectedParentClose = `closing parentheses expected`
+	ExpectedBraceClose = `closing brace expected`
+	ExpectedBracketClose = `closing bracket expected`
+	BodyNotExist = `body not found`
+	OperatorOverflow = `operator overflow: repetitive operators`
+	IncompatibleTypes = `mismatched types: @ != @`
+	OperatorNotForJuleType = `operator @ is not defined for type @`
+	OperatorNotForFloat = `operator @ is not defined for floating-point types`
+	OperatorNotForInt = `operator @ is not defined for integer types`
+	OperatorNotForUint = `operator @ is not defined for unsigned integer types`
+	IdentNotExist = `undefined identifier: @`
+	NotFuncCall = `value is not a function`
+	ArgumentOverflow = `passed more argument than expected to call @`
+	FieldOverflow = `expression exceeded field count of type`
+	FuncHaveRet = `function @ doesn't have a return type`
+	FuncHaveParameters = `function @ doesn't require any parameters`
+	RequireRetExpr = `non-void functions should return a value`
+	VoidFuncRetExpr = `void functions cannot return a value`
+	BitShiftMustUnsigned = `bit shifting value must be unsigned integer`
+	InvalidShiftCount = `invalid shift count: @`
+	LogicalNotBool = `logical expression must be boolean`
+	AssignConst = `constants cannot be assigned`
+	AssignRequireLvalue = `invalid expression: expected lvalue`
+	AssignTypeNotSupportValue = `type does not support assignment`
+	InvalidToken = `undefined token: @`
+	InvalidSyntax = `invalid syntax`
+	InvalidType = `invalid type`
+	InvalidNumericRange = `arithmetic value out of range`
+	InvalidExprForUnary = `unary operator @ not defined for type @`
+	InvalidEscapeSeq = `invalid escape sequence`
+	InvalidTypeSource = `invalid type source`
+	InvalidTypeForConst = `@ is not a constant type`
+	InvalidExpr = `invalid expression`
+	InvalidCppExt = `invalid C++ extension: @`
+	InvalidLabel = `invalid label: @`
+	InvalidExprForTypeInference = `invalid expression for type inference`
+	MissingValueForTypeInference = `type inferred declarations should have an initializer expression`
+	MissingType = `type missing`
+	MissingExpr = `expression missing`
+	MissingBlockCommentClose = `block comment not closed`
+	MissingRuneEnd = `rune not finished`
+	MissingRet = `missing return at end of function`
+	MissingStrEnd = `string not closed`
+	MissingMultiRet = `missing return expressions for multi-return`
+	MissingMultiAssignIdents = `missing identifier(s) for multiple assignment`
+	MissingUsePath = `missing path`
+	MissingGotoLabel = `missing label identifier for goto statement`
+	MissingExprFor = `missing expression for @`
+	MissingGenerics = `missing generics`
+	MissingReceiver = `missing receiver parameter`
+	MissingFuncParentheses = `missing function parentheses`
+	ExprNotConst = `expression is not constant`
+	NilForTypeInference = `nil cannot be used with type inferred definitions`
+	VoidForTypeInference = `void data cannot be used for type inferred definitions`
+	RuneEmpty = `rune cannot be empty`
+	RuneOverflow = `rune value out of range`
+	NotSupportsIndexing = `type @ does not support indexing`
+	NotSupportsSlicing = `type @ does not support slicing`
+	AlreadyConst = `define is already constant`
+	AlreadyVariadic = `define is already variadic`
+	AlreadyReference = `define is already reference`
+	StaticReference = `static variables cannot be reference`
+	DuplicateUseDecl = `@ is already being used`
+	IgnoreIdent = `ignore operator cannot be used as an identifier for this declaration`
+	OverflowMultiAssignIdents = `overflow multi assignment identifiers`
+	OverflowRet = `overflow return expressions`
+	BreakAtOutOfValidScope = `break keyword not in valid scope`
+	ContinueAtOutOfValidScope = `continue keyword not in valid scope`
+	IterWhileRequireBoolExpr = `while iterations require boolean expression`
+	IterRangeRequireEnumerableExpr = `range iterations must have enumerable expression`
+	MuchRangeVars = `range variables out of range (ironically)`
+	IfRequireBoolExpr = `if conditions require boolean expression`
+	ElseHaveExpr = `else conditions cannot have expressions`
+	VariadicParamNotLast = `variadic parameter must be last parameter`
+	VariadicWithNonVariadicable = `type @ is not variadicable`
+	MoreArgsWithVariadiced = `variadic argument cannot use with more arguments`
+	VariadicReference = `variadic storage cannot be a reference`
+	TypeNotSupportsCasting = `type @ does not support casting`
+	TypeNotSupportsCastingTo = `type @ does not support casting to type @`
+	UseAtContent = `use declaration must be at the top of source code`
+	UseNotFound = `path not found or cannot be accessed: @`
+	DefNotSupportPub = `define does not support modifiers`
+	ObjNotSupportSubFields = `object @ does not support sub-defines`
+	ObjHaveNotIdent = `type @ has no field or method: @`
+	TypeNotSupportSubFields = `type @ is not supports sub-defines`
+	TypeHaveNotIdent = `type @ has no field or method: @`
+	DeclaredButNotUsed = `@ declared but not used`
+	ExprNotFuncCall = `statement must be a function call`
+	LabelExist = `label already exists for this identifier: @`
+	LabelNotExist = `the label @ does not exist`
+	GotoJumpsDeclarations = `goto @ jumps over declaration(s)`
+	FuncNotHasParam = `function does not have a parameter in this identifier: @`
+	AlreadyHasExpr = `@ already has an expression`
+	ArgMustTargetToField = `argument must target a field`
+	OverflowLimits = `overflow the limit of data-type`
+	GenericsOverflow = `overflow generics`
+	HasGenerics = `type has generics but not instantiated with generics`
+	NotHasGenerics = `type has no generics but instantiated with generics`
+	TypeNotSupportsGenerics = `type does not support generics`
+	DivByZero = `don't divide by zero`
+	TraitHaveNotIdent = `trait @ has no define @`
+	NotImplTraitDef = `trait @ derived but not implemented define @`
+	DynamicTypeAnnotationFailed = `dynamic type annotation failed`
+	FallthroughWrongUse = `fall keyword can only be used at end of case scopes`
+	FallthroughIntoFinalCase = `fall cannot be used in the final case`
+	UnsafeBehaviorAtOutOfUnsafeScope = `unsafe behavior outside of unsafe scope`
+	RefMethodUsedWithNotRefInstance = `reference method cannot be used with a non-reference instance`
+	MethodAsAnonFunc = `non-static methods cannot be anonymized`
+	BindedFuncAsAnonFunc = `binded functions cannot be anonymized`
+	GenericedFuncAsAnonFunc = `genericed functions cannot be anonymized`
+	IllegalCycleRefersItself = `illegal cycle in declaration: @ refers to itself`
+	IllegalCrossCycle = "illegal cross cycle in declaration:\n@"
+	AssignToNonMut = `cannot assign to immutable storage`
+	AssignNonMutToMut = `immutable data cannot be assigned to mutable storage because of @ type, which is mutable`
+	RetWithMutTypedNonMut = `mutable return expressions should be mutable`
+	MutOperationOnImmut = `mutable operations cannot be used with immutable data`
+	TraitHasRefParamFunc = `trait uses a reference receiver parameter method, cannot assign non-reference instance`
+	EnumHaveNotField = `enum @ has no field: @`
+	DuplicateMatchType = `type @ is already matched`
+	BindedVarHasExpr = `binded variables cannot have expressions`
+	BindedVarIsConst = `binded variables cannot be constant`
+	ConstVarNotHaveExpr = `missing expression for constant variable initialization`
+	MissingExprForUnary = `missing expression for unary operator`
+	InvalidOpForUnary = `invalid unary operator: @`
+	UseDeclAtBody = `use declarations must be at the top of source code`
+	ArrayAutoSized = `arrays must have explicit size`
+	NamespaceNotExist = `undefined namespace: @`
+	ImplInvalidBase = `invalid base type for impl: @`
+	ImplInvalidDest = `invalid destination type for impl: @`
+	StructAlreadyHaveIdent = `struct @ already has @ defined`
+	UnsafePtrIndexing = `unsafe pointers do not support indexing`
+	MethodHasGenericWithSameIdent = `methods cannot have the same generic identifier as owner`
+	TupleAssignToSingle = `tuples cannot assign to single define in the same time`
+	MissingCompilePath = `missing path`
+	ArraySizeIsNotInt = `array size must be integer`
+	ArraySizeIsNeg = `array size must be positive`
+	BuiltinAsNonFunc = `built-in define cannot be anonymized`
+	TypeCaseHasNotValidExpr = `type-match must have <any>, <type enum>, <trait> or <generic> typed expression`
+	IllegalImplOutOfPackage = `illegal implementation via definition from out of package`
+	MethodNotInvoked = `method should be invoked`
+	BuiltinNotInvoked = `built-in functions should be invoked`
+	DuplicatedUseSelection = `@ is already selected`
+	IdentIsNotAccessible = `@ is private and could not be accessed`
+	InvalidStmtForNext = `invalid statement for while-next`
+	ModuloWithNotInt = `module operator must be used with integer type`
+	PkgIllegalCycleRefersItself = `@ cannot refer to itself`
+	PkgIllegalCrossCycle = "illegal cross cycle in use declarations:\n@"
+	RefersTo = `@ refers to @`
+	NoFileInEntryPackage = `there is no Jule source code in package: @`
+	NoMemberInEnum = `enum @ has no fields`
+	InternalTypeNotSupportsClone = `type @ has internal types that don't support cloning`
+	InvalidExprForBinary = `invalid expression for binary operation`
+	TraitMethodHasGenerics = `trait methods cannot have generics`
+	EnumAsMapVal = `maps do not support enums as map key type`
+	GlobalNotStatic = `global variables must be static`
+	StaticNotHaveExpr = `static variables must have an initialize expression`
+	StaticFuncHasReceiver = `static functions cannot have a receiver parameter`
+	RefAssignNonVar = `references requires variable based expression for assignment`
+	MutRefPointsImmut = `mutable reference cannot point to immutable data`
+	RefNotInited = `reference variables have lvalue as an initialize expression`
+	ConstRef = `references cannot be constant`
+	ConcurrentCallWithRefParam = `concurrent calls with functions with reference parameter(s) are not allowed in safe Jule`
+	ConcurrentCallWithSelfParam = `concurrent calls with methods having a "self" receiver parameter are not allowed in safe Jule`
+	UsedRefInAnonFuncFromParentScope = `anonymous functions cannot access reference definition @ of parent scope`
+	TypeEnumAssertedFromAny = `type enum cannot be asserted from any type`
+	DuplicatedUseAlias = `@ is already being used`
+	BuiltinUsedForRef = `built-in defines cannot pass to references`
+	DefaultNotLast = `default case cannot be the last case`
+	IncompatibleTypeForPtrArithmetic = `type @ is incompatible with pointer arithmetic`
+	ComptimePanic = `compile-time panic: @`
+	InvalidTypeForIndexing = `type @ is invalid for indexing`
+	UnusedDirective = `directive is out of scope`
+	UnsupportedDirective = `define does not support @ directive`
+	PanickedWithNonStr = `panic message must be a string`
+	ErrorWithNonExceptional = `error outside of exceptional scope`
+	BindedExceptional = `binded defines cannot be exceptional`
+	HandledUnexceptional = `non-exceptionals cannot be handled like exceptionals`
+	UnhandledExceptional = `exceptionals must be handled`
+	MissingAssignRet = `exceptional returns an expression, therefore else block should return an expression`
+	CoForExceptional = `concurrent calls do not support exceptionals`
+	TypeCallWithExceptional = `type-cast calls do not support exceptionals`
+	RetInDeferred = `deferred scopes do not support return statements`
+	ErrorInDeferred = `deferred scopes do not support error calls`
+	NilError = `function cannot be called with nil`
+	UseExprOutOfScope = `use expressions cannot be used out of non-void exceptional handler scopes`
+	UseExprInDeferred = `use expressions cannot be used in deferred scopes`
+	UseExprNotLast = `use expression must be the last statement in a scope`
+	InvalidMainFunction = `main function declaration is invalid`
+	InvalidInitializerFunction = `initializer function declaration is invalid`
+	AutoSizedArrFilled = `auto-sized arrays cannot filled`
+	AssignInExpr = `assignments not available for expressions`
+	WrongTestFuncDecl = `wrong test function declaration`
+	TestMethod = `test methods cannot be declared`
+	TestCalled = `test functions cannot be called`
+	ModuleNotFound = `module file not found`
+	UseDeclForInternal = `internal packages cannot be accessed`
+	PubTestFunc = `test functions cannot be public`
+	BindedTypeNotAllowed = `binded definitions are not allowed in this scope`
+	GenericsNotAllowed = `generics are not allowed in this scope`
+	InitiationCycle = `initiation cycle caused by a type declaration`
+	DeclFoundInsteadExpr = `expected expression, found type declaration`
+	CallingNonFunc = `attempted to call a non-function`
+	StructureLitWithPrivFields = `structure cannot be instantiated because it has both public and private fields`
+	AnyWithTypeEnum = `<any> type is not allowed for type-enum declarations`
+	ConstraintFailed = "type @ doesn't match @'s constraint: @"
+	SelectedImportExistInPackage = `@ already exists in this package`
+	CoForCastingCall = `concurrent calls are not allowed for type-cast calls`
+	TypeIsNotComparable = `type @ is not comparable`
+	AmperOpForEnum = `@ enum type does not support @ operator`
+	MissingArgs = `missing arguments to call @`
+	InheritedNonTrait = `trait @ cannot implement @, type should be trait`
+	IncompatibleInherit = "trait @ inherits trait @, but the same identifiers are implemented different:\n       @\n       @"
+	ArraySizeOverflow = "array size @ overflows the kernel-defined limit of @"
+	InvalidTypeForTypeOf = "comptime::TypeOf does not support type @"
+	ComptimeAsExpr = "compile-time evaluations cannot be used as expressions"
+	InvalidTypeForFunc = `type @ is invalid for function @`
+	ComptimeFallthrough = `fall statement is not allowed for comptime-matching`
+	SelectFallthrough = `fall statement is not allowed for select`
+	CannotBeMut = `define @ cannot be mutable`
+	AnonFunc = `anonymous functions are not allowed in this scope`
+	CopyWithMutableData = `struct @ contains mutable data and cannot be copied`
+	CalledOutOfScope = `function @ called out of scope`
+	ComptimeExprForRuntimeIteration = `comptime expressions cannot be iterated at runtime`
+	InvalidTypeForComptimeIter = `type @ does not support comptime iterations`
+	InvalidComptimeIter = `comptime iterations can only be range iterations`
+	InvalidComptimeTypeMatchExpr = `comptime type-match expressions can only take type declarations`
+	NotEnoughVariablesForRet = "not enough variables to return\n       @ required\n       @ provided"
+	TooManyVariablesForRet = "too many variables to return\n       @ required\n       @ provided"
+	ExportedUsedAsAnonymous = `define @ is exported for backend and cannot be anonymized`
+	InvalidImportPath = `invalid import path: @`
+	AutoAliasFail = `import path not suitable for auto-aliasing: @`
+	BindedAsSoftType = `binded type aliases cannot be soft type aliases`
+	IndexOutOfRange = `index @ out of range of @`
+	ExprNotChan = `expression is not channel for operator`
+	ImmutDataSendViaMutChan = `mutable typed @ immutable data cannot be sent via a mutable channel`
+	CloseRecvOnlyChan = `receive-only channel cannot be closed`
+	SendToRecvOnlyChan = `data cannot be sent to a receive-only channel`
+	RecvFromSendOnlyChan = `data cannot be received from a send-only channel`
+	InvalidSelectExpr = `select case expects chan-receive or chan-send expressions`
+	ExpectedNExpr = `expected @ expression`
+	IterPermitsNVar = `iteration for type @ allows only @ iteration variable`
+	UnsafePointerForAnnotation = `unsafe pointer cannot used for dynamic type annotation`
+	MiddleIndexRequired = `middle index required in 3-index slicing`
+	FinalIndexRequired = `final index required in 3-index slicing`
+	UnsupportedTypeIndex3Slice = `unsupported type for 3-index slicing: @`
+	ReuseDirective = `directive @ is already used`
+	ConstantOverflow = `constant overflow`
+	ConstantOverflowResult = `computation result is constant overflow`
+	UntypedNumericForPhysical = `cannot use untyped value @ for the actual program, it is too large for any integer type`
+	ConstantOverflowType = `untyped value @ overflows @`
+	InvalidEnumKindForNamedFields = `enum kind does not supports named enum fields`
+	TypeNotSupportsTypeAssertionTo = `type @ not supports type assertion to type @`
+	TypeNotSupportsTypeAssertion = `type @ not supports type assertion`
+	FirstGroupVarIsNotInitialized = `first define of group must be initialized`
+	EmptyGroup = `group declaration is empty`
+	ExceptionalNotPlain = `exceptionals must be used alone, not in binary expression or etc.`
+	GotoJumpsIntoScope = `goto jumps into scope`
+
+	// Suggestions.
+	ExpectedIdentifier = `create an identifier because identifier expected`
+	ExpectedLabelIdent = `create a label identifier because label expected`
+	ExpectedDotForBind = `use dot (.) to access binded defines`
+	ExpectedDblColon = `expected double colon (::)`
+	EmptyParentNotValid = `empty parentheses are not a valid expression, must include an expression in range`
+	GiveExprToCast = `provide an expression for casting`
+	GiveTypeForCast = `type declaration expected for casting`
+	ExpectedExpr = `expression expected`
+	ExpectedAnonFunc = `anonymous function expected, remove the identifier`
+	ExpectedLeftOperand = `left operand expected for binary operator`
+	ExpectedRightOperand = `right operand expected for binary operator`
+	ExpectedColon = `expected colon (:)`
+	ExpectedBody = `expected a body, bodies should start in the same line as their definition and declared with braces ({ ... })`
+	ExpectedType = `expected type declaration`
+	ExpectedPlainUseDecl = `expected plain use declaration for this package (e.g. @)`
+	DeclareComptimeForeach = `declarate comptime iteration (e.g. const for ...)`
+	MoveUseDeclToTopOfFile = `move this use declaration to the top of the file`
+	RenameForAvoidDuplication = `rename the definition to avoid duplication`
+	RemoveUseDeclAvoidDuplication = `remove this use declaration, it is already being used`
+	RenameUseAliasAvoidDuplication = `rename alias for this use declaration to avoid duplication`
+	RemoveUseSelectionAvoidDuplication = `remove this use selection, it is already selected`
+	RemoveConstToAssign = `remove constant qualifier if you need to assign`
+	UseStaticKeywordToDef = `use the "static" keyword to define`
+	RemoveFallthroughFromFinalCase = `remove the "fall" keyword`
+	MakePubToAccess = `make it public by starting with a capital letter`
+	ExpressionMustBeReferenceType = `expression must be reference type`
+	TryFloatingPoint = `floating-point literals may solve your problem`
+	ExpectedColonForAssign = `expected colon (:) for assignment`
+	DeclareExceptional = `declare an exceptional function with the "!" operator`
+	HandleExceptional = `use the "!" operator after an calling exceptional to handle it automatically`
+	HandleInFunc = `handle this exceptional in a separate function or anonymous function`
+	JustIgnoreOrHandle = `ignore this exceptional or handle it but you cannot do both at same time`
+	UseImperative = `use clear imperative approach, comes relevant assignment statement before the expression`
+	UseExpectedTestFuncDecl = `use the expected test function declaration: fn(t: &testing::T)`
+	UseModInit = `run "julec mod init" to initialize a module in the current directory`
+	RemovePubModifier = `don't use an identifier that starts with a capital letter to avoid making it public`
+	ExpectedStruct = `use a structure`
+	ExpectedTrait = `use a trait`
+	UseTypeMatch = `you can use type-match if you want to match types`
+	WrapExceptional = `wrap this exceptional in a non-exceptional function`
+	UseFieldPairToInstantiate = `use label-expression pairs to instantiate (e.g. Struct{x:foo, y:bar})`
+	InstantiateGenericFuncToUseAsAnon = `instantiate generic function to use as anonymous function`
+	UseUnsafeJuleToCallCo = `use unsafe Jule with "unsafe { ... }" to make concurrent calls`
+	UseUnsafeJuleToCallCoSelf = `use "&self" receiver parameter instead, or unsafe Jule with "unsafe { ... }" to make concurrent calls`
+	DefineZeroDefaultToUseAmper = `define default enum field (the first one is default) with zero value to use "&"`
+	InvalidExprForConstMatch = `comptime-matching requires constant expression`
+	GiveAnAliasManually = `alias the import manually (e.g. use <alias> @)`
+	WriteYourCodeInUnsafeJule = `use unsafe Jule with "unsafe { ... }"`
+	CastingBindedTypesRequiresUnsafeJule = `casting binded types requires using unsafe Jule, "unsafe { ... }"`
+	DefineAsStrictAlias = `define as strict type alias with a colon (:) (e.g. type @: <type>)`
+	RArrowOpExpectsChan = `the "<-" operator expects a channel`
+	ExpectedMainLike = `declare main function like: fn main() {}`
+	ExpectedInitializerLike = `declare initializer function like: fn init() {}`
+	AssignExceptionalResultToVariable = `consider assign result of exceptional to variable and then use it`
+)
+
+// Log kinds.
+const (
+	Flat = iota // Just text.
+	Error       // Error message.
+)
+
+// Compiler log.
+struct Log {
+	Kind:       int
+	Row:        int
+	Column:     int
+	Path:       str
+	Text:       str
+	Line:       str
+	Suggestion: str
+}
+
+// Returns formatted error message by fmt and args.
+fn Logf(fmt: str, args: ...any): str {
+	ret applyFmt(fmt, args...)
+}
+
+fn argToStr(arg: any): str {
+	match type arg {
+	| str:
+		ret arg.(str)
+	| byte:
+		ret str(arg.(byte))
+	| rune:
+		ret str(arg.(rune))
+	|:
+		ret "<fmt?>"
+	}
+}
+
+fn findNextFmt(fmt: str): int {
+	for i, b in fmt {
+		if b == '@' {
+			ret i
+		}
+	}
+	ret -1
+}
+
+fn applyFmt(mut fmt: str, args: ...any): str {
+	mut s := strings::Builder{}
+	s.Grow(1 << 5)
+	for _, arg in args {
+		i := findNextFmt(fmt)
+		if i == -1 {
+			break
+		}
+		s.WriteStr(fmt[:i])!
+		s.WriteStr(argToStr(arg))!
+		fmt = fmt[i+1:]
+	}
+	s.WriteStr(fmt)!
+	ret s.Str()
+}

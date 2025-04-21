@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use "std/jule/build"
+use "std/jule/log"
 use "std/strings"
 use "std/unicode/utf8"
 use "std/unsafe"
@@ -101,13 +102,13 @@ static basicOps: [...]kindPair = [
 	{Kind.RParent, Id.RParent},
 ]
 
-fn makeErr(row: int, col: int, &f: &Fileset, fmt: build::LogMsg, args: ...any): build::Log {
-	ret build::Log{
-		Kind: build::LogKind.Error,
+fn makeErr(row: int, col: int, &f: &Fileset, fmt: str, args: ...any): log::Log {
+	ret log::Log{
+		Kind: log::Error,
 		Row: row,
 		Column: col,
 		Path: f.Path,
-		Text: build::Logf(fmt, args...),
+		Text: log::Logf(fmt, args...),
 	}
 }
 
@@ -436,16 +437,16 @@ struct lex {
 	pos:    int
 	column: int
 	row:    int
-	errors: []build::Log
+	errors: []log::Log
 }
 
 impl lex {
-	fn pushErr(mut self, fmt: build::LogMsg, args: ...any) {
+	fn pushErr(mut self, fmt: str, args: ...any) {
 		self.errors = append(self.errors,
 			makeErr(self.row, self.column, self.file, fmt, args...))
 	}
 
-	fn pushErrTok(mut self, &token: &Token, fmt: build::LogMsg) {
+	fn pushErrTok(mut self, &token: &Token, fmt: str) {
 		self.errors = append(self.errors,
 			makeErr(token.Row, token.Column, self.file, fmt))
 	}
@@ -553,7 +554,7 @@ impl lex {
 				ret
 			}
 		}
-		self.pushErr(build::LogMsg.MissingBlockCommentClose)
+		self.pushErr(log::MissingBlockCommentClose)
 	}
 
 	// Returns literal if next token is numeric, returns empty string if not.
@@ -602,7 +603,7 @@ impl lex {
 	end:
 		if seq == "" {
 			self.pos++
-			self.pushErr(build::LogMsg.InvalidEscapeSeq)
+			self.pushErr(log::InvalidEscapeSeq)
 			ret ""
 		}
 		self.pos += len(seq)
@@ -630,7 +631,7 @@ impl lex {
 				continue
 			}
 			if txt[i] == '\n' {
-				self.pushErr(build::LogMsg.MissingRuneEnd)
+				self.pushErr(log::MissingRuneEnd)
 				self.pos++
 				self.newLine()
 				ret ""
@@ -651,9 +652,9 @@ impl lex {
 		}
 
 		if n == 0 {
-			self.pushErr(build::LogMsg.RuneEmpty)
+			self.pushErr(log::RuneEmpty)
 		} else if n > 1 {
-			self.pushErr(build::LogMsg.RuneOverflow)
+			self.pushErr(log::RuneOverflow)
 		}
 
 		ret run.Str()
@@ -678,7 +679,7 @@ impl lex {
 			if ch == '\n' {
 				self.newLine()
 				if !raw {
-					self.pushErr(build::LogMsg.MissingStrEnd)
+					self.pushErr(log::MissingStrEnd)
 					self.pos++
 					ret ""
 				}
@@ -789,7 +790,7 @@ impl lex {
 			}
 		|:
 			r, sz := utf8::DecodeRune(txt)
-			self.pushErr(build::LogMsg.InvalidToken, r)
+			self.pushErr(log::InvalidToken, r)
 			self.column++
 			self.pos += sz
 			ret t
@@ -802,7 +803,7 @@ impl lex {
 // Lex source code into fileset.
 // Returns nil if f == nil.
 // Returns nil slice for errors if no any error.
-fn Lex(mut f: &Fileset, mode: LexMode): []build::Log {
+fn Lex(mut f: &Fileset, mode: LexMode): []log::Log {
 	if f == nil {
 		ret nil
 	}

@@ -7,6 +7,7 @@ use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/constant"
 use "std/jule/internal/mod"
+use "std/jule/log"
 use "std/jule/types"
 
 // Type alias for built-in function callers.
@@ -293,11 +294,11 @@ fn findPackageBuiltinDef(&linkPath: str, &ident: str): any {
 
 fn builtinCallerError(mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "err")
+		e.pushErr(fc.Token, log::MissingExprFor, "err")
 		ret nil
 	}
 	if len(fc.Args) > 1 {
-		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "error")
+		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "error")
 	}
 	mut expr := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	if expr == nil {
@@ -306,7 +307,7 @@ fn builtinCallerError(mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 
 	mut token := fc.Args[0].Token
 	if expr.IsNil() {
-		e.pushErr(token, build::LogMsg.NilError)
+		e.pushErr(token, log::NilError)
 	}
 
 	const Reference = false
@@ -323,11 +324,11 @@ fn builtinCallerError(mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 
 fn builtinCallerPrint(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "v")
+		e.pushErr(fc.Token, log::MissingExprFor, "v")
 		ret nil
 	}
 	if len(fc.Args) > 1 {
-		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "print")
+		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "print")
 	}
 
 	mut arg := fc.Args[0]
@@ -337,7 +338,7 @@ fn builtinCallerPrint(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value
 	}
 
 	if !isBuiltinStrConvertible(expr.Type) {
-		e.pushErr(arg.Token, build::LogMsg.InvalidExpr)
+		e.pushErr(arg.Token, log::InvalidExpr)
 		ret nil
 	}
 	if expr.untyped && expr.IsConst() && expr.Constant.IsInt() {
@@ -371,11 +372,11 @@ fn builtinCallerPrintln(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Val
 
 fn builtinCallerNew(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "type")
+		e.pushErr(fc.Token, log::MissingExprFor, "type")
 		ret nil
 	}
 	if len(fc.Args) > 2 {
-		e.pushErr(fc.Args[2].Token, build::LogMsg.ArgumentOverflow, "new")
+		e.pushErr(fc.Args[2].Token, log::ArgumentOverflow, "new")
 	}
 
 	mut t := e.eval1(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
@@ -384,7 +385,7 @@ fn builtinCallerNew(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value):
 	}
 
 	if !t.Decl {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidType)
+		e.pushErr(fc.Args[0].Token, log::InvalidType)
 		ret nil
 	}
 
@@ -427,11 +428,11 @@ fn builtinCallerNew(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value):
 
 fn builtinCallerPanic(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "message")
+		e.pushErr(fc.Token, log::MissingExprFor, "message")
 		ret nil
 	}
 	if len(fc.Args) > 1 {
-		e.pushErr(fc.Args[2].Token, build::LogMsg.ArgumentOverflow, "panic")
+		e.pushErr(fc.Args[2].Token, log::ArgumentOverflow, "panic")
 	}
 
 	mut expr := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
@@ -440,7 +441,7 @@ fn builtinCallerPanic(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value
 	}
 
 	if expr.Type.Prim() == nil || !expr.Type.Prim().IsStr() {
-		e.pushErr(fc.Token, build::LogMsg.PanickedWithNonStr)
+		e.pushErr(fc.Token, log::PanickedWithNonStr)
 	}
 
 	mut v := buildVoidValue()
@@ -455,13 +456,13 @@ fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value)
 	if len(fc.Args) == 0 {
 		// All types of the make function, takes at least an argument.
 		// So if function called like make(), push an error and return immediately.
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "type")
+		e.pushErr(fc.Token, log::MissingExprFor, "type")
 		ret nil
 	}
 	if len(fc.Args) > 3 {
 		// Any type of make function, can't take more than 3 arguments, but we have.
 		// Push an error and return immediately, do not evaluate the result.
-		e.pushErr(fc.Args[3].Token, build::LogMsg.ArgumentOverflow, "make")
+		e.pushErr(fc.Args[3].Token, log::ArgumentOverflow, "make")
 		ret nil
 	}
 	mut t := e.evalExprKind(fc.Args[0].Kind)
@@ -475,13 +476,13 @@ fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value)
 	| !t.Decl:
 		// Type is not declaration, so it is not a type declaration.
 		// Push an error and return as nil immediately.
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidType)
+		e.pushErr(fc.Args[0].Token, log::InvalidType)
 		ret nil
 	| t.Type.Chan() != nil:
 		// Type is channel. Make channel initialization.
 		if len(fc.Args) > 2 {
 			// The channel type variants can take up to 2 arguments, but we have more.
-			e.pushErr(fc.Args[2].Token, build::LogMsg.ArgumentOverflow, "make")
+			e.pushErr(fc.Args[2].Token, log::ArgumentOverflow, "make")
 			ret nil
 		}
 		mut model := &BuiltinMakeCallExpr{Type: t.Type}
@@ -503,7 +504,7 @@ fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value)
 		if len(fc.Args) < 2 {
 			// The slice type variants always must have to length argument for
 			// making slice allocation, but we have not.
-			e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "size")
+			e.pushErr(fc.Token, log::MissingExprFor, "size")
 			ret nil
 		}
 		v.Type = t.Type
@@ -530,7 +531,7 @@ fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value)
 	|:
 		// Type is not supported by the make function.
 		// Push an error and return as nil immediately.
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFunc, t.Type.Str(), "make")
+		e.pushErr(fc.Args[0].Token, log::InvalidTypeForFunc, t.Type.Str(), "make")
 		ret nil
 	}
 }
@@ -538,10 +539,10 @@ fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value)
 fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if len(fc.Args) < 2 {
 		if len(fc.Args) == 1 {
-			e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "values")
+			e.pushErr(fc.Token, log::MissingExprFor, "values")
 			ret nil
 		}
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "src, values")
+		e.pushErr(fc.Token, log::MissingExprFor, "src, values")
 		ret nil
 	}
 
@@ -553,7 +554,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Valu
 
 	mut s := t.Type.Slice()
 	if s == nil {
-		e.pushErr(firstArg.Token, build::LogMsg.InvalidExpr)
+		e.pushErr(firstArg.Token, log::InvalidExpr)
 		ret nil
 	}
 
@@ -578,7 +579,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Valu
 	match type secondArg.Kind {
 	| &ast::VariadicExpr:
 		if len(fc.Args) > 2 {
-			e.pushErr(fc.Args[2].Token, build::LogMsg.MoreArgsWithVariadiced)
+			e.pushErr(fc.Args[2].Token, log::MoreArgsWithVariadiced)
 		}
 
 		mut e1 := e.evalExpr(secondArg.Kind.(&ast::VariadicExpr).Expr, evalDefault | evalPhysicalMem | evalUnwrapUntyped)
@@ -609,7 +610,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Valu
 		}
 
 		if !e1.Type.Variadicable() {
-			e.pushErr(secondArg.Token, build::LogMsg.VariadicWithNonVariadicable, e1.Type.Str())
+			e.pushErr(secondArg.Token, log::VariadicWithNonVariadicable, e1.Type.Str())
 			ret nil
 		}
 
@@ -663,7 +664,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Valu
 			ret nil
 		}
 		if e1.Type.Variadic {
-			e.pushErr(arg.Token, build::LogMsg.MoreArgsWithVariadiced)
+			e.pushErr(arg.Token, log::MoreArgsWithVariadiced)
 		}
 		if e.s.checkValidityForInitExpr(mutable, reference, s.Elem, e1, arg.Token) {
 			// Check type if validity is good.
@@ -701,7 +702,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Valu
 
 fn callerCopySlice(mut &dest: &Value, mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if !dest.Mutable {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.MutOperationOnImmut)
+		e.pushErr(fc.Args[0].Token, log::MutOperationOnImmut)
 	} else {
 		// Dest is mutable, array slicing may be mutable if possible due to slicing.
 		// But this function will use the direct memory of the array.
@@ -710,7 +711,7 @@ fn callerCopySlice(mut &dest: &Value, mut &e: &eval, mut &fc: &ast::FuncCallExpr
 		| &SlicingExpr:
 			mut se := dest.Model.(&SlicingExpr)
 			if !se.Expr.Mutable && se.Expr.Type.Array() != nil {
-				e.pushErr(fc.Args[0].Token, build::LogMsg.MutOperationOnImmut)
+				e.pushErr(fc.Args[0].Token, log::MutOperationOnImmut)
 			}
 		}
 	}
@@ -723,16 +724,16 @@ fn callerCopySlice(mut &dest: &Value, mut &e: &eval, mut &fc: &ast::FuncCallExpr
 
 	if slc != nil {
 		if !src.Mutable && slc.Elem.Mutable() {
-			e.pushErr(fc.Args[1].Token, build::LogMsg.MutOperationOnImmut)
+			e.pushErr(fc.Args[1].Token, log::MutOperationOnImmut)
 		}
 		if !dest.Type.Equal(src.Type) {
-			e.pushErr(fc.Args[1].Token, build::LogMsg.IncompatibleTypes, dest.Type.Str(), src.Type.Str())
+			e.pushErr(fc.Args[1].Token, log::IncompatibleTypes, dest.Type.Str(), src.Type.Str())
 		}
 	} else {
 		destPrim := dest.Type.Slice().Elem.Prim()
 		prim := src.Type.Prim()
 		if destPrim == nil || prim == nil || !prim.IsStr() || !destPrim.IsU8() {
-			e.pushErr(fc.Args[1].Token, build::LogMsg.IncompatibleTypes, dest.Type.Str(), src.Type.Str())
+			e.pushErr(fc.Args[1].Token, log::IncompatibleTypes, dest.Type.Str(), src.Type.Str())
 		}
 	}
 
@@ -760,14 +761,14 @@ fn callerCopySlice(mut &dest: &Value, mut &e: &eval, mut &fc: &ast::FuncCallExpr
 fn builtinCallerCopy(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if len(fc.Args) < 2 {
 		if len(fc.Args) == 1 {
-			e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "src")
+			e.pushErr(fc.Token, log::MissingExprFor, "src")
 			ret nil
 		}
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "src, values")
+		e.pushErr(fc.Token, log::MissingExprFor, "src, values")
 		ret nil
 	}
 	if len(fc.Args) > 2 {
-		e.pushErr(fc.Args[2].Token, build::LogMsg.ArgumentOverflow, "copy")
+		e.pushErr(fc.Args[2].Token, log::ArgumentOverflow, "copy")
 	}
 
 	mut dest := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
@@ -777,7 +778,7 @@ fn builtinCallerCopy(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value)
 	| dest.Type.Slice() != nil:
 		ret callerCopySlice(dest, e, fc, v)
 	|:
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidType)
+		e.pushErr(fc.Args[0].Token, log::InvalidType)
 		ret nil
 	}
 }
@@ -835,11 +836,11 @@ fn callerLenComptime(mut &v: &Value, n: int): &Value {
 
 fn builtinCallerLen(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "obj")
+		e.pushErr(fc.Token, log::MissingExprFor, "obj")
 		ret nil
 	}
 	if len(fc.Args) > 1 {
-		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "len")
+		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "len")
 	}
 	mut dest := e.evalExpr1(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	match {
@@ -868,7 +869,7 @@ fn builtinCallerLen(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value):
 	| dest.Type.comptimeDecls() != nil:
 		ret callerLenComptime(v, len(dest.Type.comptimeDecls().decls))
 	|:
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
+		e.pushErr(fc.Args[0].Token, log::InvalidExpr)
 		ret nil
 	}
 }
@@ -885,30 +886,30 @@ fn callerCapSlice(mut &expr: &Value, mut &v: &Value): &Value {
 
 fn builtinCallerCap(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "obj")
+		e.pushErr(fc.Token, log::MissingExprFor, "obj")
 		ret nil
 	}
 	if len(fc.Args) > 1 {
-		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "cap")
+		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "cap")
 	}
 	mut dest := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	match {
 	| dest == nil:
 		ret nil
 	| dest.Decl:
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
+		e.pushErr(fc.Args[0].Token, log::InvalidExpr)
 		ret nil
 	| dest.Type.Slice() != nil:
 		ret callerCapSlice(dest, v)
 	|:
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
+		e.pushErr(fc.Args[0].Token, log::InvalidExpr)
 		ret nil
 	}
 }
 
 fn callerDeleteMap(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &expr: &Value, mut &v: &Value): &Value {
 	if !expr.Mutable {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.MutOperationOnImmut)
+		e.pushErr(fc.Args[0].Token, log::MutOperationOnImmut)
 	}
 	v = buildVoidValue()
 	mut model := &BuiltinDeleteCallExpr{
@@ -920,7 +921,7 @@ fn callerDeleteMap(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &expr: &Value
 		| key == nil:
 			ret nil
 		| key.Decl:
-			e.pushErr(fc.Args[1].Token, build::LogMsg.InvalidExpr)
+			e.pushErr(fc.Args[1].Token, log::InvalidExpr)
 			ret nil
 		|:
 			const Reference = false
@@ -937,46 +938,46 @@ fn callerDeleteMap(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &expr: &Value
 
 fn builtinCallerDelete(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "map")
+		e.pushErr(fc.Token, log::MissingExprFor, "map")
 		ret nil
 	}
 	if len(fc.Args) > 2 {
-		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "delete")
+		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "delete")
 	}
 	mut dest := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	match {
 	| dest == nil:
 		ret nil
 	| dest.Decl:
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
+		e.pushErr(fc.Args[0].Token, log::InvalidExpr)
 		ret nil
 	| dest.Type.Map() != nil:
 		ret callerDeleteMap(e, fc, dest, v)
 	|:
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
+		e.pushErr(fc.Args[0].Token, log::InvalidExpr)
 		ret nil
 	}
 }
 
 fn builtinCallerClose(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "c")
+		e.pushErr(fc.Token, log::MissingExprFor, "c")
 		ret nil
 	}
 	if len(fc.Args) > 2 {
-		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "close")
+		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "close")
 	}
 	mut dest := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	match {
 	| dest == nil:
 		ret nil
 	| dest.Decl:
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
+		e.pushErr(fc.Args[0].Token, log::InvalidExpr)
 		ret nil
 	| dest.Type.Chan() != nil:
 		c := dest.Type.Chan()
 		if !c.Send {
-			e.pushErr(fc.Args[0].Token, build::LogMsg.CloseRecvOnlyChan)
+			e.pushErr(fc.Args[0].Token, log::CloseRecvOnlyChan)
 		}
 		v = buildVoidValue()
 		v.Model = &BuiltinCloseCallExpr{
@@ -985,18 +986,18 @@ fn builtinCallerClose(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value
 		}
 		ret v
 	|:
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
+		e.pushErr(fc.Args[0].Token, log::InvalidExpr)
 		ret nil
 	}
 }
 
 fn builtinCallerStdComptimeTypeOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "type|expr")
+		e.pushErr(fc.Token, log::MissingExprFor, "type|expr")
 		ret nil
 	}
 	if len(fc.Args) > 1 {
-		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "TypeOf")
+		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "TypeOf")
 	}
 
 	mut v := e.evalExprKind(fc.Args[0].Kind)
@@ -1006,25 +1007,25 @@ fn builtinCallerStdComptimeTypeOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mu
 	f := v.Type.Func()
 	if f != nil {
 		if f.IsBuiltin() {
-			e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForTypeOf, "<built-in fn>")
+			e.pushErr(fc.Args[0].Token, log::InvalidTypeForTypeOf, "<built-in fn>")
 			ret nil
 		}
 		if len(f.Generics) != len(f.Decl.Generics) {
-			e.pushErr(fc.Args[0].Token, build::LogMsg.HasGenerics)
+			e.pushErr(fc.Args[0].Token, log::HasGenerics)
 			ret nil
 		}
 	}
 	s := v.Type.Struct()
 	if s != nil && len(s.Generics) != len(s.Decl.Generics) {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.HasGenerics)
+		e.pushErr(fc.Args[0].Token, log::HasGenerics)
 		ret nil
 	}
 	if v.Type.comptime() {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForTypeOf, v.Type.Str())
+		e.pushErr(fc.Args[0].Token, log::InvalidTypeForTypeOf, v.Type.Str())
 		ret nil
 	}
 	if v.untyped {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForTypeOf, "\"untyped literal\"")
+		e.pushErr(fc.Args[0].Token, log::InvalidTypeForTypeOf, "\"untyped literal\"")
 		ret nil
 	}
 	ret buildComptimeTypeInfoData(e.s, v.Type)
@@ -1032,11 +1033,11 @@ fn builtinCallerStdComptimeTypeOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mu
 
 fn builtinCallerStdComptimeValueOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "expr")
+		e.pushErr(fc.Token, log::MissingExprFor, "expr")
 		ret nil
 	}
 	if len(fc.Args) > 1 {
-		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "ValueOf")
+		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "ValueOf")
 	}
 	mut v := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	if v == nil {
@@ -1044,11 +1045,11 @@ fn builtinCallerStdComptimeValueOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, m
 	}
 	// Do not allow value if has unsupported type for type infer.
 	if !isGoodValueToInfer(v) {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFunc, v.Type.Str(), "ValueOf")
+		e.pushErr(fc.Args[0].Token, log::InvalidTypeForFunc, v.Type.Str(), "ValueOf")
 		ret nil
 	}
 	if v.untyped {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForTypeOf, "\"untyped literal\"", "ValueOf")
+		e.pushErr(fc.Args[0].Token, log::InvalidTypeForTypeOf, "\"untyped literal\"", "ValueOf")
 		ret nil
 	}
 	ret buildComptimeValue(v)
@@ -1056,7 +1057,7 @@ fn builtinCallerStdComptimeValueOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, m
 
 fn builtinCallerStdComptimeLine(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 	if len(fc.Args) > 0 {
-		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "Line")
+		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "Line")
 	}
 	mut constant := constant::Const.NewI64(i64(fc.Token.Row))
 	ret &Value{
@@ -1068,7 +1069,7 @@ fn builtinCallerStdComptimeLine(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut 
 
 fn builtinCallerStdComptimeFile(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 	if len(fc.Args) > 0 {
-		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "File")
+		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "File")
 	}
 	ret &Value{
 		Type: &Type{
@@ -1081,7 +1082,7 @@ fn builtinCallerStdComptimeFile(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut 
 
 fn builtinCallerStdComptimeFiles(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 	if len(fc.Args) > 0 {
-		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "Files")
+		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "Files")
 	}
 	ret &Value{
 		Type: &Type{
@@ -1094,26 +1095,26 @@ fn builtinCallerStdComptimeFiles(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut
 
 fn builtinCallerStdComptimeTypeAlias(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 	if len(fc.Args) > 2 {
-		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "TypeAlias")
+		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "TypeAlias")
 		ret nil
 	}
 	if len(fc.Args) == 0 {
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "ident, type")
+		e.pushErr(fc.Token, log::MissingExprFor, "ident, type")
 		ret nil
 	}
 	if len(fc.Args) == 1 {
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "type")
+		e.pushErr(fc.Token, log::MissingExprFor, "type")
 		ret nil
 	}
 	mut ie, mut ok := fc.Args[0].Kind.(&ast::IdentExpr)
 	if !ok {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidSyntax)
-		e.pushSuggestion(build::LogMsg.ExpectedIdentifier)
+		e.pushErr(fc.Args[0].Token, log::InvalidSyntax)
+		e.pushSuggestion(log::ExpectedIdentifier)
 		ret nil
 	}
 	mut sc, ok := e.lookup.(&scopeChecker)
 	if !ok {
-		e.pushErr(fc.Token, build::LogMsg.CalledOutOfScope, "TypeAlias")
+		e.pushErr(fc.Token, log::CalledOutOfScope, "TypeAlias")
 		ret nil
 	}
 
@@ -1137,8 +1138,8 @@ fn builtinCallerStdComptimeTypeAlias(mut &e: &eval, mut &fc: &ast::FuncCallExpr,
 	} else {
 		mut cti := t.Type.comptimeTypeInfo()
 		if cti == nil {
-			e.pushErr(fc.Args[1].Token, build::LogMsg.InvalidSyntax)
-			e.pushSuggestion(build::LogMsg.ExpectedType)
+			e.pushErr(fc.Args[1].Token, log::InvalidSyntax)
+			e.pushSuggestion(log::ExpectedType)
 			ret nil
 		}
 		alias.TypeSym.Type = cti.base
@@ -1153,11 +1154,11 @@ fn builtinCallerStdMemSizeOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_:
 	}
 
 	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "type|expr")
+		e.pushErr(fc.Token, log::MissingExprFor, "type|expr")
 		ret result
 	}
 	if len(fc.Args) > 1 {
-		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "SizeOf")
+		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "SizeOf")
 	}
 
 	mut v := e.evalExprKind(fc.Args[0].Kind)
@@ -1165,7 +1166,7 @@ fn builtinCallerStdMemSizeOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_:
 		ret result
 	}
 	if !validTypeForXof(v.Type) {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFunc, v.Type.Str(), "SizeOf")
+		e.pushErr(fc.Args[0].Token, log::InvalidTypeForFunc, v.Type.Str(), "SizeOf")
 	}
 
 	result.Model = &SizeofExpr{Expr: v.Type}
@@ -1178,11 +1179,11 @@ fn builtinCallerStdMemAlignOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_
 	}
 
 	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "type|expr")
+		e.pushErr(fc.Token, log::MissingExprFor, "type|expr")
 		ret result
 	}
 	if len(fc.Args) > 1 {
-		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "AlignOf")
+		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "AlignOf")
 	}
 
 	mut v := e.evalExprKind(fc.Args[0].Kind)
@@ -1190,7 +1191,7 @@ fn builtinCallerStdMemAlignOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_
 		ret result
 	}
 	if !validTypeForXof(v.Type) {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFunc, v.Type.Str(), "AlignOf")
+		e.pushErr(fc.Args[0].Token, log::InvalidTypeForFunc, v.Type.Str(), "AlignOf")
 	}
 
 	result.Model = &AlignofExpr{Expr: v.Type}
@@ -1199,12 +1200,12 @@ fn builtinCallerStdMemAlignOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_
 
 fn builtinCallerStdJuleIntegratedEmit(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if !e.isUnsafe() {
-		e.pushErr(fc.Token, build::LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
-		e.pushSuggestion(build::LogMsg.WriteYourCodeInUnsafeJule)
+		e.pushErr(fc.Token, log::UnsafeBehaviorAtOutOfUnsafeScope)
+		e.pushSuggestion(log::WriteYourCodeInUnsafeJule)
 	}
 
 	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "code")
+		e.pushErr(fc.Token, log::MissingExprFor, "code")
 		ret nil
 	}
 
@@ -1214,12 +1215,12 @@ fn builtinCallerStdJuleIntegratedEmit(mut &e: &eval, mut &fc: &ast::FuncCallExpr
 	}
 
 	if argVal.Type.Prim() == nil || !argVal.Type.Prim().IsStr() {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.IncompatibleTypes, argVal.Type.Str(), argVal.Type.Str())
+		e.pushErr(fc.Args[0].Token, log::IncompatibleTypes, argVal.Type.Str(), argVal.Type.Str())
 		ret nil
 	}
 
 	if !argVal.IsConst() || !argVal.Constant.IsStr() {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.ExprNotConst)
+		e.pushErr(fc.Args[0].Token, log::ExprNotConst)
 		ret nil
 	}
 

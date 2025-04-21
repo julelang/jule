@@ -4,6 +4,7 @@
 
 use "std/jule/ast"
 use "std/jule/build"
+use "std/jule/log"
 use "std/jule/token"
 
 fn buildVoidType(): &ast::Type {
@@ -28,14 +29,14 @@ struct typeBuilder {
 }
 
 impl typeBuilder {
-	fn pushErr(mut self, token: &token::Token, fmt: build::LogMsg) {
+	fn pushErr(mut self, token: &token::Token, fmt: str) {
 		if self.err {
 			self.p.pushErr(token, fmt)
 		}
 	}
 
 	// Push suggestion to last log.
-	fn pushSuggestion(mut self, fmt: build::LogMsg, args: ...any) {
+	fn pushSuggestion(mut self, fmt: str, args: ...any) {
 		if self.err {
 			self.p.pushSuggestion(fmt, args...)
 		}
@@ -48,24 +49,24 @@ impl typeBuilder {
 		mut ns := new(ast::NamespaceType)
 		ns.Namespace = self.tokens[*self.i]
 		if ns.Namespace.Id != token::Id.Ident && ns.Namespace.Id != token::Id.Unsafe {
-			self.pushErr(ns.Namespace, build::LogMsg.InvalidSyntax)
-			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
+			self.pushErr(ns.Namespace, log::InvalidSyntax)
+			self.pushSuggestion(log::ExpectedIdentifier)
 		}
 		*self.i++
 		if len(self.tokens) <= *self.i {
-			self.pushErr(ns.Namespace, build::LogMsg.InvalidSyntax)
-			self.pushSuggestion(build::LogMsg.ExpectedDblColon)
+			self.pushErr(ns.Namespace, log::InvalidSyntax)
+			self.pushSuggestion(log::ExpectedDblColon)
 			ret nil
 		}
 		if self.tokens[*self.i].Id != token::Id.DblColon {
-			self.pushErr(self.tokens[*self.i], build::LogMsg.InvalidSyntax)
-			self.pushSuggestion(build::LogMsg.ExpectedDblColon)
+			self.pushErr(self.tokens[*self.i], log::InvalidSyntax)
+			self.pushSuggestion(log::ExpectedDblColon)
 			ret nil
 		}
 		*self.i++
 		if len(self.tokens) <= *self.i {
-			self.pushErr(self.tokens[*self.i-1], build::LogMsg.InvalidSyntax)
-			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
+			self.pushErr(self.tokens[*self.i-1], log::InvalidSyntax)
+			self.pushSuggestion(log::ExpectedIdentifier)
 			ret nil
 		}
 		ns.Kind = self.buildIdent()
@@ -84,7 +85,7 @@ impl typeBuilder {
 
 		mut parts := self.identGenerics()
 		if len(parts) == 0 {
-			self.pushErr(token, build::LogMsg.InvalidSyntax)
+			self.pushErr(token, log::InvalidSyntax)
 			ret nil
 		}
 
@@ -93,7 +94,7 @@ impl typeBuilder {
 			mut j := 0
 			mut t, _ := unsafe { self.p.buildType(part, &j, true) }
 			if j < len(part) {
-				self.pushErr(part[j], build::LogMsg.InvalidSyntax)
+				self.pushErr(part[j], log::InvalidSyntax)
 			}
 			types = append(types, t)
 		}
@@ -145,7 +146,7 @@ impl typeBuilder {
 
 	unsafe fn buildCppLink(mut self): &ast::Type {
 		if *self.i+1 >= len(self.tokens) || self.tokens[*self.i+1].Id != token::Id.Dot {
-			self.pushErr(self.tokens[*self.i], build::LogMsg.InvalidSyntax)
+			self.pushErr(self.tokens[*self.i], log::InvalidSyntax)
 			ret nil
 		}
 		*self.i += 2 // Skip the bind keyword and dot token.
@@ -161,7 +162,7 @@ impl typeBuilder {
 			ret nil
 		}
 		if !f.IsAnon() {
-			self.pushErr(f.Token, build::LogMsg.InvalidSyntax)
+			self.pushErr(f.Token, log::InvalidSyntax)
 		}
 		ret &ast::Type{
 			Token: token,
@@ -172,7 +173,7 @@ impl typeBuilder {
 	unsafe fn buildPtr(mut self): &ast::Type {
 		mut token := self.tokens[*self.i]
 		if *self.i+1 >= len(self.tokens) {
-			self.pushErr(token, build::LogMsg.InvalidSyntax)
+			self.pushErr(token, log::InvalidSyntax)
 			ret nil
 		}
 
@@ -203,7 +204,7 @@ impl typeBuilder {
 	unsafe fn buildSptr(mut self): &ast::Type {
 		mut token := self.tokens[*self.i]
 		if *self.i+1 >= len(self.tokens) {
-			self.pushErr(token, build::LogMsg.InvalidSyntax)
+			self.pushErr(token, log::InvalidSyntax)
 			ret nil
 		}
 
@@ -239,7 +240,7 @@ impl typeBuilder {
 	unsafe fn buildArr(mut self): &ast::Type {
 		mut exprTokens := range(*self.i, token::Id.LBracket, token::Id.RBracket, self.tokens)
 		if *self.i >= len(self.tokens) {
-			self.pushErr(self.tokens[*self.i-1], build::LogMsg.MissingType)
+			self.pushErr(self.tokens[*self.i-1], log::MissingType)
 			ret nil
 		}
 
@@ -269,17 +270,17 @@ impl typeBuilder {
 		mut mapToken := self.tokens[*self.i]
 		*self.i++ // Skip map token.
 		if *self.i >= len(self.tokens) {
-			self.pushErr(mapToken, build::LogMsg.MissingType)
+			self.pushErr(mapToken, log::MissingType)
 			ret nil
 		}
 
 		// Get key type tokens without brackets.
 		mut keyTokens := range(*self.i, token::Id.LBracket, token::Id.RBracket, self.tokens)
 		if *self.i >= len(self.tokens) {
-			self.pushErr(self.tokens[*self.i-1], build::LogMsg.MissingType)
+			self.pushErr(self.tokens[*self.i-1], log::MissingType)
 			ret nil
 		} else if len(keyTokens) == 0 {
-			self.pushErr(mapToken, build::LogMsg.MissingType)
+			self.pushErr(mapToken, log::MissingType)
 			ret nil
 		}
 
@@ -289,7 +290,7 @@ impl typeBuilder {
 		if !ok {
 			ret nil
 		} else if j < len(keyTokens) {
-			self.pushErr(keyTokens[j], build::LogMsg.InvalidSyntax)
+			self.pushErr(keyTokens[j], log::InvalidSyntax)
 		}
 		mapt.Key = keyt
 
@@ -307,7 +308,7 @@ impl typeBuilder {
 	unsafe fn buildEnumerable(mut self): &ast::Type {
 		mut token := self.tokens[*self.i]
 		if *self.i+2 >= len(self.tokens) {
-			self.pushErr(token, build::LogMsg.InvalidSyntax)
+			self.pushErr(token, log::InvalidSyntax)
 			ret nil
 		}
 		*self.i++
@@ -322,7 +323,7 @@ impl typeBuilder {
 	unsafe fn buildChan(mut self): &ast::Type {
 		mut token := self.tokens[*self.i]
 		if *self.i+1 >= len(self.tokens) {
-			self.pushErr(token, build::LogMsg.InvalidSyntax)
+			self.pushErr(token, log::InvalidSyntax)
 			ret nil
 		}
 		*self.i++
@@ -333,7 +334,7 @@ impl typeBuilder {
 		if token.Id == token::Id.RArrow {
 			send = false
 			if *self.i+1 >= len(self.tokens) {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
+				self.pushErr(token, log::InvalidSyntax)
 				ret nil
 			}
 			token = self.tokens[*self.i]
@@ -341,7 +342,7 @@ impl typeBuilder {
 		}
 
 		if token.Id != token::Id.Chan {
-			self.pushErr(token, build::LogMsg.InvalidSyntax)
+			self.pushErr(token, log::InvalidSyntax)
 			ret nil
 		}
 
@@ -350,7 +351,7 @@ impl typeBuilder {
 		if send && self.tokens[*self.i].Id == token::Id.RArrow {
 			recv = false
 			if *self.i+1 >= len(self.tokens) {
-				self.pushErr(self.tokens[*self.i], build::LogMsg.InvalidSyntax)
+				self.pushErr(self.tokens[*self.i], log::InvalidSyntax)
 				ret nil
 			}
 			*self.i++
@@ -381,7 +382,7 @@ impl typeBuilder {
 		mut rangeTokens := range(*self.i, token::Id.LParent, token::Id.RParent, self.tokens)
 		if len(rangeTokens) == 0 {
 			// Empty range.
-			self.pushErr(token, build::LogMsg.MissingType)
+			self.pushErr(token, log::MissingType)
 			ret nil
 		}
 		oldOffset := *self.i
@@ -438,7 +439,7 @@ impl typeBuilder {
 			ret self.buildMap()
 		}
 		*self.i++
-		self.pushErr(token, build::LogMsg.InvalidSyntax)
+		self.pushErr(token, log::InvalidSyntax)
 		ret nil
 	}
 

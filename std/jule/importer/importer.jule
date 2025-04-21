@@ -7,6 +7,7 @@ use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/directive"
 use "std/jule/internal/mod"
+use "std/jule/log"
 use "std/jule/parser"
 use "std/jule/sema"
 use "std/jule/token"
@@ -26,9 +27,9 @@ fn readBuff(path: str): []byte {
 
 // Make compiler error, just text.
 // Does not includes information about row, column, and etc.
-fn flatCompilerErr(text: str): build::Log {
-	ret build::Log{
-		Kind: build::LogKind.Error,
+fn flatCompilerErr(text: str): log::Log {
+	ret log::Log{
+		Kind: log::Error,
 		Text: text,
 	}
 }
@@ -82,7 +83,7 @@ impl sema::Importer for Importer {
 		ret nil
 	}
 
-	fn ImportPackage(mut self, path: str, updateMod: bool): ([]&ast::AST, []build::Log) {
+	fn ImportPackage(mut self, path: str, updateMod: bool): ([]&ast::AST, []log::Log) {
 		mut dirents := os::ReadDir(path) else {
 			ret nil, [flatCompilerErr("cannot read package directory: " + path)]
 		}
@@ -166,7 +167,7 @@ impl sema::Importer for Importer {
 
 impl Importer {
 	// Reports whether file passes build directives.
-	fn isPassBuildDirectives(mut self, mut &file: &ast::AST): (bool, []build::Log) {
+	fn isPassBuildDirectives(mut self, mut &file: &ast::AST): (bool, []log::Log) {
 		for (_, mut td) in file.TopDirectives {
 			if td.Tag.Kind != directive::Build {
 				continue

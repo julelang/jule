@@ -5,6 +5,7 @@
 use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/directive"
+use "std/jule/log"
 use "std/jule/token"
 
 struct directiveChecker {
@@ -22,11 +23,11 @@ impl directiveChecker {
 			}
 			fall
 		|:
-			self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
 		}
 
 		if len(d.Args) > 0 {
-			self.s.pushErr(d.Args[0], build::LogMsg.InvalidSyntax)
+			self.s.pushErr(d.Args[0], log::InvalidSyntax)
 		}
 	}
 
@@ -38,11 +39,11 @@ impl directiveChecker {
 			}
 			fall
 		|:
-			self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
 		}
 
 		if len(d.Args) > 0 {
-			self.s.pushErr(d.Args[0], build::LogMsg.InvalidSyntax)
+			self.s.pushErr(d.Args[0], log::InvalidSyntax)
 		}
 	}
 
@@ -50,35 +51,35 @@ impl directiveChecker {
 		match type self.o {
 		| &Struct:
 			if !self.o.(&Struct).Binded {
-				self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
 			}
 		| &Func:
 			if !self.o.(&Func).Binded {
-				self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
 			}
 		| &Var:
 			if !self.o.(&Var).Binded {
-				self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
 			}
 		|:
-			self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
 		}
 
 		if len(d.Args) == 0 {
-			self.s.pushErr(d.Tag, build::LogMsg.MissingExpr)
+			self.s.pushErr(d.Tag, log::MissingExpr)
 			ret
 		} else if len(d.Args) > 1 {
-			self.s.pushErr(d.Args[1], build::LogMsg.ArgumentOverflow, d.Tag.Kind)
+			self.s.pushErr(d.Args[1], log::ArgumentOverflow, d.Tag.Kind)
 		}
 
 		arg := d.Args[0]
 		if arg.Id != token::Id.Lit {
-			self.s.pushErr(arg, build::LogMsg.InvalidSyntax)
+			self.s.pushErr(arg, log::InvalidSyntax)
 			ret
 		}
 
 		if arg.Kind[0] != '"' {
-			self.s.pushErr(arg, build::LogMsg.InvalidSyntax)
+			self.s.pushErr(arg, log::InvalidSyntax)
 			ret
 		}
 
@@ -106,16 +107,16 @@ impl directiveChecker {
 				break
 			}
 			if f.IsMethod() {
-				self.s.pushErr(f.Token, build::LogMsg.TestMethod)
+				self.s.pushErr(f.Token, log::TestMethod)
 				break
 			}
 			fall
 		|:
-			self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
 		}
 
 		if len(d.Args) > 0 {
-			self.s.pushErr(d.Args[0], build::LogMsg.InvalidSyntax)
+			self.s.pushErr(d.Args[0], log::InvalidSyntax)
 		}
 	}
 
@@ -124,33 +125,33 @@ impl directiveChecker {
 		| &Func:
 			f := self.o.(&Func)
 			if f.Binded || f.IsInit() || f.IsEntryPoint() || f.IsMethod() || len(f.Generics) > 0 {
-				self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
 				ret
 			}
 		| &Var:
 			v := self.o.(&Var)
 			if v.Binded || v.Constant {
-				self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
 			}
 		|:
-			self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
 			ret
 		}
 		if len(d.Args) > 1 {
-			self.s.pushErr(d.Args[1], build::LogMsg.ArgumentOverflow, d.Tag.Kind)
+			self.s.pushErr(d.Args[1], log::ArgumentOverflow, d.Tag.Kind)
 			ret
 		}
 		if len(d.Args) < 1 {
-			self.s.pushErr(d.Tag, build::LogMsg.MissingExpr)
+			self.s.pushErr(d.Tag, log::MissingExpr)
 			ret
 		}
 		arg := d.Args[0]
 		if arg.Id != token::Id.Lit {
-			self.s.pushErr(arg, build::LogMsg.InvalidSyntax)
+			self.s.pushErr(arg, log::InvalidSyntax)
 			ret
 		}
 		if arg.Kind[0] != '"' {
-			self.s.pushErr(arg, build::LogMsg.InvalidSyntax)
+			self.s.pushErr(arg, log::InvalidSyntax)
 			ret
 		}
 		// remove quotes
@@ -171,9 +172,9 @@ impl directiveChecker {
 			self.checkExport(d)
 		| directive::Build
 		| directive::Pass:
-			self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
 		|:
-			self.s.pushErr(d.Tag, build::LogMsg.InvalidLabel, d.Tag.Kind)
+			self.s.pushErr(d.Tag, log::InvalidLabel, d.Tag.Kind)
 		}
 	}
 

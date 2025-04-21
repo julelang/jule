@@ -5,6 +5,7 @@
 use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/constant"
+use "std/jule/log"
 use "std/jule/token"
 use "std/jule/types"
 
@@ -559,8 +560,8 @@ impl scopeChecker {
 		}
 
 		if !token::IsIgnoreIdent(v.Ident) && self.isDuplicatedIdent(uintptr(v), v.Ident) {
-			self.s.pushErr(v.Token, build::LogMsg.DuplicatedIdent, v.Ident)
-			self.s.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+			self.s.pushErr(v.Token, log::DuplicatedIdent, v.Ident)
+			self.s.pushSuggestion(log::RenameForAvoidDuplication)
 			self.stop()
 			ret
 		}
@@ -594,7 +595,7 @@ impl scopeChecker {
 
 	fn checkVarDecl(mut &self, mut decl: &ast::Var) {
 		if token::IsIgnoreIdent(decl.Ident) {
-			self.s.pushErr(decl.Token, build::LogMsg.IgnoreIdent)
+			self.s.pushErr(decl.Token, log::IgnoreIdent)
 			ret
 		}
 		mut v := buildVar(decl)
@@ -604,8 +605,8 @@ impl scopeChecker {
 
 	fn checkTypeAlias(mut &self, mut &ta: &TypeAlias) {
 		if self.isDuplicatedIdent(uintptr(ta), ta.Ident) {
-			self.s.pushErr(ta.Token, build::LogMsg.DuplicatedIdent, ta.Ident)
-			self.s.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+			self.s.pushErr(ta.Token, log::DuplicatedIdent, ta.Ident)
+			self.s.pushSuggestion(log::RenameForAvoidDuplication)
 			self.stop()
 			ret
 		}
@@ -668,13 +669,13 @@ impl scopeChecker {
 
 	fn processErrorCall(mut &self, mut &m: &BuiltinErrorCallExpr, err: &token::Token) {
 		if self.isDeferred() {
-			self.s.pushErr(err, build::LogMsg.ErrorInDeferred)
+			self.s.pushErr(err, log::ErrorInDeferred)
 		}
 
 		mut root := self.getRoot()
 		if !root.owner.Decl.Exceptional {
-			self.s.pushErr(err, build::LogMsg.ErrorWithNonExceptional)
-			self.s.pushSuggestion(build::LogMsg.DeclareExceptional)
+			self.s.pushErr(err, log::ErrorWithNonExceptional)
+			self.s.pushSuggestion(log::DeclareExceptional)
 		}
 		m.Func = root.owner
 	}
@@ -708,7 +709,7 @@ impl scopeChecker {
 		| &ChanSend:
 			self.scope.Stmts = append(self.scope.Stmts, v)
 		|:
-			self.s.pushErr(expr.Token, build::LogMsg.InvalidSyntax)
+			self.s.pushErr(expr.Token, log::InvalidSyntax)
 		}
 	}
 
@@ -722,7 +723,7 @@ impl scopeChecker {
 
 		mut prim := v.Type.Prim()
 		if prim == nil || !prim.IsBool() {
-			self.s.pushErr(i.Expr.Token, build::LogMsg.IfRequireBoolExpr)
+			self.s.pushErr(i.Expr.Token, log::IfRequireBoolExpr)
 			ret nil
 		}
 
@@ -795,12 +796,12 @@ impl scopeChecker {
 
 			prim := v.Type.Prim()
 			if prim == nil {
-				self.s.pushErr(it.Token, build::LogMsg.IterWhileRequireBoolExpr)
+				self.s.pushErr(it.Token, log::IterWhileRequireBoolExpr)
 				ret
 			}
 
 			if !prim.IsBool() {
-				self.s.pushErr(it.Token, build::LogMsg.IterWhileRequireBoolExpr)
+				self.s.pushErr(it.Token, log::IterWhileRequireBoolExpr)
 				ret
 			}
 
@@ -809,7 +810,7 @@ impl scopeChecker {
 
 		if wh.IsWhileNext() {
 			if !isValidAstStForNextSt(wh.Next) {
-				self.s.pushErr(wh.NextToken, build::LogMsg.InvalidStmtForNext)
+				self.s.pushErr(wh.NextToken, log::InvalidStmtForNext)
 				ret
 			}
 
@@ -819,7 +820,7 @@ impl scopeChecker {
 				mut st := self.scope.Stmts[n]
 				self.scope.Stmts = self.scope.Stmts[:n] // Remove trailing statements.
 				if !isValidStForNextSt(st) {
-					self.s.pushErr(wh.NextToken, build::LogMsg.InvalidStmtForNext)
+					self.s.pushErr(wh.NextToken, log::InvalidStmtForNext)
 				}
 				kind.Next = st
 			}
@@ -829,21 +830,21 @@ impl scopeChecker {
 	fn checkComptimeRangeIter(mut &self, mut &it: &ast::Iter, mut &kind: &RangeIter, mut &v: &Value) {
 		if kind.KeyA != nil {
 			if !self.s.isFlag(Shadowing) && self.isDuplicatedIdent(0, kind.KeyA.Ident) {
-				self.s.pushErr(kind.KeyA.Token, build::LogMsg.DuplicatedIdent, kind.KeyA.Ident)
-				self.s.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+				self.s.pushErr(kind.KeyA.Token, log::DuplicatedIdent, kind.KeyA.Ident)
+				self.s.pushSuggestion(log::RenameForAvoidDuplication)
 			}
 		}
 		if kind.KeyB != nil {
 			if !self.s.isFlag(Shadowing) && self.isDuplicatedIdent(0, kind.KeyB.Ident) {
-				self.s.pushErr(kind.KeyB.Token, build::LogMsg.DuplicatedIdent, kind.KeyB.Ident)
-				self.s.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+				self.s.pushErr(kind.KeyB.Token, log::DuplicatedIdent, kind.KeyB.Ident)
+				self.s.pushSuggestion(log::RenameForAvoidDuplication)
 			}
 		}
 
 		mut rang := it.Kind.(&ast::RangeKind)
 		makeComptimeRange(v, false)
 		if v.Decl {
-			self.s.pushErr(rang.Expr.Token, build::LogMsg.InvalidTypeForComptimeIter, v.Type.Str())
+			self.s.pushErr(rang.Expr.Token, log::InvalidTypeForComptimeIter, v.Type.Str())
 			ret
 		}
 
@@ -908,8 +909,8 @@ impl scopeChecker {
 			ret
 		}
 		if v.Type.comptime() {
-			self.s.pushErr(rang.Expr.Token, build::LogMsg.ComptimeExprForRuntimeIteration)
-			self.s.pushSuggestion(build::LogMsg.DeclareComptimeForeach)
+			self.s.pushErr(rang.Expr.Token, log::ComptimeExprForRuntimeIteration)
+			self.s.pushSuggestion(log::DeclareComptimeForeach)
 			ret
 		}
 
@@ -931,8 +932,8 @@ impl scopeChecker {
 
 		if kind.KeyA != nil {
 			if !self.s.isFlag(Shadowing) && self.isDuplicatedIdent(0, kind.KeyA.Ident) {
-				self.s.pushErr(kind.KeyA.Token, build::LogMsg.DuplicatedIdent, kind.KeyA.Ident)
-				self.s.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+				self.s.pushErr(kind.KeyA.Token, log::DuplicatedIdent, kind.KeyA.Ident)
+				self.s.pushSuggestion(log::RenameForAvoidDuplication)
 			}
 			kind.KeyA.Scope = scope
 			ssc.table.Vars = append(ssc.table.Vars, kind.KeyA)
@@ -940,8 +941,8 @@ impl scopeChecker {
 
 		if kind.KeyB != nil {
 			if !self.s.isFlag(Shadowing) && self.isDuplicatedIdent(0, kind.KeyB.Ident) {
-				self.s.pushErr(kind.KeyB.Token, build::LogMsg.DuplicatedIdent, kind.KeyB.Ident)
-				self.s.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+				self.s.pushErr(kind.KeyB.Token, log::DuplicatedIdent, kind.KeyB.Ident)
+				self.s.pushSuggestion(log::RenameForAvoidDuplication)
 			}
 			kind.KeyB.Scope = scope
 			ssc.table.Vars = append(ssc.table.Vars, kind.KeyB)
@@ -954,7 +955,7 @@ impl scopeChecker {
 	fn checkIter(mut &self, mut it: &ast::Iter) {
 		if it.IsInf() {
 			if it.Comptime {
-				self.s.pushErr(it.Token, build::LogMsg.InvalidComptimeIter)
+				self.s.pushErr(it.Token, log::InvalidComptimeIter)
 				ret
 			}
 			self.checkInfIter(it)
@@ -964,7 +965,7 @@ impl scopeChecker {
 		match type it.Kind {
 		| &ast::WhileKind:
 			if it.Comptime {
-				self.s.pushErr(it.Token, build::LogMsg.InvalidComptimeIter)
+				self.s.pushErr(it.Token, log::InvalidComptimeIter)
 				ret
 			}
 			self.checkWhileIter(it)
@@ -1018,7 +1019,7 @@ impl scopeChecker {
 
 	fn checkContValidScope(mut &self, c: &ast::Continue): &Continue {
 		if self.isDeferred() {
-			self.s.pushErr(c.Token, build::LogMsg.ContinueAtOutOfValidScope)
+			self.s.pushErr(c.Token, log::ContinueAtOutOfValidScope)
 			ret nil
 		}
 
@@ -1036,7 +1037,7 @@ impl scopeChecker {
 			ret &Continue{It: scope.it}
 		}
 
-		self.s.pushErr(c.Token, build::LogMsg.ContinueAtOutOfValidScope)
+		self.s.pushErr(c.Token, log::ContinueAtOutOfValidScope)
 		ret nil
 	}
 
@@ -1049,20 +1050,20 @@ impl scopeChecker {
 		if c.Label != nil { // Label given.
 			mut label := findLabelParent(c.Label.Kind, self.parent)
 			if label == nil {
-				self.s.pushErr(c.Label, build::LogMsg.LabelNotExist, c.Label.Kind)
+				self.s.pushErr(c.Label, log::LabelNotExist, c.Label.Kind)
 				ret
 			}
 
 			label.used = true
 
 			if label.node.Index+1 >= len(label.node.Scope.Stmts) {
-				self.s.pushErr(c.Label, build::LogMsg.InvalidLabel, c.Label.Kind)
+				self.s.pushErr(c.Label, log::InvalidLabel, c.Label.Kind)
 				ret
 			}
 
 			i := label.node.Index + 1
 			if i >= len(label.node.Scope.Stmts) {
-				self.s.pushErr(c.Label, build::LogMsg.InvalidLabel)
+				self.s.pushErr(c.Label, log::InvalidLabel)
 			} else {
 				mut st := label.node.Scope.Stmts[i]
 				match type st {
@@ -1073,14 +1074,14 @@ impl scopeChecker {
 				| &WhileIter:
 					cont.It = uintptr(st.(&WhileIter))
 				|:
-					self.s.pushErr(c.Label, build::LogMsg.InvalidLabel, c.Label.Kind)
+					self.s.pushErr(c.Label, log::InvalidLabel, c.Label.Kind)
 				}
 			}
 		}
 
 		if cont.It != 0 {
 			if !self.checkValidContLabel(cont.It) {
-				self.s.pushErr(c.Label, build::LogMsg.InvalidLabel, c.Label.Kind)
+				self.s.pushErr(c.Label, log::InvalidLabel, c.Label.Kind)
 			}
 		}
 
@@ -1089,7 +1090,7 @@ impl scopeChecker {
 
 	fn checkLabel(mut &self, mut l: &ast::Label) {
 		if self.findLabel(l.Ident) != nil {
-			self.s.pushErr(l.Token, build::LogMsg.LabelExist, l.Ident)
+			self.s.pushErr(l.Token, log::LabelExist, l.Ident)
 			ret
 		}
 
@@ -1119,7 +1120,7 @@ impl scopeChecker {
 
 	fn checkPostfix(mut &self, mut a: &ast::Assign) {
 		if len(a.Left) > 1 {
-			self.s.pushErr(a.Setter, build::LogMsg.InvalidSyntax)
+			self.s.pushErr(a.Setter, log::InvalidSyntax)
 			ret
 		}
 
@@ -1137,12 +1138,12 @@ impl scopeChecker {
 		if v.Type.Ptr() != nil {
 			mut ptr := v.Type.Ptr()
 			if ptr.IsUnsafe() {
-				self.s.pushErr(a.Setter, build::LogMsg.OperatorNotForJuleType, a.Setter.Kind, v.Type.Str())
+				self.s.pushErr(a.Setter, log::OperatorNotForJuleType, a.Setter.Kind, v.Type.Str())
 				ret
 			}
 		} else {
 			if v.Type.Prim() == nil || !types::IsNum(v.Type.Prim().Kind) {
-				self.s.pushErr(a.Setter, build::LogMsg.OperatorNotForJuleType, a.Setter.Kind, v.Type.Str())
+				self.s.pushErr(a.Setter, log::OperatorNotForJuleType, a.Setter.Kind, v.Type.Str())
 				ret
 			}
 		}
@@ -1219,10 +1220,10 @@ impl scopeChecker {
 
 		if l == nil {
 			if r.Type.Void() {
-				self.s.pushErr(a.Right.Token, build::LogMsg.InvalidExpr)
+				self.s.pushErr(a.Right.Token, log::InvalidExpr)
 			}
 			if a.Setter.Id != token::Id.Eq {
-				self.s.pushErr(a.Setter, build::LogMsg.InvalidSyntax)
+				self.s.pushErr(a.Setter, log::InvalidSyntax)
 			}
 			self.scope.Stmts = append(self.scope.Stmts, r)
 			ret
@@ -1233,7 +1234,7 @@ impl scopeChecker {
 		}
 
 		if r.Type.Tuple() != nil {
-			self.s.pushErr(a.Setter, build::LogMsg.MissingMultiAssignIdents)
+			self.s.pushErr(a.Setter, log::MissingMultiAssignIdents)
 			ret
 		}
 
@@ -1273,7 +1274,7 @@ impl scopeChecker {
 		mut &lexpr: &ast::AssignLeft, mut &l: &Value, mut &r: exprPart, strict: bool) {
 		if !lexpr.Reference && token::IsIgnoreIdent(lexpr.Ident) {
 			if r.data.Type.Void() {
-				self.s.pushErr(a.Right.Token, build::LogMsg.InvalidExpr)
+				self.s.pushErr(a.Right.Token, log::InvalidExpr)
 			}
 			st.Left = append(st.Left, nil)
 			ret
@@ -1286,19 +1287,19 @@ impl scopeChecker {
 				}
 			|:
 				if lexpr.Mutable || lexpr.Reference {
-					self.s.pushErr(lexpr.Token, build::LogMsg.InvalidSyntax)
+					self.s.pushErr(lexpr.Token, log::InvalidSyntax)
 					ret
 				}
 				goto norm
 			}
 			if self.isDuplicatedIdent(0, lexpr.Ident) {
-				self.s.pushErr(lexpr.Token, build::LogMsg.DuplicatedIdent, lexpr.Ident)
-				self.s.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+				self.s.pushErr(lexpr.Token, log::DuplicatedIdent, lexpr.Ident)
+				self.s.pushSuggestion(log::RenameForAvoidDuplication)
 				self.stop()
 				ret
 			}
 			if token::IsIgnoreIdent(lexpr.Ident) {
-				self.s.pushErr(lexpr.Token, build::LogMsg.IgnoreIdent)
+				self.s.pushErr(lexpr.Token, log::IgnoreIdent)
 			}
 
 			// Add new variable declaration statement.
@@ -1327,8 +1328,8 @@ impl scopeChecker {
 		}
 	norm:
 		if lexpr.Mutable || lexpr.Reference {
-			self.s.pushErr(lexpr.Token, build::LogMsg.DuplicatedIdent, lexpr.Ident)
-			self.s.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
+			self.s.pushErr(lexpr.Token, log::DuplicatedIdent, lexpr.Ident)
+			self.s.pushSuggestion(log::RenameForAvoidDuplication)
 		}
 
 		if !checkAssign(self.s, l, r.data, lexpr.Token) {
@@ -1427,7 +1428,7 @@ impl scopeChecker {
 
 	fn checkMultiAssign(mut &self, mut &a: &ast::Assign) {
 		if a.Setter.Id != token::Id.Eq && a.Setter.Id != token::Id.ColonEq {
-			self.s.pushErr(a.Setter, build::LogMsg.InvalidSyntax)
+			self.s.pushErr(a.Setter, log::InvalidSyntax)
 			ret
 		}
 
@@ -1493,10 +1494,10 @@ impl scopeChecker {
 
 		match {
 		| len(a.Left) > len(right):
-			self.s.pushErr(a.Setter, build::LogMsg.OverflowMultiAssignIdents)
+			self.s.pushErr(a.Setter, log::OverflowMultiAssignIdents)
 			ret
 		| len(a.Left) < len(right):
-			self.s.pushErr(a.Setter, build::LogMsg.MissingMultiAssignIdents)
+			self.s.pushErr(a.Setter, log::MissingMultiAssignIdents)
 			ret
 		}
 
@@ -1571,7 +1572,7 @@ impl scopeChecker {
 				// So, v is should be type declaration already.
 				case.Exprs = append(case.Exprs, v)
 				if countMatchType(m, v.Type) > 1 {
-					self.s.pushErr(e.Token, build::LogMsg.DuplicateMatchType, v.Type.Str())
+					self.s.pushErr(e.Token, log::DuplicateMatchType, v.Type.Str())
 				}
 				if m.Comptime {
 					constMatched = constMatched || expr.Type.Equal(v.Type)
@@ -1583,15 +1584,15 @@ impl scopeChecker {
 			}
 
 			if v.Decl {
-				self.s.pushErr(e.Token, build::LogMsg.DeclFoundInsteadExpr)
-				self.s.pushSuggestion(build::LogMsg.UseTypeMatch)
+				self.s.pushErr(e.Token, log::DeclFoundInsteadExpr)
+				self.s.pushSuggestion(log::UseTypeMatch)
 				continue
 			}
 
 			if m.Comptime {
 				if !v.IsConst() && v.Type.comptimeTypeInfo() == nil {
-					self.s.pushErr(e.Token, build::LogMsg.ExprNotConst)
-					self.s.pushSuggestion(build::LogMsg.InvalidExprForConstMatch)
+					self.s.pushErr(e.Token, log::ExprNotConst)
+					self.s.pushSuggestion(log::InvalidExprForConstMatch)
 					continue
 				}
 				if !constMatched {
@@ -1678,7 +1679,7 @@ impl scopeChecker {
 				callToken = root.calledFrom
 			}
 		}
-		self.s.pushErr(callToken, build::LogMsg.ComptimePanic, c.ReadStr())
+		self.s.pushErr(callToken, log::ComptimePanic, c.ReadStr())
 		self.stop()
 	}
 
@@ -1721,14 +1722,14 @@ impl scopeChecker {
 			mut cti := v.Type.comptimeTypeInfo()
 			if cti == nil {
 				if !v.Decl {
-					self.s.pushErr(m.Expr.Token, build::LogMsg.InvalidComptimeTypeMatchExpr)
+					self.s.pushErr(m.Expr.Token, log::InvalidComptimeTypeMatchExpr)
 					ret
 				}
 			} else {
 				v.Type = cti.base
 			}
 		} else if v.Decl || !((v.Type.Prim() != nil && v.Type.Prim().IsAny()) || v.Type.Trait() != nil || v.Type.TypeEnum() != nil) {
-			self.s.pushErr(m.Expr.Token, build::LogMsg.TypeCaseHasNotValidExpr)
+			self.s.pushErr(m.Expr.Token, log::TypeCaseHasNotValidExpr)
 			ret
 		}
 
@@ -1772,13 +1773,13 @@ impl scopeChecker {
 
 		if m.Comptime {
 			if !canComptimeMatch(v) {
-				self.s.pushErr(m.Expr.Token, build::LogMsg.ExprNotConst)
-				self.s.pushSuggestion(build::LogMsg.InvalidExprForConstMatch)
+				self.s.pushErr(m.Expr.Token, log::ExprNotConst)
+				self.s.pushSuggestion(log::InvalidExprForConstMatch)
 				ret
 			}
 		} else if v.Type.comptime() {
-			self.s.pushErr(m.Expr.Token, build::LogMsg.ExprNotConst)
-			self.s.pushSuggestion(build::LogMsg.InvalidExprForConstMatch)
+			self.s.pushErr(m.Expr.Token, log::ExprNotConst)
+			self.s.pushSuggestion(log::InvalidExprForConstMatch)
 			ret
 		}
 
@@ -1827,7 +1828,7 @@ impl scopeChecker {
 			| &ChanRecv | &ChanSend:
 				case.Exprs = append(case.Exprs, v)
 			|:
-				self.s.pushErr(e.Token, build::LogMsg.InvalidSelectExpr)
+				self.s.pushErr(e.Token, log::InvalidSelectExpr)
 			}
 		}
 		case.Scope = self.checkCaseScope(case, c.Scope)
@@ -1881,7 +1882,7 @@ impl scopeChecker {
 		if self.cse == 0 ||
 			len(self.scope.Stmts)+1 < len(self.scope.Stmts) ||
 			self.isDeferred() {
-			self.s.pushErr(f.Token, build::LogMsg.FallthroughWrongUse)
+			self.s.pushErr(f.Token, log::FallthroughWrongUse)
 			ret
 		}
 
@@ -1889,16 +1890,16 @@ impl scopeChecker {
 		match type unsafe { case.Owner } {
 		| &Match:
 			if unsafe { case.Owner.(&Match).Comptime } {
-				self.s.pushErr(f.Token, build::LogMsg.ComptimeFallthrough)
+				self.s.pushErr(f.Token, log::ComptimeFallthrough)
 				ret
 			}
 		| &Select:
-			self.s.pushErr(f.Token, build::LogMsg.SelectFallthrough)
+			self.s.pushErr(f.Token, log::SelectFallthrough)
 			ret
 		}
 		if unsafe { case.Next } == nil {
-			self.s.pushErr(f.Token, build::LogMsg.FallthroughIntoFinalCase)
-			self.s.pushSuggestion(build::LogMsg.RemoveFallthroughFromFinalCase)
+			self.s.pushErr(f.Token, log::FallthroughIntoFinalCase)
+			self.s.pushSuggestion(log::RemoveFallthroughFromFinalCase)
 			ret
 		}
 
@@ -1920,20 +1921,20 @@ impl scopeChecker {
 
 		mut label := findLabelParent(b.Label.Kind, self.parent)
 		if label == nil {
-			self.s.pushErr(b.Label, build::LogMsg.LabelNotExist, b.Label.Kind)
+			self.s.pushErr(b.Label, log::LabelNotExist, b.Label.Kind)
 			ret nil
 		}
 
 		label.used = true
 
 		if label.node.Index+1 >= len(label.node.Scope.Stmts) {
-			self.s.pushErr(b.Label, build::LogMsg.InvalidLabel, b.Label.Kind)
+			self.s.pushErr(b.Label, log::InvalidLabel, b.Label.Kind)
 			ret nil
 		}
 
 		i := label.node.Index + 1
 		if i >= len(label.node.Scope.Stmts) {
-			self.s.pushErr(b.Label, build::LogMsg.InvalidLabel, b.Label.Kind)
+			self.s.pushErr(b.Label, log::InvalidLabel, b.Label.Kind)
 		} else {
 			mut st := label.node.Scope.Stmts[i]
 			match type st {
@@ -1948,25 +1949,25 @@ impl scopeChecker {
 			| &Select:
 				brk.Select = uintptr(st.(&Select))
 			|:
-				self.s.pushErr(b.Label, build::LogMsg.InvalidLabel, b.Label.Kind)
+				self.s.pushErr(b.Label, log::InvalidLabel, b.Label.Kind)
 			}
 		}
 
 		if brk.It != 0 {
 			if !self.checkValidBreakLabel(brk.It) {
-				self.s.pushErr(b.Label, build::LogMsg.InvalidLabel, b.Label.Kind)
+				self.s.pushErr(b.Label, log::InvalidLabel, b.Label.Kind)
 			}
 		}
 
 		if brk.Match != 0 {
 			if !self.checkValidBreakLabel(brk.Match) {
-				self.s.pushErr(b.Label, build::LogMsg.InvalidLabel, b.Label.Kind)
+				self.s.pushErr(b.Label, log::InvalidLabel, b.Label.Kind)
 			}
 		}
 
 		if brk.Select != 0 {
 			if !self.checkValidBreakLabel(brk.Select) {
-				self.s.pushErr(b.Label, build::LogMsg.InvalidLabel, b.Label.Kind)
+				self.s.pushErr(b.Label, log::InvalidLabel, b.Label.Kind)
 			}
 		}
 
@@ -1975,7 +1976,7 @@ impl scopeChecker {
 
 	fn checkPlainBreak(mut &self, b: &ast::Break): &Break {
 		if self.isDeferred() {
-			self.s.pushErr(b.Token, build::LogMsg.BreakAtOutOfValidScope)
+			self.s.pushErr(b.Token, log::BreakAtOutOfValidScope)
 			ret nil
 		}
 
@@ -1992,7 +1993,7 @@ impl scopeChecker {
 			ret &Break{Match: owner}
 		}
 
-		self.s.pushErr(b.Token, build::LogMsg.BreakAtOutOfValidScope)
+		self.s.pushErr(b.Token, log::BreakAtOutOfValidScope)
 		ret nil
 	}
 
@@ -2009,7 +2010,7 @@ impl scopeChecker {
 
 	fn checkRet(mut &self, mut r: &ast::Ret) {
 		if self.isDeferred() {
-			self.s.pushErr(r.Token, build::LogMsg.RetInDeferred)
+			self.s.pushErr(r.Token, log::RetInDeferred)
 		}
 
 		mut rt := &Ret{
@@ -2035,16 +2036,16 @@ impl scopeChecker {
 
 	fn checkUseExpr(mut &self, ue: &ast::UseExpr) {
 		if self.result == nil {
-			self.s.pushErr(ue.Token, build::LogMsg.UseExprOutOfScope)
+			self.s.pushErr(ue.Token, log::UseExprOutOfScope)
 			ret
 		}
 
 		if self.isDeferred() {
-			self.s.pushErr(ue.Token, build::LogMsg.UseExprInDeferred)
+			self.s.pushErr(ue.Token, log::UseExprInDeferred)
 		}
 
 		if self.i+1 < len(self.tree.Stmts) {
-			self.s.pushErr(ue.Token, build::LogMsg.UseExprNotLast)
+			self.s.pushErr(ue.Token, log::UseExprNotLast)
 		}
 		// Validated at end of scope's analysis.
 	}
@@ -2239,7 +2240,7 @@ impl scopeChecker {
 			// we have to use parent scope of gtsc.
 			// See documentation about getting parent scope of goto.
 			if gtsc.Parent != label.node.Scope {
-				self.s.pushErr(gt.Token, build::LogMsg.GotoJumpsIntoScope)
+				self.s.pushErr(gt.Token, log::GotoJumpsIntoScope)
 				ret
 			}
 			// Scopes are same and label at above, so it is safe.
@@ -2260,7 +2261,7 @@ impl scopeChecker {
 			// Label owned by a more deepter child scope than goto's scope or equal.
 			// But scopes are not equal, so equal case does not works.
 			// In final case; goto jumps into scope, which is not allowed.
-			self.s.pushErr(gt.Token, build::LogMsg.GotoJumpsIntoScope)
+			self.s.pushErr(gt.Token, log::GotoJumpsIntoScope)
 			ret
 		}
 
@@ -2270,7 +2271,7 @@ impl scopeChecker {
 			for i >= n; i-- {
 				mut stmt := s.Stmts[i]
 				if stmtIsDef(stmt) {
-					self.s.pushErr(gt.Token, build::LogMsg.GotoJumpsDeclarations, gt.Ident)
+					self.s.pushErr(gt.Token, log::GotoJumpsDeclarations, gt.Ident)
 					ret
 				}
 			}
@@ -2289,7 +2290,7 @@ impl scopeChecker {
 		for (_, mut gt) in *self.gotos {
 			mut label := self.findLabelAll(gt.Ident)
 			if label == nil {
-				self.s.pushErr(gt.Token, build::LogMsg.LabelNotExist, gt.Ident)
+				self.s.pushErr(gt.Token, log::LabelNotExist, gt.Ident)
 				continue
 			}
 			gt.Label = label.node
@@ -2301,7 +2302,7 @@ impl scopeChecker {
 	fn checkLabels(mut self) {
 		for _, l in *self.labels {
 			if !l.used {
-				self.s.pushErr(l.token, build::LogMsg.DeclaredButNotUsed, l.node.Ident)
+				self.s.pushErr(l.token, log::DeclaredButNotUsed, l.node.Ident)
 			}
 		}
 	}
@@ -2309,7 +2310,7 @@ impl scopeChecker {
 	fn checkVars(mut self) {
 		for _, v in self.table.Vars {
 			if !v.Used && !v.Constant && !token::IsIgnoreIdent(v.Ident) && !token::IsAnonIdent(v.Ident) {
-				self.s.pushErr(v.Token, build::LogMsg.DeclaredButNotUsed, v.Ident)
+				self.s.pushErr(v.Token, log::DeclaredButNotUsed, v.Ident)
 			}
 		}
 	}
@@ -2317,7 +2318,7 @@ impl scopeChecker {
 	fn checkAliases(mut self) {
 		for _, a in self.table.TypeAliases {
 			if !a.Used && !token::IsIgnoreIdent(a.Ident) && !token::IsAnonIdent(a.Ident) {
-				self.s.pushErr(a.Token, build::LogMsg.DeclaredButNotUsed, a.Ident)
+				self.s.pushErr(a.Token, log::DeclaredButNotUsed, a.Ident)
 			}
 		}
 	}
@@ -2501,10 +2502,10 @@ fn getExprs(mut &m: ast::ExprData): []ast::ExprData {
 fn checkAssignMut(mut &s: &sema, &left: &Value, mut right: &Value, op: &token::Token): (ok: bool) {
 	match {
 	| !left.Mutable:
-		s.pushErr(op, build::LogMsg.AssignToNonMut)
+		s.pushErr(op, log::AssignToNonMut)
 		ret false
 	| right != nil && !right.Mutable && right.Type.Mutable():
-		s.pushErr(op, build::LogMsg.AssignNonMutToMut, right.Type.Str())
+		s.pushErr(op, log::AssignNonMutToMut, right.Type.Str())
 		ret false
 	|:
 		ret true
@@ -2514,13 +2515,13 @@ fn checkAssignMut(mut &s: &sema, &left: &Value, mut right: &Value, op: &token::T
 fn checkAssign(mut &s: &sema, mut &left: &Value, mut right: &Value, op: &token::Token): (ok: bool) {
 	f := left.Type.Func()
 	if f != nil && f.Decl != nil && f.Decl.Global {
-		s.pushErr(op, build::LogMsg.AssignTypeNotSupportValue)
+		s.pushErr(op, log::AssignTypeNotSupportValue)
 		ret false
 	}
 	// Assignment to constant memory.
 	if left.IsConst() {
-		s.pushErr(op, build::LogMsg.AssignConst)
-		s.pushSuggestion(build::LogMsg.RemoveConstToAssign)
+		s.pushErr(op, log::AssignConst)
+		s.pushSuggestion(log::RemoveConstToAssign)
 		ret false
 	}
 	// Fast path: check whether value is lvalue.
@@ -2541,7 +2542,7 @@ fn checkAssign(mut &s: &sema, mut &left: &Value, mut right: &Value, op: &token::
 			fall
 		|:
 			// Default case.
-			s.pushErr(op, build::LogMsg.AssignRequireLvalue)
+			s.pushErr(op, log::AssignRequireLvalue)
 			ret false
 		}
 	}

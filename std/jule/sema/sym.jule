@@ -6,6 +6,7 @@ use "std/jule"
 use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/directive"
+use "std/jule/log"
 use "std/jule/token"
 use "std/os"
 use "std/os/filepath"
@@ -298,7 +299,7 @@ fn buildImpl(mut decl: &ast::Impl): &Impl {
 struct symBuilder {
 	owner:    &symBuilder
 	importer: Importer
-	errors:   []build::Log
+	errors:   []log::Log
 	ast:      &ast::AST
 	table:    &SymTab
 }
@@ -312,33 +313,33 @@ impl symBuilder {
 		ret root
 	}
 
-	fn pushErr(mut self, &token: &token::Token, fmt: build::LogMsg, args: ...any) {
+	fn pushErr(mut self, &token: &token::Token, fmt: str, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, true, fmt, args...))
 	}
 
-	fn pushErrText(mut self, &token: &token::Token, fmt: build::LogMsg, args: ...any) {
+	fn pushErrText(mut self, &token: &token::Token, fmt: str, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, false, fmt, args...))
 	}
 
 	// Push suggestion to last log.
-	fn pushSuggestion(mut self, fmt: build::LogMsg, args: ...any) {
+	fn pushSuggestion(mut self, fmt: str, args: ...any) {
 		unsafe { pushSuggestion(&self.errors[len(self.errors)-1], fmt, args...) }
 	}
 
 	fn checkCppUseDeclPath(mut self, &decl: &ast::Use, &path: str): (ok: bool) {
 		ext := filepath::Ext(path)
 		if !build::IsValidHeaderExt(ext) && !build::IsValidCppExt(ext) {
-			self.pushErr(decl.Token, build::LogMsg.InvalidCppExt, ext)
+			self.pushErr(decl.Token, log::InvalidCppExt, ext)
 			ret false
 		}
 
 		// Exist?
 		info := os::Stat(path) else {
-			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.Path.Kind)
+			self.pushErr(decl.Token, log::UseNotFound, decl.Path.Kind)
 			ret false
 		}
 		if !info.Mode().IsRegular() {
-			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.Path.Kind)
+			self.pushErr(decl.Token, log::UseNotFound, decl.Path.Kind)
 			ret false
 		}
 
@@ -357,7 +358,7 @@ impl symBuilder {
 
 			// Set to absolute path for correct include path.
 			path = filepath::Abs(path) else {
-				self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.Path.Kind)
+				self.pushErr(decl.Token, log::UseNotFound, decl.Path.Kind)
 				use ""
 			}
 		}
@@ -378,24 +379,24 @@ impl symBuilder {
 	fn checkAbsPath(mut &self, mut filepath: str, mut &decl: &ast::Use): str {
 		modPath := self.importer.GetModPath()
 		if len(modPath) == 0 {
-			self.pushErr(decl.Path, build::LogMsg.ModuleNotFound)
-			self.pushSuggestion(build::LogMsg.UseModInit)
+			self.pushErr(decl.Path, log::ModuleNotFound)
+			self.pushSuggestion(log::UseModInit)
 			ret ""
 		}
 
 		filepath = filepath::Join(modPath, filepath)
 		filepath = filepath::Abs(filepath) else {
-			self.pushErr(decl.Path, build::LogMsg.UseNotFound, decl.Path.Kind)
+			self.pushErr(decl.Path, log::UseNotFound, decl.Path.Kind)
 			ret ""
 		}
 
 		// Exist?
 		info := os::Stat(filepath) else {
-			self.pushErr(decl.Path, build::LogMsg.UseNotFound, decl.Path.Kind)
+			self.pushErr(decl.Path, log::UseNotFound, decl.Path.Kind)
 			ret ""
 		}
 		if !info.IsDir() {
-			self.pushErr(decl.Path, build::LogMsg.UseNotFound, decl.Path.Kind)
+			self.pushErr(decl.Path, log::UseNotFound, decl.Path.Kind)
 			ret ""
 		}
 
@@ -405,23 +406,23 @@ impl symBuilder {
 	// Same as the [checkAbsPath] method but designed for std package paths.
 	fn checkStdAbsPath(mut &self, mut filepath: str, mut &decl: &ast::Use): str {
 		if filepath == "std" {
-			self.pushErr(decl.Path, build::LogMsg.InvalidImportPath, decl.Path.Kind)
+			self.pushErr(decl.Path, log::InvalidImportPath, decl.Path.Kind)
 			ret ""
 		}
 		filepath = filepath[len("std")+1:] // cut "std" + pathsep prefix
 		filepath = filepath::Join(build::PathStdlib(), filepath)
 		filepath = filepath::Abs(filepath) else {
-			self.pushErr(decl.Path, build::LogMsg.UseNotFound, decl.Path.Kind)
+			self.pushErr(decl.Path, log::UseNotFound, decl.Path.Kind)
 			ret ""
 		}
 
 		// Exist?
 		info := os::Stat(filepath) else {
-			self.pushErr(decl.Path, build::LogMsg.UseNotFound, decl.Path.Kind)
+			self.pushErr(decl.Path, log::UseNotFound, decl.Path.Kind)
 			ret ""
 		}
 		if !info.IsDir() {
-			self.pushErr(decl.Path, build::LogMsg.UseNotFound, decl.Path.Kind)
+			self.pushErr(decl.Path, log::UseNotFound, decl.Path.Kind)
 			ret ""
 		}
 
@@ -432,18 +433,18 @@ impl symBuilder {
 	fn checkImpPath(mut &self, mut &decl: &ast::Use): (std: bool, filepath: str) {
 		path := decl.Path.Kind[1 : len(decl.Path.Kind)-1] // remove quotes
 		if strings::HasSuffix(path, jule::ImportPathSep) {
-			self.pushErr(decl.Path, build::LogMsg.InvalidImportPath, decl.Path.Kind)
+			self.pushErr(decl.Path, log::InvalidImportPath, decl.Path.Kind)
 			ret
 		}
 		parts := strings::Split(path, jule::ImportPathSep)
 		if len(parts) == 0 {
-			self.pushErr(decl.Path, build::LogMsg.InvalidImportPath, decl.Path.Kind)
+			self.pushErr(decl.Path, log::InvalidImportPath, decl.Path.Kind)
 			ret
 		}
 		std = parts[0] == "std"
 		for _, part in parts {
 			if part == "" || token::IsIgnoreIdent(part) {
-				self.pushErr(decl.Path, build::LogMsg.InvalidImportPath, decl.Path.Kind)
+				self.pushErr(decl.Path, log::InvalidImportPath, decl.Path.Kind)
 				ret false, ""
 			}
 			filepath = filepath::Join(filepath, part)
@@ -506,8 +507,8 @@ impl symBuilder {
 		if lpkg == nil {
 			ret true
 		}
-		self.pushErr(pkg.Decl.Token, build::LogMsg.DuplicateUseDecl, pkg.LinkPath)
-		self.pushSuggestion(build::LogMsg.RemoveUseDeclAvoidDuplication)
+		self.pushErr(pkg.Decl.Token, log::DuplicateUseDecl, pkg.LinkPath)
+		self.pushSuggestion(log::RemoveUseDeclAvoidDuplication)
 		ret false
 	}
 
@@ -538,8 +539,8 @@ impl symBuilder {
 
 	fn pushCycleError(mut &self, &sb: &symBuilder, path: str, mut &message: strings::Builder) {
 		const Padding = 7
-		refersTo := build::Logf(
-			build::LogMsg.RefersTo,
+		refersTo := log::Logf(
+			log::RefersTo,
 			self.getAsLinkPath(sb.table.File.Dir()),
 			self.getAsLinkPath(path))
 		message.WriteStr(strings::Repeat(" ", Padding))!
@@ -562,12 +563,12 @@ impl symBuilder {
 			old = owner
 			owner = owner.owner
 		}
-		self.pushErr(errorToken, build::LogMsg.PkgIllegalCrossCycle, message.Str())
+		self.pushErr(errorToken, log::PkgIllegalCrossCycle, message.Str())
 	}
 
 	fn checkImportCycles(mut &self, imp: &ImportInfo, &decl: &ast::Use): bool {
 		if imp.Path == self.table.File.Dir() {
-			self.pushErr(decl.Token, build::LogMsg.PkgIllegalCycleRefersItself, self.getAsLinkPath(imp.Path))
+			self.pushErr(decl.Token, log::PkgIllegalCycleRefersItself, self.getAsLinkPath(imp.Path))
 			ret false
 		}
 		if self.owner == nil {
@@ -602,19 +603,19 @@ impl symBuilder {
 			// "internal" or "internal/" ?
 			if len(path)-len(InternalName) == 0 ||
 				strings::HasPrefix(path, InternalName+jule::ImportPathSep) {
-				self.pushErr(decl.Token, build::LogMsg.UseDeclForInternal)
+				self.pushErr(decl.Token, log::UseDeclForInternal)
 			}
 			ret
 		}
 		// "/internal" ?
 		if path[i-1:] == jule::ImportPathSep+InternalName {
-			self.pushErr(decl.Token, build::LogMsg.UseDeclForInternal)
+			self.pushErr(decl.Token, log::UseDeclForInternal)
 			ret
 		}
 		// "/internal/" ?
 		n := i + len(InternalName) + 1
 		if n < len(path) && path[i-1:n] == jule::ImportPathSep+InternalName+jule::ImportPathSep {
-			self.pushErr(decl.Token, build::LogMsg.UseDeclForInternal)
+			self.pushErr(decl.Token, log::UseDeclForInternal)
 			ret
 		}
 	}
@@ -737,7 +738,7 @@ impl symBuilder {
 			mut e := buildTypeEnum(node.Data.(&ast::TypeEnum))
 			self.table.TypeEnums = append(self.table.TypeEnums, e)
 		|:
-			self.pushErr(node.Token, build::LogMsg.InvalidSyntax)
+			self.pushErr(node.Token, log::InvalidSyntax)
 		}
 	}
 
@@ -749,21 +750,21 @@ impl symBuilder {
 
 	fn pushDirectivePass(mut self, mut &d: &ast::Directive) {
 		if len(d.Args) == 0 {
-			self.pushErr(d.Tag, build::LogMsg.MissingExpr)
+			self.pushErr(d.Tag, log::MissingExpr)
 			ret
 		} else if len(d.Args) > 1 {
 			arg := d.Args[1]
-			self.pushErr(arg, build::LogMsg.ArgumentOverflow, d.Tag.Kind)
+			self.pushErr(arg, log::ArgumentOverflow, d.Tag.Kind)
 		}
 
 		arg := d.Args[0]
 		if arg.Id != token::Id.Lit {
-			self.pushErr(arg, build::LogMsg.InvalidSyntax)
+			self.pushErr(arg, log::InvalidSyntax)
 			ret
 		}
 
 		if arg.Kind[0] != '"' {
-			self.pushErr(arg, build::LogMsg.InvalidSyntax)
+			self.pushErr(arg, log::InvalidSyntax)
 			ret
 		}
 

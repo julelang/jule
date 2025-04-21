@@ -4,6 +4,7 @@
 
 use "std/jule/ast"
 use "std/jule/build"
+use "std/jule/log"
 use "std/unsafe"
 
 // Flags for semantic analysis.
@@ -13,7 +14,7 @@ const (
 )
 
 // Builds symbol table of AST.
-fn buildSymbols(mut &ast: &ast::AST, mut &importer: Importer, mut owner: &symBuilder): (&SymTab, []build::Log) {
+fn buildSymbols(mut &ast: &ast::AST, mut &importer: Importer, mut owner: &symBuilder): (&SymTab, []log::Log) {
 	mut sb := &symBuilder{
 		ast: ast,
 		importer: importer,
@@ -42,7 +43,7 @@ fn collectImplicitImports(mut &s: &sema, mut &file: &SymTab) {
 	}
 }
 
-fn analyzePackage(mut &files: []&ast::AST, mut &importer: Importer, flags: int): (&Package, []build::Log) {
+fn analyzePackage(mut &files: []&ast::AST, mut &importer: Importer, flags: int): (&Package, []log::Log) {
 	// Build symbol tables of files.
 	mut tables := make([]&SymTab, 0, len(files))
 	for (_, mut f) in files {
@@ -98,7 +99,7 @@ fn analyzePackage(mut &files: []&ast::AST, mut &importer: Importer, flags: int):
 // Risks:
 //	You can pass nil to importer, but panics if importer is nil and
 //	semantic analyzer used nil importer.
-fn AnalyzePackage(mut files: []&ast::AST, mut importer: Importer, flags: int): (&Package, []build::Log) {
+fn AnalyzePackage(mut files: []&ast::AST, mut importer: Importer, flags: int): (&Package, []log::Log) {
 	if len(files) == 0 {
 		ret nil, nil
 	}
@@ -122,7 +123,7 @@ fn AnalyzePackage(mut files: []&ast::AST, mut importer: Importer, flags: int): (
 // Risks:
 //	You can pass nil to importer, but panics if importer is nil and
 //	semantic analyzer used nil importer.
-fn AnalyzeFile(mut f: &ast::AST, mut importer: Importer, flags: int): (&SymTab, []build::Log) {
+fn AnalyzeFile(mut f: &ast::AST, mut importer: Importer, flags: int): (&SymTab, []log::Log) {
 	let mut files: [1]&ast::AST = [f]
 	mut _files := unsafe::Slice(&files[0], len(files), len(files))
 	mut pkg, mut errors := AnalyzePackage(_files, importer, flags)

@@ -8,6 +8,7 @@
 use "std/conv"
 use "std/jule/ast"
 use "std/jule/build"
+use "std/jule/log"
 use "std/jule/token"
 use "std/jule/types"
 use "std/strings"
@@ -784,7 +785,7 @@ struct typeChecker {
 }
 
 impl typeChecker {
-	fn pushErr(mut self, token: &token::Token, fmt: build::LogMsg, args: ...any) {
+	fn pushErr(mut self, token: &token::Token, fmt: str, args: ...any) {
 		self.s.pushErr(token, fmt, args...)
 	}
 
@@ -841,7 +842,7 @@ impl typeChecker {
 
 	fn pushCycleError(self, def1: str, def2: str, mut &message: strings::Builder) {
 		const Padding = 7
-		refersTo := build::Logf(build::LogMsg.RefersTo, def1, def2)
+		refersTo := log::Logf(log::RefersTo, def1, def2)
 		message.WriteStr(strings::Repeat(" ", Padding))!
 		message.WriteStr(refersTo)!
 		message.WriteByte('\n')!
@@ -937,7 +938,7 @@ impl typeChecker {
 			}
 			if itself {
 				if err {
-					self.pushErr(ident, build::LogMsg.IllegalCycleRefersItself, self.referencer.name)
+					self.pushErr(ident, log::IllegalCycleRefersItself, self.referencer.name)
 				}
 				self.cycleErr |= cycleErrFail
 				ret false
@@ -948,7 +949,7 @@ impl typeChecker {
 		ok, oselfExist := self.checkCrossCycle(decl, message)
 		if !ok {
 			if err {
-				self.pushErr(ident, build::LogMsg.IllegalCrossCycle, message.Str())
+				self.pushErr(ident, log::IllegalCrossCycle, message.Str())
 			}
 			self.cycleErr |= cycleErrFail
 			ret false
@@ -972,14 +973,14 @@ impl typeChecker {
 
 	fn fromTypeAlias(mut self, mut &decl: &ast::IdentType, mut &ta: &TypeAlias): Kind {
 		if !self.s.isAccessibleDefine(ta.Public, ta.Token) {
-			self.pushErr(decl.Token, build::LogMsg.IdentNotExist, decl.Ident)
+			self.pushErr(decl.Token, log::IdentNotExist, decl.Ident)
 			ret nil
 		}
 
 		ta.Used = true
 
 		if len(decl.Generics) > 0 {
-			self.pushErr(decl.Token, build::LogMsg.TypeNotSupportsGenerics, decl.Ident)
+			self.pushErr(decl.Token, log::TypeNotSupportsGenerics, decl.Ident)
 			ret nil
 		}
 
@@ -1033,11 +1034,11 @@ impl typeChecker {
 
 	fn fromEnum(mut self, &decl: &ast::IdentType, mut &e: &Enum): &Enum {
 		if !self.s.isAccessibleDefine(e.Public, e.Token) {
-			self.pushErr(decl.Token, build::LogMsg.IdentNotExist, decl.Ident)
+			self.pushErr(decl.Token, log::IdentNotExist, decl.Ident)
 			ret nil
 		}
 		if len(decl.Generics) > 0 {
-			self.pushErr(decl.Token, build::LogMsg.TypeNotSupportsGenerics, decl.Ident)
+			self.pushErr(decl.Token, log::TypeNotSupportsGenerics, decl.Ident)
 			ret nil
 		}
 		ret e
@@ -1045,11 +1046,11 @@ impl typeChecker {
 
 	fn fromTypeEnum(mut self, &decl: &ast::IdentType, mut &e: &TypeEnum): &TypeEnum {
 		if !self.s.isAccessibleDefine(e.Public, e.Token) {
-			self.pushErr(decl.Token, build::LogMsg.IdentNotExist, decl.Ident)
+			self.pushErr(decl.Token, log::IdentNotExist, decl.Ident)
 			ret nil
 		}
 		if len(decl.Generics) > 0 {
-			self.pushErr(decl.Token, build::LogMsg.TypeNotSupportsGenerics, decl.Ident)
+			self.pushErr(decl.Token, log::TypeNotSupportsGenerics, decl.Ident)
 			ret nil
 		}
 		ret e
@@ -1057,11 +1058,11 @@ impl typeChecker {
 
 	fn fromTrait(mut self, &decl: &ast::IdentType, mut &t: &Trait): &Trait {
 		if !self.s.isAccessibleDefine(t.Public, t.Token) {
-			self.pushErr(decl.Token, build::LogMsg.IdentNotExist, decl.Ident)
+			self.pushErr(decl.Token, log::IdentNotExist, decl.Ident)
 			ret nil
 		}
 		if len(decl.Generics) > 0 {
-			self.pushErr(decl.Token, build::LogMsg.TypeNotSupportsGenerics, decl.Ident)
+			self.pushErr(decl.Token, log::TypeNotSupportsGenerics, decl.Ident)
 			ret nil
 		}
 		self.pushTA(taMutable)
@@ -1208,7 +1209,7 @@ impl typeChecker {
 							}
 						}
 					}
-					self.pushErr(g.Token, build::LogMsg.InitiationCycle, decl.Ident)
+					self.pushErr(g.Token, log::InitiationCycle, decl.Ident)
 					ret nil
 				}
 			Ok:
@@ -1239,7 +1240,7 @@ impl typeChecker {
 
 	fn fromStruct(mut self, mut &decl: &ast::IdentType, mut &s: &Struct): &StructIns {
 		if !self.s.isAccessibleDefine(s.Public, s.Token) {
-			self.pushErr(decl.Token, build::LogMsg.IdentNotExist, decl.Ident)
+			self.pushErr(decl.Token, log::IdentNotExist, decl.Ident)
 			ret nil
 		}
 
@@ -1247,7 +1248,7 @@ impl typeChecker {
 		// Return instance instantly.
 		if self.selection {
 			if len(decl.Generics) > 0 {
-				self.pushErr(decl.Token, build::LogMsg.GenericsNotAllowed)
+				self.pushErr(decl.Token, log::GenericsNotAllowed)
 				ret nil
 			}
 			ret &StructIns{
@@ -1298,7 +1299,7 @@ impl typeChecker {
 		for (_, mut g) in self.useGenerics {
 			if g.Ident == decl.Ident {
 				if len(decl.Generics) > 0 {
-					self.pushErr(decl.Token, build::LogMsg.TypeNotSupportsGenerics, decl.Ident)
+					self.pushErr(decl.Token, log::TypeNotSupportsGenerics, decl.Ident)
 					ret nil
 				}
 				// If generic type is astruct, check illegal cycles here.
@@ -1337,7 +1338,7 @@ impl typeChecker {
 				ret self.fromTrait(decl, t)
 			}
 		} else if self.selection {
-			self.pushErr(decl.Token, build::LogMsg.BindedTypeNotAllowed)
+			self.pushErr(decl.Token, log::BindedTypeNotAllowed)
 			ret nil
 		}
 
@@ -1357,7 +1358,7 @@ impl typeChecker {
 			ret self.fromTypeAlias(decl, ta)
 		}
 
-		self.pushErr(decl.Token, build::LogMsg.IdentNotExist, decl.Ident)
+		self.pushErr(decl.Token, log::IdentNotExist, decl.Ident)
 		ret nil
 	}
 
@@ -1371,7 +1372,7 @@ impl typeChecker {
 		| elem == nil:
 			ret nil
 		| elem.Array() != nil && elem.Array().Auto:
-			self.pushErr(self.errorToken, build::LogMsg.ArrayAutoSized)
+			self.pushErr(self.errorToken, log::ArrayAutoSized)
 			ret nil
 		}
 		ret &Sptr{
@@ -1436,7 +1437,7 @@ impl typeChecker {
 		| elem == nil:
 			ret nil
 		| elem.Array() != nil && elem.Array().Auto:
-			self.pushErr(self.errorToken, build::LogMsg.ArrayAutoSized)
+			self.pushErr(self.errorToken, log::ArrayAutoSized)
 			ret new(Ptr)
 		}
 
@@ -1490,7 +1491,7 @@ impl typeChecker {
 		| elem == nil:
 			ret nil
 		| elem.Array() != nil && elem.Array().Auto:
-			self.pushErr(decl.Elem.Token, build::LogMsg.ArrayAutoSized)
+			self.pushErr(decl.Elem.Token, log::ArrayAutoSized)
 			ret nil
 		}
 
@@ -1508,21 +1509,21 @@ impl typeChecker {
 			}
 
 			if !size.IsConst() {
-				self.pushErr(decl.Size.Token, build::LogMsg.ExprNotConst)
+				self.pushErr(decl.Size.Token, log::ExprNotConst)
 				ret nil
 			} else if size.Type.Prim() == nil || !types::IsInt(size.Type.Prim().Kind) {
-				self.pushErr(decl.Size.Token, build::LogMsg.ArraySizeIsNotInt)
+				self.pushErr(decl.Size.Token, log::ArraySizeIsNotInt)
 				ret nil
 			}
 
 			n = int(size.Constant.AsI64())
 			if n < 0 {
-				self.pushErr(decl.Elem.Token, build::LogMsg.ArraySizeIsNeg)
+				self.pushErr(decl.Elem.Token, log::ArraySizeIsNeg)
 				ret nil
 			} else {
 				max := types::MaxI(types::Int)
 				if types::BitSize != 64 && i64(n) > max {
-					self.pushErr(decl.Size.Token, build::LogMsg.ArraySizeOverflow,
+					self.pushErr(decl.Size.Token, log::ArraySizeOverflow,
 						size.Constant.Str(), conv::FormatInt(max, 10))
 					ret nil
 				}
@@ -1538,7 +1539,7 @@ impl typeChecker {
 		| elem == nil:
 			ret nil
 		| elem.Array() != nil && elem.Array().Auto:
-			self.pushErr(decl.Elem.Token, build::LogMsg.ArrayAutoSized)
+			self.pushErr(decl.Elem.Token, log::ArrayAutoSized)
 			ret nil
 		}
 
@@ -1587,7 +1588,7 @@ impl typeChecker {
 		// so we have a map type (this type, actually), so it is not comparable.
 		if self.cycleErr&cycleErrFail == cycleErrFail || !key.Comparable() {
 			self.cycleErr = cycleErr
-			self.s.pushErr(decl.Key.Token, build::LogMsg.ConstraintFailed, key.Str(), "Key", constraintComparable)
+			self.s.pushErr(decl.Key.Token, log::ConstraintFailed, key.Str(), "Key", constraintComparable)
 			ret nil
 		}
 		self.cycleErr = cycleErr
@@ -1598,7 +1599,7 @@ impl typeChecker {
 			ret nil
 		}
 		if val.Enum() != nil {
-			self.pushErr(decl.Val.Token, build::LogMsg.EnumAsMapVal)
+			self.pushErr(decl.Val.Token, log::EnumAsMapVal)
 		}
 
 		if self.s.meta.runtime != nil {
@@ -1664,7 +1665,7 @@ impl typeChecker {
 		defer { self.disableTA = disableTA }
 
 		if len(decl.Generics) > 0 {
-			self.pushErr(decl.Token, build::LogMsg.GenericedFuncAsAnonFunc)
+			self.pushErr(decl.Token, log::GenericedFuncAsAnonFunc)
 			ret nil
 		}
 
@@ -1691,7 +1692,7 @@ impl typeChecker {
 	fn buildNamespace(mut self, mut ns: &ast::NamespaceType): Kind {
 		mut imp := findNamespace(self.lookup, ns.Namespace.Kind)
 		if imp == nil || !imp.isLookupable() {
-			self.pushErr(ns.Namespace, build::LogMsg.NamespaceNotExist, ns.Namespace.Kind)
+			self.pushErr(ns.Namespace, log::NamespaceNotExist, ns.Namespace.Kind)
 			ret nil
 		}
 
@@ -1764,7 +1765,7 @@ impl typeChecker {
 				kind = t
 			}
 		|:
-			self.pushErr(self.errorToken, build::LogMsg.InvalidType)
+			self.pushErr(self.errorToken, log::InvalidType)
 			ret nil
 		}
 		if kind == nil {
