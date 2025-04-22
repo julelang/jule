@@ -401,7 +401,7 @@ impl scopeOptimizer {
 	}
 
 	fn substr(mut &self, mut a: &sema::Assign): bool {
-		if a.Op.Id != token::Id.Eq {
+		if a.Op.Id != token::Eq {
 			ret false
 		}
 		match type a.Right.Model {
@@ -448,7 +448,7 @@ impl scopeOptimizer {
 	}
 
 	fn cmplxAssign(mut &self, mut &assign: &sema::Assign): bool {
-		if !StdMathCmplx || assign.Op.Id != token::Id.Eq || meta::Program.MathCmplx == nil {
+		if !StdMathCmplx || assign.Op.Id != token::Eq || meta::Program.MathCmplx == nil {
 			ret false
 		}
 		mut s := assign.Left.Type.Struct()
@@ -490,7 +490,7 @@ impl scopeOptimizer {
 	}
 
 	fn optimizeAssign(mut &self, mut assign: &sema::Assign) {
-		if assign.Op.Id == token::Id.Eq &&
+		if assign.Op.Id == token::Eq &&
 			obj::EqualModels(assign.Left.Model, assign.Right.Model) {
 			self.removeCurrent()
 			self.i-- // In next iteration, point to correct statement.
@@ -535,35 +535,35 @@ impl scopeOptimizer {
 		exprOptimizer.optimizeValue(assign.Right.Model, self.data, self)
 
 		match assign.Op.Id {
-		| token::Id.CaretEq | token::Id.SolidusEq | token::Id.PercentEq
-		| token::Id.ShlEq | token::Id.ShrEq | token::Id.PlusEq | token::Id.MinusEq:
+		| token::CaretEq | token::SolidusEq | token::PercentEq
+		| token::ShlEq | token::ShrEq | token::PlusEq | token::MinusEq:
 			// Do not check structures.
 			if !Math && !Str || assign.Left.Type.Struct() != nil {
 				break
 			}
 			oldId, oldKind := assign.Op.Id, assign.Op.Kind
 			match assign.Op.Id {
-			| token::Id.PlusEq:
-				assign.Op.Id = token::Id.Plus
-				assign.Op.Kind = token::Kind.Plus
-			| token::Id.MinusEq:
-				assign.Op.Id = token::Id.Minus
-				assign.Op.Kind = token::Kind.Minus
-			| token::Id.SolidusEq:
-				assign.Op.Id = token::Id.Solidus
-				assign.Op.Kind = token::Kind.Solidus
-			| token::Id.PercentEq:
-				assign.Op.Id = token::Id.Percent
-				assign.Op.Kind = token::Kind.Percent
-			| token::Id.ShlEq:
-				assign.Op.Id = token::Id.Shl
-				assign.Op.Kind = token::Kind.Shl
-			| token::Id.ShrEq:
-				assign.Op.Id = token::Id.Shr
-				assign.Op.Kind = token::Kind.Shr
-			| token::Id.CaretEq:
-				assign.Op.Id = token::Id.Caret
-				assign.Op.Kind = token::Kind.Caret
+			| token::PlusEq:
+				assign.Op.Id = token::Plus
+				assign.Op.Kind = "+"
+			| token::MinusEq:
+				assign.Op.Id = token::Minus
+				assign.Op.Kind = "-"
+			| token::SolidusEq:
+				assign.Op.Id = token::Solidus
+				assign.Op.Kind = "/"
+			| token::PercentEq:
+				assign.Op.Id = token::Percent
+				assign.Op.Kind = "%"
+			| token::ShlEq:
+				assign.Op.Id = token::Shl
+				assign.Op.Kind = "<<"
+			| token::ShrEq:
+				assign.Op.Id = token::Shr
+				assign.Op.Kind = ">>"
+			| token::CaretEq:
+				assign.Op.Id = token::Caret
+				assign.Op.Kind = "^"
 			|:
 				panic("opt: implementation mistake, this panic call should be unreachable")
 			}
@@ -577,7 +577,7 @@ impl scopeOptimizer {
 			if model != b || b.Op != assign.Op {
 				// Binary model optimized.
 				// Use optimized model directly.
-				if assign.Op.Id == token::Id.Caret {
+				if assign.Op.Id == token::Caret {
 					// If caret operator optimized, it is equal to self assignment.
 					// Remove this unnecessary statement.
 					self.removeCurrent()
@@ -585,8 +585,8 @@ impl scopeOptimizer {
 				}
 				assign.Right = new(sema::OperandExpr, *assign.Right)
 				b.Op = new(token::Token, *b.Op) // Unsafe model wraps original model. Save token.
-				assign.Op.Id = token::Id.Eq
-				assign.Op.Kind = token::Kind.Eq
+				assign.Op.Id = token::Eq
+				assign.Op.Kind = "="
 				assign.Right.Model = model
 				ret
 			}
@@ -1084,7 +1084,7 @@ fn isUnreachableExpr(&expr: sema::Expr): bool {
 		ret c.IsBool() && !c.ReadBool()
 	| &sema::BinaryExpr:
 		m := expr.(&sema::BinaryExpr)
-		if m.Op.Id == token::Id.DblAmper {
+		if m.Op.Id == token::DblAmper {
 			ret isUnreachableExpr(m.Left.Model) ||
 				isUnreachableExpr(m.Right.Model)
 		}

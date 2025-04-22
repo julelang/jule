@@ -228,11 +228,11 @@ impl exprCoder {
 		self.oc.write(")(")
 		self.oc.write(xVar)
 		match op.Id {
-		| token::Id.Solidus
-		| token::Id.SolidusEq:
+		| token::Solidus
+		| token::SolidusEq:
 			self.oc.write(" / ")
-		| token::Id.Percent
-		| token::Id.PercentEq:
+		| token::Percent
+		| token::PercentEq:
 			self.oc.write(" % ")
 		}
 		self.oc.write(yVar)
@@ -242,7 +242,7 @@ impl exprCoder {
 	// Tries to handle binary expressions with dynamic types and reports whether
 	// it successful. Should support all dynamic types.
 	fn unsafeDynamicBinary(mut &self, mut &buf: strings::Builder,
-		mut l: sema::OperandExpr, mut r: sema::OperandExpr, op: token::Id): bool {
+		mut l: sema::OperandExpr, mut r: sema::OperandExpr, op: int): bool {
 		// Return immediately if binary expression is not contain dynamic type.
 		// Handle traits separately, see documentation of obj::IsAny.
 		// They handled as <any> type, but not have pure any type implementation,
@@ -281,7 +281,7 @@ impl exprCoder {
 		})
 
 		buf.WriteByte('(')!
-		if op == token::Id.NotEq {
+		if op == token::NotEq {
 			buf.WriteByte('!')!
 		}
 		i := self.oc.pushAnyType(t)
@@ -307,14 +307,14 @@ impl exprCoder {
 	}
 
 	fn _unsafeBinaryNoDynamic(mut &self, mut &buf: strings::Builder, &l: str,
-		&r: str, mut &lk: &sema::Type, mut &rk: &sema::Type, op: token::Id, kind: str) {
+		&r: str, mut &lk: &sema::Type, mut &rk: &sema::Type, op: int, kind: str) {
 		match {
 		| lk.Array() != nil:
 			// If this binary operator comparing array type.
 			// The left operand is will be array one always.
 			arr := lk.Array()
 			mut ins := obj::FindFuncGenericInstance(meta::Program.Runtime.ArrayCmp, arr.Elem)
-			if op == token::Id.NotEq {
+			if op == token::NotEq {
 				buf.WriteByte('!')!
 			}
 			identCoder.funcIns(buf, ins)
@@ -336,9 +336,9 @@ impl exprCoder {
 
 		// guarantee integer wrap around if expressions is not a condition
 		match op {
-		| token::Id.Gt | token::Id.GtEq
-		| token::Id.Lt | token::Id.LtEq
-		| token::Id.Eqs | token::Id.NotEq:
+		| token::Gt | token::GtEq
+		| token::Lt | token::LtEq
+		| token::DblEq | token::NotEq:
 			// No op.
 		|:
 			lp := lk.Prim()
@@ -363,9 +363,9 @@ impl exprCoder {
 	}
 
 	fn _unsafeBinary(mut &self, mut &buf: strings::Builder, mut l: sema::OperandExpr,
-		mut r: sema::OperandExpr, op: token::Id, kind: str) {
+		mut r: sema::OperandExpr, op: int, kind: str) {
 		// Special cases for comparable types.
-		if (op == token::Id.Eqs || op == token::Id.NotEq) && self.unsafeDynamicBinary(buf, l, r, op) {
+		if (op == token::DblEq || op == token::NotEq) && self.unsafeDynamicBinary(buf, l, r, op) {
 			ret
 		}
 		ls := writeAndReadFromBuf(self.oc.Buf, fn() { self.possibleRefExpr(l.Model) })
@@ -439,15 +439,15 @@ impl exprCoder {
 
 	fn binary(mut &self, mut m: &sema::BinaryExpr) {
 		match m.Op.Id {
-		| token::Id.Solidus | token::Id.Percent:
+		| token::Solidus | token::Percent:
 			if env::Safety {
 				self.divByZeroBinary(m.Op, m.Left, m.Right)
 				ret
 			}
-		| token::Id.Shl:
+		| token::Shl:
 			self.shl(m.Left, m.Right)
 			ret
-		| token::Id.Shr:
+		| token::Shr:
 			self.shr(m.Left, m.Right)
 			ret
 		}
@@ -477,7 +477,7 @@ impl exprCoder {
 	fn unary(mut &self, mut m: &sema::UnaryExpr) {
 		// guarantee integer wrap around
 		match m.Op.Id {
-		| token::Id.Plus | token::Id.Minus | token::Id.Caret:
+		| token::Plus | token::Minus | token::Caret:
 			lp := m.Expr.Type.Prim()
 			if lp != nil && types::IsInt(lp.Kind) {
 				self.oc.write("(")
@@ -490,12 +490,12 @@ impl exprCoder {
 		}
 
 		match m.Op.Id {
-		| token::Id.Caret:
+		| token::Caret:
 			self.oc.write("(~(")
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write("))")
 			ret
-		| token::Id.Star:
+		| token::Star:
 			if env::Production || m.Expr.Type.Sptr() == nil {
 				break
 			}
@@ -1569,7 +1569,7 @@ impl exprCoder {
 			match type m.Err.Model {
 			| &sema::Var:
 				v := m.Err.Model.(&sema::Var)
-				if v.Ident == token::Kind.Error {
+				if v.Ident == "error" {
 					if hasDefer {
 						self.oc.write(deferStackName + ".call();\n")
 						self.oc.indent()
@@ -1585,7 +1585,7 @@ impl exprCoder {
 			match type m.Err.Model {
 			| &sema::Var:
 				v := m.Err.Model.(&sema::Var)
-				if v.Ident == token::Kind.Error {
+				if v.Ident == "error" {
 					self.oc.write(">{.error=except.error}")
 					ret
 				}
@@ -2378,11 +2378,11 @@ fn utoa(mut &s: strings::Builder, x: u64) {
 }
 
 fn structBinary(mut &buf: strings::Builder, mut &s: &sema::StructIns, &l: str,
-	&r: str, op: token::Id, kind: str) {
-	if op != token::Id.Eqs && op != token::Id.NotEq {
+	&r: str, op: int, kind: str) {
+	if op != token::DblEq && op != token::NotEq {
 		panic("cxx: unsupported token occurred for structure binary, this is an implementation mistake")
 	}
-	if op == token::Id.NotEq {
+	if op == token::NotEq {
 		buf.WriteByte('!')!
 	}
 	identCoder.structureIns(buf, s)
@@ -2457,7 +2457,7 @@ struct useExprMemory {
 	DestType: &sema::Type
 	Model:    sema::Expr
 	Type:     int
-	OpId:     token::Id
+	OpId:     int
 	OpKind:   str
 }
 

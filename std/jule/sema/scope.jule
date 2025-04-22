@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/jule"
 use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/constant"
@@ -559,7 +560,7 @@ impl scopeChecker {
 			self.scope.Stmts = append(self.scope.Stmts, v)
 		}
 
-		if !token::IsIgnoreIdent(v.Ident) && self.isDuplicatedIdent(uintptr(v), v.Ident) {
+		if !jule::IsBlank(v.Ident) && self.isDuplicatedIdent(uintptr(v), v.Ident) {
 			self.s.pushErr(v.Token, log::DuplicatedIdent, v.Ident)
 			self.s.pushSuggestion(log::RenameForAvoidDuplication)
 			self.stop()
@@ -594,7 +595,7 @@ impl scopeChecker {
 	}
 
 	fn checkVarDecl(mut &self, mut decl: &ast::Var) {
-		if token::IsIgnoreIdent(decl.Ident) {
+		if jule::IsBlank(decl.Ident) {
 			self.s.pushErr(decl.Token, log::IgnoreIdent)
 			ret
 		}
@@ -655,7 +656,7 @@ impl scopeChecker {
 			self.getRoot().owner.Decl.HasDefer = true
 			mut f := &ast::Func{
 				Scope: tree,
-				Ident: token::Ident.Anon,
+				Ident: jule::Anon,
 				Result: new(ast::RetType),
 			}
 			mut e := self.s.eval(self)
@@ -1155,7 +1156,7 @@ impl scopeChecker {
 	}
 
 	fn isNewAssignIdent(mut self, ident: str): bool {
-		if token::IsIgnoreIdent(ident) || ident == "" {
+		if jule::IsBlank(ident) || ident == "" {
 			ret false
 		}
 		ret self.table.defByIdent(ident, false) == nil
@@ -1187,7 +1188,7 @@ impl scopeChecker {
 	fn checkSingleAssign(mut &self, mut &a: &ast::Assign) {
 		let mut l: &Value = nil
 
-		if !token::IsIgnoreIdent(a.Left[0].Ident) {
+		if !jule::IsBlank(a.Left[0].Ident) {
 			mut expr := a.Left[0].Expr
 			mut eval := self.s.eval(self)
 			eval.target.mutable = true
@@ -1222,7 +1223,7 @@ impl scopeChecker {
 			if r.Type.Void() {
 				self.s.pushErr(a.Right.Token, log::InvalidExpr)
 			}
-			if a.Setter.Id != token::Id.Eq {
+			if a.Setter.Id != token::Eq {
 				self.s.pushErr(a.Setter, log::InvalidSyntax)
 			}
 			self.scope.Stmts = append(self.scope.Stmts, r)
@@ -1248,7 +1249,7 @@ impl scopeChecker {
 		}
 		self.scope.Stmts = append(self.scope.Stmts, &Assign{Left: lm, Right: rm, Op: a.Setter})
 
-		if a.Setter.Id == token::Id.Eq {
+		if a.Setter.Id == token::Eq {
 			mut checker := assignTypeChecker{
 				s: self.s,
 				dest: l.Type,
@@ -1272,7 +1273,7 @@ impl scopeChecker {
 
 	fn processEndPartOfMultiAssign(mut &self, mut &st: &MultiAssign, mut &a: &ast::Assign,
 		mut &lexpr: &ast::AssignLeft, mut &l: &Value, mut &r: exprPart, strict: bool) {
-		if !lexpr.Reference && token::IsIgnoreIdent(lexpr.Ident) {
+		if !lexpr.Reference && jule::IsBlank(lexpr.Ident) {
 			if r.data.Type.Void() {
 				self.s.pushErr(a.Right.Token, log::InvalidExpr)
 			}
@@ -1298,7 +1299,7 @@ impl scopeChecker {
 				self.stop()
 				ret
 			}
-			if token::IsIgnoreIdent(lexpr.Ident) {
+			if jule::IsBlank(lexpr.Ident) {
 				self.s.pushErr(lexpr.Token, log::IgnoreIdent)
 			}
 
@@ -1356,7 +1357,7 @@ impl scopeChecker {
 			//
 			// This is not actually a mutability safety checking.
 			// This just makes responsive-mutability possible and correct.
-			eval.target.mutable = !token::IsIgnoreIdent(l.Ident) // if assigned to blank identifier, there is no mutability risk
+			eval.target.mutable = !jule::IsBlank(l.Ident) // if assigned to blank identifier, there is no mutability risk
 			match {
 			| a.Declarative && eval.target.mutable:
 				if l.Mutable && l.Reference {
@@ -1387,7 +1388,7 @@ impl scopeChecker {
 				// Do not unwrap untyped literals, type analysis will check overflows.
 				// Check only if assigned to blank identifier.
 				mut flags := evalDefault
-				if token::IsIgnoreIdent(a.Left[*_i].Ident) {
+				if jule::IsBlank(a.Left[*_i].Ident) {
 					flags |= evalPhysicalMem | evalUnwrapUntyped
 				}
 				mut v := eval.evalExpr(expr, flags)
@@ -1427,7 +1428,7 @@ impl scopeChecker {
 	}
 
 	fn checkMultiAssign(mut &self, mut &a: &ast::Assign) {
-		if a.Setter.Id != token::Id.Eq && a.Setter.Id != token::Id.ColonEq {
+		if a.Setter.Id != token::Eq && a.Setter.Id != token::ColonEq {
 			self.s.pushErr(a.Setter, log::InvalidSyntax)
 			ret
 		}
@@ -1511,7 +1512,7 @@ impl scopeChecker {
 		for i in a.Left {
 			mut lexpr := a.Left[i]
 			let mut l: &Value = nil
-			if !token::IsIgnoreIdent(lexpr.Ident) {
+			if !jule::IsBlank(lexpr.Ident) {
 				if !a.Declarative {
 					goto eval
 				}
@@ -2309,7 +2310,7 @@ impl scopeChecker {
 
 	fn checkVars(mut self) {
 		for _, v in self.table.Vars {
-			if !v.Used && !v.Constant && !token::IsIgnoreIdent(v.Ident) && !token::IsAnonIdent(v.Ident) {
+			if !v.Used && !v.Constant && !jule::IsBlank(v.Ident) && !jule::IsAnon(v.Ident) {
 				self.s.pushErr(v.Token, log::DeclaredButNotUsed, v.Ident)
 			}
 		}
@@ -2317,7 +2318,7 @@ impl scopeChecker {
 
 	fn checkAliases(mut self) {
 		for _, a in self.table.TypeAliases {
-			if !a.Used && !token::IsIgnoreIdent(a.Ident) && !token::IsAnonIdent(a.Ident) {
+			if !a.Used && !jule::IsBlank(a.Ident) && !jule::IsAnon(a.Ident) {
 				self.s.pushErr(a.Token, log::DeclaredButNotUsed, a.Ident)
 			}
 		}
@@ -2357,28 +2358,28 @@ impl scopeChecker {
 	}
 }
 
-fn removeEqFromOp(op: token::Id): token::Id {
+fn removeEqFromOp(op: int): int {
 	match op {
-	| token::Id.PlusEq:
-		ret token::Id.Plus
-	| token::Id.MinusEq:
-		ret token::Id.Minus
-	| token::Id.StarEq:
-		ret token::Id.Star
-	| token::Id.SolidusEq:
-		ret token::Id.Solidus
-	| token::Id.PercentEq:
-		ret token::Id.Percent
-	| token::Id.ShlEq:
-		ret token::Id.Shl
-	| token::Id.ShrEq:
-		ret token::Id.Shr
-	| token::Id.CaretEq:
-		ret token::Id.Caret
-	| token::Id.AmperEq:
-		ret token::Id.Amper
-	| token::Id.VlineEq:
-		ret token::Id.Vline
+	| token::PlusEq:
+		ret token::Plus
+	| token::MinusEq:
+		ret token::Minus
+	| token::StarEq:
+		ret token::Star
+	| token::SolidusEq:
+		ret token::Solidus
+	| token::PercentEq:
+		ret token::Percent
+	| token::ShlEq:
+		ret token::Shl
+	| token::ShrEq:
+		ret token::Shr
+	| token::CaretEq:
+		ret token::Caret
+	| token::AmperEq:
+		ret token::Amper
+	| token::VlineEq:
+		ret token::Vline
 	|:
 		ret op
 	}

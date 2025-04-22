@@ -24,7 +24,7 @@ fn isValidModelForRef(mut &m: Expr): bool {
 		ret model.Field != nil && isValidModelForRef(model.Expr.Model)
 	| &UnaryExpr:
 		mut unary := m.(&UnaryExpr)
-		if unary.Op.Id != token::Id.Star {
+		if unary.Op.Id != token::Star {
 			ret false
 		}
 		// Return true because of raw pointer dereferencing is an Unsafe Jule feature.
@@ -70,7 +70,7 @@ fn appendRetVars(mut &dest: []&Var, mut &f: &FuncIns) {
 
 	mut types := f.Types()
 	for (i, mut ident) in f.Decl.Result.Idents {
-		if token::IsIgnoreIdent(ident.Kind) || token::IsAnonIdent(ident.Kind) {
+		if jule::IsBlank(ident.Kind) || jule::IsAnon(ident.Kind) {
 			continue
 		}
 		dest = append(dest, &Var{
@@ -99,7 +99,7 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FuncIns) {
 	}
 
 	for (_, mut p) in f.Params {
-		if token::IsIgnoreIdent(p.Decl.Ident) || token::IsAnonIdent(p.Decl.Ident) {
+		if jule::IsBlank(p.Decl.Ident) || jule::IsAnon(p.Decl.Ident) {
 			continue
 		}
 
@@ -517,7 +517,7 @@ impl sema {
 		}
 
 		if imp.Decl.Alias != nil { // custom alias found
-			if token::IsIgnoreIdent(imp.Alias) {
+			if jule::IsBlank(imp.Alias) {
 				self.pushErr(imp.Decl.Token, log::IgnoreIdent)
 			} else if self.isUseAliasDuplication(imp) {
 				self.pushErr(imp.Decl.Token, log::DuplicatedUseAlias, imp.Alias)
@@ -1100,7 +1100,7 @@ impl sema {
 	}
 
 	fn checkTypeAliasDecl(mut &self, mut &ta: &TypeAlias, mut prev: &referencer, mut l: Lookup): (ok: bool) {
-		if token::IsIgnoreIdent(ta.Ident) {
+		if jule::IsBlank(ta.Ident) {
 			self.pushErr(ta.Token, log::IgnoreIdent)
 		}
 		if ta.TypeSym.Type != nil {
@@ -1173,7 +1173,7 @@ impl sema {
 	}
 
 	fn checkTypeEnumDecl(mut &self, mut &e: &TypeEnum) {
-		if token::IsIgnoreIdent(e.Ident) {
+		if jule::IsBlank(e.Ident) {
 			self.pushErr(e.Token, log::IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
 			self.pushErr(e.Token, log::DuplicatedIdent, e.Ident)
@@ -1223,7 +1223,7 @@ impl sema {
 			}
 			if item.Ident == "" {
 				continue
-			} else if token::IsIgnoreIdent(item.Ident) {
+			} else if jule::IsBlank(item.Ident) {
 				self.pushErr(item.Token, log::IgnoreIdent)
 			} else {
 				for _, citem in items {
@@ -1240,7 +1240,7 @@ impl sema {
 	}
 
 	fn precheckEnumDecl(mut &self, mut &e: &Enum) {
-		if token::IsIgnoreIdent(e.Ident) {
+		if jule::IsBlank(e.Ident) {
 			self.pushErr(e.Token, log::IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
 			self.pushErr(e.Token, log::DuplicatedIdent, e.Ident)
@@ -1323,7 +1323,7 @@ impl sema {
 	fn checkDeclGenerics(mut self, &generics: []&ast::Generic): (ok: bool) {
 		ok = true
 		for i, g in generics {
-			if token::IsIgnoreIdent(g.Ident) {
+			if jule::IsBlank(g.Ident) {
 				self.pushErr(g.Token, log::IgnoreIdent)
 				ok = false
 				continue
@@ -1367,10 +1367,10 @@ impl sema {
 				| j >= i:
 					// Skip current and following parameters.
 					break paramsLookup
-				| token::IsIgnoreIdent(p.Ident)
-				| token::IsIgnoreIdent(jp.Ident)
-				| token::IsAnonIdent(p.Ident)
-				| token::IsAnonIdent(jp.Ident):
+				| jule::IsBlank(p.Ident)
+				| jule::IsBlank(jp.Ident)
+				| jule::IsAnon(p.Ident)
+				| jule::IsAnon(jp.Ident):
 					// Skip anonymous parameters.
 					break paramsLookup
 				| p.Ident == jp.Ident:
@@ -1392,7 +1392,7 @@ impl sema {
 
 		// Check duplications.
 		for i, v in f.Result.Idents {
-			if token::IsIgnoreIdent(v.Kind) || token::IsAnonIdent(v.Kind) {
+			if jule::IsBlank(v.Kind) || jule::IsAnon(v.Kind) {
 				continue // Skip anonymous return variables.
 			}
 			// Lookup in generics.
@@ -1556,9 +1556,9 @@ impl sema {
 	}
 
 	fn checkTraitDeclMethod(mut &self, mut &f: &Func) {
-		if token::IsIgnoreIdent(f.Ident) {
+		if jule::IsBlank(f.Ident) {
 			self.pushErr(f.Token, log::IgnoreIdent)
-		} else if token::IsAnonIdent(f.Ident) {
+		} else if jule::IsAnon(f.Ident) {
 			self.pushErr(f.Token, log::AnonFunc)
 		}
 		f.sema = self
@@ -1606,7 +1606,7 @@ impl sema {
 	}
 
 	fn checkTraitDecl(mut &self, mut &t: &Trait) {
-		if token::IsIgnoreIdent(t.Ident) {
+		if jule::IsBlank(t.Ident) {
 			self.pushErr(t.Token, log::IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(t), t.Ident, false) {
 			self.pushErr(t.Token, log::DuplicatedIdent, t.Ident)
@@ -1866,7 +1866,7 @@ impl sema {
 		ok = true
 		for (_, mut f) in st.Fields {
 			f.Owner = st
-			if token::IsIgnoreIdent(f.Ident) {
+			if jule::IsBlank(f.Ident) {
 				continue
 			}
 			// Check duplicated identifiers for fields.
@@ -1884,7 +1884,7 @@ impl sema {
 	}
 
 	fn checkStructDecl(mut &self, mut &s: &Struct) {
-		if token::IsIgnoreIdent(s.Ident) {
+		if jule::IsBlank(s.Ident) {
 			self.pushErr(s.Token, log::IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(s), s.Ident, s.Binded) {
 			self.pushErr(s.Token, log::DuplicatedIdent, s.Ident)
@@ -1941,7 +1941,7 @@ impl sema {
 	}
 
 	fn checkFuncDecl(mut &self, mut &f: &Func) {
-		if token::IsIgnoreIdent(f.Ident) {
+		if jule::IsBlank(f.Ident) {
 			self.pushErr(f.Token, log::IgnoreIdent)
 		} else if f.IsAnon() {
 			self.pushErr(f.Token, log::AnonFunc)
@@ -3010,7 +3010,7 @@ fn pushRuntimeMaphash(mut &s: &sema, mut &t: &Type, mut &token: &token::Token,
 // Reports whether the alias valid for the import alias.
 // Designed to check auto aliases.
 fn isValidImpAlias(mut alias: str): (valid: bool) {
-	if token::IsIgnoreIdent(alias) {
+	if jule::IsBlank(alias) {
 		ret false
 	}
 	if token::IsKeyword(alias) {

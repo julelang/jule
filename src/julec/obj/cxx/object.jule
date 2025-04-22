@@ -555,7 +555,7 @@ impl ObjectCoder {
 			self.anyObj.WriteStr("_eq(void *alloc, void *other) noexcept { ")!
 			if comparable {
 				self.anyObj.WriteStr("return ")!
-				self.ec._unsafeBinaryNoDynamic(self.anyObj, lmodel, rmodel, t, t, token::Id.Eqs, token::Kind.Eqs)
+				self.ec._unsafeBinaryNoDynamic(self.anyObj, lmodel, rmodel, t, t, token::DblEq, "==")
 				self.anyObj.WriteStr("; }\n")!
 			} else {
 				self.anyObj.WriteStr(`__jule_panic((`)!
@@ -934,7 +934,7 @@ impl ObjectCoder {
 			identCoder.field(fIdent, f.Decl)
 			lmodel += fIdent.Str()
 			rmodel += fIdent.Str()
-			self.ec._unsafeBinaryNoDynamic(self.Buf, lmodel, rmodel, f.Type, f.Type, token::Id.Eqs, token::Kind.Eqs)
+			self.ec._unsafeBinaryNoDynamic(self.Buf, lmodel, rmodel, f.Type, f.Type, token::DblEq, "==")
 			lmodel = lmodel[:len(lmodel)-fIdent.Len()]
 			rmodel = rmodel[:len(rmodel)-fIdent.Len()]
 		}
@@ -1072,7 +1072,7 @@ impl ObjectCoder {
 		for (_, mut m) in hash.methods {
 			mut ins := m.Instances[0]
 			for (i, mut ip) in ins.Params[1:] {
-				if token::IsAnonIdent(ip.Decl.Ident) {
+				if jule::IsAnon(ip.Decl.Ident) {
 					ip.Decl.Ident = "_" + conv::Itoa(i)
 				}
 			}
@@ -1163,8 +1163,8 @@ impl ObjectCoder {
 				DestType: v.TypeSym.Type,
 				Model: v,
 				Type: useExprPlain,
-				OpId: token::Id.Eq,
-				OpKind: token::Kind.Eq,
+				OpId: token::Eq,
+				OpKind: "=",
 			})
 		} else {
 			identCoder.var(self.Buf, v)
@@ -1175,7 +1175,7 @@ impl ObjectCoder {
 	}
 
 	fn var(mut &self, mut v: &sema::Var) {
-		if token::IsIgnoreIdent(v.Ident) {
+		if jule::IsBlank(v.Ident) {
 			ret
 		}
 		if v.ValueSym != nil && v.ValueSym.Expr != nil {
@@ -1491,7 +1491,7 @@ impl ObjectCoder {
 		for (_, mut v) in self.ir.Ordered.Globals {
 			// Skip blank identifiers, do not declare them.
 			// Initialization expressions will be executed when variables initializing.
-			if token::IsIgnoreIdent(v.Ident) {
+			if jule::IsBlank(v.Ident) {
 				continue
 			}
 			self.tc.kind(self.Buf, v.TypeSym.Type)
@@ -1614,7 +1614,7 @@ impl ObjectCoder {
 			}
 			self.Buf.WriteByte(indentKind)!
 			// If variable have blank identifier, just execute the initialization expression.
-			if token::IsIgnoreIdent(v.Ident) {
+			if jule::IsBlank(v.Ident) {
 				self.ec.model(v.ValueSym.Value.Model)
 				self.write(";\n")
 				continue

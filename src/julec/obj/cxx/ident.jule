@@ -5,6 +5,7 @@
 use "env"
 use "obj"
 use "std/conv"
+use "std/jule"
 use "std/jule/build"
 use "std/jule/directive"
 use "std/jule/sema"
@@ -113,7 +114,7 @@ impl identCoder {
 	}
 
 	static fn param(mut &buf: strings::Builder, &p: &sema::Param) {
-		if token::IsAnonIdent(p.Ident) || token::IsIgnoreIdent(p.Ident) {
+		if jule::IsAnon(p.Ident) || jule::IsBlank(p.Ident) {
 			ret
 		}
 		if p.IsSelf() {
@@ -151,7 +152,7 @@ impl identCoder {
 			buf.WriteStr(f.Ident)!
 			ret
 		}
-		if token::IsIgnoreIdent(f.Ident) {
+		if jule::IsBlank(f.Ident) {
 			// If the identifier is blank, there may be other fields like that.
 			// So handle them with unique identifier, avoid duplication.
 			buf.WriteStr("_field_")!
@@ -167,9 +168,9 @@ impl identCoder {
 		match {
 		| v.Binded:
 			buf.WriteStr(v.Ident)!
-		| v.Ident == token::Kind.Error:
+		| v.Ident == "error":
 			buf.WriteStr("except.error")!
-		| v.Ident == token::Kind.Self:
+		| v.Ident == "self":
 			buf.WriteStr(identSelf)!
 		| v.RetOrder == -1:
 			// The single return variable is just this one.

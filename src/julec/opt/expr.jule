@@ -86,7 +86,7 @@ impl exprOptimizer {
 					// Because the first node is the root binary expression.
 					// And by the CAST production, the || operator cames first than && operator.
 					// So it breaks if binary expression is not uses only the && operator.
-					*_check = binary.Op.Id != token::Id.DblVline
+					*_check = binary.Op.Id != token::DblVline
 					if !*_check {
 						break
 					}
@@ -109,16 +109,16 @@ impl exprOptimizer {
 			ret false
 		}
 		match m.Op.Id {
-		| token::Id.Eqs
-		| token::Id.LtEq
-		| token::Id.GtEq:
+		| token::DblEq
+		| token::LtEq
+		| token::GtEq:
 			// Operators used with itself: ==, <=, >=.
 			// Evaluation will be always true.
 			*self.model = constant::Const.NewBool(true)
 			ret true
-		| token::Id.NotEq
-		| token::Id.Lt
-		| token::Id.Gt:
+		| token::NotEq
+		| token::Lt
+		| token::Gt:
 			// Operators used with itself: !=, <, >.
 			// Evaluation will be always false.
 			*self.model = constant::Const.NewBool(false)
@@ -148,7 +148,7 @@ impl exprOptimizer {
 		}
 		mut c := m.Right.Model.(&constant::Const)
 		match m.Op.Id {
-		| token::Id.DblAmper:
+		| token::DblAmper:
 			if c.ReadBool() {
 				// Use left operand as model directly.
 				// Logical and with constant true expression is always will be true.
@@ -162,7 +162,7 @@ impl exprOptimizer {
 				*self.model = c
 			}
 			ret true
-		| token::Id.DblVline:
+		| token::DblVline:
 			if c.ReadBool() {
 				// Logical or with constant true expression.
 				// Binary expression is always will be true.
@@ -226,7 +226,7 @@ impl exprOptimizer {
 		if lp == nil || !lp.IsStr() {
 			ret false
 		}
-		if m.Op.Id != token::Id.Eqs && m.Op.Id != token::Id.NotEq {
+		if m.Op.Id != token::DblEq && m.Op.Id != token::NotEq {
 			ret false
 		}
 		match type m.Left.Model {
@@ -244,7 +244,7 @@ impl exprOptimizer {
 		}
 		mut c := m.Right.Model.(&constant::Const)
 		match m.Op.Id {
-		| token::Id.Eqs:
+		| token::DblEq:
 			if c.ReadStr() == "" {
 				mut model := any(&EmptyCompareExpr{
 					Expr: m.Left.Model,
@@ -259,7 +259,7 @@ impl exprOptimizer {
 				NotEq: false,
 			})
 			*self.model = unsafe { *(*sema::Expr)(&model) }
-		| token::Id.NotEq:
+		| token::NotEq:
 			if c.ReadStr() == "" {
 				mut model := any(&EmptyCompareExpr{
 					Expr: m.Left.Model,
@@ -284,7 +284,7 @@ impl exprOptimizer {
 		if lp == nil || !lp.IsStr() {
 			ret false
 		}
-		if m.Op.Id != token::Id.Plus {
+		if m.Op.Id != token::Plus {
 			ret false
 		}
 
@@ -349,7 +349,7 @@ impl exprOptimizer {
 			if !Str {
 				ret false
 			}
-			if c.ReadStr() == "" && m.Op.Id == token::Id.Plus {
+			if c.ReadStr() == "" && m.Op.Id == token::Plus {
 				// Concatenation with empty string, use the non-constant operand's model.
 				*self.model = nc.Model
 				ret true
@@ -363,8 +363,8 @@ impl exprOptimizer {
 			ret false
 		}
 		match m.Op.Id {
-		| token::Id.Shl
-		| token::Id.Shr:
+		| token::Shl
+		| token::Shr:
 			// If the constant expression is shifter, use the right operand's model.
 			if nc == m.Left {
 				*self.model = nc.Model
@@ -374,7 +374,7 @@ impl exprOptimizer {
 			// Use zero-constant directly.
 			*self.model = c
 			ret true
-		| token::Id.Star:
+		| token::Star:
 			if types::IsFloat(nc.Type.Prim().Kind) {
 				// If type is float, do not apply this optimization.
 				// Because multiplication with zero is not equals to zero always.
@@ -384,8 +384,8 @@ impl exprOptimizer {
 			c.SetI64(0)
 			*self.model = c
 			ret true
-		| token::Id.Plus
-		| token::Id.Minus:
+		| token::Plus
+		| token::Minus:
 			*self.model = nc.Model
 			ret true
 		}
@@ -419,12 +419,12 @@ impl exprOptimizer {
 			if !isBoundaryValidType(blc.Expr.Type) {
 				ret
 			}
-			if m.Op.Id != token::Id.Gt && m.Op.Id != token::Id.Eqs {
+			if m.Op.Id != token::Gt && m.Op.Id != token::DblEq {
 				ret
 			}
 			// len(x) > y, len(x) == y (constant)
 			// Max guaranteed size of x is y.
-			if m.Op.Id == token::Id.Eqs {
+			if m.Op.Id == token::DblEq {
 				match type m.Right.Model {
 				| &constant::Const:
 					mut c := new(constant::Const, *m.Right.Model.(&constant::Const)) // Do not mutate binary operand.
@@ -442,12 +442,12 @@ impl exprOptimizer {
 			if !isBoundaryValidType(blc.Expr.Type) {
 				ret
 			}
-			if m.Op.Id != token::Id.Lt && m.Op.Id != token::Id.Eqs {
+			if m.Op.Id != token::Lt && m.Op.Id != token::DblEq {
 				ret
 			}
 			// y < len(x), y (constant) == len(x)
 			// Max guaranteed size of x is y.
-			if m.Op.Id == token::Id.Eqs {
+			if m.Op.Id == token::DblEq {
 				match type m.Left.Model {
 				| &constant::Const:
 					mut c := new(constant::Const, *m.Left.Model.(&constant::Const)) // Do not mutate binary operand.
@@ -474,7 +474,7 @@ impl exprOptimizer {
 			| &constant::Const:
 				// No need to check whether constant variable is nil.
 				// It only can be nil.
-				self.data.nils.pushVar(var, m.Op.Id == token::Id.NotEq)
+				self.data.nils.pushVar(var, m.Op.Id == token::NotEq)
 			}
 			ret
 		}
@@ -487,7 +487,7 @@ impl exprOptimizer {
 			| &constant::Const:
 				// No need to check whether constant variable is nil.
 				// It only can be nil.
-				self.data.nils.pushVar(var, m.Op.Id == token::Id.NotEq)
+				self.data.nils.pushVar(var, m.Op.Id == token::NotEq)
 			}
 			ret
 		}
@@ -529,7 +529,7 @@ impl exprOptimizer {
 		}
 
 		match m.Op.Id {
-		| token::Id.Plus:
+		| token::Plus:
 			// If type is integer and expressions is like "x+x", then we can simplify to "x<<1" which is faster.
 			// Floating-point types is exceptional because we cannot predict the result because of NaN or similar values.
 			// Also floating-point types are not supports bit shifting operators.
@@ -537,15 +537,15 @@ impl exprOptimizer {
 				break
 			}
 			m.Op = new(token::Token, *m.Op)
-			m.Op.Id = token::Id.Shl
-			m.Op.Kind = token::Kind.Shl
+			m.Op.Id = token::Shl
+			m.Op.Kind = "<<"
 			m.Right.Model = constant::Const.NewU64(1)
 			// Set model to unsafe expression model. Because it is safe.
 			// We can remove runtime cost of shifter checking.
 			mut model := any(&UnsafeBinaryExpr{Node: m})
 			*self.model = unsafe { *(*sema::Expr)(&model) }
 			ret true
-		| token::Id.Minus:
+		| token::Minus:
 			// If type is integer and expressions is like "x-x", then we can simplify to "0" which is cheaper.
 			// Floating-point types is exceptional because we cannot predict the result because of NaN or similar values.
 			if !types::IsInt(lp.Kind) || !obj::EqualModels(m.Left.Model, m.Right.Model) {
@@ -555,7 +555,7 @@ impl exprOptimizer {
 			c.Kind = lp.Kind
 			*self.model = c
 			ret true
-		| token::Id.Amper:
+		| token::Amper:
 			// Optimize x&0 and 0&x computations to 0.
 			mut c, mut ok := m.Right.Model.(&constant::Const)
 			if ok {
@@ -578,7 +578,7 @@ impl exprOptimizer {
 				}
 			}
 			ret false
-		| token::Id.Vline | token::Id.Caret:
+		| token::Vline | token::Caret:
 			// Optimize x^0 and 0^x computations to x.
 			mut c, mut ok := m.Right.Model.(&constant::Const)
 			if ok {
@@ -609,33 +609,33 @@ impl exprOptimizer {
 		}
 
 		match m.Op.Id {
-		| token::Id.Star:
+		| token::Star:
 			if types::IsInt(lp.Kind) && types::IsUnsigInt(rp.Kind) {
 				ok, x := checkForBitShiftOpt(m.Left, m.Right)
 				if ok {
 					m.Op = new(token::Token, *m.Op)
-					m.Op.Id = token::Id.Shl
-					m.Op.Kind = token::Kind.Shl
+					m.Op.Id = token::Shl
+					m.Op.Kind = "<<"
 					mut c := m.Right.Model.(&constant::Const)
 					c.SetU64(x)
 					self.shift(m) // We should try to optimize new optimized shifting expression.
 					ret true
 				}
 			}
-		| token::Id.Percent:
+		| token::Percent:
 			if types::IsUnsigInt(lp.Kind) {
 				mut c := m.Right.Model.(&constant::Const)
 				if c.AsF64() == 0b10 {
 					m.Op = new(token::Token, *m.Op)
-					m.Op.Id = token::Id.Amper
-					m.Op.Kind = token::Kind.Amper
+					m.Op.Id = token::Amper
+					m.Op.Kind = "&"
 					c.SetI64(1)
 					// No need to set model as UnsafeBinaryExpr,
 					// bitwise and is not checked at runtime, so it is optimize enough.
 					ret true
 				}
 			}
-		| token::Id.Shl | token::Id.Shr:
+		| token::Shl | token::Shr:
 			self.shift(m)
 			ret true
 		|:
@@ -683,7 +683,7 @@ impl exprOptimizer {
 		}
 
 	end:
-		if m.Op.Id == token::Id.DblVline {
+		if m.Op.Id == token::DblVline {
 			// Binary expression uses the || operator.
 			// We should ignore optimization information updates.
 			// Because we can't whether they are really informative.
@@ -738,11 +738,11 @@ impl exprOptimizer {
 			ret
 		}
 		match m.Op.Id {
-		| token::Id.Star:
+		| token::Star:
 			match type m.Expr.Model {
 			| &sema::UnaryExpr:
 				mut um := m.Expr.Model.(&sema::UnaryExpr)
-				if um.Op.Id == token::Id.Amper {
+				if um.Op.Id == token::Amper {
 					// Remove pointer overhead.
 					// Expression is: *(&x)
 					// Simplify to: x
@@ -760,7 +760,7 @@ impl exprOptimizer {
 					self.data.nils.pushVar(var, true)
 				}
 			}
-		| token::Id.Amper:
+		| token::Amper:
 			match type m.Expr.Model {
 			| &sema::Var:
 				mut v := m.Expr.Model.(&sema::Var)
@@ -976,7 +976,7 @@ impl exprOptimizer {
 			if isPowerOfTwo(u64(array.N)) {
 				mask := u64(array.N - 1)
 				bin, mut ok := m.Index.Model.(&sema::BinaryExpr)
-				if ok && bin.Op.Kind == token::Kind.Amper {
+				if ok && bin.Op.Id == token::Amper {
 					{
 						c, (ok) := bin.Left.Model.(&constant::Const)
 						if ok && c.AsU64() == mask {
@@ -1023,7 +1023,7 @@ impl exprOptimizer {
 		| &sema::UnaryExpr:
 			self.unary(m.(&sema::UnaryExpr))
 		| &sema::StructLitExpr:
-			self.structureLit(m.(&sema::StructLitExpr))	
+			self.structureLit(m.(&sema::StructLitExpr))
 		| &sema::TypeAssertionExpr:
 			self.typeAssertion(m.(&sema::TypeAssertionExpr))
 		| &sema::FuncCallExpr:
