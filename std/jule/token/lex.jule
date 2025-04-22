@@ -9,10 +9,10 @@ use "std/unicode/utf8"
 use "std/unsafe"
 
 // Lexer mode.
-enum LexMode {
-	Standard: 0 << 0, // Standard mode.
-	Comment: 1 << 0,  // Standard mode + comments.
-}
+const (
+	Standard = 1 << iota // Standard mode.
+	Comment              // Standard mode + comments.
+)
 
 struct kindPair {
 	kind: Kind
@@ -431,7 +431,7 @@ fn byteEscape(&txt: []byte): (seq: str) {
 }
 
 struct lex {
-	mode:   LexMode
+	mode:   int
 	tokens: []&Token
 	file:   &Fileset
 	pos:    int
@@ -524,7 +524,7 @@ impl lex {
 				break
 			}
 		}
-		if self.mode&LexMode.Comment == LexMode.Comment {
+		if self.mode&Comment == Comment {
 			token.Id = Id.Comment
 			token.Kind = unsafe::StrFromBytes(self.file.data[start:self.pos])
 		}
@@ -547,7 +547,7 @@ impl lex {
 				self.file.data[self.pos+1] == '/' {
 				self.column += 2
 				self.pos += 2
-				if self.mode&LexMode.Comment == LexMode.Comment {
+				if self.mode&Comment == Comment {
 					token.Id = Id.Comment
 					token.Kind = unsafe::StrFromBytes(self.file.data[start:self.pos])
 				}
@@ -803,7 +803,7 @@ impl lex {
 // Lex source code into fileset.
 // Returns nil if f == nil.
 // Returns nil slice for errors if no any error.
-fn Lex(mut f: &Fileset, mode: LexMode): []log::Log {
+fn Lex(mut f: &Fileset, mode: int): []log::Log {
 	if f == nil {
 		ret nil
 	}
