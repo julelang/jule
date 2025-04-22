@@ -12,6 +12,7 @@ use "std/flag"
 use "std/fmt"
 use "std/jule"
 use "std/jule/build"
+use "std/jule/dist"
 use integ "std/jule/integrated"
 use "std/jule/log"
 use "std/jule/sema"
@@ -127,7 +128,7 @@ fn pushCompCmdClang(mut &cmd: strings::Builder) {
 	if env::Production {
 		cmd.WriteStr("-O3 ")!        // Enable all optimizations.
 		cmd.WriteStr("-flto=thin ")! // Enable LTO.
-		if build::OS == build::DistOS.Windows {
+		if build::OS == dist::Windows {
 			// For Windows, we have to do extra work to use LTO.
 			// If the Clang is not MinGW, it is probably the “Clang Compiler for Windows”
 			// may be installed by Microsoft Visual Studio. If so, using LTO
@@ -218,7 +219,7 @@ fn genCompileCmd(sourcePath: str, &ir: &obj::IR): (str, str) {
 		cmd.WriteStr("-o ")!
 		cmd.WriteStr(Out)!
 		// If compiling for Windows and Out path is not have `.exe` extension, then add it.
-		if build::OS == build::DistOS.Windows && filepath::Ext(Out) != ".exe" {
+		if build::OS == dist::Windows && filepath::Ext(Out) != ".exe" {
 			cmd.WriteStr(".exe")!
 		}
 		cmd.WriteByte(' ')!
@@ -232,7 +233,7 @@ fn genCompileCmd(sourcePath: str, &ir: &obj::IR): (str, str) {
 	}
 
 	// Link necessary libraries for Windows.
-	if build::OS == build::DistOS.Windows {
+	if build::OS == dist::Windows {
 		cmd.WriteStr(" -lshell32")!
 	}
 
@@ -268,17 +269,13 @@ fn checkCompilerFlag() {
 }
 
 fn checkTargetArch(arch: str) {
-	if arch != build::DistArch.Amd64 &&
-		arch != build::DistArch.Arm64 &&
-		arch != build::DistArch.I386 {
+	if arch != dist::AMD64 && arch != dist::ARM64 && arch != dist::I386 {
 		handle::Throw("--target: unsupported/undefined architecture: " + arch)
 	}
 }
 
 fn checkTargetOs(os: str) {
-	if os != build::DistOS.Windows &&
-		os != build::DistOS.Linux &&
-		os != build::DistOS.Darwin {
+	if os != dist::Windows && os != dist::Linux && os != dist::Darwin {
 		handle::Throw("--target: unsupported/undefined operating system: " + os)
 	}
 }

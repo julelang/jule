@@ -11,6 +11,7 @@ use "std/conv"
 use "std/jule"
 use "std/jule/build"
 use "std/jule/directive"
+use "std/jule/dist"
 use "std/jule/sema"
 use "std/jule/token"
 use "std/jule/types"
@@ -223,9 +224,9 @@ impl ObjectCoder {
 		self.coSpawnObj.WriteByte('\n')!
 
 		match {
-		| build::IsWindows(build::OS):
+		| dist::IsWindows(build::OS):
 			self.coSpawnObj.WriteStr("unsigned long ")!
-		| build::IsUnix(build::OS):
+		| dist::IsUnix(build::OS):
 			self.coSpawnObj.WriteStr("void *")!
 		|:
 			panic("cxx: pushCoSpawn: unimeplemented operating system for return type")
@@ -277,10 +278,10 @@ impl ObjectCoder {
 		self.coSpawnObj.WriteStr(argData)!
 		self.coSpawnObj.WriteStr(";\n")!
 		match {
-		| build::OS == build::DistOS.Windows:
+		| build::OS == dist::Windows:
 			self.coSpawnObj.WriteByte(indentKind)!
 			self.coSpawnObj.WriteStr("return 0;\n")!
-		| build::IsUnix(build::OS):
+		| dist::IsUnix(build::OS):
 			self.coSpawnObj.WriteByte(indentKind)!
 			self.coSpawnObj.WriteStr("return NULL;\n")!
 		|:
@@ -1788,9 +1789,9 @@ fn concatAllParts(parts: ...&token::Token): []byte {
 // See runtime::coSpawn function for documentation.
 fn writeThreadType(mut &b: strings::Builder) {
 	match {
-	| build::IsWindows(build::OS):
+	| dist::IsWindows(build::OS):
 		b.WriteStr("HANDLE")!
-	| build::IsUnix(build::OS):
+	| dist::IsUnix(build::OS):
 		b.WriteStr("pthread_t")!
 	|:
 		panic("unreachable")
