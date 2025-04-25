@@ -152,23 +152,15 @@ impl typeCompatibilityChecker {
 		mut trt := self.dest.Trait()
 		mut ref := false
 		match {
+		| self.src.SoftStruct() != nil:
+			goto Struct
 		| self.src.Sptr() != nil:
 			ref = true
 			self.src = self.src.Sptr().Elem
 			if self.src.SoftStruct() == nil {
 				ret false
 			}
-			fall
-		| self.src.SoftStruct() != nil:
-			s := self.src.SoftStruct()
-			if !s.Decl.IsImplements(trt) {
-				ret false
-			}
-			if !ref && traitHasReferenceReceiver(trt) {
-				self.pushErr(log::TraitHasRefParamFunc)
-				ret false
-			}
-			ret true
+			goto Struct
 		| self.src.Trait() != nil:
 			mut base := self.src.Trait()
 			if trt == base {
@@ -195,8 +187,19 @@ impl typeCompatibilityChecker {
 				}
 			}
 			ret true
+		|:
+			ret false
 		}
-		ret false
+	Struct:
+		s := self.src.SoftStruct()
+		if !s.Decl.IsImplements(trt) {
+			ret false
+		}
+		if !ref && traitHasReferenceReceiver(trt) {
+			self.pushErr(log::TraitHasRefParamFunc)
+			ret false
+		}
+		ret true
 	}
 
 	fn checkPtr(mut self): (ok: bool) {
