@@ -572,33 +572,32 @@ impl scopeCoder {
 	}
 
 	fn tryMapSet(mut &self, mut m: sema::Expr): (ok: bool) {
-		match type m {
-		| &sema::IndexingExpr:
-			mut iem := m.(&sema::IndexingExpr)
-			_map := iem.Expr.Type.Map()
-			if _map == nil {
-				break
-			}
-			// Map indexing used for assignment.
-			// Generate direct lookup unlike expression coder.
-			mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Val)
-			const Static = false
-			mut f := ins.FindMethod("set", Static).Instances[0]
-			self.oc.write("(*")
-			identCoder.funcIns(self.oc.Buf, f)
-			self.oc.write("((")
-			self.oc.ec.possibleRefExpr(iem.Expr.Model)
-			self.oc.write(").ptr(")
-			if !env::Production {
-				self.oc.write("\"")
-				self.oc.locInfo(iem.Token)
-				self.oc.write("\"")
-			}
-			self.oc.write("), ")
-			self.oc.ec.possibleRefExpr(iem.Index.Model)
-			self.oc.write("))")
-			ok = true
+		mut iem, ok := m.(&sema::IndexingExpr)
+		if !ok {
+			ret
 		}
+		_map := iem.Expr.Type.Map()
+		if _map == nil {
+			ret false
+		}
+		// Map indexing used for assignment.
+		// Generate direct lookup unlike expression coder.
+		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Val)
+		const Static = false
+		mut f := ins.FindMethod("set", Static).Instances[0]
+		self.oc.write("(*")
+		identCoder.funcIns(self.oc.Buf, f)
+		self.oc.write("((")
+		self.oc.ec.possibleRefExpr(iem.Expr.Model)
+		self.oc.write(").ptr(")
+		if !env::Production {
+			self.oc.write("\"")
+			self.oc.locInfo(iem.Token)
+			self.oc.write("\"")
+		}
+		self.oc.write("), ")
+		self.oc.ec.possibleRefExpr(iem.Index.Model)
+		self.oc.write("))")
 		ret
 	}
 
@@ -724,38 +723,32 @@ impl scopeCoder {
 
 		mut tup := a.Right.(&sema::TupleExpr)
 
+	Values:
 		for (i, mut r) in tup.Values {
 			self.oc.indent()
 			mut l := a.Left[i]
 			if l != nil {
-				match type l.Model {
-				| &sema::Var:
-					mut v := l.Model.(&sema::Var)
-					if !v.Reference {
-						break
-					}
+				mut v, _ := l.Model.(&sema::Var)
+				if v != nil && v.Reference {
 					// left expression is a reference variable
 					// lookup declared variables in this assignment
 					// so we can detetermine reference variable is declared or assigned
 					for _, dv in a.Decls {
 						if v == dv {
-							goto found
+							// variable is declaring now
+							// takes pointer from the lvalue tuple data
+							identCoder.var(self.oc.Buf, v)
+							self.oc.write(" = &(")
+							self.oc.ec.possibleRefExpr(r.Model)
+							self.oc.write(");\n")
+							a.Left[i] = nil // Ignore handling for following statements.
+							continue Values
 						}
 					}
 					// variable is not exist in declared variables
 					// it can take temporary variable strategy
 					// it just takes assignment to the pointing data
 					// not takes pointer of the lvalue data
-					break
-				found:
-					// variable is declaring now
-					// takes pointer from the lvalue tuple data
-					identCoder.var(self.oc.Buf, v)
-					self.oc.write(" = &(")
-					self.oc.ec.possibleRefExpr(r.Model)
-					self.oc.write(");\n")
-					a.Left[i] = nil // Ignore handling for following statements.
-					continue
 				}
 				self.oc.tc.kind(self.oc.Buf, l.Type)
 				self.oc.write(" ")
@@ -938,7 +931,6 @@ impl scopeCoder {
 			self.oc.indent()
 		}
 
-		// Special cases.
 		let mut r: compExpr = a.Right
 		match type r {
 		| &sema::IndexingExpr:
@@ -956,9 +948,6 @@ impl scopeCoder {
 		| &sema::ChanRecv:
 			self.chanRecvAssign(a)
 			ret
-		}
-
-		match type r {
 		| &sema::TupleExpr:
 			self.multiAssignTuple(a)
 		| &sema::FuncCallExpr:
@@ -1135,10 +1124,9 @@ impl scopeCoder {
 		mut chans := make([]chanCase, 0, len(slct.Cases))
 		mut &_chans := chans // Used by closure, unsafely.
 		obj::IterCaseExprs(slct.Cases, fn(mut &c: &sema::Case, mut &val: &sema::Value) {
-			match type val.Model {
-			| &sema::ChanRecv:
+			mut cr, _ := val.Model.(&sema::ChanRecv)
+			if cr != nil {
 				unsafe { _chans = append(_chans, chanCase{c, val}) }
-				mut cr := val.Model.(&sema::ChanRecv)
 				self.oc.ec.possibleRefExpr(cr.Expr.Model)
 				self.oc.write(".as<")
 				self.oc.write(hchan)
@@ -1147,11 +1135,10 @@ impl scopeCoder {
 		})
 		recvChans := len(chans) // Total count of chan-recv cases.
 		obj::IterCaseExprs(slct.Cases, fn(mut &c: &sema::Case, mut &val: &sema::Value) {
-			match type val.Model {
-			| &sema::ChanSend:
+			mut cs, _ := val.Model.(&sema::ChanSend)
+			if cs != nil {
 				unsafe { _chans = append(_chans, chanCase{c, val}) }
-				mut cr := val.Model.(&sema::ChanSend)
-				self.oc.ec.possibleRefExpr(cr.Chan.Model)
+				self.oc.ec.possibleRefExpr(cs.Chan.Model)
 				self.oc.write(".as<")
 				self.oc.write(hchan)
 				self.oc.write(">(), ")
@@ -1531,17 +1518,14 @@ impl scopeCoder {
 			mut v := st.(&sema::Value)
 			// Catch anonymous functions created by defer scope.
 			// Push them to defer stack.
-			match type v.Model {
-			| &sema::AnonFuncExpr:
-				f := v.Model.(&sema::AnonFuncExpr)
-				if f.Func.Scope != nil && f.Func.Scope.Deferred {
-					self.oc.write(deferStackName + ".push(")
-					self.oc.ec.model(v.Model)
-					self.oc.write(")")
-					ret
-				}
+			f, _ := v.Model.(&sema::AnonFuncExpr)
+			if f != nil && f.Func.Scope != nil && f.Func.Scope.Deferred {
+				self.oc.write(deferStackName + ".push(")
+				self.oc.ec.model(v.Model)
+				self.oc.write(")")
+			} else {
+				self.oc.ec.model(v.Model)
 			}
-			self.oc.ec.model(v.Model)
 		| &sema::Conditional:
 			self.conditional(st.(&sema::Conditional))
 		| &sema::InfIter:
@@ -1655,7 +1639,11 @@ impl scopeCoder {
 				| &sema::BuiltinErrorCallExpr
 				| &sema::BuiltinPanicCallExpr:
 					ret
+				|:
+					// no-op
 				}
+			|:
+				// no-op
 			}
 		}
 
@@ -1728,11 +1716,8 @@ fn isCopyOptimizable(&v: &sema::Value, iter: bool): bool {
 	if !v.Lvalue || (iter && v.Mutable) {
 		ret false
 	}
-	match type v.Model {
-	| &sema::SlicingExpr:
-		ret false
-	}
-	ret true
+	_, slicing := v.Model.(&sema::SlicingExpr)
+	ret !slicing
 }
 
 fn isIterCopyOptimizable(&val: &sema::Value, &v: &sema::Var): bool {

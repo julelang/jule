@@ -1182,19 +1182,17 @@ impl ObjectCoder {
 			if v.ValueSym.Value.Model != nil {
 				if v.Reference {
 					self.varInitExpr(v, fn() {
-						match type v.ValueSym.Value.Model {
-						| &sema::Var:
-							// If value is variable, check whether it is a reference.
-							// Because references implemented as raw pointers.
-							// So, do not take address of them, use directly them.
-							if v.ValueSym.Value.Model.(&sema::Var).Reference {
-								self.ec.model(v.ValueSym.Value.Model)
-								ret
-							}
+						// If value is variable, check whether it is a reference.
+						// Because references implemented as raw pointers.
+						// So, do not take address of them, use directly them.
+						vv, var := v.ValueSym.Value.Model.(&sema::Var)
+						if var && vv.Reference {
+							self.ec.model(v.ValueSym.Value.Model)
+						} else {
+							self.write("&(")
+							self.ec.model(v.ValueSym.Value.Model)
+							self.write(")")
 						}
-						self.write("&(")
-						self.ec.model(v.ValueSym.Value.Model)
-						self.write(")")
 					})
 				} else {
 					if v.Statically {

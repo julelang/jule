@@ -591,6 +591,8 @@ impl dynamicTypeAnnotation {
 		match type self.c.Kind {
 		| &ast::IdentType:
 			ret self.annotateConstraintIdent(k)
+		|:
+			// no-op
 		}
 		match {
 		| k.Array() != nil:
@@ -1177,9 +1179,8 @@ impl structLitChecker {
 	fn readyExprs(mut self, mut &exprs: []&ast::Expr): bool {
 		mut ok := true
 		for (i, mut expr) in exprs {
-			match type expr.Kind {
-			| &ast::KeyValPair:
-				mut pair := expr.Kind.(&ast::KeyValPair)
+			mut pair, pairok := expr.Kind.(&ast::KeyValPair)
+			if pairok {
 				match type pair.Key.Kind {
 				| &ast::IdentExpr:
 					// Ok
@@ -1606,8 +1607,8 @@ impl retTypeChecker {
 		| len(self.exprs) == 0 && len(self.types) > 0 && self.f.Decl.AnyVar():
 			ret true
 		| len(self.exprs) == 1 && len(self.types) > 1 && self.exprs[0].Type.Tuple() != nil:
-			match type self.exprs[0].Model {
-			| &FuncCallExpr:
+			_, fc := self.exprs[0].Model.(&FuncCallExpr)
+			if fc {
 				self.tryFuncMultiRetForward()
 				ret true
 			}

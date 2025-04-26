@@ -565,15 +565,12 @@ impl exprCoder {
 	}
 
 	fn possibleRefExpr(mut &self, mut expr: compExpr) {
-		match type expr {
-		| &sema::Var:
-			v := expr.(&sema::Var)
-			if v.Reference {
-				self.oc.write("(*(")
-				self.model(expr)
-				self.oc.write("))")
-				ret
-			}
+		v, _ := expr.(&sema::Var)
+		if v != nil && v.Reference {
+			self.oc.write("(*(")
+			self.model(expr)
+			self.oc.write("))")
+			ret
 		}
 		self.model(expr)
 	}
@@ -823,21 +820,17 @@ impl exprCoder {
 		for (i, mut arg) in m.Args {
 			p := m.Func.Params[j]
 			if p.Decl != nil && p.Decl.Reference {
-				match type arg {
-				| &sema::Var:
-					v := arg.(&sema::Var)
-					if v.Reference {
-						self.model(arg)
-						goto end
-					}
+				v, _ := arg.(&sema::Var)
+				if v != nil && v.Reference {
+					self.model(arg)
+				} else {
+					self.oc.write("&(")
+					self.model(arg)
+					self.oc.write(")")
 				}
-				self.oc.write("&(")
-				self.model(arg)
-				self.oc.write(")")
-				goto end
+			} else {
+				self.possibleRefExpr(arg)
 			}
-			self.possibleRefExpr(arg)
-		end:
 			if len(m.Args)-i > 1 {
 				self.oc.write(", ")
 			}
@@ -856,6 +849,8 @@ impl exprCoder {
 				self.funcIns(ssie.Method)
 				ret
 			}
+		|:
+			// no-op
 		}
 		self.possibleRefExpr(expr)
 	}
@@ -866,12 +861,10 @@ impl exprCoder {
 			ret
 		}
 		if m.Func.Anon {
-			match type m.Expr {
-			| &sema::StructSubIdentExpr:
-				if obj::IsStructBinded(m.Expr.(&sema::StructSubIdentExpr).Field.Owner) {
-					self.oc.write("(")
-					ret
-				}
+			ssie, _ := m.Expr.(&sema::StructSubIdentExpr)
+			if ssie != nil && obj::IsStructBinded(ssie.Field.Owner) {
+				self.oc.write("(")
+				ret
 			}
 			self.oc.write(".call")
 		}
@@ -885,9 +878,8 @@ impl exprCoder {
 
 	fn isWrapped(mut &self, mut &m: &sema::FuncCallExpr): bool {
 		if !m.Func.IsBuiltin() && len(m.Func.Decl.Params) > 0 && m.Func.Decl.Params[0].IsSelf() {
-			match type m.Expr {
-			| &sema::StructSubIdentExpr:
-				mut ssie := m.Expr.(&sema::StructSubIdentExpr)
+			mut ssie, _ := m.Expr.(&sema::StructSubIdentExpr)
+			if ssie != nil {
 				if ssie.Expr.Lvalue {
 					ret false
 				}
@@ -895,17 +887,14 @@ impl exprCoder {
 				| m.Func.Decl.Params[0].IsRef()
 				| ssie.Expr.Type.Sptr() != nil:
 					ret false
-				|:
+				| ssie.Expr.Type.SoftStruct() != nil:
 					// Check whether expression type is struct to caught strict type alias structs.
-					match type ssie.Expr.Type.Kind {
-					| &sema::StructIns:
-						self.oc.write("({ ")
-						self.oc.tc.kind(self.oc.Buf, ssie.Expr.Type)
-						self.oc.write(" _wrap_copy = ")
-						self.model(ssie.Expr.Model)
-						self.oc.write("; ")
-						ret true
-					}
+					self.oc.write("({ ")
+					self.oc.tc.kind(self.oc.Buf, ssie.Expr.Type)
+					self.oc.write(" _wrap_copy = ")
+					self.model(ssie.Expr.Model)
+					self.oc.write("; ")
+					ret true
 				}
 			}
 		}
@@ -1010,6 +999,8 @@ impl exprCoder {
 				if len(m.Args) > 0 {
 					self.oc.write(", ")
 				}
+			|:
+				// no-op
 			}
 		}
 		self.args(m)
@@ -1277,6 +1268,8 @@ impl exprCoder {
 			self.possibleRefExpr(m.Index.Model)
 			self.oc.write(")")
 			ret
+		|:
+			// no-op
 		}
 
 		// Index access with safety measures.
@@ -1566,29 +1559,23 @@ impl exprCoder {
 	fn errorCall(mut &self, mut m: &sema::BuiltinErrorCallExpr) {
 		hasDefer := m.Func.Decl != nil && m.Func.Decl.HasDefer
 		if m.Func.Decl.IsVoid() {
-			match type m.Err.Model {
-			| &sema::Var:
-				v := m.Err.Model.(&sema::Var)
-				if v.Ident == "error" {
-					if hasDefer {
-						self.oc.write(deferStackName + ".call();\n")
-						self.oc.indent()
-					}
-					self.oc.write("return jule::VoidExceptional{.error=std::move(except.error)}")
-					ret
+			v, _ := m.Err.Model.(&sema::Var)
+			if v != nil && v.Ident == "error" {
+				if hasDefer {
+					self.oc.write(deferStackName + ".call();\n")
+					self.oc.indent()
 				}
+				self.oc.write("return jule::VoidExceptional{.error=std::move(except.error)}")
+				ret
 			}
 			self.oc.write("return jule::VoidExceptional{.error=")
 		} else {
 			self.oc.write("return jule::Exceptional<")
 			self.oc.tc.rc.codeMut1(self.oc.Buf, m.Func.Result)
-			match type m.Err.Model {
-			| &sema::Var:
-				v := m.Err.Model.(&sema::Var)
-				if v.Ident == "error" {
-					self.oc.write(">{.error=except.error}")
-					ret
-				}
+			v, _ := m.Err.Model.(&sema::Var)
+			if v != nil && v.Ident == "error" {
+				self.oc.write(">{.error=except.error}")
+				ret
 			}
 			self.oc.write(">{.error=")
 		}

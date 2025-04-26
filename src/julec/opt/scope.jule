@@ -389,6 +389,8 @@ impl scopeOptimizer {
 					Kind: arr,
 					Elems: slc.Elems,
 				}
+			|:
+				// no-op
 			}
 		}
 		exprOptimizer.optimizeValue(it.Expr.Model, self.data, self)
@@ -404,19 +406,16 @@ impl scopeOptimizer {
 		if a.Op.Id != token::Eq {
 			ret false
 		}
-		match type a.Right.Model {
-		| &sema::SlicingExpr:
-			mut sem := a.Right.Model.(&sema::SlicingExpr)
-			if obj::EqualModels(a.Left.Model, sem.Expr.Model) {
-				self.setCurrentStmt(&MutSlicingExpr{
-					Token: sem.Token,
-					Expr: sem.Expr.Model,
-					Left: sem.Left,
-					Right: sem.Right,
-					Cap: sem.Cap,
-				})
-				ret true
-			}
+		mut sem, ok := a.Right.Model.(&sema::SlicingExpr)
+		if ok && obj::EqualModels(a.Left.Model, sem.Expr.Model) {
+			self.setCurrentStmt(&MutSlicingExpr{
+				Token: sem.Token,
+				Expr: sem.Expr.Model,
+				Left: sem.Left,
+				Right: sem.Right,
+				Cap: sem.Cap,
+			})
+			ret true
 		}
 		ret false
 	}
@@ -596,14 +595,13 @@ impl scopeOptimizer {
 		}
 
 		if Append {
-			match type assign.Right.Model {
-			| &sema::BuiltinAppendCallExpr:
-				mut m := assign.Right.Model.(&sema::BuiltinAppendCallExpr)
+			mut m, append := assign.Right.Model.(&sema::BuiltinAppendCallExpr)
+			if append {
 				if !areSameLvalueExpr(assign.Left.Model, m.Dest.Model) {
 					ret
 				}
-				match type m.Elements.Model {
-				| &sema::SliceExpr:
+				_, slice := m.Elements.Model.(&sema::SliceExpr)
+				if slice {
 					// Push items one-by-one for self-appended memory.
 					self.setCurrentStmt(&PushToSliceExpr{
 						Base: m,
@@ -656,15 +654,14 @@ impl scopeOptimizer {
 				// they assigned to non-constant memory such as variables.
 				// So, we need to separate attention for variable declarations.
 				// Also variable declarations are may suitable for normalization.
-				match type l.Model {
-				| &sema::Var:
-					mut v := l.Model.(&sema::Var)
+				mut v, var := l.Model.(&sema::Var)
+				if var {
 					if obj::FindVar(v, assign.Decls) == -1 {
 						// expression is variable but it is not declaring now
 						break
 					}
-					match type r.Model {
-					| &constant::Const:
+					_, constant := r.Model.(&constant::Const)
+					if constant {
 						// Expression model is constant. So, expression is constant.
 						// We can simplify it.
 
@@ -819,11 +816,7 @@ impl scopeOptimizer {
 		// If there is a tuple expression, it means this multi-assign statement is:
 		//	like: x, y, z = a, b, c
 		//	not:  x, y, z = myFunc()
-		mut tup := (&sema::TupleExpr)(nil)
-		match type assign.Right {
-		| &sema::TupleExpr:
-			tup = assign.Right.(&sema::TupleExpr)
-		}
+		mut tup, _ := assign.Right.(&sema::TupleExpr)
 
 		// Do optimizations first, because statements may be simplified.
 		// So, assignment analysis will be done in this form. Avoid making twice or more.
@@ -854,16 +847,11 @@ impl scopeOptimizer {
 			// We can simplify to single assignment statement.
 			if len(assign.Left) == 1 {
 				mut l := assign.Left[0]
-				match type l.Model {
-				| &sema::Var:
-					mut v := l.Model.(&sema::Var)
-					if obj::FindVar(v, assign.Decls) >= 0 {
-						// variable declared now, do not handle it like a assignment
-						self.setCurrentStmt(v)
-						goto end
-					}
-				}
-				{
+				mut v, var := l.Model.(&sema::Var)
+				if var && obj::FindVar(v, assign.Decls) >= 0 {
+					// variable declared now, do not handle it like a assignment
+					self.setCurrentStmt(v)
+				} else {
 					mut r := tup.Values[0]
 					self.setCurrentStmt(&sema::Assign{
 						Left: &sema::OperandExpr{Type: l.Type, Model: l.Model},
@@ -871,7 +859,6 @@ impl scopeOptimizer {
 						Op: assign.Op,
 					})
 				}
-			end:
 				self.i-- // to handle simplified form of this assignment in analysis
 				ret
 			}
@@ -1004,6 +991,8 @@ impl scopeOptimizer {
 			self.optimizeRet(stmt.(&sema::Ret))
 		| &sema::Postfix:
 			self.optimizePostfix(stmt.(&sema::Postfix))
+		|:
+			// no-op
 		}
 	}
 
@@ -1069,12 +1058,8 @@ impl scopeOptimizer {
 }
 
 fn isConstantValidConditionalCase(&i: &sema::If): bool {
-	match type i.Expr {
-	| &constant::Const:
-		c := i.Expr.(&constant::Const)
-		ret c.IsBool() && c.ReadBool()
-	}
-	ret false
+	c, ok := i.Expr.(&constant::Const)
+	ret ok && c.IsBool() && c.ReadBool()
 }
 
 fn isUnreachableExpr(&expr: sema::Expr): bool {
@@ -1088,8 +1073,10 @@ fn isUnreachableExpr(&expr: sema::Expr): bool {
 			ret isUnreachableExpr(m.Left.Model) ||
 				isUnreachableExpr(m.Right.Model)
 		}
+		ret false
+	|:
+		ret false
 	}
-	ret false
 }
 
 fn isConstantValidMatchCase(&case: &sema::Case): bool {

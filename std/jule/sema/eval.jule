@@ -1935,13 +1935,13 @@ impl eval {
 		self.prefix = nil
 		defer { self.prefix = prefix }
 		if t.Slice() != nil || t.Array() != nil {
-			match type e.Kind {
-			| &ast::SliceExpr:
+			_, slice := e.Kind.(&ast::SliceExpr)
+			if slice {
 				self.prefix = t
 			}
 		} else if t.Map() != nil {
-			match type e.Kind {
-			| &ast::BraceLit:
+			_, brace := e.Kind.(&ast::BraceLit)
+			if brace {
 				self.prefix = t
 			}
 		}
@@ -2346,8 +2346,8 @@ impl eval {
 		self.prefix = nil
 		defer { self.prefix = prefix }
 
-		match type fc.Expr.Kind {
-		| &ast::IdentExpr:
+		_, ident := fc.Expr.Kind.(&ast::IdentExpr)
+		if ident {
 			// Use fc.expr.Token.Kind instead of casting.
 			// Same thing, but more efficient and performant.
 			if fc.Expr.Token.Id == token::Error {
@@ -5208,6 +5208,8 @@ fn updateModelToGenericIns(mut &m: Expr, mut &f: &FuncIns) {
 		m.(&StructSubIdentExpr).Method = f
 	| &StructStaticIdentExpr:
 		m.(&StructStaticIdentExpr).Method = f
+	|:
+		// no-op for other types
 	}
 }
 

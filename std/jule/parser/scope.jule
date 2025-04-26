@@ -795,9 +795,9 @@ impl scopeParser {
 				StmtCheck:
 					match {
 					| ok:
-						match type stmt {
-						| &ast::Expr:
-							exprs = append(exprs, stmt.(&ast::Expr))
+						mut expr, _ := stmt.(&ast::Expr)
+						if expr != nil {
+							exprs = append(exprs, expr)
 							break StmtCheck
 						}
 						fall
@@ -1067,8 +1067,8 @@ impl scopeParser {
 			}
 			// Single left, use &Var instead if possible.
 			mut left := assign.Left[0]
-			match type left.Expr.Kind {
-			| &ast::IdentExpr:
+			_, ident := left.Expr.Kind.(&ast::IdentExpr)
+			if ident {
 				mut decl := &ast::Var{
 					Token: left.Token,
 					Setter: assign.Setter,

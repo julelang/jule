@@ -79,11 +79,8 @@ fn possibleNilRemove(mut &n: &nils, m: sema::Expr) {
 }
 
 fn isGuaranteedNonNilExpr(mut &n: &nils, m: sema::Expr): bool {
-	match type m {
-	| &sema::BuiltinNewCallExpr:
-		ret true
-	}
-	ret n != nil && n.isSafe(getNilVar(m))
+	_, ok := m.(&sema::BuiltinNewCallExpr)
+	ret ok || n != nil && n.isSafe(getNilVar(m))
 }
 
 fn isNilValidType(mut t: &sema::Type): bool { ret t.Sptr() != nil }
@@ -107,6 +104,7 @@ fn getNilVar(m: sema::Expr): uintptr {
 		ret getNilVar(v.ValueSym.Value.Model)
 	| &sema::StructSubIdentExpr:
 		ret uintptr(m.(&sema::StructSubIdentExpr).Field)
+	|:
+		ret invalidBoundary
 	}
-	ret invalidBoundary
 }

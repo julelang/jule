@@ -92,9 +92,8 @@ fn isTypeGuaranteedDynamicValue(mut &dy: &dynamic, mut t: &sema::Type, mut m: se
 	if !isAny {
 		ret nil
 	}
-	match type m {
-	| &sema::CastingExpr:
-		mut cem := m.(&sema::CastingExpr)
+	mut cem, casting := m.(&sema::CastingExpr)
+	if casting {
 		ret isTypeGuaranteedDynamicValue(dy, cem.Expr.Type, cem.Expr.Model)
 	}
 	var := getDynamicVar(m)
@@ -130,6 +129,8 @@ fn getDynamicVar(m: sema::Expr): uintptr {
 		if uem.Op.Id == token::Star { // Dereferencing.
 			ret getDynamicVar(uem.Expr.Model)
 		}
+		ret invalidDynamic
+	|:
+		ret invalidDynamic
 	}
-	ret invalidDynamic
 }
