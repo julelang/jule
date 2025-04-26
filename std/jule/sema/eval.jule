@@ -1773,7 +1773,7 @@ impl eval {
 	fn castTypeEnumT(mut self, mut &t: &Type, mut &v: &Value, mut &errorToken: &token::Token) {
 		n := len(self.s.errors)
 		// quick check: if type t and value type comparable.
-		if !self.s.checkTypeCompatibility(t, v.Type, errorToken) {
+		if !self.s.checkTypeCompatibility(t, v.Type, errorToken, typeCompDefault) {
 			self.s.errors = self.s.errors[:n] // Remove logged errors by checkTypeCompatibility.
 			self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
 		}
@@ -1783,7 +1783,7 @@ impl eval {
 
 	fn castTrait(mut self, mut &t: &Type, mut &v: &Value, mut &errorToken: &token::Token) {
 		n := len(self.s.errors)
-		if !self.s.checkTypeCompatibility(t, v.Type, errorToken) {
+		if !self.s.checkTypeCompatibility(t, v.Type, errorToken, typeCompDefault) {
 			self.s.errors = self.s.errors[:n] // Remove logged errors by checkTypeCompatibility.
 			self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
 		}
@@ -3275,7 +3275,7 @@ impl eval {
 			}
 		} else if v.Type.TypeEnum() != nil {
 			n := len(self.s.errors)
-			if !self.s.checkTypeCompatibility(v.Type, t, errorToken) {
+			if !self.s.checkTypeCompatibility(v.Type, t, errorToken, typeCompDefault) {
 				self.s.errors = self.s.errors[:n] // Remove logged errors by checkTypeCompatibility.
 				self.pushErr(errorToken, log::TypeNotSupportsTypeAssertionTo, v.Type.Str(), t.Str())
 				ret nil
@@ -3930,7 +3930,7 @@ impl binaryEval {
 	// Reports whether types are compatible.
 	// Also logs error message about incompatibility if types are incompatible.
 	fn checkTypeCompatibility(mut self): bool {
-		ret self.e.s.checkTypeCompatibility1(self.l.Type, self.r, self.op)
+		ret self.e.s.checkTypeCompatibility1(self.l.Type, self.r, self.op, typeCompDefault)
 	}
 
 	// Like the checkTypeCompatibility method, but tries to be compatible with
@@ -4001,7 +4001,7 @@ impl binaryEval {
 				rkind = self.r.Type.Enum().TypeSym.Type
 			}
 			mut enm := self.l.Type.Enum()
-			if !self.e.s.checkTypeCompatibility(enm.TypeSym.Type, rkind, self.op) {
+			if !self.e.s.checkTypeCompatibility(enm.TypeSym.Type, rkind, self.op, typeCompDefault) {
 				ret nil
 			}
 			ret &Value{

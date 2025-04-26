@@ -1579,7 +1579,11 @@ impl scopeChecker {
 					constMatched = constMatched || expr.Type.Equal(v.Type)
 				} else if expr.Type.TypeEnum() != nil || expr.Type.Trait() != nil {
 					// Check whether checked types are compatible for type-enum or trait.
-					_ = self.s.checkTypeCompatibility(expr.Type, v.Type, e.Token)
+					// For type-enums, do not consider inherited type-enums compatible directly.
+					// But still their internal type list will be considered compatible.
+					// This is needed to count all inherited type list elements as compatible,
+					// except the type-enum's itself.
+					_ = self.s.checkTypeCompatibility(expr.Type, v.Type, e.Token, typeCompDefault|typeCompNoInherited)
 				}
 				continue
 			}
@@ -1723,12 +1727,17 @@ impl scopeChecker {
 				if titem == item {
 					ret false
 				}
-				if titem.TypeSym.Type.Equal(item.TypeSym.Type) {
-					ret true
+				mut ke := titem.TypeSym.Type.TypeEnum()
+				// Check if the titem's type is not type-enum.
+				// Because inherited type-enums will not be considered compatible in type matching.
+				// See documentation of the [self.checkCase] function for type-match statements.
+				if ke == nil {
+					if titem.TypeSym.Type.Equal(item.TypeSym.Type) {
+						ret true
+					}
 				}
 				// If item is not strict type alias, check inherited types if it is type-enum.
 				if titem.TypeSym.Type.SoftStruct() == nil {
-					mut ke := titem.TypeSym.Type.TypeEnum()
 					if ke != nil {
 						pushed := unsafe { _isPushedAlready(ke, item) }
 						if pushed {

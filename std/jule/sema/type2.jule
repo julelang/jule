@@ -133,7 +133,14 @@ fn intAssignable(kind: str, mut &v: &Value): bool {
 	}
 }
 
+// Flags for typeCompatibilityChecker.
+const (
+	typeCompDefault = iota
+	typeCompNoInherited = 1 << iota // inherited type-enums (except their types) will not be considered compatible
+)
+
 struct typeCompatibilityChecker {
+	flags:      int
 	s:          &sema // Used for error logging.
 	dest:       &Type
 	src:        &Type
@@ -225,12 +232,14 @@ impl typeCompatibilityChecker {
 
 	fn typeEnum(self, mut &e: &TypeEnum, mut &t2: &Type): (ok: bool) {
 		for (_, mut item) in e.Items {
-			if item.TypeSym.Type.Equal(t2) {
-				ret true
+			mut ke := item.TypeSym.Type.TypeEnum()
+			if ke == nil || self.flags&typeCompNoInherited != typeCompNoInherited {
+				if item.TypeSym.Type.Equal(t2) {
+					ret true
+				}
 			}
 			// If item is not strict type alias, check inherited types if it is type-enum.
 			if item.TypeSym.Type.SoftStruct() == nil {
-				mut ke := item.TypeSym.Type.TypeEnum()
 				if ke == nil {
 					continue
 				}
@@ -421,7 +430,7 @@ impl assignTypeChecker {
 				break
 			}
 			mut dest := self.v.Type.Enum().TypeSym.Type
-			ret self.s.checkTypeCompatibility(dest, dkind, self.errorToken)
+			ret self.s.checkTypeCompatibility(dest, dkind, self.errorToken, typeCompDefault)
 		| self.v.Type.Chan() != nil:
 			dc := self.dest.Chan()
 			if dc == nil {
@@ -452,7 +461,7 @@ impl assignTypeChecker {
 			// So check and make sure the untyped value can unwrap safely.
 			_ = checkValue(self.v, self.s, self.errorToken, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		}
-		ret self.s.checkTypeCompatibility1(self.dest, self.v, self.errorToken)
+		ret self.s.checkTypeCompatibility1(self.dest, self.v, self.errorToken, typeCompDefault)
 	}
 
 	fn check(mut self): bool {
@@ -1562,7 +1571,7 @@ impl retTypeChecker {
 		for i in self.types {
 			mut t1 := self.types[i]
 			mut t2 := tup.Types[i]
-			if !self.sc.s._checkTypeCompatibility(t1, t2, self.errorToken) {
+			if !self.sc.s._checkTypeCompatibility(t1, t2, self.errorToken, typeCompDefault) {
 				goto err
 			}
 		}
