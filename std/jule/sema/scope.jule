@@ -9,6 +9,7 @@ use "std/jule/constant"
 use "std/jule/log"
 use "std/jule/token"
 use "std/jule/types"
+use "std/strings"
 
 // Statement type.
 enum Stmt: type {
@@ -1571,7 +1572,7 @@ impl scopeChecker {
 				// Parser always tries to build type declarations for type-match cases.
 				// So, v is should be type declaration already.
 				case.Exprs = append(case.Exprs, v)
-				if countMatchType(m, v.Type) > 1 {
+				if countMatchType(m, v.Type, 0) > 1 {
 					self.s.pushErr(e.Token, log::DuplicateMatchType, v.Type.Str())
 				}
 				if m.Comptime {
@@ -1712,12 +1713,66 @@ impl scopeChecker {
 		}
 	}
 
+	// Checks and reports whether the all possible types of enum handled in the match statement.
+	// Writes all missing types as a list to sb.
+	fn checkAllTypeEnumCasesHandled(mut &self, mut m: &Match, mut te: &TypeEnum, mut &sb: strings::Builder): (ok: bool) {
+		let mut isPushedAlready: fn(mut t: &TypeEnum, mut item: &TypeEnumItem): bool
+		&_isPushedAlready := isPushedAlready
+		isPushedAlready = fn(mut t: &TypeEnum, mut item: &TypeEnumItem): bool {
+			for (_, mut titem) in t.Items {
+				if titem == item {
+					ret false
+				}
+				if titem.TypeSym.Type.Equal(item.TypeSym.Type) {
+					ret true
+				}
+				// If item is not strict type alias, check inherited types if it is type-enum.
+				if titem.TypeSym.Type.SoftStruct() == nil {
+					mut ke := titem.TypeSym.Type.TypeEnum()
+					if ke != nil {
+						pushed := unsafe { _isPushedAlready(ke, item) }
+						if pushed {
+							ret true
+						}
+					}
+				}
+			}
+			ret false
+		}
+
+		ok = true
+		for (_, mut item) in te.Items {
+			if countMatchType(m, item.TypeSym.Type, 1) == 1 {
+				continue
+			}
+			// If item is not strict type alias, check inherited types if it is type-enum.
+			if item.TypeSym.Type.SoftStruct() == nil {
+				mut ke := item.TypeSym.Type.TypeEnum()
+				if ke != nil {
+					ok = ok && self.checkAllTypeEnumCasesHandled(m, ke, sb)
+					continue
+				}
+			}
+			// error: type is not exist in the match statement.
+			ok = false
+			if isPushedAlready(te, item) {
+				continue
+			}
+			if sb.Len() > 0 {
+				sb.WriteStr(", ")!
+			}
+			sb.WriteStr(item.TypeSym.Type.Str())!
+		}
+		ret
+	}
+
 	fn checkTypeMatch(mut &self, mut &m: &ast::Match) {
 		mut v := self.s.eval(self).eval1(m.Expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if v == nil {
 			ret
 		}
 
+		mut te := v.Type.TypeEnum()
 		if m.Comptime {
 			mut cti := v.Type.comptimeTypeInfo()
 			if cti == nil {
@@ -1728,7 +1783,7 @@ impl scopeChecker {
 			} else {
 				v.Type = cti.base
 			}
-		} else if v.Decl || !((v.Type.Prim() != nil && v.Type.Prim().IsAny()) || v.Type.Trait() != nil || v.Type.TypeEnum() != nil) {
+		} else if v.Decl || !((v.Type.Prim() != nil && v.Type.Prim().IsAny()) || v.Type.Trait() != nil || te != nil) {
 			self.s.pushErr(m.Expr.Token, log::TypeCaseHasNotValidExpr)
 			ret
 		}
@@ -1752,6 +1807,18 @@ impl scopeChecker {
 		if tm.Comptime {
 			self.processConstMatch(tm, m)
 		}
+
+		// If the expression type is a type-enum, make sure all the type cases handled.
+		// If match statement have a default case, avoid evaluation cost, handled all cases.
+		if tm.Default == nil && te != nil {
+			mut sb := strings::Builder{}
+			ok := self.checkAllTypeEnumCasesHandled(tm, te, sb)
+			if !ok {
+				self.s.pushErr(m.Token, log::MatchTypeStmtDoesNotHandleAllCases, sb.Str())
+				self.s.pushSuggestion(log::HandleMissingTypesOrAddDefault)
+			}
+		}
+
 		self.scope.Stmts = append(self.scope.Stmts, tm)
 	}
 
@@ -2450,7 +2517,9 @@ fn stmtIsDef(&stmt: Stmt): bool {
 	}
 }
 
-fn countMatchType(&m: &Match, &t: &Type): int {
+// Counts matched types with t and returns the result.
+// If limit=0, counts all types, otherwise the count is limited by the limit.
+fn countMatchType(&m: &Match, &t: &Type, limit: int): int {
 	mut n := 0
 loop:
 	for _, c in m.Cases {
@@ -2465,6 +2534,9 @@ loop:
 			}
 			if t.Equal(expr.Model.(&Type)) {
 				n++
+				if limit != 0 && n >= limit {
+					break
+				}
 			}
 		}
 	}
