@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/sys"
+
 cpp unsafe fn GetSystemTimeAsFileTime(mut ft: *cpp.FILETIME)
 cpp unsafe fn QueryPerformanceCounter(mut counter: *cpp.LARGE_INTEGER): bool
 
 #typedef
-cpp struct FILETIME {
-	dwLowDateTime:  _DWORD
-	dwHighDateTime: _DWORD
-}
+cpp struct FILETIME{}
 
 #typedef
 cpp struct LARGE_INTEGER{}
@@ -17,11 +16,11 @@ cpp struct LARGE_INTEGER{}
 // Returns system-wide realtime clock in seconds and nanoseconds.
 // The nanoseconds is not a second yet, always in range (0, 999999999).
 fn timeNow(): (sec: i64, nsec: i64) {
-	mut ft := cpp.FILETIME{}
-	unsafe { cpp.GetSystemTimeAsFileTime(&ft) } // Returns ticks in UTC
+	mut ft := sys::Filetime{}
+	unsafe { cpp.GetSystemTimeAsFileTime((*cpp.FILETIME)(&ft)) } // Returns ticks in UTC
 	// Get the number of seconds since January 1, 1970 12:00am UTC
 	// FILETIME is in 100-nanosecond intervals since 1601-01-01
-	mut t := i64(ft.dwHighDateTime)<<32 | i64(ft.dwLowDateTime)
+	mut t := i64(ft.HighDateTime)<<32 | i64(ft.LowDateTime)
 	t -= 116444736000000000 // Convert from 1601 to 1970
 	t /= 10                 // Convert from 100-ns intervals to nanoseconds
 	sec = t / 1000000
