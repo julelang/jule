@@ -254,6 +254,12 @@ struct result {
 	mutable: bool     // Whether will be assigned to mutable storage.
 }
 
+// Stmt node analysis flags.
+const (
+	checkNodeDefault = iota
+	checkNodeNoExceptional = 1 << iota
+)
+
 // Scope checker.
 struct scopeChecker {
 	calledFrom: &token::Token
@@ -682,10 +688,14 @@ impl scopeChecker {
 		m.Func = root.owner
 	}
 
-	fn checkExpr(mut &self, mut expr: &ast::Expr) {
+	fn checkExpr(mut &self, mut expr: &ast::Expr, flags: int) {
 		mut eval := self.s.eval(self)
 		eval.target.ignored = true
-		mut v := eval.evalExpr(expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped|evalExceptional)
+		mut evalFlags := evalDefault | evalPhysicalMem | evalUnwrapUntyped
+		if flags&checkNodeNoExceptional != checkNodeNoExceptional {
+			evalFlags |= evalExceptional
+		}
+		mut v := eval.evalExpr(expr, evalFlags)
 		if v == nil || v.Model == nil {
 			// Skip nil data, because evaluation failed and error documented (it should be) already.
 			// Skip nil modeled data, this return only caused by built-in functions and it should be safe.
@@ -811,17 +821,17 @@ impl scopeChecker {
 		}
 
 		if wh.IsWhileNext() {
-			if !isValidAstStForNextSt(wh.Next) {
+			if !isValidStmtForNext(wh.Next) {
 				self.s.pushErr(wh.NextToken, log::InvalidStmtForNext)
 				ret
 			}
 
 			n := len(self.scope.Stmts)
-			self.checkNode(wh.Next)
+			self.checkNode(wh.Next, checkNodeNoExceptional)
 			if n < len(self.scope.Stmts) {
 				mut st := self.scope.Stmts[n]
 				self.scope.Stmts = self.scope.Stmts[:n] // Remove trailing statements.
-				if !isValidStForNextSt(st) {
+				if !isValidStmtForNext2(st) {
 					self.s.pushErr(wh.NextToken, log::InvalidStmtForNext)
 				}
 				kind.Next = st
@@ -1186,7 +1196,7 @@ impl scopeChecker {
 		v.Mutable = true
 	}
 
-	fn checkSingleAssign(mut &self, mut &a: &ast::Assign) {
+	fn checkSingleAssign(mut &self, mut &a: &ast::Assign, flags: int) {
 		let mut l: &Value = nil
 
 		if !jule::IsBlank(a.Left[0].Ident) {
@@ -1209,11 +1219,14 @@ impl scopeChecker {
 		eval.unsafety = self.isUnsafe()
 		// Eval with evalUnwrapUntyped if l == nil, otherwise type will be checked.
 		// So, do not unwrap untyped values.
-		mut flags := evalDefault | evalExceptional
-		if l == nil {
-			flags |= evalUnwrapUntyped
+		mut evalFlags := evalDefault
+		if flags&checkNodeNoExceptional != checkNodeNoExceptional {
+			evalFlags |= evalExceptional
 		}
-		mut r := eval.evalExpr(a.Right, flags)
+		if l == nil {
+			evalFlags |= evalUnwrapUntyped
+		}
+		mut r := eval.evalExpr(a.Right, evalFlags)
 		if r == nil {
 			ret
 		}
@@ -1539,12 +1552,12 @@ impl scopeChecker {
 		self.scope.Stmts = append(self.scope.Stmts, st)
 	}
 
-	fn checkAssign(mut &self, mut a: &ast::Assign) {
+	fn checkAssign(mut &self, mut a: &ast::Assign, flags: int) {
 		match {
 		| token::IsPostfixOp(a.Setter.Id):
 			self.checkPostfix(a)
 		| len(a.Left) == 1:
-			self.checkSingleAssign(a)
+			self.checkSingleAssign(a, flags)
 		|:
 			self.checkMultiAssign(a)
 		}
@@ -2126,7 +2139,7 @@ impl scopeChecker {
 		// Validated at end of scope's analysis.
 	}
 
-	fn checkNode(mut &self, mut &node: ast::StmtData) {
+	fn checkNode(mut &self, mut &node: ast::StmtData, flags: int) {
 		match type node {
 		| &ast::ScopeTree:
 			self.checkAnonScope(node.(&ast::ScopeTree))
@@ -2135,7 +2148,7 @@ impl scopeChecker {
 		| &ast::TypeAlias:
 			self.checkTypeAliasDecl(node.(&ast::TypeAlias))
 		| &ast::Expr:
-			self.checkExpr(node.(&ast::Expr))
+			self.checkExpr(node.(&ast::Expr), flags)
 		| &ast::Conditional:
 			self.checkConditional(node.(&ast::Conditional))
 		| &ast::Iter:
@@ -2147,7 +2160,7 @@ impl scopeChecker {
 		| &ast::Goto:
 			self.pushGoto(node.(&ast::Goto))
 		| &ast::Assign:
-			self.checkAssign(node.(&ast::Assign))
+			self.checkAssign(node.(&ast::Assign), flags)
 		| &ast::Match:
 			self.checkMatch(node.(&ast::Match))
 		| &ast::Select:
@@ -2198,9 +2211,9 @@ impl scopeChecker {
 		| &ast::Break
 		| &ast::Continue
 		| &ast::Ret:
-			self.checkNode(stmt.Data)
+			self.checkNode(stmt.Data, checkNodeDefault)
 		|:
-			self.checkNode(stmt.Data)
+			self.checkNode(stmt.Data, checkNodeDefault)
 			ret
 		}
 
@@ -2264,7 +2277,7 @@ impl scopeChecker {
 					continue
 				}
 			}
-			self.checkNode(stmt.Data)
+			self.checkNode(stmt.Data, checkNodeDefault)
 			if self.stopped() {
 				ret
 			}
@@ -2631,7 +2644,7 @@ fn checkAssign(mut &s: &sema, mut &left: &Value, mut right: &Value, op: &token::
 	ret checkAssignMut(s, left, right, op)
 }
 
-fn isValidAstStForNextSt(mut &n: ast::StmtData): bool {
+fn isValidStmtForNext(mut &n: ast::StmtData): bool {
 	match type n {
 	| &ast::Assign:
 		ret !n.(&ast::Assign).Declarative
@@ -2642,7 +2655,7 @@ fn isValidAstStForNextSt(mut &n: ast::StmtData): bool {
 	}
 }
 
-fn isValidStForNextSt(&st: Stmt): bool {
+fn isValidStmtForNext2(&st: Stmt): bool {
 	match type st {
 	| &Postfix
 	| &Assign
