@@ -22,9 +22,7 @@ cpp struct _stat {
 }
 
 #typedef
-cpp struct LARGE_INTEGER {
-	QuadPart: i64
-}
+cpp struct LARGE_INTEGER{}
 
 #typedef
 cpp struct WIN32_FIND_DATAW{}
@@ -272,16 +270,13 @@ unsafe fn DuplicateHandle(hSourceProcessHandle: Handle, hSourceHandle: Handle,
 // Calls SetFilePointerEx.
 // See https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfilepointerex
 unsafe fn setFilePointerEx(handle: Handle, distToMove: i64, newFilePointer: *i64, whence: u32): (ok: bool) {
-	let mut liOffset: cpp.LARGE_INTEGER
-	liOffset.QuadPart = distToMove
-
-	let mut newPos: cpp.LARGE_INTEGER
-	ok = cpp.SetFilePointerEx(cpp.HANDLE(handle), liOffset, &newPos, cpp.DWORD(whence))
+	let mut newPos: i64
+	ok = cpp.SetFilePointerEx(cpp.HANDLE(handle), *(cpp.LARGE_INTEGER)(&distToMove), (*cpp.LARGE_INTEGER)(&newPos), cpp.DWORD(whence))
 	if !ok {
 		ret false
 	}
 	if newFilePointer != nil {
-		*newFilePointer = newPos.QuadPart
+		*newFilePointer = newPos
 	}
 	ret true
 }
