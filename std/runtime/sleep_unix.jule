@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use "std/mem"
+use "std/sys"
 
 cpp unsafe fn nanosleep(*cpp.timespec, *cpp.timespec): int
 
@@ -11,18 +12,18 @@ fn _sleep(dur: sleepDuration) {
 	mut sec := dur / _Second
 	nsec := dur % _Second // always fits in timespec.tv_nsec
 
-	mut req := cpp.timespec{}
-	secBits := mem::SizeOf(req.tv_sec) * 8
+	mut req := sys::Timespec{}
+	secBits := mem::SizeOf(req.Sec) * 8
 	limit := i64(1)<<(secBits-1) - 1
 	for ; sec -= limit {
 		if sec <= limit {
-			req.tv_sec = sec
-			req.tv_nsec = nsec
-			unsafe { cpp.nanosleep(&req, nil) }
+			req.Sec = sec
+			req.Nsec = nsec
+			unsafe { cpp.nanosleep((*cpp.timespec)(&req), nil) }
 			break
 		} else {
-			req.tv_sec = limit
-			unsafe { cpp.nanosleep(&req, nil) }
+			req.Sec = limit
+			unsafe { cpp.nanosleep((*cpp.timespec)(&req), nil) }
 		}
 	}
 }
