@@ -30,7 +30,7 @@ fn winstat(path: str, followSurrogates: bool)!: FileInfo {
 
 	// GetFileAttributesEx fails with ERROR_SHARING_VIOLATION error for
 	// files like c:\pagefile.sys. Use FindFirstFile for such files.
-	if ok && sys::GetLastError() == sys::ERROR_SHARING_VIOLATION {
+	if ok && sys::GetLastErrno() == sys::ERROR_SHARING_VIOLATION {
 		let mut fd: sys::Win32FindData
 		handle := unsafe { sys::FindFirstFile(&utf16Path[0], &fd) }
 		if handle == sys::InvalidHandle {
@@ -50,7 +50,7 @@ fn winstat(path: str, followSurrogates: bool)!: FileInfo {
 	// even if name refers to a directory.
 	let flags: u32 = sys::FILE_FLAG_BACKUP_SEMANTICS | sys::FILE_FLAG_OPEN_REPARSE_POINT
 	mut h := unsafe { sys::CreateFile(&utf16Path[0], 0, 0, nil, sys::OPEN_EXISTING, flags, 0) }
-	if h == sys::InvalidHandle && sys::GetLastError() == sys::ERROR_INVALID_PARAMETER {
+	if h == sys::InvalidHandle && sys::GetLastErrno() == sys::ERROR_INVALID_PARAMETER {
 		// Console handles, like "\\.\con", require generic read access. See
 		// https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew#consoles.
 		// We haven't set it previously because it is normally not required
