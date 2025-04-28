@@ -76,7 +76,7 @@ impl FD {
 			| self.Flags&File == File | self.Flags&Pipe == Pipe:
 				nn = self.writeFile(b)
 			| self.Flags&Socket == Socket:
-				nn = unsafe { sys::Send(uint(self.File), &b[0], uint(len(buf)), 0) }
+				nn = unsafe { sys::Send(NetHandle(self.File), &b[0], uint(len(buf)), 0) }
 				if nn < 0 {
 					nn = -1
 				}
@@ -95,7 +95,7 @@ impl FD {
 
 	// Like Write, but wraps sendto syscall.
 	// General for V4 and V6. Unsafe variant.
-	unsafe fn WriteV(mut self, buf: []byte, addr: *sys::Sockaddr, addrLen: uint): (n: int, ok: bool) {
+	unsafe fn WriteV(mut self, buf: []byte, addr: *unsafe, addrLen: uint): (n: int, ok: bool) {
 		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
 		}
@@ -110,7 +110,7 @@ impl FD {
 				max = n + maxRW
 			}
 			part := buf[n:max]
-			nn := sys::Sendto(uint(self.File), &part[0], len(part), 0, addr, integ::Int(addrLen))
+			nn := sys::Sendto(NetHandle(self.File), &part[0], len(part), 0, addr, integ::Int(addrLen))
 			if nn > 0 {
 				n += nn
 			}
@@ -199,7 +199,7 @@ impl FD {
 		| self.Flags&File == File | self.Flags&Pipe == Pipe:
 			n, ok = self.readFile(buf)
 		| self.Flags&Socket == Socket:
-			n = unsafe { sys::Recv(uint(self.File), &buf[0], uint(len(buf)), 0) }
+			n = unsafe { sys::Recv(NetHandle(self.File), &buf[0], uint(len(buf)), 0) }
 			ok = n >= 0
 			if !ok {
 				n = -1
@@ -212,7 +212,7 @@ impl FD {
 
 	// Like Read, but wraps recvfrom syscall.
 	// General for V4 and V6. Unsafe variant.
-	unsafe fn ReadV(mut self, mut buf: []byte, addr: *sys::Sockaddr, addrLen: uint): (n: int, ok: bool) {
+	unsafe fn ReadV(mut self, mut buf: []byte, addr: *unsafe, addrLen: uint): (n: int, ok: bool) {
 		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
 		}
@@ -225,7 +225,7 @@ impl FD {
 			buf = buf[:maxRW]
 		}
 		addrLenI := integ::Int(addrLen)
-		n = sys::Recvfrom(uint(self.File), &buf[0], len(buf), 0, addr, &addrLenI)
+		n = sys::Recvfrom(NetHandle(self.File), &buf[0], len(buf), 0, addr, &addrLenI)
 		ok = n >= 0
 		ret
 	}
@@ -338,7 +338,7 @@ impl FD {
 		| self.Flags&File == File | self.Flags&Pipe == Pipe | self.Flags&Pipe == Pipe | self.Flags&Console == Console:
 			ret unsafe { sys::CloseHandle(sys::Handle(self.File)) }
 		| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
-			ret sys::CloseSocket(uint(self.File)) >= 0
+			ret sys::CloseSocket(NetHandle(self.File)) >= 0
 		|:
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Close")
 		}

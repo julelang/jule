@@ -15,39 +15,27 @@ cpp use "<ws2ipdef.h>"
 #typedef
 cpp struct WSADATA{}
 
-#cdef
-cpp fn MAKEWORD(a: int, b: int): u16
-
-#cdef
-cpp fn FD_ZERO(*cpp.fd_set)
-
-#cdef
-cpp fn FD_SET(uint, *cpp.fd_set)
-
-#cdef
-cpp fn FD_ISSET(uint, *cpp.fd_set): int
-
-cpp fn socket(int, int, int): uint
-cpp unsafe fn bind(uint, *cpp.sockaddr, uint): int
-cpp unsafe fn connect(uint, *cpp.sockaddr, uint): int
-cpp fn listen(uint, int): int
-cpp unsafe fn accept(uint, *cpp.sockaddr, *integ::Int): uint
-cpp unsafe fn send(uint, *integ::Char, uint, int): int
-cpp unsafe fn recv(uint, *integ::Char, uint, int): int
-cpp unsafe fn recvfrom(uint, *integ::Char, int, int, *cpp.sockaddr, *integ::Int): int
-cpp unsafe fn sendto(uint, *integ::Char, int, int, *cpp.sockaddr, integ::Int): int
-cpp fn closesocket(uint): int
+cpp fn socket(int, int, int): uintptr
+cpp unsafe fn bind(uintptr, *cpp.sockaddr, uint): int
+cpp unsafe fn connect(uintptr, *cpp.sockaddr, uint): int
+cpp fn listen(uintptr, int): int
+cpp unsafe fn accept(uintptr, *cpp.sockaddr, *integ::Int): uintptr
+cpp unsafe fn send(uintptr, *integ::Char, uint, int): int
+cpp unsafe fn recv(uintptr, *integ::Char, uint, int): int
+cpp unsafe fn recvfrom(uintptr, *integ::Char, int, int, *cpp.sockaddr, *integ::Int): int
+cpp unsafe fn sendto(uintptr, *integ::Char, int, int, *cpp.sockaddr, integ::Int): int
+cpp fn closesocket(uintptr): int
 cpp unsafe fn WSAStartup(u16, mut _: *cpp.WSADATA): int
-cpp unsafe fn getsockopt(uint, int, int, *integ::Char, *integ::Int): int
-cpp unsafe fn setsockopt(uint, int, int, *integ::Char, int): int
-cpp unsafe fn getsockname(uint, *cpp.sockaddr, *integ::Int): int
+cpp unsafe fn getsockopt(uintptr, int, int, *integ::Char, *integ::Int): int
+cpp unsafe fn setsockopt(uintptr, int, int, *integ::Char, int): int
+cpp unsafe fn getsockname(uintptr, *cpp.sockaddr, *integ::Int): int
 cpp unsafe fn WSAIoctl(u64, cpp.DWORD, *unsafe, cpp.DWORD, *unsafe, cpp.DWORD, *cpp.DWORD, *unsafe, *unsafe): int
 
 // C's WSADATA struct.
 type WsaData: cpp.WSADATA
 
 const (
-	INVALID_SOCKET = ^uint(0)
+	INVALID_SOCKET = ^uintptr(0)
 	SOCKET_ERROR = -1
 )
 
@@ -85,68 +73,82 @@ const (
 	SO_SNDTIMEO = 0x1005
 )
 
-// C's FD_ZERO macro.
-unsafe fn FdZero(mut fd: *Fd) {
-	cpp.FD_ZERO((*cpp.fd_set)(fd))
+unsafe fn Fdzero(mut fd: *FdSet) {
+	fd.Count = 0
 }
 
-// C's FD_SET macro.
-unsafe fn FdSet(handle: uint, mut fd: *Fd) {
-	cpp.FD_SET(handle, (*cpp.fd_set)(fd))
+unsafe fn Fdset(handle: uintptr, mut fd: *FdSet) {
+	let mut i: u32
+	for i < fd.Count; i++ {
+		if fd.Array[i] == handle {
+			break
+		}
+	}
+	if i == fd.Count {
+		if fd.Count < FD_SETSIZE {
+			fd.Array[i] = handle
+			fd.Count++
+		}
+	}
 }
 
-// C's FD_ISSET macro.
-unsafe fn FdIsset(handle: uint, mut fd: *Fd): int {
-	ret cpp.FD_ISSET(handle, (*cpp.fd_set)(fd))
+unsafe fn FdIsset(handle: uintptr, mut fd: *FdSet): int {
+	let mut i: u32
+	for i < fd.Count; i++ {
+		if fd.Array[i] == handle {
+			ret 1
+		}
+	}
+	ret 0
 }
 
 // C's socket function.
-fn Socket(domain: int, t: int, protocol: int): uint {
+fn Socket(domain: int, t: int, protocol: int): uintptr {
 	ret cpp.socket(domain, t, protocol)
 }
 
 // C's bind function.
-unsafe fn Bind(handle: uint, addr: *Sockaddr, len: uint): int {
+unsafe fn Bind(handle: uintptr, addr: *unsafe, len: uint): int {
 	ret cpp.bind(handle, (*cpp.sockaddr)(addr), len)
 }
 
 // C's connect function.
-unsafe fn Connect(handle: uint, addr: *Sockaddr, len: uint): int {
+unsafe fn Connect(handle: uintptr, addr: *unsafe, len: uint): int {
 	ret cpp.connect(handle, (*cpp.sockaddr)(addr), len)
 }
 
 // C's listen function.
-fn Listen(handle: uint, backlog: int): int {
+fn Listen(handle: uintptr, backlog: int): int {
 	ret cpp.listen(handle, backlog)
 }
 
 // C's accept function.
-unsafe fn Accept(handle: uint, addr: *Sockaddr, len: *integ::Int): uint {
+unsafe fn Accept(handle: uintptr, addr: *unsafe, len: *integ::Int): uintptr {
 	ret cpp.accept(handle, (*cpp.sockaddr)(addr), len)
 }
 
 // C's recv function.
-unsafe fn Recv(handle: uint, mut buf: *byte, len: uint, flags: int): int {
+unsafe fn Recv(handle: uintptr, mut buf: *byte, len: uint, flags: int): int {
 	ret cpp.recv(handle, (*integ::Char)(buf), len, flags)
 }
 
 // C's recvfrom function.
-unsafe fn Recvfrom(handle: uint, mut buf: *byte, len: int, flags: int, from: *Sockaddr, fromLen: *integ::Int): int {
+unsafe fn Recvfrom(handle: uintptr, mut buf: *byte, len: int, flags: int, from: *unsafe, fromLen: *integ::Int): int {
 	ret cpp.recvfrom(handle, (*integ::Char)(buf), len, flags, (*cpp.sockaddr)(from), fromLen)
 }
 
 // C's send function.
-unsafe fn Send(handle: uint, mut buf: *byte, len: uint, flags: int): int {
+unsafe fn Send(handle: uintptr, mut buf: *byte, len: uint, flags: int): int {
 	ret cpp.send(handle, (*integ::Char)(buf), len, flags)
 }
 
 // C's sendto function.
-unsafe fn Sendto(handle: uint, mut buf: *byte, len: int, flags: int, to: *Sockaddr, toLen: integ::Int): int {
+unsafe fn Sendto(handle: uintptr, mut buf: *byte, len: int, flags: int, to: *unsafe, toLen: integ::Int): int {
 	ret cpp.sendto(handle, (*integ::Char)(buf), len, flags, (*cpp.sockaddr)(to), toLen)
 }
 
 // C's closesocket function.
-fn CloseSocket(handle: uint): int {
+fn CloseSocket(handle: uintptr): int {
 	ret cpp.closesocket(handle)
 }
 
@@ -161,21 +163,21 @@ unsafe fn WSAIoctl(h: u64, iocc: u32, inbuf: *byte, cbif: u32, outbuf: *byte, cb
 }
 
 // C's MAKEWORD macro.
-fn MakeWord(a: int, b: int): u16 {
-	ret cpp.MAKEWORD(a, b)
+fn MakeWord(a: u8, b: u8): u16 {
+	ret u16(a) | u16(b)<<8
 }
 
 // C's getsockopt function.
-unsafe fn Getsockopt(handle: uint, level: int, option: int, buf: *integ::Char, len: *integ::Int): int {
+unsafe fn Getsockopt(handle: uintptr, level: int, option: int, buf: *integ::Char, len: *integ::Int): int {
 	ret cpp.getsockopt(handle, level, option, buf, len)
 }
 
 // C's setsockopt function.
-unsafe fn Setsockopt(handle: uint, level: int, option: int, buf: *integ::Char, len: int): int {
+unsafe fn Setsockopt(handle: uintptr, level: int, option: int, buf: *integ::Char, len: int): int {
 	ret cpp.setsockopt(handle, level, option, buf, len)
 }
 
 // C's getsockname function.
-unsafe fn Getsockname(handle: uint, addr: *Sockaddr, len: *integ::Int): int {
+unsafe fn Getsockname(handle: uintptr, addr: *unsafe, len: *integ::Int): int {
 	ret cpp.getsockname(handle, (*cpp.sockaddr)(addr), len)
 }

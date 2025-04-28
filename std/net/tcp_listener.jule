@@ -50,43 +50,41 @@ impl TCPListener {
 			panic("net: TCPListener.Accept: connection is not open")
 		}
 		if self.v6 { // IPv6
-			mut clientAddr := sys::SockaddrIn6{}
+			mut clientAddr := sys::SockaddrInet6{}
 			clientAddrLen := unsafe { poll::AddrLen(mem::SizeOf(clientAddr)) }
-			handle, ok := unsafe { accept(poll::NetHandle(self.fd.File), (*sys::Sockaddr)(&clientAddr), &clientAddrLen) }
+			handle, ok := unsafe { accept(poll::NetHandle(self.fd.File), &clientAddr, &clientAddrLen) }
 			if !ok {
 				error(lastErrorCode())
 			}
 			mut ip := make(IP, IPv6Len)
 			unsafe {
-				getSocketAddr(handle, (*sys::Sockaddr)(&clientAddr), clientAddrLen) else { error(error) }
+				getSocketAddr(handle, &clientAddr, clientAddrLen) else { error(error) }
 			}
-			for i in ip {
-				ip[i] = clientAddr.sin6_addr.s6_addr[i]
-			}
+			copy(ip, IP(clientAddr.Addr[:]))
 			ret &TCPConn{
 				Addr: &TCPAddr{
 					IP: ip,
-					Port: int(ntohs(int(clientAddr.sin6_port))),
+					Port: int(ntohs(int(clientAddr.Port))),
 				},
 				fd: newFD(handle, poll::Socket, sys::SOCK_STREAM),
 				v6: true,
 			}
 		} else { // IPv4
-			mut clientAddr := sys::SockaddrIn{}
+			mut clientAddr := sys::SockaddrInet4{}
 			clientAddrLen := unsafe { poll::AddrLen(mem::SizeOf(clientAddr)) }
-			handle, ok := unsafe { accept(poll::NetHandle(self.fd.File), (*sys::Sockaddr)(&clientAddr), &clientAddrLen) }
+			handle, ok := unsafe { accept(poll::NetHandle(self.fd.File), &clientAddr, &clientAddrLen) }
 			if !ok {
 				error(lastErrorCode())
 			}
 			mut ip := make(IP, IPv4Len)
 			unsafe {
-				getSocketAddr(handle, (*sys::Sockaddr)(&clientAddr), clientAddrLen) else { error(error) }
+				getSocketAddr(handle, &clientAddr, clientAddrLen) else { error(error) }
 			}
-			bePutU64v4(ip, u64(clientAddr.sin_addr.s_addr))
+			copy(ip, IP(clientAddr.Addr[:]))
 			ret &TCPConn{
 				Addr: &TCPAddr{
 					IP: ip,
-					Port: int(ntohs(int(clientAddr.sin_port))),
+					Port: int(ntohs(int(clientAddr.Port))),
 				},
 				fd: newFD(handle, poll::Socket, sys::SOCK_STREAM),
 			}
@@ -133,12 +131,11 @@ fn tcpBind(network: Network, &addr: str)!: &TCPListener {
 
 			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
 
-			mut sockAddr := sys::SockaddrIn{}
-			sockAddr.sin_family = sys::AF_INET
-			sockAddr.sin_port = htons(tcpAddr.Port)
-			sockAddr.sin_addr.s_addr = sys::INADDR_ANY
+			mut sockAddr := sys::SockaddrInet4{}
+			sockAddr.Family = sys::AF_INET
+			sockAddr.Port = htons(tcpAddr.Port)
 			unsafe {
-				if sys::Bind(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr)) != 0 {
+				if sys::Bind(handle, &sockAddr, mem::SizeOf(sockAddr)) != 0 {
 					fd.Close()
 					error(lastErrorCode())
 				}
@@ -152,11 +149,11 @@ fn tcpBind(network: Network, &addr: str)!: &TCPListener {
 
 			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
 
-			mut sockAddr := sys::SockaddrIn6{}
-			sockAddr.sin6_family = sys::AF_INET6
-			sockAddr.sin6_port = htons(tcpAddr.Port)
+			mut sockAddr := sys::SockaddrInet6{}
+			sockAddr.Family = sys::AF_INET6
+			sockAddr.Port = htons(tcpAddr.Port)
 			unsafe {
-				if sys::Bind(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr)) != 0 {
+				if sys::Bind(handle, &sockAddr, mem::SizeOf(sockAddr)) != 0 {
 					fd.Close()
 					error(lastErrorCode())
 				}
@@ -178,14 +175,13 @@ fn tcpBind(network: Network, &addr: str)!: &TCPListener {
 
 			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
 
-			mut sockAddr := sys::SockaddrIn6{}
-			sockAddr.sin6_family = sys::AF_INET6
-			for i, b in tcpAddr.IP {
-				sockAddr.sin6_addr.s6_addr[i] = b
-			}
-			sockAddr.sin6_port = htons(tcpAddr.Port)
+			mut sockAddr := sys::SockaddrInet6{}
+			sockAddr.Family = sys::AF_INET6
+			sockAddr.Port = htons(tcpAddr.Port)
+			ipv6 := tcpAddr.IP.To16()
+			copy(sockAddr.Addr[:], []byte(ipv6))
 			unsafe {
-				if sys::Bind(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr)) != 0 {
+				if sys::Bind(handle, &sockAddr, mem::SizeOf(sockAddr)) != 0 {
 					fd.Close()
 					error(lastErrorCode())
 				}
@@ -202,12 +198,12 @@ fn tcpBind(network: Network, &addr: str)!: &TCPListener {
 
 			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
 
-			mut sockAddr := sys::SockaddrIn{}
-			sockAddr.sin_family = sys::AF_INET
-			sockAddr.sin_port = htons(tcpAddr.Port)
-			sockAddr.sin_addr.s_addr = u32(beU64v4(tcpAddr.IP))
+			mut sockAddr := sys::SockaddrInet4{}
+			sockAddr.Family = sys::AF_INET
+			sockAddr.Port = htons(tcpAddr.Port)
+			copy(sockAddr.Addr[:], []byte(ipv4))
 			unsafe {
-				if sys::Bind(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr)) != 0 {
+				if sys::Bind(handle, &sockAddr, mem::SizeOf(sockAddr)) != 0 {
 					fd.Close()
 					error(lastErrorCode())
 				}
@@ -240,12 +236,11 @@ fn tcpDial(network: Network, &addr: str, timeout: time::Duration)!: &TCPConn {
 
 			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
 
-			mut sockAddr := sys::SockaddrIn{}
-			sockAddr.sin_family = sys::AF_INET
-			sockAddr.sin_port = htons(tcpAddr.Port)
-			sockAddr.sin_addr.s_addr = sys::INADDR_ANY
+			mut sockAddr := sys::SockaddrInet4{}
+			sockAddr.Family = sys::AF_INET
+			sockAddr.Port = htons(tcpAddr.Port)
 			unsafe {
-				connectSocket(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr), timeout) else {
+				connectSocket(handle, &sockAddr, mem::SizeOf(sockAddr), timeout) else {
 					fd.Close()
 					error(error)
 				}
@@ -258,11 +253,11 @@ fn tcpDial(network: Network, &addr: str, timeout: time::Duration)!: &TCPConn {
 
 			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
 
-			mut sockAddr := sys::SockaddrIn6{}
-			sockAddr.sin6_family = sys::AF_INET6
-			sockAddr.sin6_port = htons(tcpAddr.Port)
+			mut sockAddr := sys::SockaddrInet6{}
+			sockAddr.Family = sys::AF_INET6
+			sockAddr.Port = htons(tcpAddr.Port)
 			unsafe {
-				connectSocket(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr), timeout) else {
+				connectSocket(handle, &sockAddr, mem::SizeOf(sockAddr), timeout) else {
 					fd.Close()
 					error(error)
 				}
@@ -284,14 +279,13 @@ fn tcpDial(network: Network, &addr: str, timeout: time::Duration)!: &TCPConn {
 
 			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
 
-			mut sockAddr := sys::SockaddrIn6{}
-			sockAddr.sin6_family = sys::AF_INET6
-			for i, b in tcpAddr.IP {
-				sockAddr.sin6_addr.s6_addr[i] = b
-			}
-			sockAddr.sin6_port = htons(tcpAddr.Port)
+			mut sockAddr := sys::SockaddrInet6{}
+			sockAddr.Family = sys::AF_INET6
+			sockAddr.Port = htons(tcpAddr.Port)
+			ipv6 := tcpAddr.IP.To16()
+			copy(sockAddr.Addr[:], []byte(ipv6))
 			unsafe {
-				connectSocket(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr), timeout) else {
+				connectSocket(handle, &sockAddr, mem::SizeOf(sockAddr), timeout) else {
 					fd.Close()
 					error(error)
 				}
@@ -308,12 +302,12 @@ fn tcpDial(network: Network, &addr: str, timeout: time::Duration)!: &TCPConn {
 
 			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
 
-			mut sockAddr := sys::SockaddrIn{}
-			sockAddr.sin_family = sys::AF_INET
-			sockAddr.sin_port = htons(tcpAddr.Port)
-			sockAddr.sin_addr.s_addr = u32(beU64v4(tcpAddr.IP))
+			mut sockAddr := sys::SockaddrInet4{}
+			sockAddr.Family = sys::AF_INET
+			sockAddr.Port = htons(tcpAddr.Port)
+			copy(sockAddr.Addr[:], []byte(ipv4))
 			unsafe {
-				connectSocket(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr), timeout) else {
+				connectSocket(handle, &sockAddr, mem::SizeOf(sockAddr), timeout) else {
 					fd.Close()
 					error(error)
 				}

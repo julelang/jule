@@ -11,8 +11,8 @@ use "std/time"
 // UDP connection.
 // This structure represents server and client connections.
 struct UDPConn {
-	mut sockaddr4: sys::SockaddrIn
-	mut sockaddr6: sys::SockaddrIn6
+	mut sockaddr4: sys::SockaddrInet4
+	mut sockaddr6: sys::SockaddrInet6
 	mut fd:        &poll::FD
 	Addr:          &UDPAddr
 	v6:            bool
@@ -145,12 +145,11 @@ fn udpBind(network: Network, &addr: str)!: &UDPConn {
 				error(lastErrorCode())
 			}
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
-			conn.sockaddr4 = sys::SockaddrIn{}
-			conn.sockaddr4.sin_family = sys::AF_INET
-			conn.sockaddr4.sin_port = htons(conn.Addr.Port)
-			conn.sockaddr4.sin_addr.s_addr = sys::INADDR_ANY
+			conn.sockaddr4 = sys::SockaddrInet4{}
+			conn.sockaddr4.Family = sys::AF_INET
+			conn.sockaddr4.Port = htons(conn.Addr.Port)
 			unsafe {
-				if sys::Bind(handle, (*sys::Sockaddr)(&conn.sockaddr4), mem::SizeOf(conn.sockaddr4)) != 0 {
+				if sys::Bind(handle, &conn.sockaddr4, mem::SizeOf(conn.sockaddr4)) != 0 {
 					conn.fd.Close()
 					error(lastErrorCode())
 				}
@@ -162,11 +161,11 @@ fn udpBind(network: Network, &addr: str)!: &UDPConn {
 				error(lastErrorCode())
 			}
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
-			mut sockAddr := sys::SockaddrIn6{}
-			sockAddr.sin6_family = sys::AF_INET6
-			sockAddr.sin6_port = htons(conn.Addr.Port)
+			mut sockAddr := sys::SockaddrInet6{}
+			sockAddr.Family = sys::AF_INET6
+			sockAddr.Port = htons(conn.Addr.Port)
 			unsafe {
-				if sys::Bind(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr)) != 0 {
+				if sys::Bind(handle, &sockAddr, mem::SizeOf(sockAddr)) != 0 {
 					conn.fd.Close()
 					error(lastErrorCode())
 				}
@@ -186,14 +185,13 @@ fn udpBind(network: Network, &addr: str)!: &UDPConn {
 				error(lastErrorCode())
 			}
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
-			conn.sockaddr6 = sys::SockaddrIn6{}
-			conn.sockaddr6.sin6_family = sys::AF_INET6
-			for i, b in conn.Addr.IP {
-				conn.sockaddr6.sin6_addr.s6_addr[i] = b
-			}
-			conn.sockaddr6.sin6_port = htons(conn.Addr.Port)
+			conn.sockaddr6 = sys::SockaddrInet6{}
+			conn.sockaddr6.Family = sys::AF_INET6
+			conn.sockaddr6.Port = htons(conn.Addr.Port)
+			ipv6 := conn.Addr.IP.To16()
+			copy(conn.sockaddr6.Addr[:], []byte(ipv6))
 			unsafe {
-				if sys::Bind(handle, (*sys::Sockaddr)(&conn.sockaddr6), mem::SizeOf(conn.sockaddr6)) != 0 {
+				if sys::Bind(handle, &conn.sockaddr6, mem::SizeOf(conn.sockaddr6)) != 0 {
 					conn.fd.Close()
 					error(lastErrorCode())
 				}
@@ -208,12 +206,12 @@ fn udpBind(network: Network, &addr: str)!: &UDPConn {
 				error(lastErrorCode())
 			}
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
-			conn.sockaddr4 = sys::SockaddrIn{}
-			conn.sockaddr4.sin_family = sys::AF_INET
-			conn.sockaddr4.sin_port = htons(conn.Addr.Port)
-			conn.sockaddr4.sin_addr.s_addr = u32(beU64v4(conn.Addr.IP))
+			conn.sockaddr4 = sys::SockaddrInet4{}
+			conn.sockaddr4.Family = sys::AF_INET
+			conn.sockaddr4.Port = htons(conn.Addr.Port)
+			copy(conn.sockaddr4.Addr[:], []byte(ipv4))
 			unsafe {
-				if sys::Bind(handle, (*sys::Sockaddr)(&conn.sockaddr4), mem::SizeOf(conn.sockaddr4)) != 0 {
+				if sys::Bind(handle, &conn.sockaddr4, mem::SizeOf(conn.sockaddr4)) != 0 {
 					conn.fd.Close()
 					error(lastErrorCode())
 				}
@@ -237,19 +235,18 @@ fn udpDial(network: Network, &addr: str)!: &UDPConn {
 				error(lastErrorCode())
 			}
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
-			conn.sockaddr4 = sys::SockaddrIn{}
-			conn.sockaddr4.sin_family = sys::AF_INET
-			conn.sockaddr4.sin_port = htons(conn.Addr.Port)
-			conn.sockaddr4.sin_addr.s_addr = sys::INADDR_ANY
+			conn.sockaddr4 = sys::SockaddrInet4{}
+			conn.sockaddr4.Family = sys::AF_INET
+			conn.sockaddr4.Port = htons(conn.Addr.Port)
 		| Network.UDP6:
 			handle := sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
 			if handle < 0 {
 				error(lastErrorCode())
 			}
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
-			conn.sockaddr6 = sys::SockaddrIn6{}
-			conn.sockaddr6.sin6_family = sys::AF_INET6
-			conn.sockaddr6.sin6_port = htons(conn.Addr.Port)
+			conn.sockaddr6 = sys::SockaddrInet6{}
+			conn.sockaddr6.Family = sys::AF_INET6
+			conn.sockaddr6.Port = htons(conn.Addr.Port)
 		|:
 			error(&AddrError{Err: "invalid network: " + str(network)})
 		}
@@ -265,12 +262,11 @@ fn udpDial(network: Network, &addr: str)!: &UDPConn {
 				error(lastErrorCode())
 			}
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
-			conn.sockaddr6 = sys::SockaddrIn6{}
-			conn.sockaddr6.sin6_family = sys::AF_INET6
-			for i, b in conn.Addr.IP {
-				conn.sockaddr6.sin6_addr.s6_addr[i] = b
-			}
-			conn.sockaddr6.sin6_port = htons(conn.Addr.Port)
+			conn.sockaddr6 = sys::SockaddrInet6{}
+			conn.sockaddr6.Family = sys::AF_INET6
+			conn.sockaddr6.Port = htons(conn.Addr.Port)
+			ipv6 := conn.Addr.IP.To16()
+			copy(conn.sockaddr6.Addr[:], []byte(ipv6))
 		} else {
 			if network == Network.UDP6 {
 				error(&AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr})
@@ -281,10 +277,10 @@ fn udpDial(network: Network, &addr: str)!: &UDPConn {
 				error(lastErrorCode())
 			}
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
-			conn.sockaddr4 = sys::SockaddrIn{}
-			conn.sockaddr4.sin_family = sys::AF_INET
-			conn.sockaddr4.sin_port = htons(conn.Addr.Port)
-			conn.sockaddr4.sin_addr.s_addr = u32(beU64v4(conn.Addr.IP))
+			conn.sockaddr4 = sys::SockaddrInet4{}
+			conn.sockaddr4.Family = sys::AF_INET
+			conn.sockaddr4.Port = htons(conn.Addr.Port)
+			copy(conn.sockaddr4.Addr[:], []byte(ipv4))
 		}
 	}
 	ret new(UDPConn, conn)
