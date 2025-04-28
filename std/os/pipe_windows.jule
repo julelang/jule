@@ -6,14 +6,8 @@ use "std/internal/poll"
 use "std/sys"
 
 fn pipe()!: (r: &File, w: &File) {
-	let p: [2]sys::Handle
-	let mut sa: sys::SecurityAttributes
-	makeInheritSa(sa)
-	ok := unsafe { sys::CreatePipe(&p[0], &p[1], &sa, 0) }
-	if !ok {
-		error(sys::GetLastErrno())
-	}
-	r = newFile(u64(p[0]), poll::Pipe) else { error(error) }
-	w = newFile(u64(p[1]), poll::Pipe) else { error(error) }
+	hr, hw := sys::Pipe() else { error(error) }
+	r = newFile(u64(hr), poll::Pipe) else { error(error) }
+	w = newFile(u64(hw), poll::Pipe) else { error(error) }
 	ret
 }
