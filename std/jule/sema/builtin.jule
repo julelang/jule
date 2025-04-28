@@ -723,7 +723,10 @@ fn callerCopySlice(mut &dest: &Value, mut &e: &eval, mut &fc: &ast::FuncCallExpr
 		if !src.Mutable && slc.Elem.Mutable() {
 			e.pushErr(fc.Args[1].Token, log::MutOperationOnImmut)
 		}
-		if !dest.Type.Equal(src.Type) {
+		// Use ActualEqual to eliminate strict type aliases.
+		// If actual types are equal, then copy is safe.
+		// No matter strict type aliases.
+		if !dest.Type.ActualEqual(src.Type) {
 			e.pushErr(fc.Args[1].Token, log::IncompatibleTypes, dest.Type.Str(), src.Type.Str())
 		}
 	} else {
