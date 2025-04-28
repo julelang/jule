@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/internal/implflags"
 use "std/mem"
 use "std/sys"
 
@@ -9,20 +10,40 @@ cpp unsafe fn nanosleep(*cpp.timespec, *cpp.timespec): int
 
 // See documentation of the sleep function.
 fn _sleep(dur: sleepDuration) {
+	// NOTE
+	// The sys::Timespec fields always i64 for 64-bit systems, and i32 for 32-bit systems.
+	// Therefore, we use const match statement to cast time value properly.
+
 	mut sec := dur / _Second
-	nsec := dur % _Second // always fits in timespec.tv_nsec
+	nsec := dur % _Second // always fits in Timespec.Nsec
 
 	mut req := sys::Timespec{}
 	secBits := mem::SizeOf(req.Sec) * 8
 	limit := i64(1)<<(secBits-1) - 1
-	for ; sec -= limit {
+	for {
 		if sec <= limit {
-			req.Sec = sec
-			req.Nsec = nsec
+			const match {
+			| implflags::Is64bit == 1:
+				req.Sec = i64(sec)
+				req.Nsec = i64(nsec)
+			| implflags::Is32bit == 1:
+				req.Sec = i32(sec)
+				req.Nsec = i32(nsec)
+			|:
+				panic("unimplemented")
+			}
 			unsafe { cpp.nanosleep((*cpp.timespec)(&req), nil) }
 			break
 		} else {
-			req.Sec = limit
+			const match {
+			| implflags::Is64bit == 1:
+				req.Sec = i64(limit)
+			| implflags::Is32bit == 1:
+				req.Sec = i32(limit)
+			|:
+				panic("unimplemented")
+			}
+			sec -= limit
 			unsafe { cpp.nanosleep((*cpp.timespec)(&req), nil) }
 		}
 	}
