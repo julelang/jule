@@ -11,9 +11,7 @@ cpp use "<unistd.h>"
 #typedef
 cpp struct DIR{}
 
-cpp struct dirent {
-	d_name: *integ::Char
-}
+cpp struct dirent{}
 
 cpp struct stat{}
 
@@ -23,7 +21,7 @@ cpp type _off_t: uint
 cpp fn fcntl(int, int, int): int
 cpp unsafe fn opendir(path: *integ::Char): *cpp.DIR
 cpp unsafe fn closedir(mut dir: *cpp.DIR): int
-cpp unsafe fn readdir(mut dir: *cpp.DIR): *cpp.dirent
+cpp unsafe fn readdir(mut dir: *cpp.DIR): *unsafe
 cpp unsafe fn open(path: *integ::Char, flag: int, mode: int): int
 cpp unsafe fn getcwd(buff: *integ::Char, bufflen: uint): *integ::Char
 cpp unsafe fn chdir(path: *integ::Char): int
@@ -35,12 +33,6 @@ cpp unsafe fn getenv(key: *integ::Char): *integ::Char
 cpp unsafe fn setenv(key: *integ::Char, val: *integ::Char, overwrite: integ::Int): int
 cpp fn ftruncate(fd: int, size: i64): int
 cpp fn fsync(fd: int): int
-
-// C's DIR.
-type Dir: cpp.DIR
-
-// C's dirent.
-type Dirent: cpp.dirent
 
 static STDIN: uintptr = 0
 static STDOUT: uintptr = 1
@@ -93,13 +85,13 @@ unsafe fn Getcwd(buff: *byte, bufflen: uint): *byte {
 }
 
 // Calls C's opendir function.
-unsafe fn Opendir(path: *byte): *Dir { ret (*Dir)(cpp.opendir((*integ::Char)(path))) }
+unsafe fn Opendir(path: *byte): *unsafe { ret cpp.opendir((*integ::Char)(path)) }
 
 // Calls C's readdir function.
-unsafe fn Readdir(mut dir: *Dir): *Dirent { ret (*Dirent)(cpp.readdir((*cpp.DIR)(dir))) }
+unsafe fn Readdir(mut dir: *unsafe): *Dirent { ret (*Dirent)(cpp.readdir((*cpp.DIR)(dir))) }
 
 // Calls C's closedir function.
-unsafe fn Closedir(mut dir: *Dir): int { ret cpp.closedir((*cpp.DIR)(dir)) }
+unsafe fn Closedir(mut dir: *unsafe): int { ret cpp.closedir((*cpp.DIR)(dir)) }
 
 // Calls C's chdir function.
 unsafe fn Chdir(path: *byte): int { ret cpp.chdir((*integ::Char)(path)) }
