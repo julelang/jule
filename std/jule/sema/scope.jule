@@ -1574,12 +1574,24 @@ impl scopeChecker {
 	}
 
 	fn checkCase(mut &self, mut m: &Match, i: int, mut c: &ast::Case, mut expr: &Value): &Case {
+		mut enm := m.Expr.Type.Enum()
 		mut case := m.Cases[i]
 		case.Exprs = make([]&Value, 0, len(c.Exprs))
 		mut constMatched := false
 		mut eval := self.s.eval(self)
 		for (_, mut e) in c.Exprs {
-			mut v := eval.evalExprKind(e.Kind)
+			let mut v: &Value
+			if enm == nil {
+				v = eval.evalExprKind(e.Kind)
+			} else {
+				mut ident, ok := e.Kind.(&ast::IdentExpr)
+				if ok {
+					v = eval.evalEnumStatic(enm, ident.Token)
+				} else {
+					self.s.pushErr(e.Token, log::InvalidExpr)
+					self.s.pushSuggestion(log::UseFieldNameToMatchEnum)
+				}
+			}
 			if v == nil {
 				continue
 			}
