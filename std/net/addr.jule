@@ -88,9 +88,9 @@ fn SplitHostPort(hostport: str)!: (host: str, port: str) {
 
 fn internetAddr(&net: Network, mut ip: IP, port: int, zone: str): Addr {
 	match net {
-	| Network.TCP | Network.TCP4 | Network.TCP6:
+	| TCP | TCP4 | TCP6:
 		ret &TCPAddr{IP: ip, Port: port, Zone: zone}
-	| Network.UDP | Network.UDP4 | Network.UDP6:
+	| UDP | UDP4 | UDP6:
 		ret &UDPAddr{IP: ip, Port: port, Zone: zone}
 	|:
 		panic("net: unexpected network: " + str(net))
@@ -129,8 +129,8 @@ fn resolveInternetAddr(&net: Network, &addr: str)!: Addr {
 	mut host, mut port := "", ""
 	mut portnum := 0
 	match net {
-	| Network.TCP | Network.TCP4 | Network.TCP6
-	| Network.UDP | Network.UDP4 | Network.UDP6:
+	| TCP | TCP4 | TCP6
+	| UDP | UDP4 | UDP6:
 		host, port = SplitHostPort(addr) else { error(error) }
 		(portnum), ok := conv::Atoi(port)
 		if !ok {
@@ -149,14 +149,14 @@ fn resolveInternetAddr(&net: Network, &addr: str)!: Addr {
 	match type ip {
 	| IP:
 		match net {
-		| Network.UDP6 | Network.UDP6:
+		| UDP6 | UDP6:
 			ret nil
-		| Network.TCP | Network.TCP4:
+		| TCP | TCP4:
 			ret &TCPAddr{
 				IP: ip.(IP),
 				Port: portnum,
 			}
-		| Network.UDP | Network.UDP4:
+		| UDP | UDP4:
 			ret &UDPAddr{
 				IP: ip.(IP),
 				Port: portnum,
@@ -167,21 +167,21 @@ fn resolveInternetAddr(&net: Network, &addr: str)!: Addr {
 	| TCPAddr:
 		mut ipAddr := ip.(TCPAddr)
 		match net {
-		| Network.TCP:
+		| TCP:
 			ipAddr.Port = portnum
 			ret new(TCPAddr, ipAddr)
-		| Network.UDP:
+		| UDP:
 			ret &UDPAddr{
 				IP: ipAddr.IP,
 				Zone: ipAddr.Zone,
 				Port: portnum,
 			}
-		| Network.TCP4:
+		| TCP4:
 			if !ipAddr.IP.To4().Empty() {
 				ipAddr.Port = portnum
 				ret new(TCPAddr, ipAddr)
 			}
-		| Network.UDP4:
+		| UDP4:
 			if !ipAddr.IP.To4().Empty() {
 				ret &UDPAddr{
 					IP: ipAddr.IP,
@@ -189,12 +189,12 @@ fn resolveInternetAddr(&net: Network, &addr: str)!: Addr {
 					Port: portnum,
 				}
 			}
-		| Network.TCP6:
+		| TCP6:
 			if len(ipAddr.IP) == IPv6Len && ipAddr.IP.To4().Empty() {
 				ipAddr.Port = portnum
 				ret new(TCPAddr, ipAddr)
 			}
-		| Network.UDP6:
+		| UDP6:
 			if len(ipAddr.IP) == IPv6Len && ipAddr.IP.To4().Empty() {
 				ret &UDPAddr{
 					IP: ipAddr.IP,
@@ -209,24 +209,24 @@ fn resolveInternetAddr(&net: Network, &addr: str)!: Addr {
 
 fn buildLocalhostAddr(&net: Network, port: int): Addr {
 	match net {
-	| Network.TCP | Network.TCP4:
+	| TCP | TCP4:
 		ret &TCPAddr{
 			IP: IPv4(127, 0, 0, 1),
 			Port: port,
 		}
-	| Network.UDP | Network.UDP4:
+	| UDP | UDP4:
 		ret &UDPAddr{
 			IP: IPv4(127, 0, 0, 1),
 			Port: port,
 		}
-	| Network.TCP6:
+	| TCP6:
 		mut ip := make(IP, IPv6Len)
 		ip[len(ip)-1] = 1
 		ret &TCPAddr{
 			IP: ip,
 			Port: port,
 		}
-	| Network.UDP6:
+	| UDP6:
 		mut ip := make(IP, IPv6Len)
 		ip[len(ip)-1] = 1
 		ret &UDPAddr{
