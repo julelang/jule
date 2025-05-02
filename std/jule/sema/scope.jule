@@ -1573,7 +1573,7 @@ impl scopeChecker {
 		ret self.checkChildSc(tree, ssc)
 	}
 
-	fn checkCase(mut &self, mut m: &Match, i: int, mut c: &ast::Case, mut expr: &Value): &Case {
+	fn checkCase(mut &self, mut m: &Match, mut astm: &ast::Match, i: int, mut c: &ast::Case, mut expr: &Value): &Case {
 		mut enm := getMatchEnum(m.Expr.Type)
 		mut case := m.Cases[i]
 		case.Exprs = make([]&Value, 0, len(c.Exprs))
@@ -1601,7 +1601,7 @@ impl scopeChecker {
 				// Parser always tries to build type declarations for type-match cases.
 				// So, v is should be type declaration already.
 				case.Exprs = append(case.Exprs, v)
-				if countMatchType(m, v.Type, 0) > 1 {
+				if countMatchType(m, v.Type, 2) > 1 {
 					self.s.pushErr(e.Token, log::DuplicateMatchType, v.Type.Str())
 				}
 				if m.Comptime {
@@ -1676,7 +1676,7 @@ impl scopeChecker {
 		}
 
 		for (i, mut c) in m.Cases {
-			self.checkCase(rm, i, c, expr)
+			self.checkCase(rm, m, i, c, expr)
 		}
 	}
 
@@ -1853,11 +1853,27 @@ impl scopeChecker {
 			ok := self.checkAllTypeEnumCasesHandled(tm, te, sb)
 			if !ok {
 				self.s.pushErr(m.Token, log::MatchTypeStmtDoesNotHandleAllCases, sb.Str())
-				self.s.pushSuggestion(log::HandleMissingTypesOrAddDefault)
+				self.s.pushSuggestion(log::HandleMissingCasesOrAddDefault)
 			}
 		}
 
 		self.scope.Stmts = append(self.scope.Stmts, tm)
+	}
+
+	fn checkAllEnumCasesHandled(mut &self, mut m: &ast::Match, mut enm: &Enum) {
+		mut sb := strings::Builder{}
+		for _, item in enm.Items {
+			if countMatchEnum(m, item.Ident, 1) == 0 {
+				if sb.Len() > 0 {
+					sb.WriteStr(", ")!
+				}
+				sb.WriteStr(item.Ident)!
+			}
+		}
+		if sb.Len() > 0 {
+			self.s.pushErr(m.Token, log::MatchEnumStmtDoesNotHandleAllCases, sb.Str())
+			self.s.pushSuggestion(log::HandleMissingCasesOrAddDefault)
+		}
 	}
 
 	fn checkCommonMatch(mut &self, mut &m: &ast::Match) {
@@ -1898,6 +1914,10 @@ impl scopeChecker {
 		// will may log error(s) even semantic is good.
 		self.scope.Stmts = append(self.scope.Stmts, mc)
 
+		// Save the current error count of semantic analysis.
+		// It will be used to detect new errors, if any.
+		errors := len(self.s.errors)
+
 		// Do not check default if comptime matching enabled.
 		// We do not know any case will be matched yet.
 		// The [self.processConstMatch] will check cases and if not exist
@@ -1905,10 +1925,18 @@ impl scopeChecker {
 		if !mc.Comptime && m.Default != nil {
 			mc.Default = self.checkDefault(mc, m.Default)
 		}
-
 		self.checkCases(m, mc, v)
 		if mc.Comptime {
 			self.processConstMatch(mc, m)
+		}
+		// If there is no error for this match statement,
+		// check the cases for enum if matching an enum.
+		// If match statement have a default case, avoid evaluation cost, handled all cases.
+		if mc.Default == nil && errors == len(self.s.errors) {
+			mut enm := getMatchEnum(mc.Expr.Type)
+			if enm != nil {
+				self.checkAllEnumCasesHandled(m, enm)
+			}
 		}
 	}
 
@@ -2555,6 +2583,25 @@ fn stmtIsDef(&stmt: Stmt): bool {
 	}
 }
 
+// Counts matched fields with x and returns the result.
+// If limit=0, counts all fields, otherwise the count is limited by the limit.
+fn countMatchEnum(&m: &ast::Match, x: str, limit: int): int {
+	mut n := 0
+loop:
+	for _, c in m.Cases {
+		for _, expr in c.Exprs {
+			name := expr.Kind.(&ast::IdentExpr)
+			if name.Ident == x {
+				n++
+				if limit != 0 && n >= limit {
+					break loop
+				}
+			}
+		}
+	}
+	ret n
+}
+
 // Counts matched types with t and returns the result.
 // If limit=0, counts all types, otherwise the count is limited by the limit.
 fn countMatchType(&m: &Match, &t: &Type, limit: int): int {
@@ -2573,7 +2620,7 @@ loop:
 			if t.Equal(expr.Model.(&Type)) {
 				n++
 				if limit != 0 && n >= limit {
-					break
+					break loop
 				}
 			}
 		}
