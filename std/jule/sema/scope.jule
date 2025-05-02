@@ -1640,6 +1640,13 @@ impl scopeChecker {
 			}
 
 			case.Exprs = append(case.Exprs, v)
+			// If matching an enum, check for the duplicate cases.
+			if enm != nil {
+				name := e.Kind.(&ast::IdentExpr)
+				if countMatchEnum(astm, name.Ident, 2) > 1 {
+					self.s.pushErr(e.Token, log::DuplicateCase, name.Ident)
+				}
+			}
 			if !m.Comptime ||
 				expr.Type.comptimeTypeInfo() == nil ||
 				v.Type.comptimeTypeInfo() == nil {
