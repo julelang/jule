@@ -71,9 +71,7 @@ const bitsetEmpty = 0b10000000_10000000_10000000_10000000_10000000_10000000_1000
 // Find operations first probe the controls bytes
 // to filter candidates before matching keys.
 struct bitset {
-	// Start a bitset with constant empty array for fast initialization.
-	// Thus we do not have to initialize allocated new bitsets.
-	bits: u64 = bitsetEmpty
+	bits: u64
 }
 
 impl bitset {
@@ -133,6 +131,12 @@ impl bitset {
 	}
 }
 
+fn initBitsets(mut bs: []bitset) {
+	for i in bs {
+		bs[i].bits = bitsetEmpty
+	}
+}
+
 // Returns the minimum number of groups needed to store |n| elems.
 fn numGroups(n: u32): (groups: u32) {
 	groups = (n + maxAvgGroupLoad - 1) / maxAvgGroupLoad
@@ -187,7 +191,8 @@ impl _Map {
 
 	fn initData(mut self, cap: u32) {
 		groups := numGroups(cap)
-		self.ctrl = make([]bitset, groups) // The bitsets will be initialized to empty.
+		self.ctrl = make([]bitset, groups)
+		initBitsets(self.ctrl)
 		self.groups = make([]group[K, V], groups)
 		self.limit = groups * maxAvgGroupLoad
 	}
@@ -206,7 +211,8 @@ impl _Map {
 
 		mut groups, ctrl := self.groups, self.ctrl
 		self.groups = make([]group[K, V], n)
-		self.ctrl = make([]bitset, n) // The bitsets will be initialized to empty.
+		self.ctrl = make([]bitset, n)
+		initBitsets(self.ctrl)
 		self.limit = n * maxAvgGroupLoad
 		self.resident, self.dead = 0, 0
 		for g in ctrl {
