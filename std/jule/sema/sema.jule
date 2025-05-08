@@ -68,6 +68,18 @@ fn appendRetVars(mut &dest: []&Var, mut &f: &FuncIns) {
 		ret
 	}
 
+	mut rst := RetState.NA
+	match len(f.Decl.Result.Idents) {
+	| 0:
+		// no-op
+	| 1:
+		// There is only one return type, not tuple.
+		rst = RetState.Single
+	|:
+		// There is more than one return type, it is tuple.
+		rst = RetState.Tuple
+	}
+
 	mut types := f.Types()
 	for (i, mut ident) in f.Decl.Result.Idents {
 		if jule::IsBlank(ident.Kind) || jule::IsAnon(ident.Kind) {
@@ -85,11 +97,9 @@ fn appendRetVars(mut &dest: []&Var, mut &f: &FuncIns) {
 			ValueSym: &ValueSym{
 				Value: new(Value),
 			},
+			RetState: rst,
 			RetOrder: i,
 		})
-	}
-	if len(f.Decl.Result.Idents) == 1 && len(dest) == 1 {
-		dest[len(dest)-1].RetOrder = -1
 	}
 }
 
