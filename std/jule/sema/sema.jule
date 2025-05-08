@@ -2336,7 +2336,6 @@ impl sema {
 		}
 
 		ok = true
-		mut eval := self.eval(self)
 		s.Comparable = !s.Decl.Binded
 		for (_, mut f) in s.Fields {
 			// Set instance for referencer if field declaration is not mutable.
@@ -2364,30 +2363,6 @@ impl sema {
 			// See developer reference (10.2.1).
 			s.Mutable = s.Mutable || (!f.Decl.Mutable && f.Type.Mutable())
 			s.Comparable = s.Comparable && f.Type.Comparable()
-
-			// Skip this field if not has default value.
-			if f.Decl.Default == nil {
-				continue
-			}
-			eval.prefix = f.Type
-			eval.field = f
-			eval.target.mutable = true // struct may used as mutable, expressions should be mutable
-			// Do not unwrap untyped literals, type analysis will check overflows.
-			f.Default = eval.evalExpr(f.Decl.Default, evalDefault)
-
-			// Skip if eval returned nil.
-			// Relevant error(s) logged by eval.
-			if f.Default == nil {
-				continue
-			}
-
-			if !f.Default.IsConst() {
-				self.pushErr(f.Decl.Default.Token, log::ExprNotConst)
-				continue
-			}
-
-			const Reference = false // Fields cannot be reference.
-			_ = self.checkAssignType(Reference, f.Type, f.Default, f.Decl.Default.Token, s.Refers)
 		}
 		ret
 	}
