@@ -719,8 +719,8 @@ struct referencer {
 
 // Cycle state flags.
 const (
-	cycleErrEnable = 1 << iota // Enables error logging for cycle analysis.
-	cycleErrFail               // Means the last cycle analysis reports cycles exist.
+	cycleErrDisable = 1 << iota // Disable error logging for cycle analysis.
+	cycleErrFail                // Means the last cycle analysis reports cycles exist.
 )
 
 // Type analysis tags.
@@ -768,7 +768,7 @@ struct typeChecker {
 	// This generics used as type alias for real kind.
 	useGenerics: []&TypeAlias
 
-	cycleErr: int = cycleErrEnable
+	cycleErr: int
 
 	// Disallow/suppress Jule's built-in defines.
 	disBuiltin: bool
@@ -904,11 +904,11 @@ impl typeChecker {
 	}
 
 	fn checkIllegalCycles(mut self, &ident: &token::Token, mut decl: any): (ok: bool) {
-		ret self.isIllegalCycleSafe(ident, decl, self.cycleErr&cycleErrEnable == cycleErrEnable)
+		ret self.isIllegalCycleSafe(ident, decl, self.cycleErr&cycleErrDisable != cycleErrDisable)
 	}
 
 	fn isIllegalCycleSafe(mut self, &ident: &token::Token, mut decl: any, err: bool): (ok: bool) {
-		self.cycleErr &= ^cycleErrFail
+		self.cycleErr &= ^cycleErrFail // clear the cycleErrFail flag for the new analysis
 		if self.referencer == nil {
 			ret true
 		}
@@ -986,7 +986,7 @@ impl typeChecker {
 
 		{
 			ok := self.checkIllegalCycles(decl.Token, ta)
-			if !ok && self.cycleErr&cycleErrEnable == cycleErrEnable {
+			if !ok && self.cycleErr&cycleErrDisable != cycleErrDisable {
 				ret nil
 			}
 		}
@@ -1275,7 +1275,7 @@ impl typeChecker {
 				self.pushTA(taMutable)
 			}
 			ok = self.checkIllegalCycles(decl.Token, ins)
-			if !ok && self.cycleErr&cycleErrEnable == cycleErrEnable {
+			if !ok && self.cycleErr&cycleErrDisable != cycleErrDisable {
 				ret nil
 			}
 		}
@@ -1314,7 +1314,7 @@ impl typeChecker {
 				mut st := g.TypeSym.Type.Struct()
 				if st != nil {
 					ok := self.checkIllegalCycles(decl.Token, st)
-					if !ok && self.cycleErr&cycleErrEnable == cycleErrEnable {
+					if !ok && self.cycleErr&cycleErrDisable != cycleErrDisable {
 						ret nil
 					}
 				}
@@ -1572,7 +1572,7 @@ impl typeChecker {
 		// do not log as cycle error, log as invalid key type error.
 		cycleErr := self.cycleErr
 		self.cycleErr &= ^cycleErrFail
-		self.cycleErr &= ^cycleErrEnable
+		self.cycleErr |= cycleErrDisable
 		if self.referencer != nil {
 			oself := self.referencer.oself
 			self.referencer.oself = true
