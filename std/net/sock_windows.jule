@@ -52,12 +52,12 @@ unsafe fn connectSocket(handle: poll::NetHandle, sockAddr: *unsafe, sockLen: uin
 	if err != sys::WSAEWOULDBLOCK {
 		error(err)
 	}
-	fdW := sys::FdSet{}
+	mut fdW := sys::FdSet{}
 	mut fdE := sys::FdSet{}
-	sys::Fdzero(&fdW)
-	sys::Fdset(handle, &fdW)
-	sys::Fdzero(&fdE)
-	sys::Fdset(handle, &fdE)
+	fdW.Zero()
+	fdW.Set(handle)
+	fdE.Zero()
+	fdE.Set(handle)
 	res := sys::Select(0, nil, &fdW, &fdE, &tv)
 	if res <= 0 {
 		if res == 0 {
@@ -66,7 +66,7 @@ unsafe fn connectSocket(handle: poll::NetHandle, sockAddr: *unsafe, sockLen: uin
 		}
 		error(lastErrorCode())
 	}
-	if sys::FdIsset(handle, &fdE) != 0 {
+	if fdE.IsSet(handle) {
 		mut opt := (integ::Int)(0)
 		mut optLen := (integ::Int)(mem::SizeOf(opt))
 		sys::Getsockopt(handle, sys::SOL_SOCKET, sys::SO_ERROR, (*integ::Char)(&opt), &optLen)

@@ -15,9 +15,6 @@ cpp struct dirent{}
 
 cpp struct stat{}
 
-cpp type _mode_t: uint
-cpp type _off_t: uint
-
 cpp fn fcntl(int, int, int): int
 cpp unsafe fn opendir(path: *integ::Char): *cpp.DIR
 cpp unsafe fn closedir(mut dir: *cpp.DIR): int
@@ -131,4 +128,28 @@ unsafe fn Setenv(key: *byte, val: *byte, overwrite: integ::Int): bool {
 // Wrapper for C's lseek function.
 fn Seek(handle: int, offset: i64, origin: int): i64 {
 	ret cpp.lseek(handle, offset, origin)
+}
+
+impl FdSet {
+	// Adds fd to the set fds.
+	fn Set(mut self, fd: int) {
+		self.Bits[fd/NFDBITS] |= (1 << (uintptr(fd) % NFDBITS))
+	}
+
+	// Removes fd from the set fds.
+	fn Clear(mut self, fd: int) {
+		self.Bits[fd/NFDBITS] &= ^(1 << (uintptr(fd) % NFDBITS))
+	}
+
+	// Returns whether fd is in the set fds.
+	fn IsSet(mut self, fd: int): bool {
+		ret self.Bits[fd/NFDBITS]&(1<<(uintptr(fd)%NFDBITS)) != 0
+	}
+
+	// Clears the set fds.
+	fn Zero(mut self) {
+		for i in self.Bits {
+			self.Bits[i] = 0
+		}
+	}
 }
