@@ -1,0 +1,327 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/testing"
+
+struct getRuneTest {
+	s:      str
+	r:      rune
+	n:      int
+	errors: []Error
+}
+
+static getRuneTests = []getRuneTest([
+	{
+		s: "hello world",
+		r: 'h',
+		n: 1,
+		errors: nil,
+	},
+	{
+		s: "çşğüö",
+		r: 'ç',
+		n: 2,
+		errors: nil,
+	},
+	{
+		s: " ",
+		r: ' ',
+		n: 1,
+		errors: nil,
+	},
+	{
+		s: "\t",
+		r: '\t',
+		n: 1,
+		errors: nil,
+	},
+	{
+		s: "\\x00",
+		r: 0,
+		n: 4,
+		errors: nil,
+	},
+	{
+		s: "\\x41",
+		r: 'A',
+		n: 4,
+		errors: nil,
+	},
+	{
+		s: "\\101",
+		r: 'A',
+		n: 4,
+		errors: nil,
+	},
+	{
+		s: "\\051",
+		r: ')',
+		n: 4,
+		errors: nil,
+	},
+	{
+		s: "\\000",
+		r: 0,
+		n: 4,
+		errors: nil,
+	},
+	{
+		s: "\\u0000",
+		r: 0,
+		n: 6,
+		errors: nil,
+	},
+	{
+		s: "\\u0041",
+		r: 'A',
+		n: 6,
+		errors: nil,
+	},
+	{
+		s: "\\u00E7",
+		r: 'ç',
+		n: 6,
+		errors: nil,
+	},
+	{
+		s: "\\U00000000",
+		r: 0,
+		n: 10,
+		errors: nil,
+	},
+	{
+		s: "\\U00000041",
+		r: 'A',
+		n: 10,
+		errors: nil,
+	},
+	{
+		s: "\\U000000E7",
+		r: 'ç',
+		n: 10,
+		errors: nil,
+	},
+	{
+		s: "\\U0010FFFF",
+		r: '\U0010FFFF',
+		n: 10,
+		errors: nil,
+	},
+	{
+		s: "\\\\",
+		r: '\\',
+		n: 2,
+		errors: nil,
+	},
+	{
+		s: "\\'",
+		r: '\'',
+		n: 2,
+		errors: nil,
+	},
+	{
+		s: "\\a",
+		r: '\a',
+		n: 2,
+		errors: nil,
+	},
+	{
+		s: "\\b",
+		r: '\b',
+		n: 2,
+		errors: nil,
+	},
+	{
+		s: "\\f",
+		r: '\f',
+		n: 2,
+		errors: nil,
+	},
+	{
+		s: "\\n",
+		r: '\n',
+		n: 2,
+		errors: nil,
+	},
+	{
+		s: "\\r",
+		r: '\r',
+		n: 2,
+		errors: nil,
+	},
+	{
+		s: "\\t",
+		r: '\t',
+		n: 2,
+		errors: nil,
+	},
+	{
+		s: "\\v",
+		r: '\v',
+		n: 2,
+		errors: nil,
+	},
+	{
+		s: "\\z",
+		r: 0,
+		n: 0,
+		errors: [
+			Error{
+				Offset: 0,
+				Text: "invalid escape sequence, found \"\\z\"",
+			},
+		],
+	},
+	{
+		s: "\\999",
+		r: 0,
+		n: 0,
+		errors: [
+			Error{
+				Offset: 0,
+				Text: "invalid escape sequence, found \"\\z\"",
+			},
+		],
+	},
+	{
+		s: "\\04",
+		r: 0,
+		n: 0,
+		errors: [
+			Error{
+				Offset: 0,
+				Text: "invalid escape sequence, expected \"\\nnn\"",
+			},
+		],
+	},
+	{
+		s: "\\049",
+		r: 0,
+		n: 0,
+		errors: [
+			Error{
+				Offset: 0,
+				Text: "invalid escape sequence, expected \"\\nnn\"",
+			},
+		],
+	},
+	{
+		s: "\\x",
+		r: 0,
+		n: 0,
+		errors: [
+			Error{
+				Offset: 0,
+				Text: "invalid escape sequence, expected \"\\xhh\"",
+			},
+		],
+	},
+	{
+		s: "\\xgg",
+		r: 0,
+		n: 0,
+		errors: [
+			Error{
+				Offset: 0,
+				Text: "invalid escape sequence, expected \"\\xhh\"",
+			},
+		],
+	},
+	{
+		s: "\\xag",
+		r: 0,
+		n: 0,
+		errors: [
+			Error{
+				Offset: 0,
+				Text: "invalid escape sequence, expected \"\\xhh\"",
+			},
+		],
+	},
+	{
+		s: "\\u",
+		r: 0,
+		n: 0,
+		errors: [
+			Error{
+				Offset: 0,
+				Text: "invalid escape sequence, expected \"\\uhhhh\"",
+			},
+		],
+	},
+	{
+		s: "\\ugggg",
+		r: 0,
+		n: 0,
+		errors: [
+			Error{
+				Offset: 0,
+				Text: "invalid escape sequence, expected \"\\uhhhh\"",
+			},
+		],
+	},
+	{
+		s: "\\uabcg",
+		r: 0,
+		n: 0,
+		errors: [
+			Error{
+				Offset: 0,
+				Text: "invalid escape sequence, expected \"\\uhhhh\"",
+			},
+		],
+	},
+	{
+		s: "\\U",
+		r: 0,
+		n: 0,
+		errors: [
+			Error{
+				Offset: 0,
+				Text: "invalid escape sequence, expected \"\\Uhhhhhhhh\"",
+			},
+		],
+	},
+	{
+		s: "\\Ugggggggg",
+		r: 0,
+		n: 0,
+		errors: [
+			Error{
+				Offset: 0,
+				Text: "invalid escape sequence, expected \"\\Uhhhhhhhh\"",
+			},
+		],
+	},
+	{
+		s: "\\Uabcde13g",
+		r: 0,
+		n: 0,
+		errors: [
+			Error{
+				Offset: 0,
+				Text: "invalid escape sequence, expected \"\\Uhhhhhhhh\"",
+			},
+		],
+	},
+])
+
+#test
+fn testGetRune(t: &testing::T) {
+	for i, test in getRuneTests {
+		r, n, errors := GetRune(test.s)
+		if len(errors) != len(test.errors) {
+			t.Errorf("#{}: error count mismatch, expected {}, found {}", i, len(test.errors), len(errors))
+			continue
+		}
+		if n != test.n {
+			t.Errorf("#{}: length mismatch, expected {}, found {}", i, test.n, n)
+			continue
+		}
+		if r != test.r {
+			t.Errorf("#{}: output mismatch, expected {}, found {}", i, test.r, r)
+			continue
+		}
+	}
+}

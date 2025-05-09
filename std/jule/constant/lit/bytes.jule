@@ -20,10 +20,9 @@ fn IsAscii(r: rune): bool {
 	ret r <= MaxAscii
 }
 
-// Returns rune value string from literal, includes quotes.
-// Bytes are represents rune literal, allows escape sequences.
-// Returns zero rune if len(lit) == 0.
-// Assumes lit is syntaticaly and semantically correct.
+// Returns rune from literal, literal includes quotes.
+// Allows escape sequences.
+// Assumes lit is syntactically correct.
 fn ToRune(mut lit: str): (rune, errors: []Error) {
 	mut r := rune(0)
 	lit = lit[1 : len(lit)-1]
@@ -36,10 +35,24 @@ fn ToRune(mut lit: str): (rune, errors: []Error) {
 	ret r, errors
 }
 
-// Returns raw-string value string from literal, includes quotes.
-// Bytes are represents string characters.
-// Returns empty string if len(lit) == 0.
-// Assumes lit is syntaticaly and semantically correct.
+// Returns the first rune from ltieral. Quotes of the literal must be removed.
+// Allows escape sequences.
+// Checks the literal syntactically and semantically for the first rune.
+fn GetRune(mut lit: str): (r: rune, length: int, errors: []Error) {
+	if lit[0] == '\\' && len(lit) > 1 {
+		ok := checkEsqSeq(lit, errors)
+		if !ok {
+			ret 0, 0, errors
+		}
+		r, _ = runeFromEsqSeq(lit, length, errors)
+	} else {
+		r, length = utf8::DecodeRuneStr(lit)
+	}
+	ret
+}
+
+// Returns raw-string value string from literal, literal includes quotes.
+// Assumes lit is syntactically correct.
 fn ToRawStr(lit: str): str {
 	if len(lit) == 2 {
 		ret ""
@@ -47,10 +60,9 @@ fn ToRawStr(lit: str): str {
 	ret lit[1 : len(lit)-1]
 }
 
-// Returns string value string from literal, includes quotes.
-// Bytes are represents string characters, allows escape sequences.
-// Returns empty string if len(lit) == 0.
-// Assumes lit is syntaticaly and semantically correct.
+// Returns string value string from literal, literal includes quotes.
+// Allows escape sequences.
+// Assumes lit is syntactically correct.
 fn ToStr(mut lit: str): (str, errors: []Error) {
 	if len(lit) == 2 {
 		ret "", nil
@@ -77,6 +89,101 @@ fn ToStr(mut lit: str): (str, errors: []Error) {
 		}
 	}
 	ret unsafe::StrFromBytes(s), errors
+}
+
+// Checks the first escape sequence is syntacticaly correct.
+// Assumes the s starts with the escape sequence rune `\`.
+fn checkEsqSeq(s: str, mut &errors: []Error): (ok: bool) {
+	if len(s) < 2 {
+		errors = append(errors, Error{
+			Offset: 0,
+			Text: "invalid escape sequence, only used the backslash, expected sequence",
+		})
+		ret false
+	}
+	match s[1] {
+	| '\\' | '\'' | '"' | 'a' | 'b' | 'f' | 'n' | 'r' | 't' | 'v':
+		ret true
+	| 'u':
+		if len(s) < 6 {
+			errors = append(errors, Error{
+				Offset: 0,
+				Text: "invalid escape sequence, expected \"\\uhhhh\"",
+			})
+			ret false
+		}
+		for _, r in s[2:6] {
+			if !isHex(r) {
+				errors = append(errors, Error{
+					Offset: 0,
+					Text: "invalid escape sequence, expected \"\\uhhhh\"",
+				})
+				ret false
+			}
+		}
+		ret true
+	| 'U':
+		if len(s) < 10 {
+			errors = append(errors, Error{
+				Offset: 0,
+				Text: "invalid escape sequence, expected \"\\Uhhhhhhhh\"",
+			})
+			ret false
+		}
+		for _, r in s[2:10] {
+			if !isHex(r) {
+				errors = append(errors, Error{
+					Offset: 0,
+					Text: "invalid escape sequence, expected \"\\Uhhhhhhhh\"",
+				})
+				ret false
+			}
+		}
+		ret true
+	| 'x':
+		if len(s) < 4 {
+			errors = append(errors, Error{
+				Offset: 0,
+				Text: "invalid escape sequence, expected \"\\xhh\"",
+			})
+			ret false
+		}
+		for _, r in s[2:4] {
+			if !isHex(r) {
+				errors = append(errors, Error{
+					Offset: 0,
+					Text: "invalid escape sequence, expected \"\\xhh\"",
+				})
+				ret false
+			}
+		}
+		ret true
+	|:
+		if !isOctal(rune(s[1])) {
+			errors = append(errors, Error{
+				Offset: 0,
+				Text: "invalid escape sequence, found \"\\"+str(s[1])+"\"",
+			})
+			ret false
+		}
+		if len(s) < 4 {
+			errors = append(errors, Error{
+				Offset: 0,
+				Text: "invalid escape sequence, expected \"\\nnn\"",
+			})
+			ret false
+		}
+		for _, r in s[1:4] {
+			if !isOctal(r) {
+				errors = append(errors, Error{
+					Offset: 0,
+					Text: "invalid escape sequence, expected \"\\nnn\"",
+				})
+				ret false
+			}
+		}
+		ret true
+	}
 }
 
 fn tryBtoaCommonEsq(s: str): (seq: byte, ok: bool) {
@@ -109,6 +216,9 @@ fn tryBtoaCommonEsq(s: str): (seq: byte, ok: bool) {
 	ret
 }
 
+// Decodes the first escape sequence rune from ltieral s, i is the start position of the decoding.
+// Advances the i by size of decoded rune.
+// Assumes literal is syntactically correct.
 fn runeFromEsqSeq(s: str, mut &i: int, mut &errors: []Error): (r: rune, isByte: bool) {
 	b, ok := tryBtoaCommonEsq(s[i:])
 	i++ // Skip escape sequence solidus.
@@ -159,6 +269,10 @@ fn runeFromEsqSeq(s: str, mut &i: int, mut &errors: []Error): (r: rune, isByte: 
 	ret
 }
 
+// Decodes the escape sequence rune from ltieral s, i is the start position of the decoding.
+// Advances the i by size of decoded rune.
+// Assumes literal is syntactically correct.
+// The decoded rune will be appended to buf.
 fn strEsqSeq(mut &buf: []byte, s: str, mut &i: int, mut &errors: []Error) {
 	r, isByte := runeFromEsqSeq(s, i, errors)
 	if isByte {
@@ -167,4 +281,21 @@ fn strEsqSeq(mut &buf: []byte, s: str, mut &i: int, mut &errors: []Error) {
 	}
 	// Unicode code point.
 	buf = utf8::AppendRune(buf, r)
+}
+
+// Reports whether rune is octal sequence.
+fn isOctal(r: rune): bool { ret '0' <= r && r <= '7' }
+
+// Reports whether rune is hexadecimal sequence.
+fn isHex(r: rune): bool {
+	match {
+	| '0' <= r && r <= '9':
+		ret true
+	| 'a' <= r && r <= 'f':
+		ret true
+	| 'A' <= r && r <= 'F':
+		ret true
+	|:
+		ret false
+	}
 }
