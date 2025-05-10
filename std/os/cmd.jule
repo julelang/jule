@@ -101,80 +101,41 @@ impl Cmd {
 
 	// Sets reader that will be connected to the command's
 	// standard input when the command starts.
-	// The reader may be &File or &Stdio; all files will be accepted, if reader
-	// is a &Stdio, it should be stdin typically received from [Stdin] function.
 	// The reader will not be closed automatically after [Cmd.Wait] sees the command exit.
-	fn Stdin(self, mut r: io::Reader)! {
+	fn Stdin(self, mut r: &File)! {
 		if self.stdin != nil {
 			error(errors::New("std/os: Cmd.Stdin used when stdin already assigned"))
 		}
 		if atomic::Load(self.started, atomic::Acquire) == 1 {
 			error(errors::New("std/os: Cmd.Stdin after process started"))
 		}
-		match type r {
-		| &File:
-			self.stdin = r.(&File)
-		| &Stdio:
-			mut stdio := r.(&Stdio)
-			if stdio.file != stdin {
-				error(errors::New("std/os: Cmd.Stdin: passed Stdio but it is not stdin"))
-			}
-			self.stdout = unsafe { stdio.File() }
-		|:
-			error(errors::New("std/os: Cmd.Stdin: passed io::Writer with invalid underliying type"))
-		}
+		self.stdin = r
 	}
 
 	// Sets writer that will be connected to the command's
 	// standard output when the command starts.
-	// The writer may be &File or &Stdio; all files will be accepted, if writer
-	// is a &Stdio, it should be stdout or stderr typically received from [Stdin] or [Stderr] function.
 	// The reader will not be closed automatically after [Cmd.Wait] sees the command exit.
-	fn Stdout(self, mut w: io::Writer)! {
+	fn Stdout(self, mut w: &File)! {
 		if self.stdout != nil {
 			error(errors::New("std/os: Cmd.Stdout used when stdout already assigned"))
 		}
 		if atomic::Load(self.started, atomic::Acquire) == 1 {
 			error(errors::New("std/os: Cmd.Stdout after process started"))
 		}
-		match type w {
-		| &File:
-			self.stdout = w.(&File)
-		| &Stdio:
-			mut stdio := w.(&Stdio)
-			if stdio.file != stdout && stdio.file != stderr {
-				error(errors::New("std/os: Cmd.Stdout: passed Stdio but it is not stdout or stderr"))
-			}
-			self.stdout = unsafe { stdio.File() }
-		|:
-			error(errors::New("std/os: Cmd.Stdout: passed io::Writer with invalid underliying type"))
-		}
+		self.stdout = w
 	}
 
 	// Sets writer that will be connected to the command's
 	// standard error when the command starts.
-	// The writer may be &File or &Stdio; all files will be accepted, if writer
-	// is a &Stdio, it should be stdout or stderr typically received from [Stdin] or [Stderr] function.
 	// The reader will not be closed automatically after [Cmd.Wait] sees the command exit.
-	fn Stderr(self, mut w: io::Writer)! {
+	fn Stderr(self, mut w: &File)! {
 		if self.stderr != nil {
 			error(errors::New("std/os: Cmd.Stderr used when stderr already assigned"))
 		}
 		if atomic::Load(self.started, atomic::Acquire) == 1 {
 			error(errors::New("std/os: Cmd.Stderr after process started"))
 		}
-		match type w {
-		| &File:
-			self.stderr = w.(&File)
-		| &Stdio:
-			mut stdio := w.(&Stdio)
-			if stdio.file != stdout && stdio.file != stderr {
-				error(errors::New("std/os: Cmd.Stdout: passed Stdio but it is not stdout or stderr"))
-			}
-			self.stdout = unsafe { stdio.File() }
-		|:
-			error(errors::New("std/os: Cmd.Stderr: passed io::Writer with invalid underliying type"))
-		}
+		self.stderr = w
 	}
 
 	// Returns a pipe that will be connected to the command's
