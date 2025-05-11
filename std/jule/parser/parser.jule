@@ -1201,7 +1201,16 @@ impl parser {
 		mut i := 0
 		f.Kind, _ = unsafe { self.buildType(tokens, &i, true) }
 		if i < len(tokens) {
-			self.pushErr(tokens[i], log::InvalidSyntax)
+			mut token := tokens[i]
+			if token.Id == token::Lit {
+				f.Tag = token
+				i++
+				if i < len(tokens) {
+					self.pushErr(tokens[i], log::InvalidSyntax)
+				}
+			} else {
+				self.pushErr(tokens[i], log::InvalidSyntax)
+			}
 		}
 		f.Public = mod::IsPub(f.Ident)
 		ret f

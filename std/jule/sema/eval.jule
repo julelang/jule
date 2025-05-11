@@ -178,18 +178,6 @@ impl eval {
 		ret true
 	}
 
-	fn pushErrorsFromLitError(mut self, &l: &ast::LitExpr, errors: []lit::Error) {
-		for _, err in errors {
-			self.s.errors = append(self.s.errors, log::Log{
-				Kind: log::Error,
-				Row: l.Token.Row,
-				Column: l.Token.Column+err.Offset,
-				Path: l.Token.File.Path,
-				Text: err.Text,
-			})
-		}
-	}
-
 	fn litStr(mut self, &l: &ast::LitExpr): &Value {
 		mut s := ""
 		if token::IsRawStr(l.Value) {
@@ -198,7 +186,7 @@ impl eval {
 			mut errors := []lit::Error(nil)
 			s, errors = lit::ToStr(l.Value)
 			if len(errors) != 0 {
-				self.pushErrorsFromLitError(l, errors)
+				self.s.pushErrorsFromLitErrors(l.Token, errors)
 				ret nil
 			}
 		}
@@ -216,7 +204,7 @@ impl eval {
 	fn litRune(mut self, &l: &ast::LitExpr): &Value {
 		r, errors := lit::ToRune(l.Value)
 		if len(errors) != 0 {
-			self.pushErrorsFromLitError(l, errors)
+			self.s.pushErrorsFromLitErrors(l.Token, errors)
 			ret nil
 		}
 		mut data := &Value{

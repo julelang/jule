@@ -1,0 +1,163 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/jule/constant/lit"
+use "std/jule/token"
+use "std/strings"
+use "std/unicode"
+use "std/unicode/utf8"
+
+// Structure field tag checker.
+struct tagChecker {
+	s:   &sema
+	f:   &Field
+	off: int // leading offset for tags
+}
+
+impl tagChecker {
+	fn getKey(mut self, tag: str, mut &i: int): str {
+		j := i
+		for k, r in tag[i:] {
+			if unicode::IsSpace(r) {
+				self.s.pushErrorFromLitError(self.f.Tag, lit::Error{
+					Offset: self.off+i,
+					Text: "space cannot be part of key",
+				})
+				ret ""
+			}
+			if r == ':' {
+				ret tag[j : j+k]
+			}
+			i += utf8::RuneLen(r)
+		}
+		ret tag[j:]
+	}
+
+	fn getValue(mut self, tag: str, mut &i: int): str {
+		{
+			r, _ := utf8::DecodeRuneStr(tag[i:])
+			if r != '"' {
+				self.s.pushErrorFromLitError(self.f.Tag, lit::Error{
+					Offset: self.off+i,
+					Text: "invalid value sequence, expected '\"', found '"+str(r)+"'",
+				})
+				ret ""
+			}
+		}
+		i++
+		if i >= len(tag) {
+			self.s.pushErrorFromLitError(self.f.Tag, lit::Error{
+				Offset: self.off+i,
+				Text: "missing closing quote of value, expected '\"', found EOF",
+			})
+			ret ""
+		}
+		mut value := strings::Builder{}
+		for {
+			mut r, _ := utf8::DecodeRuneStr(tag[i:])
+			if r == '"' {
+				ret value.Str()
+			}
+			r, n, mut errors := lit::GetRune(tag[i:])
+			if len(errors) > 0 {
+				for j in errors {
+					errors[j].Offset += self.off + i
+				}
+				self.s.pushErrorsFromLitErrors(self.f.Tag, errors)
+				ret ""
+			}
+			i += n
+			value.WriteRune(r)!
+		}
+		self.s.pushErrorFromLitError(self.f.Tag, lit::Error{
+			Offset: self.off+i,
+			Text: "missing closing quote of value, expected '\"', found EOF",
+		})
+		ret ""
+	}
+
+	fn parseTags(mut self, tag: str): (ok: bool) {
+		mut i := 0
+		for i < len(tag); i++ {
+			keyPos := i
+			key := self.getKey(tag, i)
+			if key == "" {
+				ret false
+			}
+			if i >= len(tag) {
+				self.s.pushErrorFromLitError(self.f.Tag, lit::Error{
+					Offset: self.off+i,
+					Text: "missing value for the key, expected ':', found EOF",
+				})
+				ret false
+			}
+			mut r, _ := utf8::DecodeRuneStr(tag[i:])
+			if r != ':' {
+				self.s.pushErrorFromLitError(self.f.Tag, lit::Error{
+					Offset: self.off+i,
+					Text: "missing value for the key, expected ':', found '"+str(r)+"'",
+				})
+				ret false
+			}
+			i++
+			if i >= len(tag) {
+				self.s.pushErrorFromLitError(self.f.Tag, lit::Error{
+					Offset: self.off+i,
+					Text: "missing value for the key, expected value, found EOF",
+				})
+				ret false
+			}
+			value := self.getValue(tag, i)
+			if value == "" {
+				ret false
+			}
+			_, exist := self.f.Tags[key]
+			if exist {
+				self.s.pushErrorFromLitError(self.f.Tag, lit::Error{
+					Offset: self.off+keyPos,
+					Text: "key \""+key+"\" already exist",
+				})
+				ret false
+			}
+			self.f.Tags[key] = value
+			i++
+			if i >= len(tag) {
+				// EOF
+				ret true
+			}
+			// Trailing rune, tags mut be separated by whitespaces.
+			r, _ = utf8::DecodeRuneStr(tag[i:])
+			if r != ' ' {
+				self.s.pushErrorFromLitError(self.f.Tag, lit::Error{
+					Offset: self.off+i,
+					Text: "tags must be separated by the whitespace",
+				})
+				ret false
+			}
+		}
+		ret true
+	}
+
+	fn check(mut self): (ok: bool) {
+		mut tag := ""
+		if token::IsRawStr(self.f.Tag.Kind) {
+			tag = lit::ToRawStr(self.f.Tag.Kind)
+		} else {
+			mut errors := []lit::Error(nil)
+			tag, errors = lit::ToStr(self.f.Tag.Kind)
+			if len(errors) != 0 {
+				self.s.pushErrorsFromLitErrors(self.f.Tag, errors)
+				ret false
+			}
+		}
+
+		// add offset for removed leading special runes
+		self.off++ // for quote of literal
+
+		self.f.Tags = map[str]str{}
+
+		ok = self.parseTags(tag)
+		ret
+	}
+}

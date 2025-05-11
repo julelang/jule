@@ -1,0 +1,97 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/jule/token"
+use "std/testing"
+
+struct tagTest {
+	lit:  str
+	tags: map[str]str
+}
+
+static tagTests = []tagTest([
+	{
+		lit: "`foo:\"bar\"`",
+		tags: map[str]str{
+			"foo": "bar",
+		},
+	},
+	{
+		lit: "`f_oo:\"bar\"`",
+		tags: map[str]str{
+			"f_oo": "bar",
+		},
+	},
+	{
+		lit: "\"foo:\\\"bar\\\"\"",
+		tags: map[str]str{
+			"foo": "bar",
+		},
+	},
+	{
+		lit: "`foo:\"\\u00E7\"`",
+		tags: map[str]str{
+			"foo": "ç",
+		},
+	},
+	{
+		lit: "\"foo:\\\"\\\\u00E7\\\"\"",
+		tags: map[str]str{
+			"foo": "ç",
+		},
+	},
+	{
+		lit: "\"foo:\\\"\\u00E7\\\"\"",
+		tags: map[str]str{
+			"foo": "ç",
+		},
+	},
+	{
+		lit: "`foo:\"bar\" baz:\"foo\"`",
+		tags: map[str]str{
+			"foo": "bar",
+			"baz": "foo",
+		},
+	},
+	{
+		lit: "`fo34çöğ;)(9384#o:\"foo\"`",
+		tags: map[str]str{
+			"fo34çöğ;)(9384#o": "foo",
+		},
+	},
+])
+
+#test
+fn testTags(t: &testing::T) {
+	mut f := &Field{
+		Tag: &token::Token{
+			File: &token::Fileset{
+				Path: "/jule/test",
+			},
+		},
+	}
+	mut tc := &tagChecker{
+		s: new(sema),
+		f: f,
+	}
+	for i, test in tagTests {
+		f.Tag.Kind = test.lit
+		ok := tc.check()
+		if !ok {
+			t.Errorf("#{} checking failed", i)
+			continue
+		}
+		if len(f.Tags) != len(test.tags) {
+			t.Errorf("#{} f.Tags != test.tags, expected {}, found {}", i, test.tags, f.Tags)
+			continue
+		}
+		for k, v in test.tags {
+			v2, exist := f.Tags[k]
+			if !exist || v != v2 {
+				t.Errorf("#{} f.Tags != test.tags, expected {}, found {}", i, test.tags, f.Tags)
+				break
+			}
+		}
+	}
+}

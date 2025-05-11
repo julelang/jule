@@ -6,6 +6,7 @@ use "std/jule"
 use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/constant"
+use "std/jule/constant/lit"
 use "std/jule/directive"
 use "std/jule/internal/mod"
 use "std/jule/log"
@@ -383,6 +384,23 @@ impl sema {
 
 	fn pushErr(mut self, token: &token::Token, fmt: str, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, true, fmt, args...))
+	}
+
+	fn pushErrorFromLitError(mut self, t: &token::Token, err: lit::Error) {
+		self.errors = append(self.errors, log::Log{
+			Kind: log::Error,
+			Row: t.Row,
+			Column: t.Column+err.Offset,
+			Path: t.File.Path,
+			Text: err.Text,
+			Line: t.File.GetRow(t.Row),
+		})
+	}
+
+	fn pushErrorsFromLitErrors(mut self, t: &token::Token, errors: []lit::Error) {
+		for _, err in errors {
+			self.pushErrorFromLitError(t, err)
+		}
 	}
 
 	// Push suggestion to last log.
@@ -1894,6 +1912,20 @@ impl sema {
 		ret ok
 	}
 
+	fn checkStructFieldTags(mut &self, mut &s: &Struct): (ok: bool) {
+		ok = true
+		mut tc := tagChecker{
+			s: self,
+		}
+		for (_, mut f) in s.Fields {
+			if f.Tag != nil {
+				tc.f = f
+				ok = tc.check() && ok
+			}
+		}
+		ret
+	}
+
 	fn checkStructDecl(mut &self, mut &s: &Struct) {
 		if jule::IsBlank(s.Ident) {
 			self.pushErr(s.Token, log::IgnoreIdent)
@@ -1907,6 +1939,7 @@ impl sema {
 		match {
 		| !self.checkDeclGenerics(s.Generics):
 		| !self.checkStructFields(s):
+		| !self.checkStructFieldTags(s):
 		| !self.checkStructImpls(s):
 		| !self.checkFuncDeclsBy(s.Methods):
 		}
