@@ -1984,6 +1984,26 @@ impl comptimeDecl {
 		}
 	}
 
+	fn _Tags(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Tags")
+			ret nil
+		}
+		match type self.decl {
+		| &Field:
+			f := self.decl.(&Field)
+			mut constant := constant::Const.NewI64(i64(len(f.Tags)))
+			ret &Value{
+				untyped: true,
+				Type: primInt,
+				Constant: constant,
+				Model: constant,
+			}
+		|:
+			panic("sema: comptimeDecl.Tags: unimplemented declaration kind")
+		}
+	}
+
 	fn subIdent(mut &self, &ident: str): &Value {
 		match ident {
 		| "Name":
@@ -2053,6 +2073,13 @@ impl comptimeDecl {
 			mut method := &FuncIns{
 				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Methods(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Tags":
+			mut method := &FuncIns{
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
+					ret self._Tags(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
