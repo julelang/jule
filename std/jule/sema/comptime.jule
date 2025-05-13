@@ -2040,6 +2040,41 @@ impl comptimeDecl {
 		}
 	}
 
+	fn _IsTag(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
+		if len(fc.Args) > 1 {
+			e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "IsTag")
+			ret nil
+		}
+		f, field := self.decl.(&Field)
+		if !field {
+			e.pushErr(fc.Token, log::InvalidTypeForFunc, self.declAsStr(), "IsTag")
+			ret nil
+		}
+		mut arg := fc.Args[0]
+		mut v := e.evalExpr(arg, evalDefault)
+		if v == nil {
+			ret nil
+		}
+		if !v.IsConst() {
+			e.pushErr(arg.Token, log::ExprNotConst)
+			ret nil
+		}
+		prim := v.Type.Prim()
+		if prim == nil || !prim.IsStr() {
+			e.pushErr(arg.Token, log::IncompatibleTypes, str(types::Str), v.Type.Str())
+			ret nil
+		}
+		key := v.Constant.ReadStr()
+		_, exist := f.Tags[key]
+		mut constant := constant::Const.NewBool(exist)
+		ret &Value{
+			untyped: true,
+			Type: primBool,
+			Constant: constant,
+			Model: constant,
+		}
+	}
+
 	fn subIdent(mut &self, &ident: str): &Value {
 		match ident {
 		| "Name":
@@ -2123,6 +2158,13 @@ impl comptimeDecl {
 			mut method := &FuncIns{
 				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Tag(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "IsTag":
+			mut method := &FuncIns{
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
+					ret self._IsTag(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
