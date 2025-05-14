@@ -469,11 +469,13 @@ impl jsonDecoder {
 			const tt = comptime::TypeOf(T).Decl()
 			const vt = comptime::ValueOf(t)
 			const fields = tt.Fields()
-			const for _, field in fields {
+			const for i, field in fields {
+				const tag = field.Tag("json")
 				const match {
-				| field.Public():
-					if keyS == field.Name() {
-						const fieldV = vt.Field(field.Name())
+				| field.Public() | tag != "":
+					name := getFieldName[T](field.Public(), field.Name(), tag)
+					if name != "" && keyS == name {
+						const fieldV = vt.FieldByIndex(i)
 						self.value(fieldV.Unwrap()) else { error(error) }
 						// Skip undecoded field handling and trailing if blocks if exist.
 						goto fieldDecoded
@@ -781,7 +783,14 @@ impl jsonDecoder {
 //		Unicode replacement character U+FFFD.
 //
 //	Structs:
-//		Decode as JSON objects with only public fields of struct.
+//		Decode as JSON objects with only visible fields of struct.
+//
+//		The private and anonymous fields will be igored.
+//		If the field is public, the field name will be used.
+//		If the field have a json tag, the json tag will be used even if field is private or anonymous.
+//		If the field have json tag but it is duplicate, the field will be ignored.
+//		A valid JSON tag must contain only Unicode letter, digit or punctuation
+//		except quote chars and backslash.
 //
 //	Arrays:
 //		Decode as JSON array.

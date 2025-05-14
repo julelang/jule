@@ -425,3 +425,34 @@ fn testCustomEncode3(t: &testing::T) {
 		t.Errorf("want true, found {}", str(r))
 	}
 }
+
+struct taggedFields {
+	Foo: int
+	foo: int
+	fo1: int `json:"foo1"`
+	bar: int `json:"baz"`
+	baz: int `json:"Foo"`
+	Bar: int `json:"-"`
+}
+
+#test
+fn testTaggedFields(t: &testing::T) {
+	mut tf := taggedFields{10, 20, 30, 40, 50, 60}
+	data := Encode(tf) else {
+		t.Errorf("tagged fields returns exception for Encode")
+		ret
+	}
+	if str(data) != `{"Foo":10,"foo1":30,"baz":40}` {
+		t.Errorf("tagged fields encode incorrect")
+		ret
+	}
+	tf = taggedFields{}
+	Decode(data, tf) else {
+		t.Errorf("tagged fields returns exception for Decode")
+		ret
+	}
+	if (tf != taggedFields{Foo: 10, fo1: 30, bar: 40}) {
+		t.Errorf("tagged fields decode incorrect")
+		ret
+	}
+}

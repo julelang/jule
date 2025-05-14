@@ -7,6 +7,8 @@ use "std/conv"
 use "std/encoding/base64"
 use "std/math"
 use "std/runtime"
+use "std/strings"
+use "std/unicode"
 use "std/unicode/utf8"
 use "std/unsafe"
 
@@ -235,24 +237,30 @@ impl jsonEncoder {
 		const vt = comptime::ValueOf(t)
 		const fields = tt.Fields()
 		const for i, field in fields {
+			const tag = field.Tag("json")
 			const match {
-			| field.Public():
-				const match {
-				| i > 0 && useIndent:
-					self.total += self.depth * self.indent
-					self.buf.writeByte('\n')
-				}
-				self.buf.writeStr("\"" + field.Name() + "\":")
-				const fieldValue = vt.Field(field.Name())
-				comptime::TypeAlias(fieldType, fieldValue.Type())
-				const match type Flag {
-				| encodeIndent:
-					self.buf.writeByte(' ')
-				}
-				self.encode[fieldType, Flag](fieldValue.Unwrap()) else { error(error) }
-				const match {
-				| i < len(fields)-1:
-					self.buf.writeByte(',')
+			| field.Public() | tag != "":
+				name := getFieldName[T](field.Public(), field.Name(), tag)
+				if name != "" {
+					const match {
+					| i > 0:
+						self.buf.writeByte(',')
+					}
+					const match {
+					| i > 0 && useIndent:
+						self.total += self.depth * self.indent
+						self.buf.writeByte('\n')
+					}
+					self.buf.writeStr("\"")
+					self.buf.writeStr(name)
+					self.buf.writeStr("\":")
+					const fieldValue = vt.FieldByIndex(i)
+					comptime::TypeAlias(fieldType, fieldValue.Type())
+					const match type Flag {
+					| encodeIndent:
+						self.buf.writeByte(' ')
+					}
+					self.encode[fieldType, Flag](fieldValue.Unwrap()) else { error(error) }
 				}
 			}
 		}
@@ -518,7 +526,14 @@ fn encoder(): jsonEncoder {
 //		to "\u003c", "\u003e", "\u0026", "\u2028", and "\u2029".
 //
 //	Structs:
-//		Encode as JSON objects with only public fields of struct.
+//		Encode as JSON objects with only visible fields of struct.
+//
+//		The private and anonymous fields will be igored.
+//		If the field is public, the field name will be used.
+//		If the field have a json tag, the json tag will be used even if field is private or anonymous.
+//		If the field have json tag but it is duplicate, the field will be ignored.
+//		A valid JSON tag must contain only Unicode letter, digit or punctuation
+//		except quote chars and backslash.
 //
 //	Arrays:
 //		Encode as JSON array.
@@ -588,4 +603,63 @@ fn EncodeIndent[T](t: T, indent: str)!: []byte {
 		}
 	}
 	ret buf
+}
+
+// Reports whether the JSON tag name is duplicated.
+fn isDuplicateTag[T](tag: str): bool {
+	mut i := 0
+	const t = comptime::TypeOf(T)
+	const for _, field in t.Decl().Fields() {
+		ftag := field.Tag("json")
+		if ftag == tag || field.Public() && field.Name() == tag {
+			i++
+			if i > 1 {
+				ret true
+			}
+		}
+	}
+	ret false
+}
+
+// Returns the JSON key name of structure field.
+// If field is not public, field name will not be evaluated.
+// Tries to use JSON tag name first, if tag name is not valid, falling back to field name.
+// Returns empty string if field name and JSON tag name not suitable to use.
+// The type T must be the structure type of field.
+fn getFieldName[T](pub: bool, name: str, tag: str): str {
+	// If the tag is "-", ignore this field for the JSON encode/decode.
+	if tag == "-" {
+		ret ""
+	}
+	ok := isValidTag(tag)
+	// JSON tag name is not suitable to use, falling back to field name.
+	// If the field is public, use the field's name, otherwise there is no name to use.
+	if !ok && pub {
+		ret name
+	}
+	// If the JSON tag name is suitable to use, check for duplicates.
+	// If the key is not duplicate, use the tag name.
+	if ok && !isDuplicateTag[T](tag) {
+		ret tag
+	}
+	// No suitable name to use, return empty.
+	ret ""
+}
+
+// Reports whether the JSON tag name valid.
+fn isValidTag(s: str): bool {
+	if s == "" {
+		ret false
+	}
+	for _, c in s {
+		match {
+		| strings::ContainsRune("!#$%&()*+-./:;<=>?@[]^_{|}~ ", c):
+			// Backslash and quote chars are reserved, but
+			// otherwise any punctuation chars are allowed
+			// in a tag name.
+		| !unicode::IsLetter(c) && !unicode::IsDigit(c):
+			ret false
+		}
+	}
+	ret true
 }
