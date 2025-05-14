@@ -22,3 +22,33 @@ fn isSafe(b: byte): bool {
 fn isHTMLSafe(b: byte): bool {
 	ret b != '"' && b != '&' && b != '<' && b != '>' && b != '\\' && b > 31
 }
+
+fn appendHTMLEscape(mut &dst: buffer, src: []byte) {
+	// The characters can only appear in string literals,
+	// so just scan the string one byte at a time.
+	mut start := 0
+	for i, c in src {
+		if c == '<' || c == '>' || c == '&' {
+			dst.write(src[start:i])
+			dst.writeByte('\\')
+			dst.writeByte('u')
+			dst.writeByte('0')
+			dst.writeByte('0')
+			dst.writeByte(hex[c>>4])
+			dst.writeByte(hex[c&0xF])
+			start = i + 1
+		}
+		// Convert U+2028 and U+2029 (E2 80 A8 and E2 80 A9).
+		if c == 0xE2 && i+2 < len(src) && src[i+1] == 0x80 && src[i+2]&^1 == 0xA8 {
+			dst.write(src[start:i])
+			dst.writeByte('\\')
+			dst.writeByte('u')
+			dst.writeByte('2')
+			dst.writeByte('0')
+			dst.writeByte('2')
+			dst.writeByte(hex[src[i+2]&0xF])
+			start = i + len("\u2029")
+		}
+	}
+	dst.write(src[start:])
+}

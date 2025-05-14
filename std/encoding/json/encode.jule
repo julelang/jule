@@ -245,14 +245,18 @@ impl jsonEncoder {
 					const match {
 					| i > 0:
 						self.buf.writeByte(',')
-					}
-					const match {
-					| i > 0 && useIndent:
-						self.total += self.depth * self.indent
-						self.buf.writeByte('\n')
+						const match {
+						| useIndent:
+							self.total += self.depth * self.indent
+							self.buf.writeByte('\n')
+						}
 					}
 					self.buf.writeStr("\"")
-					self.buf.writeStr(name)
+					if self.escapeHTML {
+						appendHTMLEscape(self.buf, unsafe::StrBytes(name))
+					} else {
+						self.buf.writeStr(name)
+					}
 					self.buf.writeStr("\":")
 					const fieldValue = vt.FieldByIndex(i)
 					comptime::TypeAlias(fieldType, fieldValue.Type())
@@ -276,7 +280,6 @@ impl jsonEncoder {
 	fn encodeMap[T, Flag](mut self, &t: T)! {
 		const tt = comptime::TypeOf(T)
 		const keyT = tt.Key()
-		const valT = tt.Value()
 		match keyT.Kind() {
 		| comptime::Str
 		| comptime::Int
@@ -298,7 +301,6 @@ impl jsonEncoder {
 			self.encodeNil()
 			ret
 		}
-		const quoted = keyT.Kind() == comptime::Str
 		const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeIndent)
 		self.buf.writeByte('{')
 		const match {
@@ -308,7 +310,6 @@ impl jsonEncoder {
 			self.buf.writeByte('\n')
 		}
 		mut first := true
-		comptime::TypeAlias(keyType, tt.Key())
 		comptime::TypeAlias(valType, tt.Value())
 		for k, v in t {
 			if !first {
@@ -322,14 +323,8 @@ impl jsonEncoder {
 			// No need to check Flag. The key type cannot be/include
 			// indentation-sensitive type. Look at this function's
 			// implementation to see match-type conditions for the key type.
-			const match {
-			| quoted:
-				self.encode[keyType, Flag](k) else { error(error) }
-			|:
-				self.buf.writeByte('"')
-				self.encode[keyType, Flag](k) else { error(error) }
-				self.buf.writeByte('"')
-			}
+			key := resolveKeyName(k)
+			self.encodeStr(key)
 			self.buf.writeByte(':')
 			const match {
 			| useIndent:
@@ -528,7 +523,7 @@ fn encoder(): jsonEncoder {
 //	Structs:
 //		Encode as JSON objects with only visible fields of struct.
 //
-//		The private and anonymous fields will be igored.
+//		The private and anonymous fields will be ignored.
 //		If the field is public, the field name will be used.
 //		If the field have a json tag, the json tag will be used even if field is private or anonymous.
 //		If the field have json tag but it is duplicate, the field will be ignored.
@@ -662,4 +657,17 @@ fn isValidTag(s: str): bool {
 		}
 	}
 	ret true
+}
+
+fn resolveKeyName[T](k: T): str {
+	const t = comptime::TypeOf(T)
+	const match t.Kind() {
+	| comptime::Str:
+		ret str(k)
+	| comptime::Int | comptime::I8 | comptime::I16 | comptime::I32 | comptime::I64:
+		ret conv::FormatInt(i64(k), 10)
+	| comptime::Uintptr | comptime::Uint | comptime::U8 | comptime::U16 | comptime::U32 | comptime::U64:
+		ret conv::FormatUint(u64(k), 10)
+	}
+	panic("unexpected map key type")
 }
