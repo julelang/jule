@@ -71,18 +71,7 @@ type encodePlain = int
 
 // Flag type for JSON encoding with indentation.
 // When this type used for Flag type, indentation algorithms will be included.
-// Indentation algorithms does not appends indentation during encoding,
-// because it is not efficient enough as far as tested. Probably causes too
-// many reallocation. Therefore, just appends the newline when indentation needed,
-// this newlines also part of the encoded JSON result. After encoding,
-// bytes should be handled and indentation should be appended after each newline.
-// Except indentations, it will append whitespace after colons and etc. to buffer.
-// So, just newlines should be handled, minor whitespaces will be handled by encoder.
-// The encoder also computes the total count of bytes for indentations. Thus,
-// we can know the exact size of the buffer including indentations with
-// calculation like this: len(encoder.buf.bytes()) + encoder.total
-// So if needed to making new allocation to handle indentations after encoding,
-// we can allocate new buffer with exact size without wasted memory.
+// Encoder will add indentation when needed.
 type encodeIndent = uint
 
 // JSON encoder with/without indentation.
@@ -91,9 +80,8 @@ type encodeIndent = uint
 // See documentation of the Encode[T] for encoding details.
 struct jsonEncoder {
 	buf:        buffer // Common internal buffer to encode JSON.
-	indent:     int    // Length of bytes per indentation.
+	indent:     str    // Indentation.
 	depth:      int    // Current depth.
-	total:      int    // Total count of bytes for indentations.
 	escapeHTML: bool
 }
 
@@ -231,8 +219,8 @@ impl jsonEncoder {
 		const match {
 		| useIndent:
 			self.depth++
-			self.total += self.depth * self.indent
 			self.buf.writeByte('\n')
+			self.buf.writeStr(strings::Repeat(self.indent, self.depth))
 		}
 		const vt = comptime::ValueOf(t)
 		const fields = tt.Fields()
@@ -247,8 +235,8 @@ impl jsonEncoder {
 						self.buf.writeByte(',')
 						const match {
 						| useIndent:
-							self.total += self.depth * self.indent
 							self.buf.writeByte('\n')
+							self.buf.writeStr(strings::Repeat(self.indent, self.depth))
 						}
 					}
 					self.buf.writeStr("\"")
@@ -270,9 +258,9 @@ impl jsonEncoder {
 		}
 		const match {
 		| useIndent:
-			self.total += self.depth * self.indent
 			self.depth--
 			self.buf.writeByte('\n')
+			self.buf.writeStr(strings::Repeat(self.indent, self.depth))
 		}
 		self.buf.writeByte('}')
 	}
@@ -306,8 +294,8 @@ impl jsonEncoder {
 		const match {
 		| useIndent:
 			self.depth++
-			self.total += self.depth * self.indent
 			self.buf.writeByte('\n')
+			self.buf.writeStr(strings::Repeat(self.indent, self.depth))
 		}
 		mut first := true
 		comptime::TypeAlias(valType, tt.Value())
@@ -316,8 +304,8 @@ impl jsonEncoder {
 				self.buf.writeByte(',')
 				const match {
 				| useIndent:
-					self.total += self.depth * self.indent
 					self.buf.writeByte('\n')
+					self.buf.writeStr(strings::Repeat(self.indent, self.depth))
 				}
 			}
 			// No need to check Flag. The key type cannot be/include
@@ -335,9 +323,9 @@ impl jsonEncoder {
 		}
 		const match {
 		| useIndent:
-			self.total += self.depth * self.indent
 			self.depth--
 			self.buf.writeByte('\n')
+			self.buf.writeStr(strings::Repeat(self.indent, self.depth))
 		}
 		self.buf.writeByte('}')
 	}
@@ -348,8 +336,8 @@ impl jsonEncoder {
 		const match {
 		| useIndent:
 			self.depth++
-			self.total += self.depth * self.indent
 			self.buf.writeByte('\n')
+			self.buf.writeStr(strings::Repeat(self.indent, self.depth))
 		}
 		comptime::TypeAlias(elem, comptime::TypeOf(t).Elem())
 		for i, e in t {
@@ -357,17 +345,17 @@ impl jsonEncoder {
 				self.buf.writeByte(',')
 				const match {
 				| useIndent:
-					self.total += self.depth * self.indent
 					self.buf.writeByte('\n')
+					self.buf.writeStr(strings::Repeat(self.indent, self.depth))
 				}
 			}
 			self.encode[elem, Flag](e) else { error(error) }
 		}
 		const match {
 		| useIndent:
-			self.total += self.depth * self.indent
 			self.depth--
 			self.buf.writeByte('\n')
+			self.buf.writeStr(strings::Repeat(self.indent, self.depth))
 		}
 		self.buf.writeByte(']')
 	}
@@ -567,36 +555,9 @@ fn Encode[T](t: T)!: []byte {
 // Same as Encode[T] function but enables indentation.
 fn EncodeIndent[T](t: T, indent: str)!: []byte {
 	mut encoder := encoder()
-	encoder.indent = len(indent)
+	encoder.indent = indent
 	encoder.encode[T, encodeIndent](t) else { error(error) }
-	mut bytes := encoder.buf.bytes()
-	if encoder.total == 0 {
-		ret bytes
-	}
-	// Handle indentation.
-	// See documentation of [encodeIndent].
-	mut buf := make([]byte, len(bytes)+encoder.total)
-	mut depth := 0
-	mut p := &buf[0] // Use raw pointer to mutate buffer efficiently.
-	for _, b in bytes {
-		unsafe { *p = b }
-		p++
-		match b {
-		| '[' | '{':
-			depth++
-		| ']' | '}':
-			depth--
-		| '\n':
-			mut i := 0
-			for i < depth; i++ {
-				for _, ib in indent {
-					unsafe { *p = ib }
-					p++
-				}
-			}
-		}
-	}
-	ret buf
+	ret encoder.buf.bytes()
 }
 
 // Reports whether the JSON tag name is duplicated.
