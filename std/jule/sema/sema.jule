@@ -485,30 +485,6 @@ impl sema {
 		ret nil
 	}
 
-	fn checkImportSelection[T](mut self, &ident: &token::Token, &s: T): bool {
-		if !self.isAccessibleDefine(s.Public, s.Token) {
-			self.pushErr(ident, log::IdentIsNotAccessible, ident.Kind)
-			self.pushSuggestion(log::MakePubToAccess)
-			ret false
-		}
-		const Binded = false // Exported defines cannot be binded.
-		if defByIdentPackage(self.files, s.Ident, Binded) != nil {
-			self.pushErr(ident, log::SelectedImportExistInPackage, s.Ident)
-			ret false
-		}
-		ret true
-	}
-
-	fn checkImportsAllSelectionsFromCollection[T](mut self, &s: []T, &et: &token::Token): bool {
-		mut ok := true
-		for _, d in s {
-			if d.Public {
-				ok = self.checkImportSelection(et, d) && ok
-			}
-		}
-		ret ok
-	}
-
 	fn isUseAliasDuplication(mut self, &imp: &ImportInfo): bool {
 		for (_, mut imp2) in self.file.Imports {
 			if imp2 == imp {
