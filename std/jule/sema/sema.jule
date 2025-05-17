@@ -487,7 +487,7 @@ impl sema {
 
 	fn isUseAliasDuplication(mut self, &imp: &ImportInfo): bool {
 		for (_, mut imp2) in self.file.Imports {
-			if imp2 == imp {
+			if imp == imp2 {
 				break
 			}
 			if imp2.Alias == imp.Alias {
@@ -499,7 +499,7 @@ impl sema {
 
 	fn checkAutoAlias(mut self, mut &imp: &ImportInfo): bool {
 		if imp.LinkPath == "std/unsafe" {
-			// the "std/unsafe" package is able to use unsafe keyword as alias
+			// the "std/unsafe" package is able to use the "unsafe" keyword as alias
 			ret true
 		}
 		valid := isValidImpAlias(imp.Alias)
@@ -523,9 +523,11 @@ impl sema {
 		if imp.Decl.Alias != nil { // custom alias found
 			if jule::IsBlank(imp.Alias) {
 				self.pushErr(imp.Decl.Token, log::IgnoreIdent)
+				ret false
 			} else if self.isUseAliasDuplication(imp) {
-				self.pushErr(imp.Decl.Token, log::DuplicatedUseAlias, imp.Alias)
+				self.pushErr(imp.Decl.Alias, log::DuplicatedUseAlias, imp.Alias)
 				self.pushSuggestion(log::RenameUseAliasAvoidDuplication)
+				ret false
 			}
 
 			// Check special cases for the "std/unsafe" package.
@@ -537,6 +539,19 @@ impl sema {
 			ret false
 		}
 		ret true
+	}
+
+	fn checkImports(mut self) {
+		for (_, mut file) in self.files {
+			self.setCurrentFile(file)
+			for (_, mut imp) in self.file.Imports {
+				ok := self.checkImport(imp)
+				// Break checking if package has error.
+				if !ok {
+					ret
+				}
+			}
+		}
 	}
 
 	// Checks all imports.
@@ -2781,13 +2796,18 @@ impl sema {
 	}
 
 	fn check(mut &self) {
+		self.checkImports()
+		if len(self.errors) > 0 {
+			ret
+		}
+
 		self.checkInherits()
-		if len(self.errors) != 0 {
+		if len(self.errors) > 0 {
 			ret
 		}
 
 		self.implImpls()
-		if len(self.errors) != 0 {
+		if len(self.errors) > 0 {
 			ret
 		}
 		self.step |= stepFlag.ImplsImplemented
@@ -2795,12 +2815,12 @@ impl sema {
 		// Check enums here.
 		// See developer reference (5).
 		self.checkEnums()
-		if len(self.errors) != 0 {
+		if len(self.errors) > 0 {
 			ret
 		}
 
 		self.checkPackageDecls()
-		if len(self.errors) != 0 {
+		if len(self.errors) > 0 {
 			ret
 		}
 
