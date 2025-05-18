@@ -1,0 +1,66 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/unsafe"
+
+// Unsafe buffer for bytes.
+// It removes mutability for the all functionalities even for mutable ones,
+// and removes boundary checking for fast memory access and performance gain.
+// Intended for buffer handling of performance critical implementations.
+struct Ubuf {
+	mut data: []byte
+	mut p:    *byte
+}
+
+impl Ubuf {
+	// Returns the mutable data of the buffer.
+	fn GetData(self): []byte {
+		ret self.data
+	}
+
+	// Sets the data of the buffer.
+	fn SetData(self, data: []byte) {
+		if len(data) == 0 {
+			self.data, self.p = nil, nil
+			ret
+		}
+		self.data = unsafe { *(&data) }
+		self.p = &data[0]
+	}
+
+	// self.data[i]
+	fn Get(self, i: int): byte {
+		ret unsafe { *(self.p + i) }
+	}
+
+	// self.data[i:]
+	// Returned slice will have no GC.
+	fn Slice1(self, i: int): []byte {
+		n := len(self.data) - i
+		ret unsafe { unsafe::Slice(self.p+i, n, n) }
+	}
+
+	// self.data[i:t]
+	// Returned slice will have no GC.
+	fn Slice2(self, i: int, t: int): []byte {
+		n := t - i
+		ret unsafe { unsafe::Slice(self.p+i, n, n) }
+	}
+
+	// self.data[:i]
+	// Returned slice will have no GC.
+	fn Slice3(self, i: int): []byte {
+		ret unsafe { unsafe::Slice(self.p, i, i) }
+	}
+
+	// self.data[i] = b
+	fn Set(self, i: int, b: byte) {
+		unsafe { *(self.p + i) = b }
+	}
+
+	// len(self.data)
+	fn Len(self): int {
+		ret len(self.data)
+	}
+}

@@ -7,6 +7,7 @@ use "std/conv"
 use "std/encoding/base64"
 use "std/errors"
 use "std/internal/nbits"
+use "std/internal/ubuf"
 use "std/unicode"
 use "std/unicode/utf16"
 use "std/unicode/utf8"
@@ -26,7 +27,7 @@ const (
 )
 
 struct jsonDecoder {
-	data:  []byte
+	data:  ubuf::Ubuf
 	mut i: int // Read offset for data.
 
 	// Stack of what we're in the middle of - array values, object keys, object values.
@@ -35,11 +36,11 @@ struct jsonDecoder {
 
 impl jsonDecoder {
 	fn eof(self): bool {
-		ret self.i >= len(self.data)
+		ret self.i >= self.data.Len()
 	}
 
 	fn skipSpace(self) {
-		for !self.eof() && isSpace(self.data[self.i]); self.i++ {
+		for !self.eof() && isSpace(self.data.Get(self.i)); self.i++ {
 		}
 	}
 
@@ -47,7 +48,7 @@ impl jsonDecoder {
 	// Checks syntax errors.
 	// Unlike [scanValidLit], it supports objects and arrays.
 	fn scanValidValue(self)!: []byte {
-		mut b := self.data[self.i]
+		mut b := self.data.Get(self.i)
 		if b != '[' && b != '{' { // Literal.
 			ret self.scanValidLit() else { error(error) }
 		}
@@ -57,7 +58,7 @@ impl jsonDecoder {
 		mut colon := false
 		mut j := 0 // Last seen actual byte. Non-space.
 		for !self.eof() {
-			b = self.data[self.i]
+			b = self.data.Get(self.i)
 			if isSpace(b) {
 				self.skipSpace()
 				continue
@@ -77,7 +78,7 @@ impl jsonDecoder {
 				self.i++
 				if depth >= len(self.parseState) {
 					// Keep immutability, it will not be mutated.
-					ret unsafe { (*(&self.data))[i:self.i] }
+					ret self.data.Slice2(i, self.i)
 				}
 			| ']':
 				if colon || self.parseState[len(self.parseState)-1] != parseArray {
@@ -87,23 +88,8 @@ impl jsonDecoder {
 				self.i++
 				if depth >= len(self.parseState) {
 					// Keep immutability, it will not be mutated.
-					ret unsafe { (*(&self.data))[i:self.i] }
+					ret self.data.Slice2(i, self.i)
 				}
-				//| ':':
-				//	error(errors::New("json: invalid character " + quoteChar(b) + " looking for beginning of value"))
-				//	if colon {
-				//		error(errors::New("json: invalid character " + quoteChar(b) + " looking for beginning of value"))
-				//	}
-				//	if self.parseState[len(self.parseState)-1] != parseObject {
-				//		error(errors::New("json: invalid character " + quoteChar(b) + " used out of object value"))
-				//	}
-				//	if len(self.data)-self.i <= 1 || self.data[j] != '"' {
-				//		error(errors::New("json: invalid character " + quoteChar(b) + " after " + quoteChar(self.data[j])))
-				//	}
-				//	j = self.i
-				//	self.i++
-				//	colon = true
-				//	continue
 			| ',':
 				if colon {
 					error(errors::New("json: invalid character " + quoteChar(b) + " looking for beginning of value"))
@@ -114,16 +100,16 @@ impl jsonDecoder {
 					if self.eof() {
 						continue // Error will be handled by next iteration step.
 					}
-					if self.data[self.i] != '"' {
-						error(errors::New("json: invalid character " + quoteChar(self.data[self.i]) + " looking for beginning of object key string"))
+					if self.data.Get(self.i) != '"' {
+						error(errors::New("json: invalid character " + quoteChar(self.data.Get(self.i)) + " looking for beginning of object key string"))
 					}
 					self.scanValidLit() else { error(error) }
 					self.skipSpace()
 					if self.eof() {
 						continue // Error will be handled by next iteration step.
 					}
-					if self.data[self.i] != ':' {
-						error(errors::New("json: invalid character " + quoteChar(self.data[self.i]) + " after object key"))
+					if self.data.Get(self.i) != ':' {
+						error(errors::New("json: invalid character " + quoteChar(self.data.Get(self.i)) + " after object key"))
 					}
 					j = self.i
 					self.i++
@@ -133,7 +119,7 @@ impl jsonDecoder {
 				if self.eof() {
 					continue // Error will be handled by next iteration step.
 				}
-				b2 := self.data[self.i]
+				b2 := self.data.Get(self.i)
 				if b2 == ',' || b2 == ':' || b2 == '}' || b2 == ']' {
 					// We can say array element because object values are handled separately above.
 					// So we should be in array value.
@@ -149,7 +135,7 @@ impl jsonDecoder {
 				if self.eof() {
 					continue // Error will be handled by next iteration step.
 				}
-				b2 := self.data[self.i]
+				b2 := self.data.Get(self.i)
 				if b == '"' && b2 == ':' {
 					if self.parseState[len(self.parseState)-1] != parseObject {
 						error(errors::New("json: invalid character " + quoteChar(b2) + " used out of object value"))
@@ -160,7 +146,7 @@ impl jsonDecoder {
 				} else {
 					colon = false
 					if b2 != ',' && b2 != '}' && b2 != ']' {
-						error(errors::New("json: invalid character " + quoteChar(b2) + " after " + quoteChar(self.data[j])))
+						error(errors::New("json: invalid character " + quoteChar(b2) + " after " + quoteChar(self.data.Get(j))))
 					}
 				}
 				continue
@@ -190,13 +176,13 @@ impl jsonDecoder {
 	// It only supports basic literals, not objects or arrays.
 	fn scanLit(self)!: []byte {
 		i := self.i
-		b := self.data[self.i]
+		b := self.data.Get(self.i)
 	Match:
 		match b {
 		| '"': // string
 			self.i++
 			for !self.eof(); self.i++ {
-				match self.data[self.i] {
+				match self.data.Get(self.i) {
 				| '\\':
 					self.i++
 				| '"':
@@ -207,7 +193,7 @@ impl jsonDecoder {
 		| '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '-': // number
 			self.i++
 			for !self.eof(); self.i++ {
-				match self.data[self.i] {
+				match self.data.Get(self.i) {
 				| '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
 				| '.' | 'e' | 'E' | '+' | '-':
 					continue
@@ -224,11 +210,11 @@ impl jsonDecoder {
 		|:
 			error(errors::New("json: invalid character " + quoteChar(b) + " looking for literal"))
 		}
-		if self.i > len(self.data) {
-			error(errors::New("json: unexpected end of JSON, looking for literal: " + conv::Quote(unsafe::StrFromBytes(self.data[i:]))))
+		if self.i > self.data.Len() {
+			error(errors::New("json: unexpected end of JSON, looking for literal: " + conv::Quote(unsafe::StrFromBytes(self.data.GetData()[i:]))))
 		}
 		// Keep immutability, it will not be mutated.
-		ret unsafe { (*(&self.data))[i:self.i] }
+		ret self.data.Slice2(i, self.i)
 	}
 
 	// Pushes a new parse state p onto the parse stack.
@@ -251,7 +237,7 @@ impl jsonDecoder {
 		comptime::TypeAlias(elem, t.Elem())
 		self.i++
 		self.skipSpace()
-		if !self.eof() && self.data[self.i] == ']' {
+		if !self.eof() && self.data.Get(self.i) == ']' {
 			self.i++
 			ret
 		}
@@ -287,7 +273,7 @@ impl jsonDecoder {
 				error(errors::New("json: array is not ended"))
 			}
 			// Next token must be , or ].
-			b := self.data[self.i]
+			b := self.data.Get(self.i)
 			if b == ',' {
 				self.i++
 				continue
@@ -340,7 +326,7 @@ impl jsonDecoder {
 			error(&UnsupportedTypeError{Type: mapT.Str()})
 		}
 		self.i++
-		if !self.eof() && self.data[self.i] == '}' {
+		if !self.eof() && self.data.Get(self.i) == '}' {
 			self.i++
 			ret
 		}
@@ -352,8 +338,8 @@ impl jsonDecoder {
 			if self.eof() {
 				error(errors::New("json: object is not ended"))
 			}
-			if self.data[self.i] != '"' {
-				error(errors::New("json: invalid character " + quoteChar(self.data[self.i]) + " looking for beginning of object key string"))
+			if self.data.Get(self.i) != '"' {
+				error(errors::New("json: invalid character " + quoteChar(self.data.Get(self.i)) + " looking for beginning of object key string"))
 			}
 			// Don't check validity for literal, following algorithms will check it.
 			lit := self.scanLit() else { error(error) }
@@ -361,8 +347,8 @@ impl jsonDecoder {
 			if self.eof() {
 				error(errors::New("json: object is not ended"))
 			}
-			if self.data[self.i] != ':' {
-				error(errors::New("json: invalid character " + quoteChar(self.data[self.i]) + " after object key"))
+			if self.data.Get(self.i) != ':' {
+				error(errors::New("json: invalid character " + quoteChar(self.data.Get(self.i)) + " after object key"))
 			}
 			self.i++
 			self.skipSpace()
@@ -414,7 +400,7 @@ impl jsonDecoder {
 				error(errors::New("json: object is not ended"))
 			}
 			// Next token must be , or }.
-			b := self.data[self.i]
+			b := self.data.Get(self.i)
 			if b == ',' {
 				self.i++
 				continue
@@ -431,7 +417,7 @@ impl jsonDecoder {
 	fn objectStruct[T](self, mut &t: T)! {
 		self.i++
 		self.skipSpace()
-		if !self.eof() && self.data[self.i] == '}' {
+		if !self.eof() && self.data.Get(self.i) == '}' {
 			self.i++
 			ret
 		}
@@ -441,8 +427,8 @@ impl jsonDecoder {
 			if self.eof() {
 				error(errors::New("json: object is not ended"))
 			}
-			if self.data[self.i] != '"' {
-				error(errors::New("json: invalid character " + quoteChar(self.data[self.i]) + " looking for beginning of object key string"))
+			if self.data.Get(self.i) != '"' {
+				error(errors::New("json: invalid character " + quoteChar(self.data.Get(self.i)) + " looking for beginning of object key string"))
 			}
 			// Don't check validity for literal, following algorithms will check it.
 			lit := self.scanLit() else { error(error) }
@@ -450,8 +436,8 @@ impl jsonDecoder {
 			if self.eof() {
 				error(errors::New("json: object is not ended"))
 			}
-			if self.data[self.i] != ':' {
-				error(errors::New("json: invalid character " + quoteChar(self.data[self.i]) + " after object key"))
+			if self.data.Get(self.i) != ':' {
+				error(errors::New("json: invalid character " + quoteChar(self.data.Get(self.i)) + " after object key"))
 			}
 			self.i++
 			self.skipSpace()
@@ -493,7 +479,7 @@ impl jsonDecoder {
 				error(errors::New("json: object is not ended"))
 			}
 			// Next token must be , or }.
-			b := self.data[self.i]
+			b := self.data.Get(self.i)
 			if b == ',' {
 				self.i++
 				continue
@@ -510,7 +496,7 @@ impl jsonDecoder {
 	// Check literal validity in quick way rather than using the Valid function.
 	// It should be used after the scanValidLit.
 	fn checkScanValidLit(self)! {
-		lb := self.data[self.i-1]
+		lb := self.data.Get(self.i - 1)
 		self.skipSpace()
 		if self.eof() {
 			// No parse state, just literal is fine.
@@ -522,7 +508,7 @@ impl jsonDecoder {
 			}
 			error(errors::New("json: array is not ended"))
 		}
-		b := self.data[self.i]
+		b := self.data.Get(self.i)
 		if b != '[' && b != '{' {
 			error(errors::New("json: invalid character " + quoteChar(b) + " after " + quoteChar(lb)))
 		}
@@ -561,7 +547,7 @@ impl jsonDecoder {
 											m.Unwrap()(lit) else { error(error) }
 											ret true
 										| "DecodeText":
-											b := self.data[self.i]
+											b := self.data.Get(self.i)
 											if b == '"' {
 												// Next literal is a string literal.
 												// DecodeText is suitable.
@@ -593,7 +579,7 @@ impl jsonDecoder {
 			ret
 		}
 		const tt = comptime::TypeOf(T)
-		b := self.data[self.i]
+		b := self.data.Get(self.i)
 		match b {
 		| '{': // Object.
 			const match {
@@ -728,7 +714,7 @@ impl jsonDecoder {
 		const tt = comptime::TypeOf(T)
 		const match tt.Kind() {
 		| comptime::SmartPtr:
-			b := self.data[self.i]
+			b := self.data.Get(self.i)
 			if b == 'n' { // Null literal.
 				self.scanValidLit() else { error(error) }
 				t = nil
@@ -750,8 +736,8 @@ impl jsonDecoder {
 			self.value(t) else { error(error) }
 		}
 		self.skipSpace()
-		if len(self.data)-self.i > 0 {
-			error(errors::New("json: unexpected end of JSON: " + conv::Quote(unsafe::StrFromBytes(self.data[self.i:]))))
+		if self.data.Len()-self.i > 0 {
+			error(errors::New("json: unexpected end of JSON: " + conv::Quote(unsafe::StrFromBytes(self.data.GetData()[self.i:]))))
 		}
 	}
 }
@@ -837,10 +823,8 @@ impl jsonDecoder {
 // (having methods without implementing the trait is valid):
 //	JSONDecoder, TextDecoder
 fn Decode[T](data: []byte, mut &t: T)! {
-	decoder := jsonDecoder{
-		data: data,
-		i: 0,
-	}
+	decoder := jsonDecoder{}
+	decoder.data.SetData(data)
 	decoder.decode(t) else { error(error) }
 }
 
@@ -873,18 +857,24 @@ fn getu4(s: []byte): rune {
 }
 
 // Returns nil if failed.
-fn unquoteBytes(s: []byte): (t: []byte) {
-	if len(s) < 2 || s[0] != '"' || s[len(s)-1] != '"' {
-		ret
+fn unquoteBytes(s: []byte): []byte {
+	ss := ubuf::Ubuf{}
+	ss.SetData(s)
+	if ss.Len() < 2 || ss.Get(0) != '"' || ss.Get(ss.Len()-1) != '"' {
+		ret nil
 	}
-	unsafe { *(&s) = (*(&s))[1 : len(s)-1] }
+	// Empty literal.
+	if ss.Len() == 2 {
+		ret make([]byte, 0)
+	}
+	ss.SetData(ss.Slice2(1, ss.Len()-1))
 
 	// Check for unusual characters. If there are none,
 	// then no unquoting is needed, so return a slice of the
 	// original bytes.
 	mut r := 0
-	for r < len(s) {
-		c := s[r]
+	for r < ss.Len() {
+		c := ss.Get(r)
 		if c == '\\' || c == '"' || c < ' ' {
 			break
 		}
@@ -892,79 +882,80 @@ fn unquoteBytes(s: []byte): (t: []byte) {
 			r++
 			continue
 		}
-		rr, size := utf8::DecodeRune(s[r:])
+		rr, size := utf8::DecodeRune(ss.Slice1(r))
 		if rr == utf8::RuneError && size == 1 {
 			break
 		}
 		r += size
 	}
-	if r == len(s) {
-		ret unsafe { *(&s) }
+	if r == ss.Len() {
+		ret ss.GetData()
 	}
 
-	mut b := make([]byte, len(s)+utf8::UTFMax<<1)
-	mut w := copy(b, s[:r])
-	for r < len(s) {
+	b := ubuf::Ubuf{}
+	b.SetData(make([]byte, ss.Len()+2*utf8::UTFMax))
+	mut w := copy(b.GetData(), ss.Slice3(r))
+	for r < ss.Len() {
 		// Out of room? Can only happen if s is full of
 		// malformed UTF-8 and we're replacing each
 		// byte with RuneError.
-		if w >= len(b)-utf8::UTFMax<<1 {
-			mut nb := make([]byte, (len(b)+utf8::UTFMax)<<1)
-			copy(nb, b[:w])
-			b = nb
+		if w >= b.Len()-utf8::UTFMax*2 {
+			mut nb := make([]byte, (b.Len()+utf8::UTFMax)*2)
+			copy(nb, b.Slice3(w))
+			b.SetData(nb)
 		}
-		c := s[r]
+		c := ss.Get(r)
 		match {
 		| c == '\\':
 			r++
-			if r >= len(s) {
+			if r >= ss.Len() {
 				ret nil
 			}
-			match s[r] {
+			match ss.Get(r) {
 			| '"' | '\\' | '/' | '\'':
-				b[w] = s[r]
+				b.Set(w, ss.Get(r))
 				r++
 				w++
 			| 'b':
-				b[w] = '\b'
+				b.Set(w, '\b')
 				r++
 				w++
 			| 'f':
-				b[w] = '\f'
+				b.Set(w, '\f')
 				r++
 				w++
 			| 'n':
-				b[w] = '\n'
+				b.Set(w, '\n')
 				r++
 				w++
 			| 'r':
-				b[w] = '\r'
+				b.Set(w, '\r')
 				r++
 				w++
 			| 't':
-				b[w] = '\t'
+				b.Set(w, '\t')
 				r++
 				w++
 			| 'u':
 				r--
-				mut rr := getu4(s[r:])
+				mut rr := getu4(ss.Slice1(r))
 				if rr < 0 {
 					ret nil
 				}
 				r += 6
 				if utf16::IsSurrogate(rr) {
-					rr1 := getu4(s[r:])
+					rr1 := getu4(ss.Slice1(r))
 					dec := utf16::DecodeRune(rr, rr1)
 					if dec != unicode::ReplacementChar {
 						// A valid pair; consume.
 						r += 6
-						w += utf8::EncodeRune(b[w:], dec)
+						w += utf8::EncodeRune(b.Slice1(w), dec)
 						break
 					}
 					// Invalid surrogate; fall back to replacement rune.
 					rr = unicode::ReplacementChar
 				}
-				w += utf8::EncodeRune(b[w:], rr)
+				w += utf8::EncodeRune(b.Slice1(w), rr)
 			|:
 				ret nil
 			}
@@ -973,17 +964,20 @@ fn unquoteBytes(s: []byte): (t: []byte) {
 			ret nil
 		| c < utf8::RuneSelf:
 			// ASCII
-			b[w] = c
+			b.Set(w, c)
 			r++
 			w++
 		|:
 			// Coerce to well-formed UTF-8.
-			rr, size := utf8::DecodeRune(s[r:])
+			rr, size := utf8::DecodeRune(ss.Slice1(r))
 			r += size
-			w += utf8::EncodeRune(b[w:], rr)
+			w += utf8::EncodeRune(b.Slice1(w), rr)
 		}
 	}
-	ret b[:w]
+	// GC must be remain for the allocation, do not use b.Slice3 to slice.
+	// For memory efficiency, new allocation might be used as result or etc.
+	// Therefore avoid making allocation zero-reference and deallocation.
+	ret b.GetData()[:w]
 }
 
 fn decodeInt[T](mut &t: T, lit: []byte)! {
@@ -1055,19 +1049,22 @@ fn isValidString(b: []byte): bool {
 	if len(b) == 1 {
 		ret false
 	}
+
+	bb := ubuf::Ubuf{}
+	bb.SetData(b)
 	mut i := 1
-	for i < len(b); i++ {
-		match b[i] {
+	for i < bb.Len(); i++ {
+		match bb.Get(i) {
 		| '\\':
 			i++
-			if i >= len(b) {
+			if i >= bb.Len() {
 				ret false
 			}
-			match b[i] {
+			match bb.Get(i) {
 			| '"' | '\\' | '/' | '\'' | 'b' | 'f' | 'r' | 't' | 'n':
 				i++
 			| 'u':
-				mut rr := getu4(b[i-1:])
+				mut rr := getu4(bb.Slice1(i - 1))
 				if rr < 0 {
 					ret false
 				}
@@ -1077,14 +1074,11 @@ fn isValidString(b: []byte): bool {
 			}
 		| '"':
 			i++ // Tokenize the closing quote too.
-			goto end
+			ret i == bb.Len() // Make sure we are at the end.
 		}
 	}
 	// Missing closing quote.
 	ret false
-end:
-	// Make sure we are at the end.
-	ret i == len(b)
 }
 
 // Reports whether the literal b is valid JSON number literal.
@@ -1092,57 +1086,62 @@ end:
 // It will not mutate the b.
 // See https://tools.ietf.org/html/rfc7159#section-6
 // and https://www.json.org/img/number.png
-fn isValidNumber(mut b: []byte): bool {
+fn isValidNumber(b: []byte): bool {
 	if len(b) == 0 {
 		ret false
 	}
 
+	mut i := 0
+
+	bb := ubuf::Ubuf{}
+	bb.SetData(b)
+
 	// Optional -
-	if b[0] == '-' {
-		b = b[1:]
-		if len(b) == 0 {
+	if bb.Get(i) == '-' {
+		i++
+		if bb.Len() == i {
 			ret false
 		}
 	}
 
 	// Digits
 	match {
-	| b[0] == '0':
-		b = b[1:]
-	| '1' <= b[0] && b[0] <= '9':
-		b = b[1:]
-		for len(b) > 0 && '0' <= b[0] && b[0] <= '9' {
-			b = b[1:]
+	| bb.Get(i) == '0':
+		i++
+	| '1' <= bb.Get(i) && bb.Get(i) <= '9':
+		i++
+		for bb.Len() > i && '0' <= bb.Get(i) && bb.Get(i) <= '9' {
+			i++
 		}
 	|:
 		ret false
 	}
 
 	// . followed by 1 or more digits.
-	if len(b) >= 2 && b[0] == '.' && '0' <= b[1] && b[1] <= '9' {
-		b = b[2:]
-		for len(b) > 0 && '0' <= b[0] && b[0] <= '9' {
-			b = b[1:]
+	if bb.Len() > i+1 && bb.Get(i) == '.' && '0' <= bb.Get(i+1) && bb.Get(i+1) <= '9' {
+		i += 2
+		for bb.Len() > i && '0' <= bb.Get(i) && bb.Get(i) <= '9' {
+			i++
 		}
 	}
 
 	// e or E followed by an optional - or + and
 	// 1 or more digits.
-	if len(b) >= 2 && (b[0] == 'e' || b[0] == 'E') {
-		b = b[1:]
-		if b[0] == '+' || b[0] == '-' {
-			b = b[1:]
-			if len(b) == 0 {
+	if bb.Len() > i+1 && (bb.Get(i) == 'e' || bb.Get(i) == 'E') {
+		i++
+		if bb.Get(i) == '+' || bb.Get(i) == '-' {
+			i++
+			if bb.Len() == i {
 				ret false
 			}
 		}
-		for len(b) > 0 && '0' <= b[0] && b[0] <= '9' {
-			b = b[1:]
+		for bb.Len() > i && '0' <= bb.Get(i) && bb.Get(i) <= '9' {
+			i++
 		}
 	}
 
 	// Make sure we are at the end.
-	ret len(b) == 0
+	ret bb.Len() == i
 }
 
 // Reports whether literal b is syntactically and semantically correct.
@@ -1161,7 +1160,7 @@ fn isValidLit(b: []byte): bool {
 	| '"':
 		ret isValidString(b)
 	| '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '-':
-		ret isValidNumber(unsafe { *(&b) })
+		ret isValidNumber(b)
 	|:
 		ret false
 	}
