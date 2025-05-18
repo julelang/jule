@@ -840,6 +840,24 @@ impl typeChecker {
 		}
 	}
 
+	// Push runtime built-in type implementation instance.
+	// Such as map or channel implementations.
+	fn pushRuntimeImpl(mut self, name: str, mut token: &token::Token, mut types: ...&Type) {
+		// Runtime metadata collection is disabled.
+		// Return immediately, there is not nothing we can do.
+		if self.s.meta.runtime == nil {
+			ret
+		}
+		mut s := runtimeFindStruct(self.s.meta.runtime, name)
+		mut ins := s.instance()
+		ins.Generics = make([]&InsGeneric, len(types))
+		for (i, mut t) in types {
+			ins.Generics[i] = &InsGeneric{Type: t}
+		}
+		ins = self.fromStructIns(ins, token)
+		self.pushReference[&StructIns](ins)
+	}
+
 	fn pushCycleError(self, def1: str, def2: str, mut &message: strings::Builder) {
 		const Padding = 7
 		refersTo := log::Logf(log::RefersTo, def1, def2)
@@ -1414,13 +1432,7 @@ impl typeChecker {
 		if elem == nil {
 			ret nil
 		}
-		if self.s.meta.runtime != nil {
-			mut s := runtimeFindStruct(self.s.meta.runtime, "pchan")
-			mut ins := s.instance()
-			ins.Generics = [&InsGeneric{Type: elem}]
-			ins = self.fromStructIns(ins, decl.Elem.Token)
-			self.pushReference[&StructIns](ins)
-		}
+		self.pushRuntimeImpl("pchan", decl.Elem.Token, elem)
 		if self.disableTA&taMutable != taMutable && elem.Mutable() {
 			self.pushTA(taMutable)
 		}
@@ -1602,13 +1614,7 @@ impl typeChecker {
 			self.pushErr(decl.Val.Token, log::EnumAsMapVal)
 		}
 
-		if self.s.meta.runtime != nil {
-			mut s := runtimeFindStruct(self.s.meta.runtime, "_Map")
-			mut ins := s.instance()
-			ins.Generics = [&InsGeneric{Type: key}, &InsGeneric{Type: val}]
-			ins = self.fromStructIns(ins, decl.Key.Token)
-			self.pushReference[&StructIns](ins)
-		}
+		self.pushRuntimeImpl("_Map", decl.Key.Token, key, val)
 
 		if self.disableTA&taMutable != taMutable && (key.Mutable() || val.Mutable()) {
 			self.pushTA(taMutable)
