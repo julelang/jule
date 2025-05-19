@@ -237,54 +237,54 @@ impl jsonDecoder {
 		comptime::TypeAlias(elem, t.Elem())
 		self.i++
 		self.skipSpace()
+		mut i := 0
 		if !self.eof() && self.data.Get(self.i) == ']' {
 			self.i++
-			ret
-		}
-		const match t.Kind() {
-		| comptime::Slice:
-			a = a[:0] // Keep capacity, but clear current elements.
-		}
-		self.pushParseState(parseArray) else { error(error) }
-		mut i := 0
-		for {
-			// Look ahead for ] - can only happen on first iteration.
-			self.skipSpace()
-			if self.eof() {
-				error(errors::New("json: array is not ended"))
-			}
+		} else {
 			const match t.Kind() {
-			| comptime::Array:
-				if i >= len(a) {
-					// Ran out of fixed array.
-					error(errors::New("json: array exceeds length of fixed array of type :" + t.Str() + ", got " + conv::Itoa(i)))
-				}
-				self.value(a[i]) else { error(error) }
 			| comptime::Slice:
-				let mut v: elem
-				self.value(v) else { error(error) }
-				a = append(a, v)
-			|:
-				panic("json: unimplemented type, this panic call should be unreachable")
+				a = a[:0] // Keep capacity, but clear current elements.
 			}
-			i++
-			self.skipSpace()
-			if self.eof() {
-				error(errors::New("json: array is not ended"))
+			self.pushParseState(parseArray) else { error(error) }
+			for {
+				// Look ahead for ] - can only happen on first iteration.
+				self.skipSpace()
+				if self.eof() {
+					error(errors::New("json: array is not ended"))
+				}
+				const match t.Kind() {
+				| comptime::Array:
+					if i >= len(a) {
+						// Ran out of fixed array.
+						error(errors::New("json: array exceeds length of fixed array of type :" + t.Str() + ", got " + conv::Itoa(i)))
+					}
+					self.value(a[i]) else { error(error) }
+				| comptime::Slice:
+					let mut v: elem
+					self.value(v) else { error(error) }
+					a = append(a, v)
+				|:
+					panic("json: unimplemented type, this panic call should be unreachable")
+				}
+				i++
+				self.skipSpace()
+				if self.eof() {
+					error(errors::New("json: array is not ended"))
+				}
+				// Next token must be , or ].
+				b := self.data.Get(self.i)
+				if b == ',' {
+					self.i++
+					continue
+				}
+				if b == ']' {
+					self.i++
+					break
+				}
+				error(errors::New("json: invalid character " + quoteChar(b) + " after array element"))
 			}
-			// Next token must be , or ].
-			b := self.data.Get(self.i)
-			if b == ',' {
-				self.i++
-				continue
-			}
-			if b == ']' {
-				self.i++
-				break
-			}
-			error(errors::New("json: invalid character " + quoteChar(b) + " after array element"))
+			self.popParseState()
 		}
-		self.popParseState()
 		if i < len(a) {
 			const match t.Kind() {
 			| comptime::Array:
