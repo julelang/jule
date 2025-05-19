@@ -838,6 +838,19 @@ impl typeChecker {
 			mut t := k.Trait()
 			self.pushReference[&Trait](t)
 		}
+
+		// Push references to runtime implementations.
+		// We can use nil pointer for token, because it never be used.
+		// Since the k is actually based on type alias, the actual type is already instantiated.
+		// Therefore, the pushRuntimeImpl function just will add an reference to exist instance.
+		match {
+		| k.Map() != nil:
+			mut m := k.Map()
+			self.pushRuntimeImpl("_Map", nil, m.Key, m.Val)
+		| k.Chan() != nil:
+			mut ch := k.Chan()
+			self.pushRuntimeImpl("pchan", nil, ch.Elem)
+		}
 	}
 
 	// Push runtime built-in type implementation instance.
