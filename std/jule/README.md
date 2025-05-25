@@ -97,6 +97,36 @@ An example of a faulty analysis scenario:
 
   - **(14.1)** If enum's type supports the `iota`, so incremental enumeration, the first member uses the `iota` variable as expression by default. So, it enables the incremental enumeration for the following fields.
 
+- **(15)** The recheck strategy revalidates types rather than creating a new instance. Its advantage lies in checking the existing instance again, instead of initializing a new one. This approach improves speed and efficiency by avoiding the need to verify all types for a general type—instead, only the types that require revalidation are rechecked when necessary.
+  \
+  Types that need to be rechecked most often arise during the processing of generic types. Below is an example scenario:
+  ```
+  struct MyStruct[T1, T2] {
+  	x: T1
+  	y: T2
+  }
+
+  fn NewMyStruct[T1, T2](x: T1, y: T2): MyStruct[T1, T2] {
+  	ret MyStruct[T1, T2]{x, y}
+  }
+
+  fn main() {
+  	mc := NewMyStruct(123, 789)
+  	_ = mc
+  }
+  ```
+  In the example above, the `NewMyStruct` function is invoked with dynamic annotation, which means the generic types are initially treated as pseudo types. In this context, the return type is nominally `MyStruct[int, int]`, but since the structure has not yet been fully type-checked, the field types still internally reference the pseudo types `T1` and `T2`.
+  
+  As a result, when evaluating the expression `MyStruct[T1, T2]{x, y}`, a type mismatch error occurs — because the values `x` and `y` are of type `int`, while the structure fields are still marked with unresolved pseudo types. Since `int` and unresolved pseudo types are not compatible, the compiler raises an error.
+  
+  With the standard strategy, re-checking all function types from scratch using the resolved generic types is not only more costly but also problematic. That's because the type-checking algorithm, for the sake of performance, does not re-check already existing instances.
+  
+  In this case, `MyStruct[int, int]` would already be considered an existing instance. Initially, a generic instance like `MyStruct[T1, T2]` is registered. When the generic types are resolved via dynamic type annotation, the registered instance is updated to reflect the concrete types, i.e., it becomes `MyStruct[int, int]`.
+  
+  As a result, the type checker will recognize `MyStruct[int, int]` as an already-handled case and skip re-validation, even though the type-checking for the structure's internal fields has not yet been completed. This leads to incomplete type-checking and potential errors if no mechanism like recheck strategy is used to force revalidation.
+  
+  With the recheck strategy, when a function instance is created using pseudo generic types, any types that depend on these pseudo types—such as structures that require re-validation—are temporarily stored in memory. After dynamic type annotation resolves the actual types, the recheck algorithm is triggered to revalidate those stored types. This ensures that all types relying on the initially unresolved generic parameters are now correctly and fully type-checked using the concrete types. As a result, the issues arising from incomplete or mismatched type assumptions are resolved, making the generic system more robust and accurate without sacrificing performance.
+
 ### Implicit Imports
 
 Implicit imports are as described in developer reference (9). This section addresses which package is supported and what special behaviors it has.

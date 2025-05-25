@@ -848,18 +848,19 @@ impl sema {
 	//	- For non-generic type parsed string type kinds.
 	//	- For checking non-generic types.
 	fn buildNonGenericType(mut &self, mut &ast: &ast::Type,
-		mut &generics: []&ast::Generic, mut &ignored: []&Type): &Type {
+		mut &generics: []&ast::Generic, mut &ignored: []&Type, mut &recheckNeed: []recheckableType): &Type {
 		mut tc := &typeChecker{
 			s: self,
 			rootLookup: self,
 			lookup: self,
 			ignoreGenerics: generics,
 			ignoredGenerics: &ignored,
+			recheckNeed: &recheckNeed,
 		}
 		ret tc.checkDecl(ast)
 	}
 
-	fn buildFuncNonGenericTypes(mut &self, mut f: &FuncIns, mut &ignored: []&Type): (ok: bool) {
+	fn buildFuncNonGenericTypes(mut &self, mut f: &FuncIns, mut &ignored: []&Type, mut &recheckNeed: []recheckableType): (ok: bool) {
 		let mut generics: []&ast::Generic = nil
 		if f.Decl.IsMethod() {
 			generics = append(f.Decl.Generics, f.Decl.Owner.Generics...)
@@ -870,12 +871,12 @@ impl sema {
 			ok = true
 			for (_, mut p) in f.Params {
 				if !p.Decl.IsSelf() {
-					p.Type = sema.buildNonGenericType(p.Decl.TypeSym.Decl, generics, unsafe { ignored })
+					p.Type = sema.buildNonGenericType(p.Decl.TypeSym.Decl, generics, unsafe { ignored }, unsafe { recheckNeed })
 					ok = ok && p.Type != nil
 				}
 			}
 			if !f.Decl.IsVoid() {
-				f.Result = sema.buildNonGenericType(f.Decl.Result.TypeSym.Decl, generics, unsafe { ignored })
+				f.Result = sema.buildNonGenericType(f.Decl.Result.TypeSym.Decl, generics, unsafe { ignored }, unsafe { recheckNeed })
 				ok = ok && f.Result != nil
 			}
 			ret
@@ -978,36 +979,50 @@ impl sema {
 		p.Type.Variadic = p.Decl.Variadic
 	}
 
+	// Reload type of function's self (receiver) parameter.
+	fn reloadSelf(mut &self, mut f: &FuncIns) {
+		if f.Owner == nil {
+			// Trait methods have not owner yet. Skip them.
+			ret
+		}
+		// No parameters, no receiver.
+		if len(f.Params) == 0 {
+			ret
+		}
+		mut p := f.Params[0]
+		// Receiver parameter already have a type, return immediately.
+		if p.Type != nil {
+			ret
+		}
+		if p.Decl.IsRef() {
+			p.Type = &Type{
+				Kind: &Sptr{
+					Elem: &Type{
+						Kind: f.Owner,
+					},
+				},
+			}
+		} else {
+			p.Type = &Type{Kind: f.Owner}
+		}
+	}
+
 	fn reloadFuncInsTypes(mut &self, mut f: &FuncIns): bool {
 		if f.IsBuiltin() || f.IsAnon() {
 			ret true
 		}
 		ret self.funcEnvironment(f, fn(mut &sema: &sema, mut &generics: []&TypeAlias): bool {
+			self.reloadSelf(f)
 			mut ok := true
 			for (_, mut p) in f.Params {
 				if p.Decl.IsSelf() {
-					if f.Owner == nil {
-						// Trait methods have not owner yet. Skip them.
-						continue
-					}
-					if p.Decl.IsRef() {
-						p.Type = &Type{
-							Kind: &Sptr{
-								Elem: &Type{
-									Kind: f.Owner,
-								},
-							},
-						}
-					} else {
-						p.Type = &Type{Kind: f.Owner}
-					}
+					continue
+				}
+				p.Type = sema.buildTypeWithGenerics(p.Decl.TypeSym.Decl, generics, f.Refers)
+				if p.Type != nil {
+					self.checkFuncParamKind(p)
 				} else {
-					p.Type = sema.buildTypeWithGenerics(p.Decl.TypeSym.Decl, generics, f.Refers)
-					if p.Type != nil {
-						self.checkFuncParamKind(p)
-					} else {
-						ok = false
-					}
+					ok = false
 				}
 			}
 			if !f.Decl.IsVoid() {
@@ -2267,6 +2282,52 @@ impl sema {
 			ret ins
 		}
 		ret nil
+	}
+
+	fn recheckType(mut &self, mut t: recheckableType, mut &errorToken: &token::Token,
+		mut &refers: &ReferenceStack): (ok: bool) {
+		mut tc := &typeChecker{
+			s: self,
+			rootLookup: self,
+			lookup: self,
+			refers: refers,
+		}
+		ret tc.recheck(t, errorToken)
+	}
+
+	// Basically same as the checkGenericFunc,
+	// but checks the function with the recheck strategy.
+	// See developer reference (15).
+	fn checkGenericFuncRecheck(mut &self, mut &f: &FuncIns, mut &et: &token::Token,
+		mut recheckNeed: []recheckableType): (ok: bool, exist: bool) {
+		// If len(recheckNeed)>0, check the types before handling function.
+		if len(recheckNeed) > 0 {
+			ok = true
+			for (_, mut t) in recheckNeed {
+				ok = self.recheckType(t, et, f.Refers) && ok
+			}
+			if !ok {
+				ret false, false
+			}
+		}
+		mut existInstance := f.Decl.appendInstance(f)
+		// If instance already exist with same generics, return immediately.
+		// This function should be already checked, or it will be.
+		if existInstance != nil {
+			// Set f to exist one.
+			f = existInstance
+			ret true, true
+		}
+		// We still need to check self parameter.
+		self.reloadSelf(f)
+		// TODO: [check] is possible to optimize here using same environment with realoadFuncInsTypes?
+		if !self.checkConstraintsFunc(f, et, existInstance) {
+			ret false, false
+		}
+		// Check generic function instance instantly.
+		self.checkFuncInsCaller(f, et)
+		ok = true
+		ret
 	}
 
 	// Checks new generics function instance.

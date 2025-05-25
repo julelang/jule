@@ -717,17 +717,21 @@ struct referencer {
 	next:  &referencer // Next referencer.
 }
 
+enum recheckableType: type {
+	&StructIns,
+}
+
 // Cycle state flags.
 const (
 	cycleErrDisable = 1 << iota // Disable error logging for cycle analysis.
 	cycleErrFail                // Means the last cycle analysis reports cycles exist.
 )
 
-// Type analysis tags.
+// Type analysis flags.
 // See developer reference (10).
 const (
-	taNotComparable = 1 << iota
-	taMutable
+	taNotComparable = 1 << iota // current type is not comparable
+	taMutable                   // current type is mutable
 )
 
 // Checks type and builds result as kind.
@@ -765,6 +769,9 @@ struct typeChecker {
 	// Relevant type kinds that contains an ignored generic type.
 	ignoredGenerics: *[]&Type
 
+	// See developer reference (15).
+	recheckNeed: *[]recheckableType
+
 	// This generics used as type alias for real kind.
 	useGenerics: []&TypeAlias
 
@@ -795,6 +802,15 @@ impl typeChecker {
 
 	fn disallowBuiltin(mut self) {
 		self.disBuiltin = true
+	}
+
+	fn isIgnoredGeneric(mut self, name: str): bool {
+		for _, g in self.ignoreGenerics {
+			if g.Ident == name {
+				ret true
+			}
+		}
+		ret false
 	}
 
 	// Push type analysis flag to owner structure instance if exist.
@@ -1215,6 +1231,9 @@ impl typeChecker {
 		self.lookup = self.rootLookup
 		defer { self.lookup = lookup }
 
+		// Whether the instance pushed to recheck stack.
+		mut recheck := false
+
 		// Build generics.
 		mut ins := s.instance()
 		ins.Generics = make([]&InsGeneric, 0, len(decl.Generics))
@@ -1245,12 +1264,31 @@ impl typeChecker {
 				}
 			Ok:
 			}
+			// Insert type to recheck collection if recheck needed.
+			if !recheck && len(self.ignoreGenerics) > 0 {
+				prim := kind.Prim()
+				if prim != nil && self.isIgnoredGeneric(prim.Kind) {
+					recheck = true
+					unsafe { *self.recheckNeed = append(*self.recheckNeed, ins) }
+				}
+			}
 			ins.Generics = append(ins.Generics, &InsGeneric{Type: kind})
 		}
 
 		ret ins
 	}
 
+	// Checks structure instance.
+	fn _fromStructIns(mut self, mut &ins: &StructIns, mut token: &token::Token): (ok: bool) {
+		ok = self.checkStructIns(ins, token)
+		if ok {
+			self.pushReference[&StructIns](ins)
+		}
+		ret
+	}
+
+	// Calls _fromStructIns and returns the instance if the instance is new,
+	// otherwise returns the exist instance.
 	fn fromStructIns(mut self, mut &ins: &StructIns, mut token: &token::Token): &StructIns {
 		mut existInstance := ins.Decl.appendInstance(ins)
 		if existInstance != nil {
@@ -1262,10 +1300,7 @@ impl typeChecker {
 			self.pushReference[&StructIns](existInstance)
 			ret existInstance
 		}
-		if !self.checkStructIns(ins, token) {
-			ret nil
-		}
-		self.pushReference[&StructIns](ins)
+		self._fromStructIns(ins, token)
 		ret ins
 	}
 
@@ -1321,10 +1356,8 @@ impl typeChecker {
 	// process will use internal lookup. This might be useful for building
 	// genericed type from another package.
 	fn getDef(mut self, mut &decl: &ast::IdentType): Kind {
-		for _, g in self.ignoreGenerics {
-			if g.Ident == decl.Ident {
-				ret buildPrimType(g.Ident)
-			}
+		if self.isIgnoredGeneric(decl.Ident) {
+			ret buildPrimType(decl.Ident)
 		}
 
 		for (_, mut g) in self.useGenerics {
@@ -1795,9 +1828,9 @@ impl typeChecker {
 			ret kind.(&Type)
 		|:
 			mut tk := &Type{Kind: kind}
-			match type kind {
-			| &Prim:
-				if self.ignoredGenerics != nil {
+			if self.ignoredGenerics != nil {
+				_, prim := kind.(&Prim)
+				if prim {
 					unsafe { *self.ignoredGenerics = append(*self.ignoredGenerics, tk) }
 				}
 			}
@@ -1826,6 +1859,18 @@ impl typeChecker {
 			ret
 		}
 		t.Type = kind
+	}
+
+	// Rechecks the recheckable type.
+	// See developer reference (15).
+	fn recheck(mut self, mut &t: recheckableType, mut &errorToken: &token::Token): (ok: bool) {
+		match type t {
+		| &StructIns:
+			mut s := t.(&StructIns)
+			s.Checked = false
+			ok = self._fromStructIns(s, errorToken)
+		}
+		ret
 	}
 }
 

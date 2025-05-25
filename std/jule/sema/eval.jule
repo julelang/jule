@@ -96,7 +96,6 @@ const (
 	evalExceptional               // Allows calling exceptional functions.
 )
 
-// Evaluator.
 struct eval {
 	s:          &sema // Used for error logging.
 	lookup:     Lookup
@@ -1197,9 +1196,15 @@ impl eval {
 
 	// Checks new generics function instance.
 	// If instance is already exist, f will point to exist instantantiation.
-	fn checkGenericFunc(mut &self, mut &f: &FuncIns, mut &et: &token::Token, mut &model: Expr): (ok: bool, exist: bool) {
+	// If recheckNeed is not nil, function will checked with recheck strategy.
+	fn checkGenericFunc(mut &self, mut &f: &FuncIns, mut &et: &token::Token,
+		mut &model: Expr, mut recheckNeed: []recheckableType): (ok: bool, exist: bool) {
 		mut old := f
-		ok, exist = self.s.checkGenericFunc(f, et)
+		if recheckNeed == nil {
+			ok, exist = self.s.checkGenericFunc(f, et)
+		} else {
+			ok, exist = self.s.checkGenericFuncRecheck(f, et, recheckNeed)
+		}
 		if ok && exist {
 			// Update model by exist function instance.
 			// Generic functions returns always new instance, because might be
@@ -1245,7 +1250,7 @@ impl eval {
 			ret
 		}
 
-		ok, _ := self.checkGenericFunc(f, i.Expr.Token, v.Model)
+		ok, _ := self.checkGenericFunc(f, i.Expr.Token, v.Model, nil)
 		if ok {
 			v.Type.Kind = f
 		} else {
@@ -2242,6 +2247,10 @@ impl eval {
 			errorToken: fc.Token,
 		}
 
+		// This will be used to collect recheck-needed types if dynamic annotation enabled.
+		// See developer reference (15).
+		let mut recheckNeed: []recheckableType
+
 		if !dynamicAnnotation {
 			if !f.reloaded {
 				ok := self.s.reloadFuncInsTypes(f)
@@ -2255,18 +2264,23 @@ impl eval {
 			if existInstance != nil {
 				f = existInstance
 			}
-		} else if !self.s.buildFuncNonGenericTypes(f, fcac.ignored) {
-			v = nil
-			ret
+		} else {
+			// Use non-nil slice for dynamic type annotation.
+			// Thus we can use recheck strategy even for zero recheck-need cases.
+			recheckNeed = make([]recheckableType, 0, len(f.Params)/2)
+			if !self.s.buildFuncNonGenericTypes(f, fcac.ignored, recheckNeed) {
+				v = nil
+				ret
+			}
 		}
 
 		fcac.f = f
 
 		mut ok := false
 		if f.Decl.Owner != nil {
-			old, self.s = self.s, old // Save current Sema.
+			old, self.s = self.s, old // Save current sema.
 			ok = fcac.check()
-			old, self.s = self.s, old // Save owner Sema.
+			old, self.s = self.s, old // Save owner sema.
 		} else {
 			ok = fcac.check()
 		}
@@ -2276,7 +2290,7 @@ impl eval {
 				v = nil
 				ret
 			}
-			ok, _ = self.checkGenericFunc(f, fc.Token, v.Model)
+			ok, _ = self.checkGenericFunc(f, fc.Token, v.Model, recheckNeed)
 			if !ok {
 				v = nil
 				ret
