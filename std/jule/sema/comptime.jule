@@ -557,6 +557,21 @@ impl Kind for comptimeTypeInfo {
 }
 
 impl comptimeTypeInfo {
+	fn _Hash(&self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Hash")
+			ret nil
+		}
+		mut constant := constant::Const.NewU64(u64(uintptr(self)))
+		constant.Kind = types::Uintptr
+		ret &Value{
+			untyped: false,
+			Type: primUintptr,
+			Constant: constant,
+			Model: constant,
+		}
+	}
+
 	fn _Decl(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Decl")
@@ -984,6 +999,13 @@ impl comptimeTypeInfo {
 
 	fn subIdent(mut &self, &ident: str): &Value {
 		match ident {
+		| "Hash":
+			mut method := &FuncIns{
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
+					ret self._Hash(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
 		| "Strict":
 			mut method := &FuncIns{
 				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
