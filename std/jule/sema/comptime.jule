@@ -1012,6 +1012,21 @@ impl comptimeTypeInfo {
 		ret buildComptimeTypeInfoData(e.s, s.Source)
 	}
 
+	fn _ActualSource(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "ActualSource")
+			ret nil
+		}
+		s := self.base.SoftStruct()
+		isStrict := s != nil && s.Source != nil
+		if !isStrict {
+			e.pushErr(fc.Token, log::InvalidTypeForFunc, self.base.Str(), "ActualSource")
+			ret nil
+		}
+		mut t := &Type{Kind: self.base.ActualKind()}
+		ret buildComptimeTypeInfoData(e.s, t)
+	}
+
 	fn subIdent(mut &self, &ident: str): &Value {
 		match ident {
 		| "Hash":
@@ -1025,6 +1040,13 @@ impl comptimeTypeInfo {
 			mut method := &FuncIns{
 				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Source(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "ActualSource":
+			mut method := &FuncIns{
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
+					ret self._ActualSource(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
