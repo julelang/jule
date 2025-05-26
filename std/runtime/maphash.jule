@@ -122,8 +122,9 @@ fn maphash[K](k: K, seed: uintptr): uintptr {
 		ret unsafe { integ::Emit[uintptr]("{}.type->hash(&{}.data, {})", k, k, seed) }
 	| comptime::Str:
 		ret strhash(str(k), seed)
-	| comptime::Ptr | comptime::SmartPtr:
-		ret unsafe { memhash((*unsafe)(uintptr(k)), _ptrSize, seed) }
+	| comptime::Uintptr | comptime::Ptr | comptime::SmartPtr:
+		z := uintptr(k)
+		ret unsafe { memhash(&z, _ptrSize, seed) }
 	| comptime::Bool:
 		ret boolhash(bool(k), seed)
 	| comptime::Array:
@@ -131,7 +132,8 @@ fn maphash[K](k: K, seed: uintptr): uintptr {
 	| comptime::Struct:
 		ret structhash(k, seed)
 	| comptime::Chan:
-		ret unsafe { memhash((*unsafe)(uintptr(*(*&hchan)(&k))), _ptrSize, seed) }
+		z := unsafe { uintptr(*(*&hchan)(&k)) }
+		ret unsafe { memhash(&z, _ptrSize, seed) }
 	}
 	panic("unreachable")
 }
