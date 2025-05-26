@@ -998,12 +998,33 @@ impl comptimeTypeInfo {
 		}
 	}
 
+	fn _Source(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Source")
+			ret nil
+		}
+		mut s := self.base.SoftStruct()
+		isStrict := s != nil && s.Source != nil
+		if !isStrict {
+			e.pushErr(fc.Token, log::InvalidTypeForFunc, self.base.Str(), "Source")
+			ret nil
+		}
+		ret buildComptimeTypeInfoData(e.s, s.Source)
+	}
+
 	fn subIdent(mut &self, &ident: str): &Value {
 		match ident {
 		| "Hash":
 			mut method := &FuncIns{
 				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Hash(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Source":
+			mut method := &FuncIns{
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
+					ret self._Source(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
