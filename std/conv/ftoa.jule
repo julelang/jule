@@ -146,7 +146,8 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int
 	shortest := prec < 0
 	if shortest {
 		// Use Ryu algorithm.
-		digs.d = make([]byte, 32)
+		let mut buf: [32]byte
+		digs.d = unsafe::Slice(&buf[0], len(buf), len(buf))
 		ryuFtoaShortest(digs, mant, exp-int(flt.mantbits), *flt)
 		ok = true
 		// Precision for shortest representation mode.
@@ -174,11 +175,13 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int
 			digits = 1
 		}
 		if bitSize == 32 && digits <= 9 {
-			digs.d = make([]byte, 24)
+			let mut buf: [24]byte
+			digs.d = unsafe::Slice(&buf[0], len(buf), len(buf))
 			ryuFtoaFixed32(digs, u32(mant), exp-int(flt.mantbits), digits)
 			ok = true
 		} else if digits <= 18 {
-			digs.d = make([]byte, 24)
+			let mut buf: [24]byte
+			digs.d = unsafe::Slice(&buf[0], len(buf), len(buf))
 			ryuFtoaFixed64(digs, mant, exp-int(flt.mantbits), digits)
 			ok = true
 		}
