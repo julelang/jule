@@ -39,24 +39,26 @@ impl Ubuf {
 		ret unsafe { *(self.data.slice + i) }
 	}
 
-	// self.data[i:]
+	// self.data[s:]
 	// Returned slice will have no GC.
-	fn Slice1(self, i: int): []byte {
-		n := self.data.len - i
-		ret unsafe { unsafe::Slice(self.data.slice+i, n, n) }
+	fn Slice1(self, s: int): []byte {
+		l := self.data.len - s
+		c := self.data.cap - s
+		ret unsafe { unsafe::Slice(self.data.slice+s, l, c) }
 	}
 
-	// self.data[i:t]
+	// self.data[s:n]
 	// Returned slice will have no GC.
-	fn Slice2(self, i: int, t: int): []byte {
-		n := t - i
-		ret unsafe { unsafe::Slice(self.data.slice+i, n, n) }
+	fn Slice2(self, s: int, n: int): []byte {
+		l := n - s
+		c := self.data.cap - s
+		ret unsafe { unsafe::Slice(self.data.slice+s, l, c) }
 	}
 
-	// self.data[:i]
+	// self.data[:n]
 	// Returned slice will have no GC.
-	fn Slice3(self, i: int): []byte {
-		ret unsafe { unsafe::Slice(self.data.slice, i, i) }
+	fn Slice3(self, n: int): []byte {
+		ret unsafe { unsafe::Slice(self.data.slice, n, self.data.cap) }
 	}
 
 	// self.data[i] = b
@@ -74,6 +76,13 @@ impl Ubuf {
 		self.data.slice += s
 		self.data.len = n - s
 		self.data.cap -= s
+	}
+
+	// self.data = self.data[s:]
+	fn SetLen3(self, s: int) {
+		self.data.len -= s
+		self.data.cap -= s
+		self.data.slice += s
 	}
 
 	// len(self.data)
