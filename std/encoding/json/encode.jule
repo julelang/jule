@@ -5,9 +5,11 @@
 use "std/comptime"
 use "std/conv"
 use "std/encoding/base64"
+use "std/internal/ubuf"
 use "std/math"
 use "std/runtime"
 use "std/strings"
+use "std/sync"
 use "std/unicode"
 use "std/unicode/utf8"
 use "std/unsafe"
@@ -99,50 +101,57 @@ impl jsonEncoder {
 	}
 
 	fn encodeInt(mut self, x: i64) {
-		self.buf.writeStr(conv::FormatInt(x, 0xA))
+		mut b := self.buf.availableBuffer()
+		b = conv::AppendInt(b, x, 10)
+		self.buf.write(b)
 	}
 
 	fn encodeUint(mut self, x: u64) {
-		self.buf.writeStr(conv::FormatUint(x, 0xA))
+		mut b := self.buf.availableBuffer()
+		b = conv::AppendUint(b, x, 10)
+		self.buf.write(b)
 	}
 
 	fn encodeFloat(mut self, f: f64, bits: int)! {
 		if math::IsNaN(f) || math::IsInf(f, 0) {
 			error(&UnsupportedValueError{conv::FormatFloat(f, 'g', -1, bits)})
 		}
-		mut fmt := 'f'
+		mut fmt := byte('f')
 		abs := math::Abs(f)
 		// Note: Must use f32 comparisons for underlying f32 value to get precise cutoffs right.
 		if abs != 0 {
-			if bits == 1<<6 && (abs < 1e-6 || abs >= 1e21) || bits == 1<<5 && (f32(abs) < 1e-6 || f32(abs) >= 1e21) {
+			if bits == 64 && (abs < 1e-6 || abs >= 1e21) ||
+				bits == 32 && (f32(abs) < 1e-6 || f32(abs) >= 1e21) {
 				fmt = 'e'
 			}
 		}
-		s := conv::FormatFloat(f, fmt, -1, 1<<6)
-		mut sb := unsafe::StrBytes(s)
+		bb := ubuf::Ubuf{}
+		bb.SetData(conv::AppendFloat(self.buf.availableBuffer(), f, fmt, -1, bits))
 		if fmt == 'e' {
 			// clean up e-09 to e-9
-			n := len(s)
-			if n >= 4 && sb[n-4] == 'e' && sb[n-3] == '-' && sb[n-2] == '0' {
-				sb[n-2] = sb[n-1]
-				sb = sb[:n-1]
+			n := bb.Len()
+			if n >= 4 && bb.Get(n-4) == 'e' && bb.Get(n-3) == '-' && bb.Get(n-2) == '0' {
+				bb.Set(n-2, bb.Get(n-1))
+				bb.SetLen(n - 1)
 			}
 		}
-		self.buf.write(sb)
+		self.buf.write(bb.Slice1(0))
 	}
 
 	fn encodeStr(mut self, s: str) {
+		ss := ubuf::Ubuf{}
+		ss.SetData(unsafe::StrBytes(s))
 		self.buf.writeByte('"')
 		mut start := 0
 		mut i := 0
-		for i < len(s) {
-			b := s[i]
+		for i < ss.Len() {
+			b := ss.Get(i)
 			if b < utf8::RuneSelf {
 				if isHTMLSafe(b) || (!self.escapeHTML && isSafe(b)) {
 					i++
 					continue
 				}
-				self.buf.writeStr(s[start:i])
+				self.buf.write(ss.Slice2(start, i))
 				match b {
 				| '\\':
 					self.buf.writeStr(`\\`)
@@ -172,13 +181,13 @@ impl jsonEncoder {
 				start = i
 				continue
 			}
-			mut n := len(s) - i
+			mut n := ss.Len() - i
 			if n > utf8::UTFMax {
 				n = utf8::UTFMax
 			}
-			c, size := utf8::DecodeRuneStr(s[i : i+n])
+			c, size := utf8::DecodeRune(ss.Slice2(i, i+n))
 			if c == utf8::RuneError && size == 1 {
-				self.buf.writeStr(s[start:i])
+				self.buf.write(ss.Slice2(start, i))
 				self.buf.writeStr(`\ufffd`)
 				i += size
 				start = i
@@ -192,7 +201,7 @@ impl jsonEncoder {
 			// escape them, so we do so unconditionally.
 			// See https://en.wikipedia.org/wiki/JSON#Safety.
 			if c == '\u2028' || c == '\u2029' {
-				self.buf.writeStr(s[start:i])
+				self.buf.write(ss.Slice2(start, i))
 				self.buf.writeStr(`\u202`)
 				self.buf.writeByte(hex[c&0xF])
 				i += size
@@ -201,68 +210,57 @@ impl jsonEncoder {
 			}
 			i += size
 		}
-		self.buf.writeStr(s[start:])
+		self.buf.write(ss.Slice1(start))
 		self.buf.writeByte('"')
 	}
 
 	fn encodeByteSlice(mut self, s: []byte) {
-		const Padding = true // Padding for Base64 encoding.
+		const Padding = true
 		self.buf.writeByte('"')
 		self.buf.write(base64::Encode(s, Padding))
 		self.buf.writeByte('"')
 	}
 
 	fn encodeStruct[T, Flag](mut self, &t: T)! {
-		const tt = comptime::TypeOf(T).Decl()
 		const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeIndent)
-		self.buf.writeByte('{')
 		const match {
 		| useIndent:
 			self.depth++
-			self.buf.writeByte('\n')
-			self.buf.writeStr(strings::Repeat(self.indent, self.depth))
 		}
-		const vt = comptime::ValueOf(t)
-		const fields = tt.Fields()
-		const for i, field in fields {
-			const tag = field.Tag("json")
+		mut next := '{'
+		p := uintptr(&t)
+		for _, fieldCache in cachedFields[T]() {
+			self.buf.writeByte(next)
+			next = ','
 			const match {
-			| field.Public() | tag != "":
-				name := getFieldName[T](field.Public(), field.Name(), tag)
-				if name != "" {
-					const match {
-					| i > 0:
-						self.buf.writeByte(',')
-						const match {
-						| useIndent:
-							self.buf.writeByte('\n')
-							self.buf.writeStr(strings::Repeat(self.indent, self.depth))
-						}
-					}
-					self.buf.writeStr("\"")
-					if self.escapeHTML {
-						appendHTMLEscape(self.buf, unsafe::StrBytes(name))
-					} else {
-						self.buf.writeStr(name)
-					}
-					self.buf.writeStr("\":")
-					const fieldValue = vt.FieldByIndex(i)
-					comptime::TypeAlias(fieldType, fieldValue.Type())
-					const match type Flag {
-					| encodeIndent:
-						self.buf.writeByte(' ')
-					}
-					self.encode[fieldType, Flag](fieldValue.Unwrap()) else { error(error) }
-				}
+			| useIndent:
+				self.buf.writeByte('\n')
+				self.buf.writeStr(strings::Repeat(self.indent, self.depth))
+			}
+			if self.escapeHTML {
+				self.buf.writeStr(fieldCache.nameEscHTML)
+			} else {
+				self.buf.writeStr(fieldCache.nameNonEsc)
+			}
+			const match {
+			| useIndent:
+				self.buf.writeByte(' ')
+				fieldCache.encodeIndent(self, p+fieldCache.offset) else { error(error) }
+			|:
+				fieldCache.encodePlain(self, p+fieldCache.offset) else { error(error) }
 			}
 		}
-		const match {
-		| useIndent:
-			self.depth--
-			self.buf.writeByte('\n')
-			self.buf.writeStr(strings::Repeat(self.indent, self.depth))
+		if next == '{' {
+			self.buf.writeStr("{}")
+		} else {
+			const match {
+			| useIndent:
+				self.depth--
+				self.buf.writeByte('\n')
+				self.buf.writeStr(strings::Repeat(self.indent, self.depth))
+			}
+			self.buf.writeByte('}')
 		}
-		self.buf.writeByte('}')
 	}
 
 	fn encodeMap[T, Flag](mut self, &t: T)! {
@@ -290,23 +288,19 @@ impl jsonEncoder {
 			ret
 		}
 		const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeIndent)
-		self.buf.writeByte('{')
 		const match {
 		| useIndent:
 			self.depth++
-			self.buf.writeByte('\n')
-			self.buf.writeStr(strings::Repeat(self.indent, self.depth))
 		}
-		mut first := true
 		comptime::TypeAlias(valType, tt.Value())
+		mut next := '{'
 		for k, v in t {
-			if !first {
-				self.buf.writeByte(',')
-				const match {
-				| useIndent:
-					self.buf.writeByte('\n')
-					self.buf.writeStr(strings::Repeat(self.indent, self.depth))
-				}
+			self.buf.writeByte(next)
+			next = ','
+			const match {
+			| useIndent:
+				self.buf.writeByte('\n')
+				self.buf.writeStr(strings::Repeat(self.indent, self.depth))
 			}
 			// No need to check Flag. The key type cannot be/include
 			// indentation-sensitive type. Look at this function's
@@ -319,7 +313,6 @@ impl jsonEncoder {
 				self.buf.writeByte(' ')
 			}
 			self.encode[valType, Flag](v) else { error(error) }
-			first = false
 		}
 		const match {
 		| useIndent:
@@ -332,32 +325,33 @@ impl jsonEncoder {
 
 	fn encodeArray[T, Flag](mut self, &t: T)! {
 		const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeIndent)
-		self.buf.writeByte('[')
 		const match {
 		| useIndent:
 			self.depth++
-			self.buf.writeByte('\n')
-			self.buf.writeStr(strings::Repeat(self.indent, self.depth))
 		}
 		comptime::TypeAlias(elem, comptime::TypeOf(t).Elem())
-		for i, e in t {
-			if i > 0 {
-				self.buf.writeByte(',')
-				const match {
-				| useIndent:
-					self.buf.writeByte('\n')
-					self.buf.writeStr(strings::Repeat(self.indent, self.depth))
-				}
+		mut next := '['
+		for _, e in t {
+			self.buf.writeByte(next)
+			next = ','
+			const match {
+			| useIndent:
+				self.buf.writeByte('\n')
+				self.buf.writeStr(strings::Repeat(self.indent, self.depth))
 			}
 			self.encode[elem, Flag](e) else { error(error) }
 		}
-		const match {
-		| useIndent:
-			self.depth--
-			self.buf.writeByte('\n')
-			self.buf.writeStr(strings::Repeat(self.indent, self.depth))
+		if next == '[' {
+			self.buf.writeStr("[]")
+		} else {
+			const match {
+			| useIndent:
+				self.depth--
+				self.buf.writeByte('\n')
+				self.buf.writeStr(strings::Repeat(self.indent, self.depth))
+			}
+			self.buf.writeByte(']')
 		}
-		self.buf.writeByte(']')
 	}
 
 	// Checks nil case for slices, then forwards to the [encodeArray] method.
@@ -424,10 +418,10 @@ impl jsonEncoder {
 			self.encodeUint(u64(t))
 			ret
 		| comptime::F32:
-			self.encodeFloat(f64(t), 1<<5) else { error(error) }
+			self.encodeFloat(f64(t), 32) else { error(error) }
 			ret
 		| comptime::F64:
-			self.encodeFloat(f64(t), 1<<6) else { error(error) }
+			self.encodeFloat(f64(t), 64) else { error(error) }
 			ret
 		| comptime::Bool:
 			self.encodeBool(bool(t))
@@ -560,17 +554,92 @@ fn EncodeIndent[T](t: T, indent: str)!: []byte {
 	ret encoder.buf.bytes()
 }
 
+// Cache data for the structure field.
+struct field {
+	offset:       uintptr
+	nameNonEsc:   str
+	nameEscHTML:  str
+	encodePlain:  fn(mut &encoder: jsonEncoder, field: uintptr)!
+	encodeIndent: fn(mut &encoder: jsonEncoder, field: uintptr)!
+	decode:       fn(&decoder: jsonDecoder, field: uintptr)!
+}
+
+// Field cache data for structure types and associated RWMutex.
+static mut fieldMap = map[uintptr][]&field{}
+static mut fieldMapLock = sync::RWMutex{}
+
+// Returns field cache data for the structure type T.
+// If the structure is not cached yet, it will cache it.
+fn cachedFields[T](): []&field {
+	const t = comptime::TypeOf(T)
+	fieldMapLock.RLock()
+	mut cache, mut exist := fieldMap[t.Hash()]
+	fieldMapLock.RUnlock()
+	if exist {
+		ret cache
+	}
+	// There is no cache for type type T, cache it.
+	fieldMapLock.Lock()
+	// Last check with write lock before cache.
+	cache, exist := fieldMap[t.Hash()]
+	if exist {
+		fieldMapLock.Unlock()
+		ret cache
+	}
+	p := unsafe { (*T)(0) }
+	const pv = comptime::ValueOf(unsafe { *p })
+	const fields = t.Fields()
+	const for i, f in t.Decl().Fields() {
+		const tag = f.Tag("json")
+		const match {
+		| f.Public() | tag != "":
+			name := getFieldName[T](f.Public(), f.Name(), tag)
+			if name != "" {
+				comptime::TypeAlias(fieldType, fields[i].Type())
+
+				mut fieldCache := new(field)
+				fieldCache.offset = uintptr(&pv.FieldByIndex(i).Unwrap())
+
+				// Cache name for non-escape.
+				fieldCache.nameNonEsc = "\"" + name + "\":"
+
+				// Cache name for escape-HTML.
+				if isNeedHTMLEscape(unsafe::StrBytes(name)) {
+					mut buf := buffer{}
+					buf.writeByte('"')
+					appendHTMLEscape(buf, unsafe::StrBytes(name))
+					buf.writeStr("\":")
+					fieldCache.nameEscHTML = unsafe::StrFromBytes(buf.bytes())
+				} else {
+					fieldCache.nameEscHTML = fieldCache.nameNonEsc
+				}
+
+				// Cache encoder and decoder functions.
+				fieldCache.encodePlain = typeEncoderPlain[fieldType]
+				fieldCache.encodeIndent = typeEncoderIndent[fieldType]
+				fieldCache.decode = typeDecoder[fieldType]
+
+				cache = append(cache, fieldCache)
+			}
+		}
+	}
+	fieldMap[t.Hash()] = cache
+	fieldMapLock.Unlock()
+	ret cache
+}
+
 // Reports whether the JSON tag name is duplicated.
 fn isDuplicateTag[T](tag: str): bool {
-	mut i := 0
-	const t = comptime::TypeOf(T)
-	const for _, field in t.Decl().Fields() {
-		ftag := field.Tag("json")
-		if ftag == tag || field.Public() && field.Name() == tag {
-			i++
-			if i > 1 {
+	mut seen := false
+	const t = comptime::TypeOf(T).Decl()
+	const for _, f in t.Fields() {
+		const ftag = f.Tag("json")
+		if ftag != "" && ftag == tag ||
+			f.Public() && f.Name() == tag {
+			if seen {
 				ret true
 			}
+			seen = true
 		}
 	}
 	ret false
@@ -607,12 +676,11 @@ fn isValidTag(s: str): bool {
 		ret false
 	}
 	for _, c in s {
-		match {
-		| strings::ContainsRune("!#$%&()*+-./:;<=>?@[]^_{|}~ ", c):
+		if strings::ContainsRune("!#$%&()*+-./:;<=>?@[]^_{|}~ ", c) {
 			// Backslash and quote chars are reserved, but
 			// otherwise any punctuation chars are allowed
 			// in a tag name.
-		| !unicode::IsLetter(c) && !unicode::IsDigit(c):
+		} else if !unicode::IsLetter(c) && !unicode::IsDigit(c) {
 			ret false
 		}
 	}
@@ -630,4 +698,16 @@ fn resolveKeyName[T](k: T): str {
 		ret conv::FormatUint(u64(k), 10)
 	}
 	panic("unexpected map key type")
+}
+
+fn typeEncoderPlain[T](mut &encoder: jsonEncoder, field: uintptr)! {
+	encoder.encode[T, encodePlain](unsafe { *(*T)(field) }) else { error(error) }
+}
+
+fn typeEncoderIndent[T](mut &encoder: jsonEncoder, field: uintptr)! {
+	encoder.encode[T, encodeIndent](unsafe { *(*T)(field) }) else { error(error) }
+}
+
+fn typeDecoder[T](&decoder: jsonDecoder, field: uintptr)! {
+	decoder.value(unsafe { *(*T)(field) }) else { error(error) }
 }

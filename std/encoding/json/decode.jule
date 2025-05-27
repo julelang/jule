@@ -6,8 +6,8 @@ use "std/comptime"
 use "std/conv"
 use "std/encoding/base64"
 use "std/errors"
-use "std/internal/nbits"
 use "std/internal/ubuf"
+use "std/strings"
 use "std/unicode"
 use "std/unicode/utf16"
 use "std/unicode/utf8"
@@ -422,6 +422,8 @@ impl jsonDecoder {
 			ret
 		}
 		self.pushParseState(parseObject) else { error(error) }
+		cache := cachedFields[T]()
+		p := uintptr(&t)
 		for {
 			self.skipSpace()
 			if self.eof() {
@@ -430,8 +432,12 @@ impl jsonDecoder {
 			if self.data.Get(self.i) != '"' {
 				error(errors::New("json: invalid character " + quoteChar(self.data.Get(self.i)) + " looking for beginning of object key string"))
 			}
-			// Don't check validity for literal, following algorithms will check it.
-			lit := self.scanLit() else { error(error) }
+			// Save the current position of decoder.
+			// We use it to select beginning of literal.
+			j := self.i
+			// Scan literal with validity control.
+			// Because we will not unquote it, it should be checked here.
+			self.scanValidLit() else { error(error) }
 			self.skipSpace()
 			if self.eof() {
 				error(errors::New("json: object is not ended"))
@@ -440,40 +446,36 @@ impl jsonDecoder {
 				error(errors::New("json: invalid character " + quoteChar(self.data.Get(self.i)) + " after object key"))
 			}
 			self.i++
+			// Get literal with quotes and colon.
+			// Result will be something like: `"foo":`
+			// Thus we match cached names without unquote it.
+			lit := unsafe::BytesStr(self.data.Slice2(j, self.i))
 			self.skipSpace()
 			if self.eof() {
 				error(errors::New("json: object is not ended"))
 			}
-			key := unquoteBytes(lit)
-			if key == nil {
-				error(errors::New("json: invalid value for object key type" + comptime::TypeOf(str).Str() + ": " + str(lit)))
-			}
-			keyS := unsafe::BytesStr(key)
-			// To avoid unused error.
-			// Empty or no-public field structure may cause compile error(s).
-			_ = keyS
-			const tt = comptime::TypeOf(T).Decl()
-			const vt = comptime::ValueOf(t)
-			const fields = tt.Fields()
-			const for i, field in fields {
-				const tag = field.Tag("json")
-				const match {
-				| field.Public() | tag != "":
-					name := getFieldName[T](field.Public(), field.Name(), tag)
-					if name != "" && keyS == name {
-						const fieldV = vt.FieldByIndex(i)
-						self.value(fieldV.Unwrap()) else { error(error) }
-						// Skip undecoded field handling and trailing if blocks if exist.
-						goto fieldDecoded
+			// If literal have escape characters, it is escaped literal.
+			// Compare it only escaped cached name, otherwise compere it with non-escape one.
+			// This is fast and safe way, backslash is reserved character.
+			// Therefore, a backslash always means literal is escaped.
+			if strings::ContainsRune(lit, '\\') {
+				for _, f in cache {
+					if f.nameEscHTML == lit {
+						f.decode(self, p+f.offset) else { error(error) }
+						goto FieldDecoded
+					}
+				}
+			} else {
+				for _, f in cache {
+					if f.nameNonEsc == lit {
+						f.decode(self, p+f.offset) else { error(error) }
+						goto FieldDecoded
 					}
 				}
 			}
 			// Skip JSON object field if is not decoded for struct.
 			self.scanValidValue() else { error(error) }
-			// To avoid unused error.
-			// Empty or no-public field structure may cause compile error(s).
-			goto fieldDecoded
-		fieldDecoded:
+		FieldDecoded:
 			self.skipSpace()
 			if self.eof() {
 				error(errors::New("json: object is not ended"))
@@ -856,7 +858,11 @@ fn getu4(s: []byte): rune {
 	ret r
 }
 
+// Unquotes the JSON string literal s.
 // Returns nil if failed.
+// This function implements the JSON strings grammar.
+// See https://tools.ietf.org/html/rfc7159#section-7
+// and https://www.json.org/img/string.png
 fn unquoteBytes(s: []byte): []byte {
 	ss := ubuf::Ubuf{}
 	ss.SetData(s)
@@ -867,7 +873,7 @@ fn unquoteBytes(s: []byte): []byte {
 	if ss.Len() == 2 {
 		ret make([]byte, 0)
 	}
-	ss.SetData(ss.Slice2(1, ss.Len()-1))
+	ss.SetLen2(1, ss.Len()-1)
 
 	// Check for unusual characters. If there are none,
 	// then no unquoting is needed, so return a slice of the
@@ -984,10 +990,7 @@ fn decodeInt[T](mut &t: T, lit: []byte)! {
 	// Use [unsafe::ByteStr] instead of casting.
 	// The byte buffer will not change, so it's safe and efficient.
 	const tt = comptime::TypeOf(T)
-	n := conv::ParseInt(unsafe::BytesStr(lit), 0xA, 1<<6) else {
-		error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
-	}
-	if !nbits::Fits(n, tt.Bits()) {
+	n := conv::ParseInt(unsafe::BytesStr(lit), 10, tt.Bits()) else {
 		error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
 	}
 	t = (T)(n)
@@ -997,10 +1000,7 @@ fn decodeUInt[T](mut &t: T, lit: []byte)! {
 	// Use [unsafe::ByteStr] instead of casting.
 	// The byte buffer will not change, so it's safe and efficient.
 	const tt = comptime::TypeOf(T)
-	n := conv::ParseUint(unsafe::BytesStr(lit), 0xA, 1<<6) else {
-		error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
-	}
-	if !nbits::FitsU(n, comptime::TypeOf(T).Bits()) {
+	n := conv::ParseUint(unsafe::BytesStr(lit), 10, tt.Bits()) else {
 		error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
 	}
 	t = (T)(n)
@@ -1010,10 +1010,7 @@ fn decodeFloat[T](mut &t: T, lit: []byte)! {
 	// Use [unsafe::ByteStr] instead of casting.
 	// The byte buffer will not change, so it's safe and efficient.
 	const tt = comptime::TypeOf(T)
-	n := conv::ParseFloat(unsafe::BytesStr(lit), 1<<6) else {
-		error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
-	}
-	if f64(T.Max) < n {
+	n := conv::ParseFloat(unsafe::BytesStr(lit), tt.Bits()) else {
 		error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
 	}
 	t = (T)(n)
@@ -1042,43 +1039,90 @@ fn decodeString(mut &s: str, lit: []byte): (ok: bool) {
 }
 
 // Reports whether the literal b is valid JSON string literal.
-// This function implements the JSON strings grammar.
-// See https://tools.ietf.org/html/rfc7159#section-7
-// and https://www.json.org/img/string.png
+// Implementation is based on the [unquoteBytes] function.
 fn isValidString(b: []byte): bool {
-	if len(b) == 1 {
+	ss := ubuf::Ubuf{}
+	ss.SetData(b)
+	if ss.Len() < 2 || ss.Get(0) != '"' || ss.Get(ss.Len()-1) != '"' {
 		ret false
 	}
+	// Empty literal.
+	if ss.Len() == 2 {
+		ret true
+	}
+	ss.SetLen2(1, ss.Len()-1)
 
-	bb := ubuf::Ubuf{}
-	bb.SetData(b)
-	mut i := 1
-	for i < bb.Len(); i++ {
-		match bb.Get(i) {
-		| '\\':
-			i++
-			if i >= bb.Len() {
+	// Check for unusual characters. If there are none,
+	// then no unquoting is needed, so return a slice of the
+	// original bytes.
+	mut r := 0
+	for r < ss.Len() {
+		c := ss.Get(r)
+		if c == '\\' || c == '"' || c < ' ' {
+			break
+		}
+		if c < utf8::RuneSelf {
+			r++
+			continue
+		}
+		rr, size := utf8::DecodeRune(ss.Slice1(r))
+		if rr == utf8::RuneError && size == 1 {
+			break
+		}
+		r += size
+	}
+	if r == ss.Len() {
+		ret true
+	}
+
+	for r < ss.Len() {
+		// Out of room? Can only happen if s is full of
+		// malformed UTF-8 and we're replacing each
+		// byte with RuneError.
+		c := ss.Get(r)
+		match {
+		| c == '\\':
+			r++
+			if r >= ss.Len() {
 				ret false
 			}
-			match bb.Get(i) {
-			| '"' | '\\' | '/' | '\'' | 'b' | 'f' | 'r' | 't' | 'n':
-				i++
+			match ss.Get(r) {
+			| '"' | '\\' | '/' | '\'' | 'b' | 'f' | 'n' | 'r' | 't':
+				r++
 			| 'u':
-				mut rr := getu4(bb.Slice1(i - 1))
+				r--
+				rr := getu4(ss.Slice1(r))
 				if rr < 0 {
 					ret false
 				}
-				i += 5
+				r += 6
+				if utf16::IsSurrogate(rr) {
+					rr1 := getu4(ss.Slice1(r))
+					dec := utf16::DecodeRune(rr, rr1)
+					if dec != unicode::ReplacementChar {
+						// A valid pair; consume.
+						r += 6
+						break
+					}
+					// Invalid surrogate; fall back to replacement rune.
+					// But it is still a valid literal.
+				}
 			|:
 				ret false
 			}
-		| '"':
-			i++ // Tokenize the closing quote too.
-			ret i == bb.Len() // Make sure we are at the end.
+		| c == '"' | c < ' ':
+			// Quote, control characters are invalid.
+			ret false
+		| c < utf8::RuneSelf:
+			// ASCII
+			r++
+		|:
+			// Coerce to well-formed UTF-8.
+			_, size := utf8::DecodeRune(ss.Slice1(r))
+			r += size
 		}
 	}
-	// Missing closing quote.
-	ret false
+	ret true
 }
 
 // Reports whether the literal b is valid JSON number literal.
