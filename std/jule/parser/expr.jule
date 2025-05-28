@@ -969,7 +969,7 @@ fn findLowestPrecOp(tokens: []&token::Token): int {
 	mut op := true // Ready to read operator.
 
 	mut braceN := 0
-	mut skipToNextBraceOpen := false
+	mut mapType := 0
 
 	// Skips all unary operators of tokens by i and increases the i for each token.
 	// At the end, i will point to last skipped unary operator, if any.
@@ -999,10 +999,9 @@ fn findLowestPrecOp(tokens: []&token::Token): int {
 	for i < len(tokens); i++ {
 		token := tokens[i]
 		match token.Id {
-		| token::LBrace:
-			op = true
-			skipToNextBraceOpen = false
-			fall
+		| token::Map:
+			mapType++
+		| token::LBrace
 		| token::LParent
 		| token::LBracket:
 			op = true
@@ -1022,18 +1021,19 @@ fn findLowestPrecOp(tokens: []&token::Token): int {
 			}
 			i-- // Fallback to the range closer token or last skipped unary operator.
 			fall // Fallback to ordinary range closing algorithm.
-		| token::RBrace
 		| token::RBracket:
+			op = mapType == 0
+			if mapType > 0 {
+				mapType--
+			}
+			braceN--
+			continue
+		| token::RBrace:
 			op = true
 			braceN--
 			continue
-		| token::If:
-			skipToNextBraceOpen = true
-			continue
 		}
 		match {
-		| skipToNextBraceOpen:
-			continue
 		| i == 0:
 			continue
 		| braceN > 0:
