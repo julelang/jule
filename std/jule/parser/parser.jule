@@ -128,6 +128,27 @@ fn parts(mut &tokens: []&token::Token, id: int, exprMust: bool): (parts: [][]&to
 	ret
 }
 
+fn isTupleExpr(mut &tokens: []&token::Token): bool {
+	if len(tokens) == 0 {
+		ret false
+	}
+	mut rangeN := 0
+	for _, token in tokens {
+		match token.Id {
+		| token::LBrace | token::LBracket | token::LParent:
+			rangeN++
+		| token::RBrace | token::RBracket | token::RParent:
+			rangeN--
+		| token::Comma:
+			if rangeN > 0 {
+				continue
+			}
+			ret true
+		}
+	}
+	ret false
+}
+
 fn getCloseOfBrace(left: int): int {
 	match left {
 	| token::RParent:

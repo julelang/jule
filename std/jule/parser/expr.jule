@@ -649,20 +649,20 @@ impl exprBuilder {
 		// Remove expression tokens.
 		// Holds only indexing tokens.
 		// Includes brackets.
-		tokens = tokens[len(exprTokens):]
+		mut bracketTokens := tokens[len(exprTokens):]
 
 		// Catch slicing expressions.
-		mut splitTokens := tokens[1 : len(tokens)-1] // Remove brackets.
+		mut splitTokens := bracketTokens[1 : len(bracketTokens)-1] // Remove brackets.
 		mut start, mut to := splitDelim(splitTokens, token::Colon)
 		if start != nil || to != nil {
-			ret self.buildSlicing(exprTokens, start, to, errorToken, tokens[len(tokens)-1])
+			ret self.buildSlicing(exprTokens, start, to, errorToken, bracketTokens[len(bracketTokens)-1])
 		}
-		if tokens[1].Id == token::DblColon {
+		if bracketTokens[1].Id == token::DblColon {
 			// Special case: catch x[::] and x[::index3] like expressions.
 			self.pushErr(errorToken, log::MiddleIndexRequired)
 			ret nil
 		}
-		ret self.buildIndexing(exprTokens, tokens, errorToken)
+		ret self.buildIndexing(exprTokens, bracketTokens, errorToken)
 	}
 
 	fn buildExclRight(mut self, mut &tokens: []&token::Token): ast::ExprData {
@@ -818,12 +818,14 @@ impl exprBuilder {
 	}
 
 	fn buildKind(mut self, mut &tokens: []&token::Token): ast::ExprData {
-		mut parts, errors := parts(tokens, token::Comma, true)
-		if errors != nil {
-			self.p.errors = append(self.p.errors, errors...)
-			ret nil
-		} else if len(parts) > 1 {
-			ret self.buildTuple(parts)
+		if isTupleExpr(tokens) {
+			mut parts, errors := parts(tokens, token::Comma, true)
+			if errors != nil {
+				self.p.errors = append(self.p.errors, errors...)
+				ret nil
+			} else if len(parts) > 1 {
+				ret self.buildTuple(parts)
+			}
 		}
 		ret self.build(tokens)
 	}
