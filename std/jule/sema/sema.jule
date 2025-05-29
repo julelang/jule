@@ -215,6 +215,13 @@ unsafe fn pushSuggestion(mut log: *log::Log, fmt: str, args: ...any) {
 	log.Suggestion = log::Logf(fmt, args...)
 }
 
+// Semantic analysis environment for defines.
+struct environ {
+	sema:     &sema
+	file:     &SymTab
+	generics: []&TypeAlias
+}
+
 // Flags for commonSemaMeta flag.
 const (
 	semametaGstruct = 1 << iota // Adds generic structures to gstructs.
@@ -944,34 +951,29 @@ impl sema {
 	// Errors will be handled.
 	// Returns result of algo.
 	fn basicFuncEnvironment(mut &self, mut &f: &FuncIns, algo: fn(mut &sema: &sema): bool): bool {
-		mut sema := f.Decl.sema
-		mut old := sema.getCurrentFile()
-		mut file := findFile(sema.files, f.Decl.Token.File)
-		if file != nil {
-			sema.setCurrentFile(file)
+		f.fillEnviron()
+
+		if f.env.file != nil {
+			mut old := f.env.sema.getCurrentFile()
+			defer { f.env.sema.setCurrentFile(old) }
+			f.env.sema.setCurrentFile(f.env.file)
 		}
 
-		ok := algo(sema)
+		ok := algo(f.env.sema)
 
-		if sema != self {
-			self.errors = append(self.errors, sema.errors...)
-			sema.errors = nil
+		if f.env.sema != self {
+			self.errors = append(self.errors, f.env.sema.errors...)
+			f.env.sema.errors = nil
 		}
-		sema.setCurrentFile(old)
 
 		ret ok
 	}
 
 	// Calls basicFuncEnvironment internally but handles generics.
-	fn funcEnvironment(mut &self, mut &f: &FuncIns, algo: fn(mut &sema: &sema, mut &generics: []&TypeAlias): bool): bool {
-		mut size := len(f.Generics)
-		if f.Decl != nil && f.Decl.Owner != nil {
-			size += len(f.Decl.Owner.Generics)
-		}
-		mut generics := make([]&TypeAlias, 0, size)
-		appendGenericTypeAliases(generics, f)
+	fn funcEnvironment(mut &self, mut f: &FuncIns, algo: fn(mut &sema: &sema, mut &generics: []&TypeAlias): bool): bool {
+		// Needs to f.environ(), but the basicFuncEnviron will handle it.
 		ret self.basicFuncEnvironment(f, fn(mut &sema: &sema): bool {
-			ret algo(sema, generics)
+			ret algo(f.env.sema, f.env.generics)
 		})
 	}
 
@@ -2320,7 +2322,6 @@ impl sema {
 		}
 		// We still need to check self parameter.
 		self.reloadSelf(f)
-		// TODO: [check] is possible to optimize here using same environment with realoadFuncInsTypes?
 		if !self.checkConstraintsFunc(f, et, existInstance) {
 			ret false, false
 		}
@@ -2346,7 +2347,6 @@ impl sema {
 		if !ok {
 			ret false, false
 		}
-		// TODO: [check] is possible to optimize here using same environment with realoadFuncInsTypes?
 		if !self.checkConstraintsFunc(f, et, existInstance) {
 			ret false, false
 		}
@@ -2366,47 +2366,34 @@ impl sema {
 	// Which is contains fields and generic-type constraints.
 	// If generic instance will be check, errorToken should be passed.
 	fn checkStructEnv(mut &self, mut &s: &StructIns, mut prev: &referencer, mut errorToken: &token::Token): (ok: bool) {
+		s.fillEnviron()
+
 		// If source is not nil, do not check.
 		// This is unnecessary process for strict type alias structure instances.
 		if s.Source != nil {
 			ret true
 		}
 		mut tc := typeChecker{
-			s: s.Decl.sema,
-			rootLookup: s.Decl.sema,
-			lookup: s.Decl.sema,
+			s: s.env.sema,
+			rootLookup: s.env.sema,
+			lookup: s.env.sema,
 			referencer: &referencer{
 				name: s.Decl.Ident,
 				owner: s,
 				prev: prev,
 			},
 			refers: s.Refers,
+			useGenerics: s.env.generics,
 		}
 		if prev != nil {
 			prev.next = tc.referencer
 			defer { prev.next = nil }
 		}
 
-		if len(s.Generics) > 0 {
-			tc.useGenerics = make([]&TypeAlias, 0, len(s.Generics))
-			for (i, mut g) in s.Generics {
-				mut decl := s.Decl.Generics[i]
-				tc.useGenerics = append(tc.useGenerics, &TypeAlias{
-					Ident: decl.Ident,
-					Token: decl.Token,
-					TypeSym: &TypeSym{Type: g.Type},
-				})
-			}
-		}
-
-		mut oldFile := self.file
-		defer { self.setCurrentFile(oldFile) }
-
-		if self.file.File != s.Decl.Token.File {
-			mut file := findFile(self.files, s.Decl.Token.File)
-			if file != nil {
-				self.setCurrentFile(file)
-			}
+		if s.env.file != nil && self.file != s.env.file {
+			mut oldFile := self.file
+			defer { self.setCurrentFile(oldFile) }
+			self.setCurrentFile(s.env.file)
 		}
 
 		if len(s.Generics) > 0 {
@@ -2434,9 +2421,9 @@ impl sema {
 			mut kind := tc.checkDecl(f.Decl.TypeSym.Decl)
 			ok = kind != nil && ok
 			if kind == nil {
-				if self != s.Decl.sema && len(s.Decl.sema.errors) > 0 {
-					self.errors = append(self.errors, s.Decl.sema.errors...)
-					s.Decl.sema.errors = nil
+				if self != s.env.sema && len(s.env.sema.errors) > 0 {
+					self.errors = append(self.errors, s.env.sema.errors...)
+					s.env.sema.errors = nil
 				}
 				continue
 			}
@@ -2456,7 +2443,7 @@ impl sema {
 		// Return is source type is still pseudoSource of a strict type alias instance.
 		// Following analysis must be done with real source type.
 		if s.Source == pseudoSource {
-			s.Checked = false
+			s.checked = false
 			ret true
 		}
 		ok = self.checkStructEnv(s, prev, errorToken)
@@ -2524,8 +2511,8 @@ impl sema {
 		// Precheck is instance is not checked already.
 		if len(s.Generics) == 0 {
 			mut ins := s.Instances[0]
-			if !ins.Checked {
-				ins.Checked = true
+			if !ins.checked {
+				ins.checked = true
 				ok := self.precheckStructIns(ins, nil, nil)
 				if !ok {
 					ret
@@ -2557,8 +2544,8 @@ impl sema {
 		// Precheck is instance is not checked already.
 		if len(s.Generics) == 0 {
 			mut ins := s.Instances[0]
-			if !ins.Checked {
-				ins.Checked = true
+			if !ins.checked {
+				ins.checked = true
 				ok := self.precheckStructIns(ins, nil, nil)
 				if !ok {
 					ret
@@ -2584,10 +2571,14 @@ impl sema {
 		}
 	}
 
+	// Checks scope of the function f.
+	// The function environment must be filled.
 	fn checkFuncInsSc(mut self, mut &f: &FuncIns, mut &sc: &scopeChecker) {
 		appendRetVars(sc.table.Vars, f)
 		appendParamVars(sc.table.Vars, f)
-		appendGenericTypeAliases(sc.table.TypeAliases, f)
+		if len(f.env.generics) > 0 {
+			sc.table.TypeAliases = append(sc.table.TypeAliases, f.env.generics...)
+		}
 
 		sc.check(f.Decl.Scope, f.Scope)
 
@@ -2603,20 +2594,21 @@ impl sema {
 		}
 		f.checked = true
 
-		mut old := f.Decl.sema.file
-		defer { f.Decl.sema.setCurrentFile(old) }
-		mut file := findFile(f.Decl.sema.files, f.Decl.Token.File)
-		if file != nil {
-			f.Decl.sema.setCurrentFile(file)
+		f.fillEnviron()
+
+		if f.env.file != nil {
+			mut old := f.Decl.sema.file
+			defer { f.Decl.sema.setCurrentFile(old) }
+			f.env.sema.setCurrentFile(f.env.file)
 		}
 
-		mut sc := newScopeChecker(f.Decl.sema, f)
+		mut sc := newScopeChecker(f.env.sema, f)
 		sc.calledFrom = caller
 		self.checkFuncInsSc(f, sc)
 
-		if f.Decl.sema != self {
-			self.errors = append(self.errors, f.Decl.sema.errors...)
-			f.Decl.sema.errors = nil
+		if f.env.sema != self {
+			self.errors = append(self.errors, f.env.sema.errors...)
+			f.env.sema.errors = nil
 		}
 	}
 
@@ -2813,8 +2805,8 @@ impl sema {
 			for (_, mut ta) in self.file.TypeAliases {
 				if ta.Strict {
 					mut s := ta.TypeSym.Type.Kind.(&StructIns)
-					if !s.Checked {
-						s.Checked = true
+					if !s.checked {
+						s.checked = true
 						ok := self.precheckStructIns(s, nil, nil)
 						if !ok {
 							ret

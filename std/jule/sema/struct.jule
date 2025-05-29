@@ -197,7 +197,6 @@ struct FieldIns {
 // Structure instance.
 struct StructIns {
 	Source:     &Type // See developer reference (9).
-	Checked:    bool
 	Decl:       &Struct
 	Generics:   []&InsGeneric
 	Fields:     []&FieldIns
@@ -205,6 +204,9 @@ struct StructIns {
 	Mutable:    bool // This structure has mutable defines.
 	Comparable: bool
 	Refers:     &ReferenceStack
+
+	checked: bool
+	env:     &environ
 }
 
 impl Kind for StructIns {
@@ -313,5 +315,26 @@ impl StructIns {
 			}
 		}
 		ret nil
+	}
+
+	fn fillEnviron(mut &self) {
+		if self.env == nil {
+			self.env = new(environ)
+			self.env.sema = self.Decl.sema
+			if self.Decl != nil && self.Decl.Token != nil {
+				self.env.file = findFile(self.env.sema.files, self.Decl.Token.File)
+			}
+		}
+		if len(self.env.generics) == 0 && len(self.Generics) > 0 {
+			self.env.generics = make([]&TypeAlias, 0, len(self.Generics))
+			for (i, mut g) in self.Generics {
+				mut decl := self.Decl.Generics[i]
+				self.env.generics = append(self.env.generics, &TypeAlias{
+					Ident: decl.Ident,
+					Token: decl.Token,
+					TypeSym: &TypeSym{Type: g.Type},
+				})
+			}
+		}
 	}
 }

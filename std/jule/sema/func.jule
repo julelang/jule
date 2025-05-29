@@ -233,6 +233,7 @@ struct FuncIns {
 	caller:   builtinCaller
 	reloaded: bool
 	checked:  bool
+	env:      &environ
 }
 
 impl Kind for FuncIns {
@@ -418,6 +419,19 @@ impl FuncIns {
 			s.WriteStr(self.Result.Str())!
 		}
 		ret s.Str()
+	}
+
+	fn fillEnviron(mut &self) {
+		if self.env == nil {
+			self.env = new(environ)
+			self.env.sema = self.Decl.sema
+			if self.Decl != nil && self.Decl.Token != nil {
+				self.env.file = findFile(self.env.sema.files, self.Decl.Token.File)
+			}
+		}
+		if len(self.env.generics) == 0 {
+			appendGenericTypeAliases(self.env.generics, self)
+		}
 	}
 }
 
