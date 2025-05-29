@@ -64,66 +64,81 @@ fn compilerErr(&token: &token::Token, line: bool, fmt: str, args: ...any): log::
 	ret log
 }
 
-fn appendRetVars(mut &dest: []&Var, mut &f: &FuncIns) {
-	if f.Decl.IsVoid() || f.Result == nil {
+// Appends return variables to dest.
+// If variable is exist, updates it.
+// Assumes return variable part of dest is dest[i:].
+fn updateRetVars(mut &dest: []&Var, mut &f: &FuncIns, mut i: int) {
+	if f.Decl.IsVoid() || f.Result == nil || len(f.Decl.Result.Idents) == 0 {
 		ret
 	}
-
-	mut rst := RetState.NA
-	match len(f.Decl.Result.Idents) {
-	| 0:
-		// no-op
-	| 1:
-		// There is only one return type, not tuple.
-		rst = RetState.Single
-	|:
-		// There is more than one return type, it is tuple.
+	mut rst := RetState.Single
+	// There is more than one return type, it is tuple.
+	if len(f.Decl.Result.Idents) > 1 {
 		rst = RetState.Tuple
 	}
-
 	mut types := f.Types()
-	for (i, mut ident) in f.Decl.Result.Idents {
+	for (j, mut ident) in f.Decl.Result.Idents {
 		if jule::IsBlank(ident.Kind) || jule::IsAnon(ident.Kind) {
 			continue
 		}
-		dest = append(dest, &Var{
-			Used: true,
-			Mutable: true,
-			Ident: ident.Kind,
-			Token: ident,
-			Scope: f.Scope,
-			TypeSym: &TypeSym{
-				Type: types[i],
-			},
-			ValueSym: &ValueSym{
-				Value: new(Value),
-			},
-			RetState: rst,
-			RetOrder: i,
-		})
+		// If variable is not exist in the dest, append it.
+		// Otherwise update it.
+		let mut v: &Var
+		if i < len(dest) {
+			v = dest[i]
+		} else {
+			v = &Var{
+				Used: true,
+				Mutable: true,
+				Ident: ident.Kind,
+				Token: ident,
+				Scope: f.Scope,
+				TypeSym: new(TypeSym),
+				ValueSym: &ValueSym{
+					Value: new(Value),
+				},
+				RetState: rst,
+				RetOrder: j,
+			}
+			dest = append(dest, v)
+		}
+		v.TypeSym.Type = types[j]
+		i++
 	}
 }
 
-fn appendParamVars(mut &dest: []&Var, mut &f: &FuncIns) {
+// Appends parameter variables to dest.
+// If parameter is exist, updates it.
+// Returns count of parameter variables.
+fn updateParamVars(mut &dest: []&Var, mut &f: &FuncIns): (n: int) {
 	if len(f.Params) == 0 {
 		ret
 	}
 
-	for (_, mut p) in f.Params {
+	for (i, mut p) in f.Params {
 		if jule::IsBlank(p.Decl.Ident) || jule::IsAnon(p.Decl.Ident) {
 			continue
 		}
+		n++
 
-		mut v := &Var{
-			Checked: true,
-			Used: true,
-			Reference: p.Decl.Reference,
-			Mutable: p.Decl.Mutable,
-			Ident: p.Decl.Ident,
-			Token: p.Decl.Token,
-			TypeSym: new(TypeSym),
-			Scope: f.Scope,
-			ValueSym: new(ValueSym),
+		// If variable is not exist in the dest, append it.
+		// Otherwise update it.
+		let mut v: &Var
+		if i < len(dest) {
+			v = dest[i]
+		} else {
+			v = &Var{
+				Checked: true,
+				Used: true,
+				Reference: p.Decl.Reference,
+				Mutable: p.Decl.Mutable,
+				Ident: p.Decl.Ident,
+				Token: p.Decl.Token,
+				TypeSym: new(TypeSym),
+				Scope: f.Scope,
+				ValueSym: new(ValueSym),
+			}
+			dest = append(dest, v)
 		}
 
 		match {
@@ -138,7 +153,7 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FuncIns) {
 				v.Ident = v.Ident[1:] // Remove reference sign.
 				v.TypeSym.Type.Kind = &Sptr{
 					Elem: &Type{
-						Kind: v.TypeSym.Type.Kind,
+						Kind: f.Owner,
 					},
 				}
 			}
@@ -154,9 +169,8 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FuncIns) {
 		|:
 			v.TypeSym.Type = p.Type
 		}
-
-		dest = append(dest, v)
 	}
+	ret
 }
 
 // Builds type aliases for generic types of scope.
@@ -217,9 +231,21 @@ unsafe fn pushSuggestion(mut log: *log::Log, fmt: str, args: ...any) {
 
 // Semantic analysis environment for defines.
 struct environ {
-	sema:     &sema
-	file:     &SymTab
+	sema: &sema
+	file: &SymTab
+
+	// Generics of type.
+	// For structures, it contains type aliases for the all generics of struct.
+	// For functions, it contains type aliases for the all generics of
+	// function and owner struct if exist.
 	generics: []&TypeAlias
+
+	// Function only.
+	// There is two parts in the single allocation.
+	// The first part is parameter variables of function.
+	// Trailing variables after parameters are return variables.
+	// The first return variable can be determine with Var.RetState!=RetState.NA.
+	vars: []&Var
 }
 
 // Flags for commonSemaMeta flag.
@@ -951,7 +977,7 @@ impl sema {
 	// Errors will be handled.
 	// Returns result of algo.
 	fn basicFuncEnvironment(mut &self, mut &f: &FuncIns, algo: fn(mut &sema: &sema): bool): bool {
-		f.fillEnviron()
+		f.fillEnviron(false)
 
 		if f.env.file != nil {
 			mut old := f.env.sema.getCurrentFile()
@@ -2574,10 +2600,11 @@ impl sema {
 	// Checks scope of the function f.
 	// The function environment must be filled.
 	fn checkFuncInsSc(mut self, mut &f: &FuncIns, mut &sc: &scopeChecker) {
-		appendRetVars(sc.table.Vars, f)
-		appendParamVars(sc.table.Vars, f)
+		if len(f.env.vars) > 0 {
+			sc.table.Vars = f.env.vars[:len(f.env.vars):len(f.env.vars)]
+		}
 		if len(f.env.generics) > 0 {
-			sc.table.TypeAliases = append(sc.table.TypeAliases, f.env.generics...)
+			sc.table.TypeAliases = f.env.generics[:len(f.env.generics):len(f.env.generics)]
 		}
 
 		sc.check(f.Decl.Scope, f.Scope)
@@ -2594,7 +2621,7 @@ impl sema {
 		}
 		f.checked = true
 
-		f.fillEnviron()
+		f.fillEnviron(true)
 
 		if f.env.file != nil {
 			mut old := f.Decl.sema.file
