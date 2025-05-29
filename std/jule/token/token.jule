@@ -3,114 +3,6 @@
 // license that can be found in the LICENSE file.
 
 use "std/strings"
-use "std/unicode"
-use "std/unicode/utf8"
-
-// Punctuations.
-static Puncts: [...]rune = [
-	'!',
-	'#',
-	'$',
-	',',
-	'.',
-	'\'',
-	'"',
-	':',
-	';',
-	'<',
-	'>',
-	'=',
-	'?',
-	'-',
-	'+',
-	'*',
-	'(',
-	')',
-	'[',
-	']',
-	'{',
-	'}',
-	'%',
-	'&',
-	'/',
-	'\\',
-	'@',
-	'^',
-	'_',
-	'`',
-	'|',
-	'~',
-	'¦',
-]
-
-// Space characters.
-static Spaces: [...]rune = [
-	' ',
-	'\t',
-	'\v',
-	'\r',
-	'\n',
-]
-
-// Kind list of unary operators.
-static UnaryOps: [...]int = [
-	Minus,
-	Plus,
-	Caret,
-	Excl,
-	Star,
-	Amper,
-]
-
-// Kind list of binary operators.
-static BinOps: [...]int = [
-	Plus,
-	Minus,
-	Star,
-	Solidus,
-	Percent,
-	Amper,
-	Vline,
-	Caret,
-	Shl,
-	Shr,
-	Lt,
-	Gt,
-	LtEq,
-	GtEq,
-	DblAmper,
-	DblVline,
-	DblEq,
-	NotEq,
-]
-
-// Kind list of weak operators.
-// These operators are weak, can used as part of expression.
-static WeakOps: [...]int = [
-	TripleDot,
-	Colon,
-]
-
-// List of postfix operators.
-static PostfixOps: [...]int = [
-	DblPlus,
-	DblMinus,
-]
-
-// List of assign operators.
-static AssignOps: [...]int = [
-	Eq,
-	PlusEq,
-	MinusEq,
-	SolidusEq,
-	StarEq,
-	PercentEq,
-	ShrEq,
-	ShlEq,
-	VlineEq,
-	AmperEq,
-	CaretEq,
-]
 
 // Token identities.
 const (
@@ -197,13 +89,13 @@ const (
 	Select
 )
 
-// Token is lexer token.
+// Token.
 struct Token {
-	File:   &Fileset
-	Row:    int
-	Column: int
-	Kind:   str
-	Id:     int
+	Id:     int      // Identitiy of token.
+	File:   &FileSet // Associated FileSet where token appear.
+	Row:    int      // Row position of token.
+	Column: int      // Column position of token.
+	Kind:   str      // Token kind as string.
 }
 
 impl Token {
@@ -245,36 +137,6 @@ impl Token {
 	}
 }
 
-// Reports whether kind is unary operator.
-fn IsUnaryOp(id: int): bool {
-	for _, op in UnaryOps {
-		if id == op {
-			ret true
-		}
-	}
-	ret false
-}
-
-// Reports whether kind is binary operator.
-fn IsBinOp(id: int): bool {
-	for _, op in BinOps {
-		if id == op {
-			ret true
-		}
-	}
-	ret false
-}
-
-// Reports whether kind is weak operator.
-fn IsWeakOp(id: int): bool {
-	for _, op in WeakOps {
-		if id == op {
-			ret true
-		}
-	}
-	ret false
-}
-
 // Reports whether kind is string literal.
 fn IsStr(k: str): bool { ret k != "" && (k[0] == '"' || IsRawStr(k)) }
 
@@ -314,100 +176,28 @@ fn IsLit(k: str): bool {
 	ret IsNum(k) || IsStr(k) || IsRune(k) || IsNil(k) || IsBool(k)
 }
 
-// Reports whether rune is punctuation.
-fn IsPunct(r: rune): bool {
-	for _, cr in Puncts {
-		if r == cr {
-			ret true
-		}
-	}
-	ret false
-}
-
-// Reports whether rune is whitespace.
-fn IsSpace(r: rune): bool {
-	for _, cr in Spaces {
-		if r == cr {
-			ret true
-		}
-	}
-	ret false
-}
-
-// Reports whether rune is letter.
-fn IsLetter(r: rune): bool {
-	ret unicode::IsLetter(r)
-}
-
-// Reports whether first rune of string is allowed
-// to first rune for identifier.
-fn IsNameRune(s: str): bool {
-	if s == "" {
-		ret false
-	}
-	if s[0] != '_' {
-		r, _ := utf8::DecodeRuneStr(s)
-		if !IsLetter(r) {
-			ret false
-		}
-	}
-	ret true
-}
-
 // Reports whether s is keyword.
 fn IsKeyword(s: str): bool {
-	for _, op in keywords {
-		if s == op.kind {
-			ret true
-		}
-	}
-	ret false
+	_, exist := keywords[s]
+	ret exist
 }
 
-// Reports whether rune is decimal sequence.
-fn IsDecimal(r: rune): bool { ret '0' <= r && r <= '9' }
-
-// Reports whether rune is binary sequence.
-fn IsBinary(r: rune): bool { ret r == '0' || r == '1' }
-
-// Reports whether rune is octal sequence.
-fn IsOctal(r: rune): bool { ret '0' <= r && r <= '7' }
-
-// Reports whether rune is hexadecimal sequence.
-fn IsHex(r: rune): bool {
-	match {
-	| '0' <= r && r <= '9':
-		ret true
-	| 'a' <= r && r <= 'f':
-		ret true
-	| 'A' <= r && r <= 'F':
-		ret true
-	|:
-		ret false
-	}
+// Reports whether operator kind is postfix operator.
+fn IsPostfixOp(id: int): bool {
+	ret id == DblPlus || id == DblMinus
 }
 
 // Reports given token id is allow for
 // assignment left-expression or not.
 fn IsAssign(id: int): bool {
-	ret (id == Name ||
+	ret id == Name ||
 		id == Cpp ||
 		id == Let ||
 		id == Mut ||
 		id == Self ||
 		id == LParent ||
 		id == Star ||
-		id == Amper)
-}
-
-// Reports whether operator kind is postfix operator.
-fn IsPostfixOp(id: int): bool {
-	for _, op in PostfixOps {
-		if id == op {
-			ret true
-		}
-	}
-	ret false
+		id == Amper
 }
 
 // Reports whether operator kind is assignment operator.
@@ -415,10 +205,47 @@ fn IsAssignOp(id: int): bool {
 	if IsPostfixOp(id) {
 		ret true
 	}
-	for _, op in AssignOps {
-		if id == op {
-			ret true
-		}
-	}
-	ret false
+	ret id == Eq ||
+		id == PlusEq ||
+		id == MinusEq ||
+		id == SolidusEq ||
+		id == StarEq ||
+		id == PercentEq ||
+		id == ShrEq ||
+		id == ShlEq ||
+		id == VlineEq ||
+		id == AmperEq ||
+		id == CaretEq
+}
+
+// Reports whether kind is unary operator.
+fn IsUnaryOp(id: int): bool {
+	ret id == Minus ||
+		id == Plus ||
+		id == Caret ||
+		id == Excl ||
+		id == Star ||
+		id == Amper
+}
+
+// Reports whether kind is binary operator.
+fn IsBinOp(id: int): bool {
+	ret id == Plus ||
+		id == Minus ||
+		id == Star ||
+		id == Solidus ||
+		id == Percent ||
+		id == Amper ||
+		id == Vline ||
+		id == Caret ||
+		id == Shl ||
+		id == Shr ||
+		id == Lt ||
+		id == Gt ||
+		id == LtEq ||
+		id == GtEq ||
+		id == DblAmper ||
+		id == DblVline ||
+		id == DblEq ||
+		id == NotEq
 }
