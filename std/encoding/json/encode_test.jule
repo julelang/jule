@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/encoding"
 use "std/encoding/base64"
 use "std/testing"
 
@@ -268,8 +269,8 @@ struct encodeTree {
 
 type abc: int
 
-impl abc {
-	fn EncodeJSON(self)!: []byte {
+impl encoding::TextEncoder for abc {
+	fn EncodeText(self)!: []byte {
 		match self {
 		| 1:
 			ret []byte("true")
@@ -279,8 +280,10 @@ impl abc {
 			panic("unimplemented case")
 		}
 	}
+}
 
-	fn DecodeJSON(mut self, data: []byte)! {
+impl encoding::TextDecoder for abc {
+	fn DecodeText(mut self, data: []byte)! {
 		match {
 		| str(data) == "true":
 			self = 1
@@ -297,7 +300,7 @@ fn testCustomEncode(t: &testing::T) {
 		t.Errorf("want false, threw exception")
 		use []byte("false")
 	}
-	if str(r) != "false" {
+	if str(r) != "\"false\"" {
 		t.Errorf("want false, found {}", str(r))
 	}
 	*a = 1
@@ -305,7 +308,7 @@ fn testCustomEncode(t: &testing::T) {
 		t.Errorf("want true, threw exception")
 		use []byte("true")
 	}
-	if str(r) != "true" {
+	if str(r) != "\"true\"" {
 		t.Errorf("want true, found {}", str(r))
 	}
 }
@@ -317,7 +320,7 @@ fn testCustomEncode1(t: &testing::T) {
 		t.Errorf("want false, threw exception")
 		use []byte("false")
 	}
-	if str(r) != "false" {
+	if str(r) != "\"false\"" {
 		t.Errorf("want false, found {}", str(r))
 	}
 	a = 1
@@ -325,15 +328,15 @@ fn testCustomEncode1(t: &testing::T) {
 		t.Errorf("want true, threw exception")
 		use []byte("true")
 	}
-	if str(r) != "true" {
+	if str(r) != "\"true\"" {
 		t.Errorf("want true, found {}", str(r))
 	}
 }
 
 type abc2: &int
 
-impl abc2 {
-	fn EncodeJSON(self)!: []byte {
+impl encoding::TextEncoder for abc2 {
+	fn EncodeText(self)!: []byte {
 		match *self {
 		| 1:
 			ret []byte("true")
@@ -343,8 +346,10 @@ impl abc2 {
 			panic("unimplemented case")
 		}
 	}
+}
 
-	fn DecodeJSON(mut self, data: []byte)! {
+impl encoding::TextDecoder for abc2 {
+	fn DecodeText(mut self, data: []byte)! {
 		match {
 		| str(data) == "true":
 			*self = 1
@@ -361,7 +366,7 @@ fn testCustomEncode2(t: &testing::T) {
 		t.Errorf("want false, threw exception")
 		use []byte("false")
 	}
-	if str(r) != "false" {
+	if str(r) != "\"false\"" {
 		t.Errorf("want false, found {}", str(r))
 	}
 	*a = 1
@@ -369,7 +374,7 @@ fn testCustomEncode2(t: &testing::T) {
 		t.Errorf("want true, threw exception")
 		use []byte("true")
 	}
-	if str(r) != "true" {
+	if str(r) != "\"true\"" {
 		t.Errorf("want true, found {}", str(r))
 	}
 }
@@ -381,7 +386,7 @@ fn testCustomEncode3(t: &testing::T) {
 		t.Errorf("want false, threw exception")
 		use []byte("false")
 	}
-	if str(r) != "false" {
+	if str(r) != "\"false\"" {
 		t.Errorf("want false, found {}", str(r))
 	}
 	**a = 1
@@ -389,7 +394,7 @@ fn testCustomEncode3(t: &testing::T) {
 		t.Errorf("want true, threw exception")
 		use []byte("true")
 	}
-	if str(r) != "true" {
+	if str(r) != "\"true\"" {
 		t.Errorf("want true, found {}", str(r))
 	}
 }
