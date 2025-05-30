@@ -524,7 +524,7 @@ impl jsonDecoder {
 		const tt = comptime::TypeOf(T)
 		const match {
 		| tt.Strict() || tt.Kind() == comptime::Struct:
-			const for _, name in ["DecodeJSON", "DecodeText"] {
+			const for _, name in ["DecodeText"] {
 				const for _, method in tt.Decl().Methods() {
 					const match {
 					| method.Name() == name:
@@ -543,19 +543,17 @@ impl jsonDecoder {
 									| m.Type().Decl().Exceptional() &&
 										m.Type().Result().Kind() == comptime::Void:
 										const match name {
-										| "DecodeJSON":
-											lit := self.scanValidValue() else { error(error) }
-											self.checkScanValidLit() else { error(error) }
-											m.Unwrap()(lit) else { error(error) }
-											ret true
 										| "DecodeText":
 											b := self.data.Get(self.i)
 											if b == '"' {
 												// Next literal is a string literal.
 												// DecodeText is suitable.
-												lit := self.scanValidLit() else { error(error) }
-												self.checkScanValidLit() else { error(error) }
-												m.Unwrap()(lit[1 : len(lit)-1]) else { error(error) }
+												mut lit := self.scanLit() else { error(error) }
+												lit = unquoteBytes(lit)
+												if lit == nil {
+													error(errors::New("json: invalid value for DecodeText function:" + str(lit)))
+												}
+												m.Unwrap()(lit) else { error(error) }
 												ret true
 											}
 										|:

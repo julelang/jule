@@ -38,7 +38,7 @@ impl UnsupportedValueError {
 	}
 }
 
-// Represents an error from calling a reserved [EncodeJSON] or [EncodeText] method.
+// Represents an error from calling a reserved [EncodeText] method.
 struct EncodeError {
 	Type:       str
 	Err:        any
@@ -377,7 +377,7 @@ impl jsonEncoder {
 			// Before using the default encoding strategy, look for the custom encoder
 			// methods and use it, if any. If not exist any custom encoder method,
 			// fallback to default encoding.
-			const for _, name in ["EncodeJSON", "EncodeText"] {
+			const for _, name in ["EncodeText"] {
 				const for _, method in tt.Decl().Methods() {
 					const match {
 					| method.Name() == name:
@@ -392,11 +392,6 @@ impl jsonEncoder {
 									error(&EncodeError{Type: tt.Str(), Err: error, sourceFunc: name})
 								}
 								const match name {
-								| "EncodeJSON":
-									if !Valid(bytes) {
-										error(&EncodeError{Type: tt.Str(), Err: "returned JSON value is not valid", sourceFunc: name})
-									}
-									self.buf.write(bytes)
 								| "EncodeText":
 									self.encodeStr(unsafe::BytesStr(bytes))
 								|:
@@ -549,8 +544,12 @@ fn Encode[T](t: T)!: []byte {
 // Same as Encode[T] function but enables indentation.
 fn EncodeIndent[T](t: T, indent: str)!: []byte {
 	mut encoder := encoder()
-	encoder.indent = indent
-	encoder.encode[T, encodeIndent](t) else { error(error) }
+	if indent == "" {
+		encoder.encode[T, encodePlain](t) else { error(error) }
+	} else {
+		encoder.indent = indent
+		encoder.encode[T, encodeIndent](t) else { error(error) }
+	}
 	ret encoder.buf.bytes()
 }
 
