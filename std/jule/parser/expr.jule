@@ -39,10 +39,6 @@ impl exprBuilder {
 		}
 	}
 
-	fn buildPrimitiveType(self, mut &token: &token::Token): &ast::Type {
-		ret buildPrimType(token)
-	}
-
 	fn buildSingle(mut self, mut token: &token::Token): ast::ExprData {
 		match token.Id {
 		| token::Lit:
@@ -158,7 +154,7 @@ impl exprBuilder {
 		ret ns
 	}
 
-	fn buildType(mut self, mut &tokens: []&token::Token): &ast::Type {
+	fn buildType(mut self, mut &tokens: []&token::Token): ast::ExprData {
 		mut i := 0
 		mut t, ok := unsafe { self.p.buildType(tokens, &i, true) }
 		if !ok {
@@ -167,7 +163,7 @@ impl exprBuilder {
 		if i < len(tokens) {
 			self.pushErr(tokens[i], log::InvalidSyntax)
 		}
-		ret t
+		ret t.Kind
 	}
 
 	fn buildSubIdent(mut self, mut &tokens: []&token::Token): ast::ExprData {
@@ -183,7 +179,7 @@ impl exprBuilder {
 			ret self.buildType(tokens)
 		}
 
-		// Caught anonymous functions.
+		// Catch anonymous functions.
 		if isAnonFuncHead(tokens) {
 			ret self.buildType(tokens)
 		}
@@ -324,7 +320,11 @@ impl exprBuilder {
 		}
 		ret &ast::TypeAssertionExpr{
 			Expr: expr,
-			Kind: t,
+			Kind: &ast::Expr{
+				Token: typeTokens[0],
+				End: typeTokens[len(typeTokens)-1],
+				Kind: t,
+			},
 		}
 	}
 
@@ -345,10 +345,6 @@ impl exprBuilder {
 		// Catch type assertions.
 		if exprTokens[len(exprTokens)-1].Id == token::Dot {
 			ret self.buildTypeAssertion(exprTokens, argsTokens)
-		}
-		// Catch anonymous function types.
-		if isAnonFuncHead(exprTokens) {
-			ret self.buildType(tokens)
 		}
 		ret self.buildFuncCall(token, exprTokens, argsTokens)
 	}

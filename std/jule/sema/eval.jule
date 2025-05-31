@@ -40,6 +40,8 @@ struct Value {
 	//	- &Struct
 	//	- int type
 	//	- bool type
+	// If this is true, Model might be nil or something.
+	// Use the Type field to handle declaration type.
 	Decl: bool
 
 	// Constant expression data.
@@ -1072,85 +1074,30 @@ impl eval {
 		self.pushErr(i.Token, log::NotSupportsIndexing, v.Type.Str())
 	}
 
-	fn pushGenericsFromData(mut &self, mut &generics: []&ast::Type, mut &expr: &ast::Expr): bool {
-		match type expr.Kind {
-		| &ast::UnaryExpr:
-			mut u := expr.Kind.(&ast::UnaryExpr)
-			match u.Op.Id {
-			| token::Star:
-				mut kind := new(ast::PtrType)
-				mut _generics := make([]&ast::Type, 0, 1)
-				self.pushGenericsFromData(_generics, u.Expr)
-				kind.Elem = _generics[0]
-				generics = append(generics, &ast::Type{
-					Token: expr.Token,
-					Kind: kind,
-				})
-			| token::Amper:
-				mut kind := new(ast::SptrType)
-				mut _generics := make([]&ast::Type, 0, 1)
-				self.pushGenericsFromData(_generics, u.Expr)
-				kind.Elem = _generics[0]
-				generics = append(generics, &ast::Type{
-					Token: expr.Token,
-					Kind: kind,
-				})
-			|:
-				self.pushErr(u.Op, log::InvalidType)
-				ret false
-			}
-		| &ast::Type:
-			generics = append(generics, expr.Kind.(&ast::Type))
-		| &ast::IndexingExpr:
-			mut v := self.eval(expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
-			if v == nil {
-				ret false
-			}
-			if !v.Decl {
-				self.pushErr(expr.Token, log::InvalidType)
-				self.pushSuggestion(log::ExpectedType)
-				ret false
-			}
-			mut kind := semaTypeKind(v.Type)
-			generics = append(generics, &ast::Type{
-				Kind: unsafe { *(*ast::TypeKind)(&kind) },
-			})
-		| &ast::IdentExpr:
-			mut ident := expr.Kind.(&ast::IdentExpr)
-			generics = append(generics, &ast::Type{
-				Kind: &ast::IdentType{
-					Binded: ident.Binded,
-					Token: ident.Token,
-					Ident: ident.Ident,
-				},
-			})
+	fn pushGenericsFromData(mut &self, mut &generics: []&InsGeneric, mut &indx: &ast::IndexingExpr): (ok: bool) {
+		mut tc := self.typeChecker()
+		ok = true
+		match type indx.Index.Kind {
 		| &ast::TupleExpr:
-			for (_, mut texpr) in expr.Kind.(&ast::TupleExpr).Expr {
-				if !self.pushGenericsFromData(generics, texpr) {
-					ret false
+			mut tup := indx.Index.Kind.(&ast::TupleExpr)
+			generics = make([]&InsGeneric, 0, len(tup.Expr))
+			for (_, mut typDecl) in tup.Expr {
+				mut typ := tc.checkDecl(typDecl)
+				if typ == nil {
+					ok = false
+				} else {
+					generics = append(generics, &InsGeneric{Type: typ})
 				}
 			}
-		| &ast::NamespaceExpr:
-			mut ns := expr.Kind.(&ast::NamespaceExpr)
-			mut decl := &ast::IdentType{
-				Token: ns.Ident,
-				Ident: ns.Ident.Kind,
-			}
-			generics = append(generics, &ast::Type{
-				Token: decl.Token,
-				Kind: &ast::NamespaceType{
-					Namespace: ns.Namespace,
-					Kind: &ast::Type{
-						Token: decl.Token,
-						Kind: decl,
-					},
-				},
-			})
 		|:
-			self.pushErr(expr.Token, log::InvalidSyntax)
-			ret false
+			mut typ := tc.checkDecl(indx.Index)
+			if typ == nil {
+				ok = false
+			} else {
+				generics = append(generics, &InsGeneric{Type: typ})
+			}
 		}
-		ret true
+		ret
 	}
 
 	fn evalIdentDeclFromIndexing(mut &self, mut &v: &Value, mut &i: &ast::IndexingExpr) {
@@ -1160,33 +1107,7 @@ impl eval {
 			v = nil
 			ret
 		}
-
-		let mut decl: &ast::IdentType = nil
-		match type i.Expr.Kind {
-		| &ast::IdentExpr:
-			mut expr := i.Expr.Kind.(&ast::IdentExpr)
-			decl = &ast::IdentType{
-				Binded: expr.Binded,
-				Token: expr.Token,
-				Ident: expr.Ident,
-			}
-		| &ast::NamespaceExpr:
-			mut expr := i.Expr.Kind.(&ast::NamespaceExpr)
-			decl = &ast::IdentType{
-				Token: expr.Ident,
-				Ident: expr.Ident.Kind,
-			}
-		|:
-			self.pushErr(i.Token, log::InvalidSyntax)
-			v = nil
-			ret
-		}
-		if !self.pushGenericsFromData(decl.Generics, i.Index) {
-			v = nil
-			ret
-		}
-
-		s = self.typeChecker().fromStruct(decl, s.Decl)
+		s = self.typeChecker().buildStructInsWithGenerics(s, i)
 		if s == nil {
 			v = nil
 			ret
@@ -1219,34 +1140,23 @@ impl eval {
 	}
 
 	fn evalFuncGenericFromIndexing(mut &self, mut &v: &Value, mut &i: &ast::IndexingExpr) {
-		mut generics := make([]&ast::Type, 0, 1<<3)
-		if !self.pushGenericsFromData(generics, i.Index) {
+		mut f := v.Type.Func()
+		if !self.pushGenericsFromData(f.Generics, i) {
 			v = nil
 			ret
 		}
 
-		mut f := v.Type.Func()
 		mut genericsLen := 0
 		if f.Decl != nil {
 			genericsLen = len(f.Decl.Generics)
 		}
-		if !self.s.checkGenericQuantity(genericsLen, len(generics), i.Expr.Token) {
+		if !self.s.checkGenericQuantity(genericsLen, len(f.Generics), i.Expr.Token) {
 			v = nil
 			ret
 		}
 
-		// Build real kinds of generic types.
-		f.Generics = make([]&InsGeneric, 0, len(f.Decl.Generics))
-		for (_, mut g) in generics {
-			mut k := self.evalType(g)
-			if k == nil {
-				v = nil
-				ret
-			}
-			f.Generics = append(f.Generics, &InsGeneric{Type: k.Type})
-		}
-
 		if f.IsBuiltin() {
+			v.Type.Kind = f
 			ret
 		}
 
@@ -1263,7 +1173,7 @@ impl eval {
 		self.prefix = nil
 		defer { self.prefix = prefix }
 
-		mut v := self.evalExprKind(i.Expr.Kind)
+		mut v := self.evalExprPlain(i.Expr)
 		if v == nil {
 			ret nil
 		}
@@ -2057,12 +1967,8 @@ impl eval {
 		ret v
 	}
 
-	fn typeChecker(mut self): typeChecker {
-		ret self.s.typeChecker(self.lookup, nil, nil)
-	}
-
-	fn evalType1(mut self, mut t: &ast::Type): &Type {
-		let mut tc: typeChecker
+	fn typeChecker(mut self): &typeChecker {
+		mut tc := new(typeChecker)
 		tc.s = self.s
 		tc.refers = self.getOwnerRefers()
 		tc.lookup = self.lookup
@@ -2081,10 +1987,14 @@ impl eval {
 				owner: self.field.Owner,
 			}
 		}
-		ret tc.checkDecl(t)
+		ret tc
 	}
 
-	fn evalType(mut self, mut t: &ast::Type): &Value {
+	fn evalType1(mut self, mut t: &ast::Expr): &Type {
+		ret self.typeChecker().checkDecl(t)
+	}
+
+	fn evalType(mut self, mut t: &ast::Expr): &Value {
 		mut t1 := self.evalType1(t)
 		if t1 == nil {
 			ret nil
@@ -2357,7 +2267,7 @@ impl eval {
 			}
 		}
 
-		mut v := self.evalExprKind(fc.Expr.Kind)
+		mut v := self.evalExprPlain(fc.Expr)
 		if v == nil {
 			ret nil
 		}
@@ -3116,16 +3026,20 @@ impl eval {
 	}
 
 	fn evalAnonFunc(mut &self, mut decl: &ast::Func): &Value {
-		mut tc := typeChecker{
-			s: self.s,
-			rootLookup: self.lookup,
-			lookup: self.lookup,
-		}
-		mut ins := tc.buildFunc(decl)
+		mut ins := self.typeChecker().buildFunc(decl)
 		if ins == nil {
 			ret nil
 		}
 		ins.AsAnon = true
+		// Function is type declaration.
+		if decl.IsDecl() {
+			ret &Value{
+				Decl: true,
+				Type: &Type{
+					Kind: ins,
+				},
+			}
+		}
 		mut captured := make([]&Var, 0)
 		match type self.lookup {
 		| &scopeChecker:
@@ -3340,8 +3254,6 @@ impl eval {
 			ret self.evalNamespace(kind.(&ast::NamespaceExpr))
 		| &ast::TypedBraceLit:
 			ret self.evalTypedBraceLit(kind.(&ast::TypedBraceLit))
-		| &ast::Type:
-			ret self.evalType(kind.(&ast::Type))
 		| &ast::FuncCallExpr:
 			ret self.evalFuncCall(kind.(&ast::FuncCallExpr))
 		| &ast::SubIdentExpr:
@@ -3365,10 +3277,23 @@ impl eval {
 		}
 	}
 
+	// Like evalExprKind, but it handles type declarations.
+	fn evalExprPlain(mut &self, mut expr: &ast::Expr): &Value {
+		match type expr.Kind {
+		| &ast::ArrayType
+		| &ast::SliceType
+		| &ast::ChanType
+		| &ast::MapType:
+			ret self.evalType(expr)
+		|:
+			ret self.evalExprKind(expr.Kind)
+		}
+	}
+
 	// Returns value data of evaluated expression.
 	// Returns nil if error occurs.
 	fn eval1(mut &self, mut expr: &ast::Expr, flags: int): &Value {
-		mut v := self.evalExprKind(expr.Kind)
+		mut v := self.evalExprPlain(expr)
 		if v == nil || v.Type == nil {
 			ret nil
 		}
@@ -3824,12 +3749,7 @@ impl unaryEval {
 	}
 
 	fn typeDecl(mut self) {
-		mut tc := typeChecker{
-			s: self.e.s,
-			rootLookup: self.e.lookup,
-			lookup: self.e.lookup,
-			errorToken: self.u.Op,
-		}
+		mut tc := self.e.typeChecker()
 		match self.u.Op.Id {
 		| token::Star:
 			self.v.Type = &Type{Kind: tc.buildPtrFromType(self.v.Type)}

@@ -256,7 +256,7 @@ impl parser {
 	}
 
 	unsafe fn _buildType(mut &self, mut &tokens: []&token::Token,
-		mut i: *int, err: bool): (&ast::Type, bool) {
+		mut i: *int, err: bool): (&ast::Expr, bool) {
 		mut tb := typeBuilder{
 			p: self,
 			tokens: tokens,
@@ -268,7 +268,7 @@ impl parser {
 
 	// Builds AST model of data-type.
 	unsafe fn buildType(mut &self, mut &tokens: []&token::Token,
-		mut i: *int, err: bool): (&ast::Type, bool) {
+		mut i: *int, err: bool): (&ast::Expr, bool) {
 		ret self._buildType(tokens, i, err)
 	}
 
@@ -475,7 +475,7 @@ impl parser {
 				self.errors = append(self.errors, errors...)
 				ret nil
 			}
-			g.Constraint = &ast::Constraint{Mask: make([]&ast::Type, 0, len(parts))}
+			g.Constraint = &ast::Constraint{Mask: make([]&ast::Expr, 0, len(parts))}
 			for (_, mut part) in parts {
 				mut i := 0
 				mut kind, _ := unsafe { self.buildType(part, &i, true) }
@@ -648,9 +648,10 @@ impl parser {
 			if param.Token == nil {
 				self.pushErr(param.Token, log::MissingType)
 			} else {
-				param.Kind = &ast::Type{
+				param.Kind = &ast::Expr{
 					Token: param.Token,
-					Kind: &ast::IdentType{
+					End: param.Token,
+					Kind: &ast::IdentExpr{
 						Token: param.Token,
 						Ident: param.Token.Kind,
 					},
@@ -707,7 +708,7 @@ impl parser {
 			ret
 		}
 
-		mut types := make([]&ast::Type, 0, len(parts))
+		mut types := make([]&ast::Expr, 0, len(parts))
 		t.Idents = make([]&token::Token, 0, len(parts))
 		for (_, mut part) in parts {
 			if len(part) == 0 {
@@ -745,10 +746,11 @@ impl parser {
 		}
 
 		if len(types) > 1 {
-			t.Kind = &ast::Type{
+			t.Kind = &ast::Expr{
 				Token: tokens[0],
-				Kind: &ast::TupleType{
-					Types: types,
+				End: types[len(types)-1].End,
+				Kind: &ast::TupleExpr{
+					Expr: types,
 				},
 			}
 		} else {
@@ -981,7 +983,7 @@ impl parser {
 		ret decl
 	}
 
-	fn buildTypeEnumItemKind(mut &self, mut &i: int, mut &tokens: []&token::Token): &ast::Type {
+	fn buildTypeEnumItemKind(mut &self, mut &i: int, mut &tokens: []&token::Token): &ast::Expr {
 		mut braceN := 0
 		exprStart := i
 		for i < len(tokens); i++ {

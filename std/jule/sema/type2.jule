@@ -480,7 +480,7 @@ struct dynamicTypeAnnotation {
 	a:          &Value
 	errorToken: &token::Token
 	k:          *&Type
-	c:          &ast::Type
+	c:          &ast::Expr
 	ignored:    []&Type // Ignored generics.
 }
 
@@ -494,21 +494,37 @@ impl dynamicTypeAnnotation {
 		const match type T {
 		| ast::ArrayType:
 			elem = k.Array().Elem
+			self.c = c.Elem
 		| ast::SliceType:
 			elem = k.Slice().Elem
-		| ast::PtrType:
-			mut p := k.Ptr()
-			if p.IsUnsafe() {
-				self.e.pushErr(self.errorToken, log::UnsafePointerForAnnotation)
-				ret false
+			self.c = c.Elem
+		| ast::UnaryExpr:
+			match c.Op.Id {
+			| token::Star:
+				mut p := k.Ptr()
+				if p == nil {
+					ret false
+				}
+				if p.IsUnsafe() {
+					self.e.pushErr(self.errorToken, log::UnsafePointerForAnnotation)
+					ret false
+				}
+				elem = p.Elem
+				self.c = c.Expr
+			| token::Amper:
+				mut p := k.Sptr()
+				if p == nil {
+					ret false
+				}
+				elem = p.Elem
+				self.c = c.Expr
+			|:
+				panic("unreachable")
 			}
-			elem = p.Elem
-		| ast::SptrType:
-			elem = k.Sptr().Elem
 		| ast::ChanType:
 			elem = k.Chan().Elem
+			self.c = c.Elem
 		}
-		self.c = c.Elem
 		ret self.annotateConstraint(elem)
 	}
 
@@ -527,11 +543,11 @@ impl dynamicTypeAnnotation {
 	}
 
 	fn annotateConstraintTuple(mut self, mut &k: &Type): (ok: bool) {
-		mut tup, ok := self.c.Kind.(&ast::TupleType)
+		mut tup, ok := self.c.Kind.(&ast::TupleExpr)
 		if ok {
 			mut tup2 := k.Tuple()
 			for (_, mut t2) in tup2.Types {
-				for (_, mut t) in tup.Types {
+				for (_, mut t) in tup.Expr {
 					self.c = t
 					if self.annotateConstraint(t2) {
 						ret true
@@ -563,7 +579,7 @@ impl dynamicTypeAnnotation {
 	}
 
 	fn annotateConstraintIdent(mut self, mut &k: &Type): bool {
-		mut ident := self.c.Kind.(&ast::IdentType)
+		mut ident := self.c.Kind.(&ast::IdentExpr)
 		mut s := k.Struct()
 		for i, g in self.f.Decl.Generics {
 			if g.Ident == ident.Ident {
@@ -582,23 +598,13 @@ impl dynamicTypeAnnotation {
 			if s == nil {
 				continue
 			}
-			mut c := self.c
-			for (_, mut ig) in ident.Generics {
-				self.c = ig
-				for (_, mut sg) in s.Generics {
-					if self.annotateConstraint(sg.Type) {
-						ret true
-					}
-				}
-			}
-			self.c = c
 		}
 		ret false
 	}
 
 	fn annotateConstraint(mut self, mut &k: &Type): bool {
 		match type self.c.Kind {
-		| &ast::IdentType:
+		| &ast::IdentExpr:
 			ret self.annotateConstraintIdent(k)
 		|:
 			// no-op
@@ -609,9 +615,9 @@ impl dynamicTypeAnnotation {
 		| k.Slice() != nil:
 			ret self.annotateConstraintElem[ast::SliceType](k)
 		| k.Ptr() != nil:
-			ret self.annotateConstraintElem[ast::PtrType](k)
+			ret self.annotateConstraintElem[ast::UnaryExpr](k)
 		| k.Sptr() != nil:
-			ret self.annotateConstraintElem[ast::SptrType](k)
+			ret self.annotateConstraintElem[ast::UnaryExpr](k)
 		| k.Chan() != nil:
 			ret self.annotateConstraintElem[ast::ChanType](k)
 		| k.Map() != nil:

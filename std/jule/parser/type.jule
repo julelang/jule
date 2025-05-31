@@ -7,20 +7,6 @@ use "std/jule/build"
 use "std/jule/log"
 use "std/jule/token"
 
-fn buildVoidType(): &ast::Type {
-	ret new(ast::Type)
-}
-
-fn buildPrimType(mut t: &token::Token): &ast::Type {
-	ret &ast::Type{
-		Token: t,
-		Kind: &ast::IdentType{
-			Token: t,
-			Ident: t.Kind,
-		},
-	}
-}
-
 struct typeBuilder {
 	p:      &parser
 	tokens: []&token::Token
@@ -29,9 +15,9 @@ struct typeBuilder {
 }
 
 impl typeBuilder {
-	fn pushErr(mut self, token: &token::Token, fmt: str) {
+	fn pushErr(mut self, token: &token::Token, fmt: str, args: ...any) {
 		if self.err {
-			self.p.pushErr(token, fmt)
+			self.p.pushErr(token, fmt, args...)
 		}
 	}
 
@@ -42,11 +28,9 @@ impl typeBuilder {
 		}
 	}
 
-	unsafe fn buildNamespace(mut self): &ast::Type {
-		mut t := &ast::Type{
-			Token: self.tokens[*self.i],
-		}
-		mut ns := new(ast::NamespaceType)
+	unsafe fn buildNamespace(mut self): &ast::Expr {
+		mut token := self.tokens[*self.i]
+		mut ns := new(ast::NamespaceExpr)
 		ns.Namespace = self.tokens[*self.i]
 		if ns.Namespace.Id != token::Name && ns.Namespace.Id != token::Unsafe {
 			self.pushErr(ns.Namespace, log::InvalidSyntax)
@@ -64,98 +48,124 @@ impl typeBuilder {
 			ret nil
 		}
 		*self.i++
-		if len(self.tokens) <= *self.i {
+		if len(self.tokens) <= *self.i || self.tokens[*self.i].Id != token::Name {
 			self.pushErr(self.tokens[*self.i-1], log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedIdentifier)
 			ret nil
 		}
-		ns.Kind = self.buildIdent()
-		t.Kind = ns
-		ret t
+		ns.Ident = self.tokens[*self.i]
+		mut typ := &ast::Expr{
+			Token: token,
+			End: ns.Ident,
+			Kind: ns,
+		}
+		*self.i++
+		if *self.i < len(self.tokens) && self.tokens[*self.i].Id == token::LBracket {
+			ret self.buildGenericType(typ)
+		}
+		ret typ
 	}
 
-	unsafe fn buildGenerics(mut self): []&ast::Type {
-		if *self.i >= len(self.tokens) {
-			ret nil
-		}
-		token := self.tokens[*self.i]
-		if token.Id != token::LBracket {
-			ret nil
-		}
-
-		mut parts := self.identGenerics()
-		if len(parts) == 0 {
-			self.pushErr(token, log::InvalidSyntax)
-			ret nil
-		}
-
-		mut types := make([]&ast::Type, 0, len(parts))
-		for (_, mut part) in parts {
-			mut j := 0
-			mut t, _ := unsafe { self.p.buildType(part, &j, true) }
-			if j < len(part) {
-				self.pushErr(part[j], log::InvalidSyntax)
-			}
-			types = append(types, t)
-		}
-		ret types
-	}
-
-	unsafe fn identGenerics(mut self): [][]&token::Token {
-		first := *self.i
-		mut rangeN := 0
-		for *self.i < len(self.tokens); *self.i++ {
-			token := self.tokens[*self.i]
-			match token.Id {
-			| token::LBracket:
-				rangeN++
-			| token::RBracket:
-				rangeN--
-			}
-			if rangeN == 0 {
-				*self.i++ // Skip right bracket
-				break
-			}
-		}
-		mut tokens := self.tokens[first+1 : *self.i-1] // Take range of brackets.
-		mut parts, errors := parts(tokens, token::Comma, true)
-		if self.err {
-			self.p.errors = append(self.p.errors, errors...)
-		}
-		ret parts
-	}
-
-	unsafe fn buildIdent(mut self): &ast::Type {
+	unsafe fn buildIdent(mut self): &ast::Expr {
 		mut next := *self.i+1 < len(self.tokens)
 		if next && self.tokens[*self.i+1].Id == token::DblColon {
 			ret self.buildNamespace()
 		}
 		mut token := self.tokens[*self.i]
-		mut it := &ast::IdentType{
+		mut ident := &ast::IdentExpr{
 			Token: token,
 			Ident: token.Kind,
 			Binded: false,
 		}
-		*self.i++
-		it.Generics = self.buildGenerics()
-		ret &ast::Type{
+		mut typ := &ast::Expr{
 			Token: token,
-			Kind: it,
+			End: token,
+			Kind: ident,
+		}
+		*self.i++
+		if *self.i < len(self.tokens) && self.tokens[*self.i].Id == token::LBracket {
+			ret self.buildGenericType(typ)
+		}
+		ret typ
+	}
+
+	unsafe fn buildGenericType(mut self, mut &lead: &ast::Expr): &ast::Expr {
+		// There is no need to check unclosed range of token '[', because already checked.
+		mut types := make([]&ast::Expr, 0, 1)
+		mut exprToken := self.tokens[*self.i]
+		mut rangeN := 1 // leading '['
+		for {
+			*self.i++
+			mut typ := self.step()
+			if typ != nil {
+				types = append(types, typ)
+			} else {
+				ret nil
+			}
+			mut token := self.tokens[*self.i]
+			match token.Id {
+			| token::Comma:
+				continue
+			| token::LBracket:
+				rangeN++
+			| token::RBracket:
+				rangeN--
+				if rangeN > 0 {
+					continue
+				}
+				*self.i++
+				mut indx := (&ast::Expr)(nil)
+				if len(types) > 1 {
+					indx = &ast::Expr{
+						Token: exprToken,
+						End: token,
+					}
+					indx.Kind = &ast::TupleExpr{
+						Expr: types,
+					}
+				} else if len(types) == 1 {
+					indx = types[0]
+				} else {
+					panic("unreachable")
+				}
+				ret &ast::Expr{
+					Token: lead.Token,
+					End: token,
+					Kind: &ast::IndexingExpr{
+						Token: lead.Token,
+						End: token,
+						Expr: lead,
+						Index: indx,
+					},
+				}
+			|:
+				self.pushErr(token, log::ExpectedXorZFoundY, "','", "']'", "'"+token.Kind+"'")
+				ret nil
+			}
 		}
 	}
 
-	unsafe fn buildCppLink(mut self): &ast::Type {
+	unsafe fn buildCppLink(mut self): &ast::Expr {
 		if *self.i+1 >= len(self.tokens) || self.tokens[*self.i+1].Id != token::Dot {
 			self.pushErr(self.tokens[*self.i], log::InvalidSyntax)
 			ret nil
 		}
 		*self.i += 2 // Skip the bind keyword and dot token.
 		mut t := self.buildIdent()
-		t.Kind.(&ast::IdentType).Binded = true
+		if t != nil {
+			match type t.Kind {
+			| &ast::IdentExpr:
+				t.Kind.(&ast::IdentExpr).Binded = true
+			| &ast::IndexingExpr:
+				t.Kind.(&ast::IndexingExpr).Expr.Kind.(&ast::IdentExpr).Binded = true
+			|:
+				panic("unreachable")
+			}
+		}
 		ret t
 	}
 
-	unsafe fn buildFunc(mut self): &ast::Type {
+	unsafe fn buildFunc(mut self): &ast::Expr {
 		mut token := self.tokens[*self.i]
 		mut f := self.p.buildFuncPrototype(self.tokens, *self.i, false)
 		if f == nil {
@@ -164,13 +174,14 @@ impl typeBuilder {
 		if !f.IsAnon() {
 			self.pushErr(f.Token, log::InvalidSyntax)
 		}
-		ret &ast::Type{
+		ret &ast::Expr{
 			Token: token,
+			End: self.tokens[*self.i-1],
 			Kind: f,
 		}
 	}
 
-	unsafe fn buildPtr(mut self): &ast::Type {
+	unsafe fn buildPtr(mut self): &ast::Expr {
 		mut token := self.tokens[*self.i]
 		if *self.i+1 >= len(self.tokens) {
 			self.pushErr(token, log::InvalidSyntax)
@@ -180,10 +191,12 @@ impl typeBuilder {
 		*self.i++
 		if self.tokens[*self.i].Id == token::Unsafe {
 			*self.i++
-			ret &ast::Type{
+			ret &ast::Expr{
 				Token: token,
-				Kind: &ast::PtrType{
-					Elem: nil, // Set Elem as nil for unsafe pointer (*unsafe) type.
+				End: self.tokens[*self.i-1],
+				Kind: &ast::UnaryExpr{
+					Op: token,
+					Expr: nil, // Set Expr as nil for unsafe pointer (*unsafe) type.
 				},
 			}
 		}
@@ -193,15 +206,17 @@ impl typeBuilder {
 			ret nil
 		}
 
-		ret &ast::Type{
+		ret &ast::Expr{
 			Token: token,
-			Kind: &ast::PtrType{
-				Elem: elem,
+			End: self.tokens[*self.i-1],
+			Kind: &ast::UnaryExpr{
+				Op: token,
+				Expr: elem,
 			},
 		}
 	}
 
-	unsafe fn buildSptr(mut self): &ast::Type {
+	unsafe fn buildSptr(mut self): &ast::Expr {
 		mut token := self.tokens[*self.i]
 		if *self.i+1 >= len(self.tokens) {
 			self.pushErr(token, log::InvalidSyntax)
@@ -214,30 +229,33 @@ impl typeBuilder {
 			ret nil
 		}
 
-		ret &ast::Type{
+		ret &ast::Expr{
 			Token: token,
-			Kind: &ast::SptrType{
-				Elem: elem,
+			End: self.tokens[*self.i-1],
+			Kind: &ast::UnaryExpr{
+				Op: token,
+				Expr: elem,
 			},
 		}
 	}
 
-	unsafe fn buildSlice(mut self): &ast::Type {
+	unsafe fn buildSlice(mut self): &ast::Expr {
 		mut token := self.tokens[*self.i]
 		*self.i++ // skip right bracket
 		mut elem := self.step()
 		if elem == nil {
 			ret nil
 		}
-		ret &ast::Type{
+		ret &ast::Expr{
 			Token: token,
+			End: self.tokens[*self.i-1],
 			Kind: &ast::SliceType{
 				Elem: elem,
 			},
 		}
 	}
 
-	unsafe fn buildArr(mut self): &ast::Type {
+	unsafe fn buildArr(mut self): &ast::Expr {
 		mut exprTokens := range(*self.i, token::LBracket, token::RBracket, self.tokens)
 		if *self.i >= len(self.tokens) {
 			self.pushErr(self.tokens[*self.i-1], log::MissingType)
@@ -260,13 +278,14 @@ impl typeBuilder {
 			arrt.Size = self.p.buildExpr(exprTokens)
 		}
 
-		ret &ast::Type{
+		ret &ast::Expr{
 			Token: token,
+			End: self.tokens[*self.i-1],
 			Kind: arrt,
 		}
 	}
 
-	unsafe fn buildMap(mut self): &ast::Type {
+	unsafe fn buildMap(mut self): &ast::Expr {
 		mut mapToken := self.tokens[*self.i]
 		*self.i++ // Skip map token.
 		if *self.i >= len(self.tokens) {
@@ -299,13 +318,14 @@ impl typeBuilder {
 			ret nil
 		}
 		mapt.Val = valt
-		ret &ast::Type{
+		ret &ast::Expr{
 			Token: mapToken,
+			End: self.tokens[*self.i-1],
 			Kind: mapt,
 		}
 	}
 
-	unsafe fn buildEnumerable(mut self): &ast::Type {
+	unsafe fn buildEnumerable(mut self): &ast::Expr {
 		mut token := self.tokens[*self.i]
 		if *self.i+2 >= len(self.tokens) {
 			self.pushErr(token, log::InvalidSyntax)
@@ -320,7 +340,7 @@ impl typeBuilder {
 		ret self.buildArr()
 	}
 
-	unsafe fn buildChan(mut self): &ast::Type {
+	unsafe fn buildChan(mut self): &ast::Expr {
 		mut token := self.tokens[*self.i]
 		if *self.i+1 >= len(self.tokens) {
 			self.pushErr(token, log::InvalidSyntax)
@@ -357,7 +377,7 @@ impl typeBuilder {
 			*self.i++
 		}
 
-		mut elem := (&ast::Type)(nil)
+		mut elem := (&ast::Expr)(nil)
 		if send && recv && self.tokens[*self.i].Id == token::LParent {
 			elem = self.buildParenthesesRange()
 		} else {
@@ -367,8 +387,9 @@ impl typeBuilder {
 			ret nil
 		}
 
-		ret &ast::Type{
+		ret &ast::Expr{
 			Token: token,
+			End: self.tokens[*self.i-1],
 			Kind: &ast::ChanType{
 				Recv: recv,
 				Send: send,
@@ -377,7 +398,7 @@ impl typeBuilder {
 		}
 	}
 
-	unsafe fn buildParenthesesRange(mut self): &ast::Type {
+	unsafe fn buildParenthesesRange(mut self): &ast::Expr {
 		token := self.tokens[*self.i] // Save token for error log.
 		mut rangeTokens := range(*self.i, token::LParent, token::RParent, self.tokens)
 		if len(rangeTokens) == 0 {
@@ -395,7 +416,7 @@ impl typeBuilder {
 		ret t
 	}
 
-	unsafe fn step(mut self): &ast::Type {
+	unsafe fn step(mut self): &ast::Expr {
 		mut token := self.tokens[*self.i]
 		match token.Id {
 		| token::Name:
@@ -427,10 +448,13 @@ impl typeBuilder {
 		| token::Amper:
 			ret self.buildSptr()
 		| token::DblAmper:
-			ret &ast::Type{
+			mut sptr := self.buildSptr()
+			ret &ast::Expr{
 				Token: token,
-				Kind: &ast::SptrType{
-					Elem: self.buildSptr(),
+				End: sptr.End,
+				Kind: &ast::UnaryExpr{
+					Op: token,
+					Expr: sptr,
 				},
 			}
 		| token::LBracket:
@@ -445,10 +469,10 @@ impl typeBuilder {
 
 	// Builds type.
 	// Returns void if error occurs.
-	unsafe fn build(mut self): (&ast::Type, ok: bool) {
+	unsafe fn build(mut self): (&ast::Expr, ok: bool) {
 		mut root := self.step()
 		if root == nil {
-			ret buildVoidType(), false
+			ret nil, false
 		}
 		ret root, true
 	}

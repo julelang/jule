@@ -29,87 +29,22 @@ struct Directive {
 	Args: []&token::Token
 }
 
-// Kind type of type declarations.
-enum TypeKind: type {
-	&IdentType,
-	&SptrType,
-	&PtrType,
-	&SliceType,
-	&ArrayType,
-	&MapType,
-	&TupleType,
-	&Func,
-	&NamespaceType,
-	&ChanType,
-}
-
-// Type declaration.
-// Also represents type expression.
-//
-// For primitive types:
-//	- Represented by IdentType.
-//	- Token's identity is data type.
-//	- Primitive type kind is Ident.
-//
-// For function types:
-//	- Function types represented by &Func.
-struct Type {
-	Token: &token::Token
-	Kind:  TypeKind
-}
-
-// Identifier type.
-struct IdentType {
-	Token:    &token::Token
-	Ident:    str
-	Binded:   bool
-	Generics: []&Type
-}
-
-// Namespace chain type.
-struct NamespaceType {
-	Namespace: &token::Token // Namespace token.
-	Kind:      &Type         // Type of identifier.
-}
-
 // Channel type.
 struct ChanType {
 	Recv: bool
 	Send: bool
-	Elem: &Type
-}
-
-// Smart pointer type.
-struct SptrType {
-	Elem: &Type
+	Elem: &Expr
 }
 
 // Slice type.
 struct SliceType {
-	Elem: &Type
-}
-
-// Tuple type.
-struct TupleType {
-	Types: []&Type
-}
-
-// Pointer type.
-struct PtrType {
-	Elem: &Type
-}
-
-impl PtrType {
-	// Reports whether pointer is unsafe pointer (*unsafe).
-	fn IsUnsafe(self): bool {
-		ret self.Elem == nil
-	}
+	Elem: &Expr
 }
 
 // Array type.
 // Size expression is nil for auto-sized array.
 struct ArrayType {
-	Elem: &Type
+	Elem: &Expr
 	Size: &Expr
 }
 
@@ -122,14 +57,14 @@ impl ArrayType {
 
 // Map type.
 struct MapType {
-	Key: &Type
-	Val: &Type
+	Key: &Expr
+	Val: &Expr
 }
 
 // Return type.
 // Kind and Idents is nil for void type.
 struct RetType {
-	Kind:   &Type
+	Kind:   &Expr
 	Idents: []&token::Token
 }
 
@@ -138,7 +73,6 @@ enum ExprData: type {
 	&RangeExpr,
 	&TupleExpr,
 	&LitExpr,
-	&Type,
 	&IdentExpr,
 	&UnaryExpr,
 	&SubIdentExpr,
@@ -159,6 +93,10 @@ enum ExprData: type {
 	&ChanRecv,
 	&ChanSend,
 	&TypeAssertionExpr,
+	&ChanType,
+	&ArrayType,
+	&MapType,
+	&SliceType,
 }
 
 // Expression.
@@ -216,9 +154,17 @@ impl IdentExpr {
 }
 
 // Unary expression.
+// For the unsafe pointer (*unsafe) type, Op is star and Expr is nil.
 struct UnaryExpr {
 	Op:   &token::Token
 	Expr: &Expr
+}
+
+impl UnaryExpr {
+	// Reports whether the unary expression is the unsafe pointer type declaration.
+	fn IsUnsafePtr(self): bool {
+		ret self.Op.Id == token::Star && self.Expr == nil
+	}
 }
 
 // Variadiced expression.
@@ -229,13 +175,13 @@ struct VariadicExpr {
 
 // Casting expression.
 struct CastExpr {
-	Kind: &Type
+	Kind: &Expr
 	Expr: &Expr
 }
 
 // Type assertion expression.
 struct TypeAssertionExpr {
-	Kind: &Type
+	Kind: &Expr
 	Expr: &Expr
 }
 
@@ -296,7 +242,7 @@ impl FieldExprPair {
 
 // Typed brace instantiating expression.
 struct TypedBraceLit {
-	Kind: &Type
+	Kind: &Expr
 	Lit:  &BraceLit
 }
 
@@ -356,7 +302,7 @@ struct SlicingExpr {
 
 // Constraint.
 struct Constraint {
-	Mask: []&Type
+	Mask: []&Expr
 }
 
 // Generic type declaration.
@@ -448,7 +394,7 @@ struct Param {
 	Mutable:   bool
 	Variadic:  bool
 	Reference: bool
-	Kind:      &Type
+	Kind:      &Expr
 	Ident:     str
 }
 
@@ -465,7 +411,7 @@ impl Param {
 }
 
 // Function declaration.
-// Also represents anonymous function expression.
+// Also represents anonymous function expression and function type declarations.
 struct Func {
 	Token:       &token::Token
 	Global:      bool
@@ -487,6 +433,11 @@ impl Func {
 	fn IsAnon(self): bool {
 		ret self.Ident == jule::Anon
 	}
+
+	// Reports whether function is type declaration.
+	fn IsDecl(self): bool {
+		ret self.Scope == nil
+	}
 }
 
 // Variable declaration.
@@ -502,7 +453,7 @@ struct Var {
 	Statically: bool
 	Reference:  bool
 	Directives: []&Directive
-	Kind:       &Type // nil for type inferred
+	Kind:       &Expr // nil for type inferred
 	Expr:       &Expr
 
 	// See developer reference (12).
@@ -597,7 +548,7 @@ struct TypeAlias {
 	Token:  &token::Token
 	Ident:  str
 	Strict: bool
-	Kind:   &Type
+	Kind:   &Expr
 }
 
 // Case of match-case.
@@ -656,7 +607,7 @@ struct Enum {
 	Token:  &token::Token
 	Public: bool
 	Ident:  str
-	Kind:   &Type
+	Kind:   &Expr
 	Items:  []&EnumItem
 	End:    &token::Token
 }
@@ -671,7 +622,7 @@ impl Enum {
 // TypeEnum item.
 struct TypeEnumItem {
 	Token: &token::Token
-	Kind:  &Type
+	Kind:  &Expr
 }
 
 // TypeEnum declaration.
@@ -689,7 +640,7 @@ struct Field {
 	Public:  bool
 	Mutable: bool // Interior mutability.
 	Ident:   str
-	Kind:    &Type
+	Kind:    &Expr
 	Tag:     &token::Token // Nil if not given.
 }
 
@@ -711,7 +662,7 @@ struct Trait {
 	End:      &token::Token
 	Ident:    str
 	Public:   bool
-	Inherits: []&Type
+	Inherits: []&Expr
 	Methods:  []&Func
 }
 
@@ -721,12 +672,12 @@ struct Impl {
 
 	// This token available for these cases:
 	//	- Implementation trait to structure, represents trait's type.
-	Base: &Type
+	Base: &Expr
 
 	// This token available for these cases:
 	//	- Implementation trait to structure, represents structure's type.
 	//	- Implementation to structure, represents structure's type.
-	Dest: &Type
+	Dest: &Expr
 
 	// Given methods to implement.
 	Methods: []&Func
