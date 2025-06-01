@@ -423,7 +423,7 @@ impl sema {
 		self.errors = append(self.errors, log::Log{
 			Kind: log::Error,
 			Row: t.Row,
-			Column: t.Column+err.Offset,
+			Column: t.Column + err.Offset,
 			Path: t.File.Path,
 			Text: err.Text,
 			Line: t.File.GetRow(t.Row),
@@ -2912,69 +2912,63 @@ impl sema {
 
 struct missingRetChecker {
 	mut breaked: []uintptr
-	mut fell:    bool
 }
 
 impl missingRetChecker {
 	static fn new(): missingRetChecker {
-		ret missingRetChecker{
-			breaked: make([]uintptr, 1<<4),
-		}
+		ret missingRetChecker{}
 	}
 
-	fn checkConditional(self, mut c: &Conditional): bool {
+	fn checkConditional(self, mut c: &Conditional): (ok: bool) {
+		// To collect all break statements, check the all scopes.
+		ok = true
 		for (_, mut elif) in c.Elifs {
 			if elif == nil {
 				ret false
 			}
 			if !self.checkScope(elif.Scope) {
-				ret false
+				ok = false
 			}
 		}
-		ret c.Default != nil && self.checkScope(c.Default.Scope)
+		if c.Default != nil && !self.checkScope(c.Default.Scope) {
+			ok = false
+		}
+		ret
 	}
 
-	fn checkMatch(self, mut m: &Match): bool {
+	fn checkMatch(self, mut m: &Match): (ok: bool) {
+		// To collect all break and fall statements, check the all scopes.
+		ok = true
 		for (_, mut c) in m.Cases {
 			if c == nil {
-				ret false
-			}
-			n := len(self.breaked)
-			ok := self.checkScope(c.Scope)
-			match {
-			| n != len(self.breaked):
-				ret false
-			| !ok:
-				if !self.fell {
-					ret false
-				}
-				fall
-			| self.fell:
-				self.fell = false
-				if c.Next == nil {
-					ret false
-				}
+				ok = false
 				continue
 			}
+			if !self.checkScope(c.Scope) {
+				ok = false
+			}
 		}
-		ret m.Default != nil && self.checkScope(m.Default.Scope)
+		if m.Default != nil && !self.checkScope(m.Default.Scope) {
+			ok = false
+		}
+		ret
 	}
 
 	fn checkInfIter(self, it: uintptr, mut &s: &Scope): bool {
 		n := len(self.breaked)
+		defer { self.breaked = self.breaked[:n] }
 		if self.checkScope(s) {
-			self.breaked = self.breaked[:n]
 			ret true
 		}
 		if n != len(self.breaked) {
 			for _, addr in self.breaked[n:] {
 				if it == addr {
-					self.breaked = self.breaked[:n]
 					ret false
 				}
 			}
-			self.breaked = self.breaked[:n]
 		}
+		// If infinit iteration never breaked, it makes the return value unavailable.
+		// So do not complain about missing return statement.
 		ret true
 	}
 
@@ -2984,16 +2978,18 @@ impl missingRetChecker {
 		}
 		for (_, mut st) in s.Stmts {
 			match type st {
-			| &Fall:
-				self.fell = true
-				ret false
 			| &Break:
+				// Store if break statements breaks an iteration.
+				// For match breaking match cases, no extra attention needed.
+				// Following statements will not be executed, ignore them, if any.
+				// So the match case is not return anything.
 				addr := st.(&Break).It
 				if addr != 0 {
 					self.breaked = append(self.breaked, addr)
 				}
 				ret false
 			| &Continue:
+				// Following statements will not be executed, ignore them, if any.
 				ret false
 			| &InfIter:
 				mut ii := st.(&InfIter)
@@ -3011,6 +3007,7 @@ impl missingRetChecker {
 			| &Ret:
 				ret true
 			| &Scope:
+				// If case returns, then report true.
 				if self.checkScope(st.(&Scope)) {
 					ret true
 				}
@@ -3018,15 +3015,19 @@ impl missingRetChecker {
 				match type st.(&Value).Model {
 				| &BuiltinPanicCallExpr
 				| &BuiltinErrorCallExpr:
+					// Following statements will not be executed, ignore them, if any.
+					// And panic or error call makes the return value unavailable.
 					ret true
 				|:
 					continue
 				}
 			| &Conditional:
+				// If all cases returns, then report true.
 				if self.checkConditional(st.(&Conditional)) {
 					ret true
 				}
 			| &Match:
+				// If all cases returns, then report true.
 				if self.checkMatch(st.(&Match)) {
 					ret true
 				}
