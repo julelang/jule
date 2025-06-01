@@ -1813,15 +1813,6 @@ impl exprCoder {
 		self.oc.write(fmt::Format(m.Code, args...))
 	}
 
-	fn free(mut &self, mut m: &sema::FreeExpr) {
-		self.possibleRefExpr(m.Expr)
-		if env::RC {
-			self.oc.write(".dealloc()")
-			ret
-		}
-		self.oc.write(".__free()")
-	}
-
 	fn chanRecv(mut &self, mut m: &sema::ChanRecv, ok: fn(), owned: bool) {
 		ch := m.Expr.Type.Chan()
 		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
@@ -2077,8 +2068,6 @@ impl exprCoder {
 			self.structureStatic(m.(&sema::StructStaticIdentExpr))
 		| &sema::BackendEmitExpr:
 			self.backendEmit(m.(&sema::BackendEmitExpr))
-		| &sema::FreeExpr:
-			self.free(m.(&sema::FreeExpr))
 		| &sema::ChanRecv:
 			self.chanRecv(m.(&sema::ChanRecv), nil, false)
 		| &sema::ChanSend:
@@ -2109,8 +2098,6 @@ impl exprCoder {
 			self.bytesFromStr(m.(&opt::BytesFromStr))
 		| &opt::ArrayAsSlice:
 			self.arrayAsSlice(m.(&opt::ArrayAsSlice))
-		|:
-			self.oc.write("<unimplemented_expression_model>")
 		}
 	}
 
