@@ -2,16 +2,108 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use integ "std/jule/integrated"
+// This package implements thread-safe interface for runtime environment variables.
+// Returned data by the [runtime::env] may be different.
+
+use "std/runtime"
+use "std/sync"
 use "std/sys"
 
-fn lookupenv(key: str): (val: str, unset: bool) {
-	keyPtr := integ::StrToBytes(key)
-	ret unsafe { sys::Getenv(&keyPtr[0]) }
+// Guards initialization by copyenv, which populates env.
+static envOnce = sync::Once{}
+
+// Guards env and envs.
+static envLock = sync::RWMutex{}
+
+// Maps from an environment variable to its first occurrence in envs.
+static mut env: map[str]int = nil
+
+// Provided by the runtime. Elements are expected to
+// be of the form "key=value". An empty string means deleted
+// (or a duplicate to be ignored).
+static mut envs = runtime::env()
+
+fn copyenv() {
+	env = map[str]int{}
+	for i, s in envs {
+		mut j := 0
+		for j < len(s); j++ {
+			if s[j] == '=' {
+				key := s[:j]
+				_, ok := env[key]
+				if !ok {
+					env[key] = i // first mention of key
+				} else {
+					// Clear duplicate keys. This permits Unsetenv to
+					// safely delete only the first item without
+					// worrying about unshadowing a later one,
+					// which might be a security problem.
+					envs[i] = ""
+				}
+				break
+			}
+		}
+	}
 }
 
-fn setenv(key: str, val: str): bool {
-	keyPtr := integ::StrToBytes(key)
-	valPtr := integ::StrToBytes(val)
-	ret unsafe { sys::Setenv(&keyPtr[0], &valPtr[0], 1) }
+fn lookupenv(key: str): (value: str, found: bool) {
+	envOnce.Do(copyenv)
+	if len(key) == 0 {
+		ret "", false
+	}
+
+	envLock.RLock()
+	defer { envLock.RUnlock() }
+
+	mut i, ok := env[key]
+	if !ok {
+		ret "", false
+	}
+	s := envs[i]
+	i = 0
+	for i < len(s); i++ {
+		if s[i] == '=' {
+			ret s[i+1:], true
+		}
+	}
+	ret "", false
+}
+
+fn setenv(key: str, value: str)! {
+	envOnce.Do(copyenv)
+	if len(key) == 0 {
+		error(sys::EINVAL)
+	}
+	mut i := 0
+	for i < len(key); i++ {
+		if key[i] == '=' || key[i] == 0 {
+			error(sys::EINVAL)
+		}
+	}
+
+	envLock.Lock()
+	unsafe defer { envLock.Unlock() }
+
+	i, ok := env[key]
+	kv := key + "=" + value
+	if ok {
+		envs[i] = kv
+	} else {
+		i = len(envs)
+		envs = append(envs, kv)
+	}
+	env[key] = i
+}
+
+fn environ(): []str {
+	envOnce.Do(copyenv)
+	envLock.RLock()
+	mut a := make([]str, 0, len(envs))
+	for _, env in envs {
+		if env != "" {
+			a = append(a, env)
+		}
+	}
+	envLock.RUnlock()
+	ret a
 }
