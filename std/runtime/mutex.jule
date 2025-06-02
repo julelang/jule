@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/internal/runtime/atomic"
+
 // Ideal threshold for the wait/sleep time. Supports every possible platform.
 // For sleep functions, on most UNIX-like systems we can sleep less than 1ms,
 // but Windows supports minimum 1ms sleep. So, the threshold is 1ms to be portable.
@@ -37,13 +39,13 @@ impl fmutex {
 	}
 
 	fn unlock(self) {
-		new := atomicAdd(self.state, -1, atomicAcqRel)
+		new := atomic::Add(self.state, -1, atomic::AcqRel)
 		if new != 0 {
 			panic("runtime: mutex: unlock of unlocked mutex")
 		}
 	}
 
 	fn tryLock(self): bool {
-		ret atomicCompareAndSwap(self.state, 0, 1, atomicSeqCst)
+		ret atomic::CompareAndSwap(self.state, 0, 1, atomic::SeqCst)
 	}
 }

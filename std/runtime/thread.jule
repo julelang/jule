@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/internal/runtime/atomic"
+
 const (
 	// State flags of threads.
 	threadRunning   = 1 << iota // Header group specifier of running thread state.
@@ -422,7 +424,7 @@ fn checkDeadlock(mu: uintptr, reason: u32): (frameConsumed: bool) {
 			// state but no one locked the mutex yet. In this case common analysis will
 			// result as deadlock due to all threads suspended.
 			if t.mu != 0 && t.state&reasonMutex == reasonMutex {
-				if atomicLoad(unsafe { *(*u32)(t.mu) }, atomicRelaxed) > 0 {
+				if atomic::Load(unsafe { *(*u32)(t.mu) }, atomic::Relaxed) > 0 {
 					ret
 				}
 			}

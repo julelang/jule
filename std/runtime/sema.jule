@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use "std/internal/cpu"
+use "std/internal/runtime/atomic"
 
 struct semaLeaf {
 	ticket: u32  // acquired, boolean
@@ -126,11 +127,11 @@ fn semtable_rootFor(&sema: u32): &semaRoot {
 
 fn cansemacquire(mut &sema: u32): bool {
 	for {
-		v := atomicLoad(sema, atomicSeqCst)
+		v := atomic::Load(sema, atomic::SeqCst)
 		if v == 0 {
 			ret false
 		}
-		if atomicCompareAndSwap(sema, v, v-1, atomicSeqCst) {
+		if atomic::CompareAndSwap(sema, v, v-1, atomic::SeqCst) {
 			ret true
 		}
 	}
@@ -180,10 +181,10 @@ fn semacquire(mut &sema: u32, lifo: bool, opt: u32) {
 	for {
 		root.lock.lock()
 		// Add ourselves to nwait to disable "easy case" in semrelease.
-		atomicAdd(root.nwait, 1, atomicSeqCst)
+		atomic::Add(root.nwait, 1, atomic::SeqCst)
 		// Check cansemacquire to avoid missed wakeup.
 		if cansemacquire(sema) {
-			atomicAdd(root.nwait, ^u32(0), atomicSeqCst)
+			atomic::Add(root.nwait, ^u32(0), atomic::SeqCst)
 			root.lock.unlock()
 			break
 		}
@@ -205,18 +206,18 @@ fn semacquire(mut &sema: u32, lifo: bool, opt: u32) {
 // If handoff is true, tries to pass count directly to the first waiter.
 fn semrelease(mut &sema: u32, handoff: bool) {
 	mut root := semtable_rootFor(sema)
-	atomicAdd(sema, 1, atomicSeqCst)
+	atomic::Add(sema, 1, atomic::SeqCst)
 
 	// Easy case: no waiters?
 	// This check must happen after the atomicAdd, to avoid a missed wakeup
 	// (see loop in semacquire).
-	if atomicLoad(root.nwait, atomicSeqCst) == 0 {
+	if atomic::Load(root.nwait, atomic::SeqCst) == 0 {
 		ret
 	}
 
 	// Harder case: search for a waiter and wake it.
 	root.lock.lock()
-	if atomicLoad(root.nwait, atomicSeqCst) == 0 {
+	if atomic::Load(root.nwait, atomic::SeqCst) == 0 {
 		// The count is already consumed by another thread,
 		// so no need to wake up another thread.
 		root.lock.unlock()
@@ -225,7 +226,7 @@ fn semrelease(mut &sema: u32, handoff: bool) {
 
 	mut sl := root.dequeue(sema)
 	if sl != nil {
-		atomicAdd(root.nwait, ^u32(0), atomicSeqCst)
+		atomic::Add(root.nwait, ^u32(0), atomic::SeqCst)
 	}
 	root.lock.unlock()
 	// If handoff is true, immediately yield the CPU with no analysis.
@@ -264,7 +265,7 @@ struct notifyList {
 
 // Adds new notify ticked to list l and returns the ticket number.
 fn notifyListAdd(mut &l: notifyList): u32 {
-	ret atomicAdd(l.wait, 1, atomicSeqCst) - 1
+	ret atomic::Add(l.wait, 1, atomic::SeqCst) - 1
 }
 
 // Waits for a notification. If one has been sent since
@@ -287,20 +288,20 @@ fn notifyListWait(mut &l: notifyList, t: u32) {
 fn notifyListNotifyOne(mut &l: notifyList) {
 	// Fast-path: if there are no new waiters since the last notification
 	// we don't need to acquire the lock at all.
-	if atomicLoad(l.wait, atomicSeqCst) == atomicLoad(l.notify, atomicSeqCst) {
+	if atomic::Load(l.wait, atomic::SeqCst) == atomic::Load(l.notify, atomic::SeqCst) {
 		ret
 	}
 
 	l.lock.lock()
 	// Re-check under the lock if we need to do anything.
 	t := l.notify
-	if t == atomicLoad(l.wait, atomicSeqCst) {
+	if t == atomic::Load(l.wait, atomic::SeqCst) {
 		l.lock.unlock()
 		ret
 	}
 
 	// Update the next notify ticket number.
-	atomicAdd(l.notify, t+1, atomicSeqCst)
+	atomic::Add(l.notify, t+1, atomic::SeqCst)
 
 	l.lock.unlock()
 }
@@ -313,8 +314,8 @@ fn notifyListNotifyAll(mut &l: notifyList) {
 	// value of wait because any previous waiters are already in the list
 	// or will notice that they have already been notified when trying to
 	// add themselves to the list.
-	wait := atomicLoad(l.wait, atomicSeqCst)
-	atomicStore(l.notify, wait, atomicSeqCst)
+	wait := atomic::Load(l.wait, atomic::SeqCst)
+	atomic::Store(l.notify, wait, atomic::SeqCst)
 
 	l.lock.unlock()
 }

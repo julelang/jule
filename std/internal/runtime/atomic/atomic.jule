@@ -2,63 +2,63 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-type atomicMemoryOrder: int
+type MemoryOrder: int
 
 const (
-	atomicRelaxed = atomicMemoryOrder(0)
-	atomicConsume = atomicMemoryOrder(1)
-	atomicAcquire = atomicMemoryOrder(2)
-	atomicRelease = atomicMemoryOrder(3)
-	atomicAcqRel  = atomicMemoryOrder(4)
-	atomicSeqCst  = atomicMemoryOrder(5)
+	Relaxed = MemoryOrder(0)
+	Consume = MemoryOrder(1)
+	Acquire = MemoryOrder(2)
+	Release = MemoryOrder(3)
+	AcqRel  = MemoryOrder(4)
+	SeqCst  = MemoryOrder(5)
 )
 
 #cdef
-cpp unsafe fn __atomic_store(*unsafe, *unsafe, atomicMemoryOrder)
+cpp unsafe fn __atomic_store(*unsafe, *unsafe, MemoryOrder)
 
 #cdef
-cpp unsafe fn __atomic_load(*unsafe, *unsafe, atomicMemoryOrder)
+cpp unsafe fn __atomic_load(*unsafe, *unsafe, MemoryOrder)
 
 #cdef
-cpp unsafe fn __atomic_exchange[T](*unsafe, *unsafe, *unsafe, atomicMemoryOrder): T
+cpp unsafe fn __atomic_exchange[T](*unsafe, *unsafe, *unsafe, MemoryOrder): T
 
 #cdef
-cpp unsafe fn __atomic_compare_exchange(*unsafe, *unsafe, *unsafe, int, atomicMemoryOrder, atomicMemoryOrder): bool
+cpp unsafe fn __atomic_compare_exchange(*unsafe, *unsafe, *unsafe, int, MemoryOrder, MemoryOrder): bool
 
 #cdef
-cpp unsafe fn __atomic_fetch_add[T](*unsafe, T, atomicMemoryOrder): T
+cpp unsafe fn __atomic_fetch_add[T](*unsafe, T, MemoryOrder): T
 
 // Atomically stores new value to p with memory order mo, and returns the old value.
-fn atomicSwap[T](mut &p: T, new: T, mo: atomicMemoryOrder): (old: T) {
-	ret atomicSwapZ(p, new, mo)
+fn Swap[T](mut &p: T, new: T, mo: MemoryOrder): (old: T) {
+	ret SwapZ(p, new, mo)
 }
 
 // Atomically reads value of the p with memory order mo and returns.
-fn atomicLoad[T](&p: T, mo: atomicMemoryOrder): T {
-	ret atomicLoadZ[T, T](p, mo)
+fn Load[T](&p: T, mo: MemoryOrder): T {
+	ret LoadZ[T, T](p, mo)
 }
 
 // Atomically reads value of the p and compares it with old.
 // If comparison results with true, it atomically stores new value into p.
 // In every case, it will use memory order mo.
 // Reports whether swap succeeded.
-fn atomicCompareAndSwap[T](mut &p: T, old: T, new: T, mo: atomicMemoryOrder): (swapped: bool) {
-	ret atomicCompareAndSwapZ(p, old, new, mo)
+fn CompareAndSwap[T](mut &p: T, old: T, new: T, mo: MemoryOrder): (swapped: bool) {
+	ret CompareAndSwapZ(p, old, new, mo)
 }
 
 // Atomically adds delta to p with memory order mo and returns the new value.
-fn atomicAdd[T](mut &p: T, delta: T, mo: atomicMemoryOrder): (new: T) {
-	ret atomicAddZ(p, delta, mo)
+fn Add[T](mut &p: T, delta: T, mo: MemoryOrder): (new: T) {
+	ret AddZ(p, delta, mo)
 }
 
 // Atomically stores new value to p with memory order mo.
-fn atomicStore[T](mut &p: T, val: T, mo: atomicMemoryOrder) {
-	atomicStoreZ(p, val, mo)
+fn Store[T](mut &p: T, val: T, mo: MemoryOrder) {
+	StoreZ(p, val, mo)
 }
 
 // Atomically stores new value to p with memory order mo, and returns the old value.
 // T1 is a base pointer type, T2 is the output type.
-fn atomicSwapZ[T1, T2](mut &p: T1, new: T2, mo: atomicMemoryOrder): (old: T2) {
+fn SwapZ[T1, T2](mut &p: T1, new: T2, mo: MemoryOrder): (old: T2) {
 	let mut tmp: T2
 	unsafe { cpp.__atomic_exchange[T2](&p, &new, &tmp, mo) }
 	ret tmp
@@ -66,7 +66,7 @@ fn atomicSwapZ[T1, T2](mut &p: T1, new: T2, mo: atomicMemoryOrder): (old: T2) {
 
 // Atomically reads value of the p with memory order mo and returns.
 // T1 is a base pointer type, T2 is the output type.
-fn atomicLoadZ[T1, T2](&p: T1, mo: atomicMemoryOrder): T2 {
+fn LoadZ[T1, T2](&p: T1, mo: MemoryOrder): T2 {
 	let mut tmp: T2
 	unsafe { cpp.__atomic_load(&p, &tmp, mo) }
 	ret tmp
@@ -77,19 +77,19 @@ fn atomicLoadZ[T1, T2](&p: T1, mo: atomicMemoryOrder): T2 {
 // In every case, it will use memory order mo.
 // Reports whether swap succeeded.
 // T1 is a base pointer type, T2 is the output type.
-fn atomicCompareAndSwapZ[T1, T2](mut &p: T1, old: T2, new: T2, mo: atomicMemoryOrder): (swapped: bool) {
+fn CompareAndSwapZ[T1, T2](mut &p: T1, old: T2, new: T2, mo: MemoryOrder): (swapped: bool) {
 	const Strong = 0 // strong atomicity
 	ret unsafe { cpp.__atomic_compare_exchange(&p, &old, &new, Strong, mo, mo) }
 }
 
 // Atomically adds delta to p with memory order mo and returns the new value.
 // T1 is a base pointer type, T2 is the output type.
-fn atomicAddZ[T1, T2](mut &p: T1, delta: T2, mo: atomicMemoryOrder): (new: T2) {
+fn AddZ[T1, T2](mut &p: T1, delta: T2, mo: MemoryOrder): (new: T2) {
 	ret unsafe { cpp.__atomic_fetch_add[T2](&p, delta, mo) } + delta
 }
 
 // Atomically stores new value to p with memory order mo.
 // T1 is a base pointer type, T2 is the output type.
-fn atomicStoreZ[T1, T2](mut &p: T1, val: T2, mo: atomicMemoryOrder) {
+fn StoreZ[T1, T2](mut &p: T1, val: T2, mo: MemoryOrder) {
 	unsafe { cpp.__atomic_store(&p, &val, mo) }
 }
