@@ -7,22 +7,17 @@ use "std/jule/sema"
 use "std/os/filepath"
 use "std/strings"
 
-// Reports whether exceptional scope s forwards exceptional to safe place.
+// Reports whether exceptional scope s directly forwards exceptional.
+// Example expression: ret foo() else { error(error) }
+//                                      ^^^^^^^^^^^^ forwarding
 fn IsForwarded(&s: &sema::Scope): bool {
 	last := s.Stmts[len(s.Stmts)-1]
-	match type last {
-	| &sema::Value:
-		match type last.(&sema::Value).Model {
-		| &sema::BuiltinPanicCallExpr
-		| &sema::BuiltinErrorCallExpr:
-			ret true
-		|:
-			ret false
-		}
-	|:
-		// Return true for break, continue, goto, ret or other control flows.
-		ret true
+	v, mut isValue := last.(&sema::Value)
+	if !isValue {
+		ret false
 	}
+	_, isValue = v.Model.(&sema::BuiltinErrorCallExpr)
+	ret isValue
 }
 
 // Reports whether expression comes from binded define.
