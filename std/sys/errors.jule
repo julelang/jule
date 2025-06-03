@@ -2,14 +2,30 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-// Type of error number.
-type Errno: errno
+use "std/internal/conv"
 
-// Returns number of last error.
-fn GetLastErrno(): Errno { ret getLastErrno() }
+const _NO_ERROR = 0
+
+// Type of error number.
+type Errno: uintptr
 
 impl Errno {
 	fn Str(self): str {
 		ret formatError(self)
+	}
+}
+
+// A Signal is a number describing a process signal.
+type Signal: int
+
+impl Signal {
+	fn Str(self): str {
+		if 0 <= self && int(self) < len(signals) {
+			st := signals[self]
+			if st != "" {
+				ret st
+			}
+		}
+		ret "signal " + conv::Itoa(int(self))
 	}
 }

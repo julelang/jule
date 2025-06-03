@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 use "std/internal/poll"
-use integ "std/jule/integrated"
 use "std/sys"
 
 const devNull = "/dev/null"
@@ -12,12 +11,8 @@ fn openFile(path: str, flag: int, perm: FileMode)!: &File {
 	if path == "" {
 		error(sys::ENOENT)
 	}
-	s := integ::StrToBytes(path)
-	handle := unsafe { sys::Open(&s[0], flag|sys::O_CLOEXEC, int(syscallMode(perm))) }
-	if handle == -1 {
-		error(sys::GetLastErrno())
-	}
-	ret newFile(u64(handle), poll::File) else { error(error) }
+	fd := sys::Open(path, flag|sys::O_CLOEXEC, syscallMode(perm)) else { error(error) }
+	ret newFile(u64(fd), poll::File) else { error(error) }
 }
 
 fn newFile(h: u64, mut flags: int)!: &File {
@@ -32,8 +27,5 @@ fn newFile(h: u64, mut flags: int)!: &File {
 }
 
 fn remove(path: str)! {
-	s := integ::StrToBytes(path)
-	if unsafe { sys::Unlink(&s[0]) } != 0 {
-		error(sys::GetLastErrno())
-	}
+	sys::Unlink(path) else { error(error) }
 }

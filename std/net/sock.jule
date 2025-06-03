@@ -89,16 +89,12 @@ fn DialTimeout(network: Network, addr: str, timeout: time::Duration)!: Conn {
 	}
 }
 
-unsafe fn getSocketAddr(handle: poll::NetHandle, addr: *unsafe, len: poll::AddrLen)! {
-	if sys::Getsockname(handle, addr, &len) < 0 {
-		error(lastErrorCode())
-	}
+fn getSocketAddr(handle: poll::NetHandle, addr: uintptr, len: sys::Socklen)! {
+	sys::Getsockname(handle, addr, len) else { error(error) }
 }
 
-unsafe fn connectSocketNoTimeout(handle: poll::NetHandle, sockAddr: *unsafe, sockLen: uint)! {
-	if sys::Connect(handle, sockAddr, sockLen) < 0 {
-		error(lastErrorCode())
-	}
+fn connectSocketNoTimeout(handle: poll::NetHandle, sockAddr: uintptr, sockLen: sys::Socklen)! {
+	sys::Connect(handle, sockAddr, sockLen) else { error(error) }
 }
 
 fn timevalFromDuration(timeout: time::Duration): (tv: sys::Timeval, ok: bool) {

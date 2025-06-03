@@ -56,11 +56,11 @@ impl FD {
 
 	// Writes bytes to the file descriptor and returns written byte count.
 	// The number of bytes written can never exceed the length of the buf.
-	fn Write(mut self, buf: []byte): (n: int, ok: bool) {
+	fn Write(mut self, buf: []byte)!: (n: int) {
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte write, return immediately
 			// without trying to write.
-			ret 0, true
+			ret 0
 		}
 
 		mut buf2 := unsafe { *(&buf) } // break immutability, do not mutable the content
@@ -72,37 +72,31 @@ impl FD {
 			mut nn := 0
 			match {
 			| self.Flags&Console == Console:
-				nn = self.writeConsole(b)
+				nn = self.writeConsole(b) else { error(error) }
 			| self.Flags&File == File | self.Flags&Pipe == Pipe:
-				nn = self.writeFile(b)
+				nn = self.writeFile(b) else { error(error) }
 			| self.Flags&Socket == Socket:
-				nn = unsafe { sys::Send(NetHandle(self.File), &b[0], uint(len(buf)), 0) }
-				if nn < 0 {
-					nn = -1
-				}
+				nn = len(b)
+				sys::Send(NetHandle(self.File), b, 0) else { error(error) }
 			|:
 				panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Write")
-			}
-			ok = nn != -1
-			if !ok {
-				ret
 			}
 			n += nn
 			buf2 = buf2[n:]
 		}
-		ret n, true
+		ret n
 	}
 
 	// Like Write, but wraps sendto syscall.
 	// General for V4 and V6. Unsafe variant.
-	unsafe fn WriteV(mut self, buf: []byte, addr: *unsafe, addrLen: uint): (n: int, ok: bool) {
+	fn WriteV(mut self, buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
 		if self.Flags&SocketNoConn != SocketNoConn {
-			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for WriteV")
 		}
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte read, return immediately
 			// without trying to read.
-			ret 0, true
+			ret 0
 		}
 		for {
 			mut max := len(buf)
@@ -110,32 +104,23 @@ impl FD {
 				max = n + maxRW
 			}
 			part := buf[n:max]
-			nn := sys::Sendto(NetHandle(self.File), &part[0], len(part), 0, addr, integ::Int(addrLen))
-			if nn > 0 {
-				n += nn
-			}
-			ok = nn >= 0
-			if n == len(buf) || !ok {
+			sys::Sendto(NetHandle(self.File), part, 0, addr, addrLen) else { error(error) }
+			n += len(part)
+			if n == len(buf) {
 				ret
 			}
 		}
-		ret
 	}
 
 	// Writes buf to file handle, returns written byte count.
 	// Returns -1 if error occurred.
-	fn writeFile(mut self, mut buf: []byte): (n: int) {
-		mut n32 := u32(0)
-		ok := unsafe { sys::WriteFile(sys::Handle(self.File), &buf[0], u32(len(buf)), &n32, nil) }
-		if !ok {
-			ret -1
-		}
-		ret int(n32)
+	fn writeFile(mut self, mut buf: []byte)!: (n: int) {
+		ret sys::WriteFile(sys::Handle(self.File), buf) else { error(error) }
 	}
 
 	// Writes buf to console handle, returns written byte count.
 	// Returns -1 if error occurred.
-	fn writeConsole(mut self, mut buf: []byte): (n: int) {
+	fn writeConsole(mut self, mut buf: []byte)!: (n: int) {
 		n = len(buf)
 		mut runes := make([]rune, 0, 256)
 		if len(self.lastbits) > 0 {
@@ -167,10 +152,7 @@ impl FD {
 			mut u16s := utf16::Encode(chunk)
 			for len(u16s) > 0 {
 				mut written := u32(0)
-				ok := unsafe { sys::WriteConsole(sys::Handle(self.File), &u16s[0], u32(len(u16s)), written, nil) }
-				if !ok {
-					ret -1
-				}
+				unsafe { sys::WriteConsole(sys::Handle(self.File), &u16s[0], u32(len(u16s)), written, nil) else { error(error) } }
 				u16s = u16s[written:]
 			}
 		}
@@ -182,11 +164,11 @@ impl FD {
 	// If the buf is larger than the number of bytes that can be read,
 	// the buffer will not cause an overflow. Offset will be shifted
 	// by the number of bytes read.
-	fn Read(mut self, mut buf: []byte): (n: int, ok: bool) {
+	fn Read(mut self, mut buf: []byte)!: (n: int) {
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte read, return immediately
 			// without trying to read.
-			ret 0, true
+			ret 0
 		}
 
 		if len(buf) > maxRW {
@@ -195,15 +177,11 @@ impl FD {
 
 		match {
 		| self.Flags&Console == Console:
-			n, ok = self.readConsole(buf)
+			n = self.readConsole(buf) else { error(error) }
 		| self.Flags&File == File | self.Flags&Pipe == Pipe:
-			n, ok = self.readFile(buf)
+			n = self.readFile(buf) else { error(error) }
 		| self.Flags&Socket == Socket:
-			n = unsafe { sys::Recv(NetHandle(self.File), &buf[0], uint(len(buf)), 0) }
-			ok = n >= 0
-			if !ok {
-				n = -1
-			}
+			n = sys::Recv(NetHandle(self.File), buf, 0) else { error(error) }
 		|:
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Read")
 		}
@@ -212,40 +190,34 @@ impl FD {
 
 	// Like Read, but wraps recvfrom syscall.
 	// General for V4 and V6. Unsafe variant.
-	unsafe fn ReadV(mut self, mut buf: []byte, addr: *unsafe, addrLen: uint): (n: int, ok: bool) {
+	fn ReadV(mut self, mut buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
 		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
 		}
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte read, return immediately
 			// without trying to read.
-			ret 0, true
+			ret 0
 		}
 		if len(buf) > maxRW {
 			buf = buf[:maxRW]
 		}
-		addrLenI := integ::Int(addrLen)
-		n = sys::Recvfrom(NetHandle(self.File), &buf[0], len(buf), 0, addr, &addrLenI)
-		ok = n >= 0
-		ret
+		ret sys::Recvfrom(NetHandle(self.File), buf, 0, addr, addrLen) else { error(error) }
 	}
 
 	// Reads from file handle into buf, returns read byte count.
-	fn readFile(mut self, mut buf: []byte): (n: int, ok: bool) {
-		mut n32 := u32(0)
-		ok = unsafe { sys::ReadFile(sys::Handle(self.File), &buf[0], u32(len(buf)), &n32, nil) }
-		if !ok {
-			if sys::GetLastErrno() == sys::ERROR_BROKEN_PIPE {
-				// Work around ERROR_BROKEN_PIPE is returned on reading EOF from stdin
-				ret 0, true
+	fn readFile(mut self, mut buf: []byte)!: (n: int) {
+		ret sys::ReadFile(sys::Handle(self.File), buf) else {
+			if error == sys::ERROR_BROKEN_PIPE {
+				// Work around ERROR_BROKEN_PIPE is returned on reading EOF from stdin.
+				ret 0
 			}
-			ret 0, false
+			error(error)
 		}
-		ret int(n32), true
 	}
 
 	// Reads from console handle into buf, returns read byte count.
-	fn readConsole(mut self, mut buf: []byte): (n: int, ok: bool) {
+	fn readConsole(mut self, mut buf: []byte)!: (n: int) {
 		if self.readu16 == nil {
 			// This information adopted from the Go programming language:
 			//
@@ -262,9 +234,12 @@ impl FD {
 				n = len(buf)
 			}
 			mut nw := u32(0)
-			ok = unsafe { sys::ReadConsole(sys::Handle(self.File), &self.readu16[:len(self.readu16)+1][len(self.readu16)], u32(n), nw) }
-			if !ok {
-				ret 0, false
+			unsafe {
+				sys::ReadConsole(
+					sys::Handle(self.File),
+					&self.readu16[:len(self.readu16)+1][len(self.readu16)],
+					u32(n),
+					nw) else { error(error) }
 			}
 			u16s := self.readu16[:len(self.readu16)+int(nw)]
 			self.readu16 = self.readu16[:0]
@@ -310,35 +285,33 @@ impl FD {
 			buf[i] = x
 		}
 		self.readbyteOffset += i
-		ret i, true
+		ret i
 	}
 
 	// Sets offset to next Read/Write operation and returns the new offset.
 	// whence: 0 (Seek.Set) means, relative to the whence of the file, 1 (Seek.Cur)
 	// means relative to the current offset, and 2 (Seek.End) means relative to end.
-	fn Seek(mut self, offset: i64, whence: int): (newoffset: i64, ok: bool) {
-		newoffset = unsafe { sys::Seek(sys::Handle(self.File), offset, whence) }
-		ok = newoffset != -1
-		ret
+	fn Seek(mut self, offset: i64, whence: int)!: (newoffset: i64) {
+		ret sys::Seek(sys::Handle(self.File), offset, whence) else { error(error) }
 	}
 
 	// Imitates the POSIX ftruncate function.
-	fn Ftruncate(mut self, size: i64): (ok: bool) {
-		ret unsafe { sys::Ftruncate(sys::Handle(self.File), size) } == 0
+	fn Ftruncate(mut self, size: i64)! {
+		sys::Ftruncate(sys::Handle(self.File), size) else { error(error) }
 	}
 
 	// Wraps sys::FlushFileBuffers.
-	fn Fsync(mut self): (ok: bool) {
-		ret unsafe { sys::FlushFileBuffers(sys::Handle(self.File)) }
+	fn Fsync(mut self)! {
+		sys::FlushFileBuffers(sys::Handle(self.File)) else { error(error) }
 	}
 
 	// Closes file descriptor.
-	fn Close(mut self): (ok: bool) {
+	fn Close(mut self)! {
 		match {
 		| self.Flags&File == File | self.Flags&Pipe == Pipe | self.Flags&Pipe == Pipe | self.Flags&Console == Console:
-			ret unsafe { sys::CloseHandle(sys::Handle(self.File)) }
+			sys::CloseHandle(sys::Handle(self.File)) else { error(error) }
 		| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
-			ret sys::CloseSocket(NetHandle(self.File)) >= 0
+			sys::CloseSocket(NetHandle(self.File)) else { error(error) }
 		|:
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Close")
 		}

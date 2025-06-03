@@ -17,7 +17,7 @@ fn read(fd: uintptr, mut buf: []byte): (n: int, ok: bool) {
 		// without trying to read.
 		ret 0, true
 	}
-	n = unsafe { sys::Read(int(fd), &buf[0], uint(len(buf))) }
+	n = poll_readFile(fd, buf)
 	ok = n != -1
 	ret
 }
@@ -25,16 +25,13 @@ fn read(fd: uintptr, mut buf: []byte): (n: int, ok: bool) {
 // Derived from std/internal/poll's Read implementation for Windows.
 // Stay up to date with the original source code.
 fn poll_readFile(fd: uintptr, mut buf: []byte): (n: int) {
-	mut n32 := u32(0)
-	ok := unsafe { sys::ReadFile(sys::Handle(fd), &buf[0], u32(len(buf)), &n32, nil) }
-	if !ok {
-		if sys::GetLastErrno() == sys::ERROR_BROKEN_PIPE {
+	ret sys::ReadFile(sys::Handle(fd), buf) else {
+		if error == sys::ERROR_BROKEN_PIPE {
 			// Work around ERROR_BROKEN_PIPE is returned on reading EOF from stdin
 			ret 0
 		}
 		ret -1
 	}
-	ret int(n32)
 }
 
 fn preadn(fd: uintptr, mut buf: []byte, off: int): (ok: bool) {
@@ -42,9 +39,7 @@ fn preadn(fd: uintptr, mut buf: []byte, off: int): (ok: bool) {
 	if off < 0 {
 		whence = seekEnd
 	}
-	if unsafe { sys::Seek(sys::Handle(fd), i64(off), whence) == -1 } {
-		ret false
-	}
+	sys::Seek(sys::Handle(fd), i64(off), whence) else { ret false }
 	for len(buf) > 0 {
 		m := poll_readFile(fd, buf)
 		if m <= 0 {
@@ -56,5 +51,5 @@ fn preadn(fd: uintptr, mut buf: []byte, off: int): (ok: bool) {
 }
 
 fn closefd(fd: uintptr) {
-	sys::Close(int(fd))
+	sys::CloseHandle(sys::Handle(fd))!
 }

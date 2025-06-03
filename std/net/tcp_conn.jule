@@ -38,14 +38,11 @@ impl TCPConn {
 		if len(buf) == 0 {
 			ret 0
 		}
-		n, ok := self.fd.Read(buf)
-		if ok {
-			if n == 0 {
-				self.Close()!
-			}
-			ret n
+		n := self.fd.Read(buf) else { error(error) }
+		if n == 0 {
+			self.Close()!
 		}
-		error(lastErrorCode())
+		ret n
 	}
 
 	// Writes bytes to connection and returns written byte count.
@@ -54,11 +51,7 @@ impl TCPConn {
 		if self.fd == nil {
 			panic("net: TCPConn.Write: connection is closed")
 		}
-		n, ok := self.fd.Write(buf)
-		if ok {
-			ret n
-		}
-		error(lastErrorCode())
+		ret self.fd.Write(buf) else { error(error) }
 	}
 
 	// Sets read timeout for connection.
@@ -101,10 +94,7 @@ impl TCPConn {
 		if self.fd == nil {
 			ret
 		}
-		ok := self.fd.Close()
-		if !ok {
-			error(lastErrorCode())
-		}
+		self.fd.Close() else { error(error) }
 		self.fd = nil
 		self.v6 = false
 	}

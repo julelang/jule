@@ -6,9 +6,7 @@ use integ "std/jule/integrated"
 use "std/sys"
 
 fn open(name: str): (uintptr, ok: bool) {
-	sName := integ::StrToBytes(name)
-	fd := unsafe { sys::Open(&sName[0], sys::O_RDONLY, 0) }
-	if fd == -1 {
+	fd := sys::Open(name, sys::O_RDONLY, 0) else {
 		ret 0, false
 	}
 	ret uintptr(fd), true
@@ -20,8 +18,11 @@ fn read(fd: uintptr, mut buf: []byte): (n: int, ok: bool) {
 		// without trying to read.
 		ret 0, true
 	}
-	n = unsafe { sys::Read(int(fd), &buf[0], uint(len(buf))) }
-	ok = n != -1
+	ok = true
+	n = sys::Read(int(fd), buf) else {
+		ok = false
+		use 0
+	}
 	ret
 }
 
@@ -30,12 +31,11 @@ fn preadn(fd: uintptr, mut buf: []byte, off: int): (ok: bool) {
 	if off < 0 {
 		whence = seekEnd
 	}
-	if sys::Seek(int(fd), i64(off), whence) == -1 {
+	sys::Seek(int(fd), i64(off), whence) else {
 		ret false
 	}
 	for len(buf) > 0 {
-		m := unsafe { sys::Read(int(fd), &buf[0], uint(len(buf))) }
-		if m <= 0 {
+		m := sys::Read(int(fd), buf) else {
 			ret false
 		}
 		buf = buf[m:]
@@ -44,5 +44,5 @@ fn preadn(fd: uintptr, mut buf: []byte, off: int): (ok: bool) {
 }
 
 fn closefd(fd: uintptr) {
-	sys::Close(int(fd))
+	sys::Close(int(fd))!
 }

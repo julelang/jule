@@ -31,12 +31,12 @@ fn openSocketBlockingMode(handle: poll::NetHandle)! {
 	setSocketBlockingMode(handle, 0) else { error(error) }
 }
 
-unsafe fn connectSocket(handle: poll::NetHandle, sockAddr: *unsafe, sockLen: uint, timeout: time::Duration)! {
+fn connectSocket(handle: poll::NetHandle, sockAddr: uintptr, sockLen: sys::Socklen, timeout: time::Duration)! {
 	if timeout == 0 {
 		connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
 		ret
 	}
-	tv, ok := timevalFromDuration(timeout)
+	mut tv, ok := timevalFromDuration(timeout)
 	if !ok {
 		error(ErrInvalidTimeout)
 	}
@@ -45,31 +45,31 @@ unsafe fn connectSocket(handle: poll::NetHandle, sockAddr: *unsafe, sockLen: uin
 		ret
 	}
 	closeSocketBlockingMode(handle) else { error(error) }
-	if sys::Connect(handle, sockAddr, sockLen) != sys::SOCKET_ERROR {
-		ret
+	sys::Connect(handle, sockAddr, sockLen) else {
+		if error != sys::WSAEWOULDBLOCK {
+			error(error)
+		}
+		goto Select
 	}
-	err := lastErrorCode()
-	if err != sys::WSAEWOULDBLOCK {
-		error(err)
-	}
+	ret
+Select:
 	mut fdW := sys::FdSet{}
 	mut fdE := sys::FdSet{}
 	fdW.Zero()
 	fdW.Set(handle)
 	fdE.Zero()
 	fdE.Set(handle)
-	res := sys::Select(0, nil, &fdW, &fdE, &tv)
-	if res <= 0 {
-		if res == 0 {
-			// Timeout.
-			error(ErrTimeout)
-		}
-		error(lastErrorCode())
+	mut emptyFD := sys::FdSet{}
+	emptyFD.Zero()
+	res := sys::Select(0, emptyFD, fdW, fdE, tv) else { error(error) }
+	if res == 0 {
+		// Timeout.
+		error(ErrTimeout)
 	}
 	if fdE.IsSet(handle) {
-		mut opt := (integ::Int)(0)
-		mut optLen := (integ::Int)(mem::SizeOf(opt))
-		sys::Getsockopt(handle, sys::SOL_SOCKET, sys::SO_ERROR, (*integ::Char)(&opt), &optLen)
+		mut opt := 0
+		mut optLen := sys::Socklen(mem::SizeOf(opt))
+		sys::Getsockopt(handle, sys::SOL_SOCKET, sys::SO_ERROR, uintptr(&opt), optLen)!
 		error(int(opt))
 	}
 	openSocketBlockingMode(handle) else { error(error) }
@@ -80,39 +80,30 @@ fn setSocketTimeout(handle: poll::NetHandle, scope: int, timeout: time::Duration
 	if !ok {
 		error(ErrInvalidTimeout)
 	}
-	unsafe {
-		if sys::Setsockopt(handle, sys::SOL_SOCKET, scope, (*integ::Char)(&tv), int(mem::SizeOf(tv))) < 0 {
-			error(lastErrorCode())
-		}
-	}
+	sys::Setsockopt(handle, sys::SOL_SOCKET, scope, uintptr(&tv), sys::Socklen(mem::SizeOf(tv))) else { error(error) }
 }
 
-unsafe fn accept(h: poll::NetHandle, addr: *unsafe, addrLen: *poll::AddrLen): (poll::NetHandle, ok: bool) {
+fn accept(h: poll::NetHandle, addr: uintptr, addrlen: sys::Socklen)!: poll::NetHandle {
 	for {
-		handle := sys::Accept(h, addr, addrLen)
-		ok = handle != sys::INVALID_SOCKET
-		if ok {
-			ret handle, ok
+		ret sys::Accept(h, addr, addrlen) else {
+			// Sometimes we see WSAECONNRESET and ERROR_NETNAME_DELETED is
+			// returned here. These happen if connection reset is received
+			// before Accept could complete. These errors relate to new
+			// connection, not to Accept, so ignore broken connection and
+			// try Accept again for more connections.
+			if error == sys::ERROR_NETNAME_DELETED || error == sys::WSAECONNRESET {
+				// ignore these and try again
+				continue
+			}
+			error(error)
 		}
-		// Sometimes we see WSAECONNRESET and ERROR_NETNAME_DELETED is
-		// returned here. These happen if connection reset is received
-		// before Accept could complete. These errors relate to new
-		// connection, not to Accept, so ignore broken connection and
-		// try Accept again for more connections.
-		err := lastErrorCode()
-		if err == sys::ERROR_NETNAME_DELETED || err == sys::WSAECONNRESET {
-			// ignore these and try again
-			continue
-		}
-		ret 0, false
 	}
 }
 
 fn init() {
 	mut wsaData := sys::WsaData{}
 	verReq := sys::MakeWord(2, 2)
-	r := unsafe { sys::WSAStartup(verReq, &wsaData) }
-	if r != 0 {
+	sys::WSAStartup(verReq, wsaData) else {
 		panic("net: WSAStartup failed (Windows specific)")
 	}
 }

@@ -26,6 +26,10 @@ cpp struct SECURITY_ATTRIBUTES{}
 #typedef
 cpp struct BY_HANDLE_FILE_INFORMATION{}
 
+#typedef
+cpp struct timeval{}
+
+cpp fn ExitProcess(exitcode: u32)
 cpp fn GetStdHandle(stdh: uintptr): *unsafe
 cpp unsafe fn CloseHandle(stdh: *unsafe): bool
 cpp unsafe fn GetEnvironmentVariableW(key: *integ::Wchar, mut out: *integ::Wchar, nSize: cpp.DWORD): cpp.DWORD
@@ -69,16 +73,71 @@ type Handle: uintptr
 
 const InvalidHandle = ^Handle(0)
 
+const (
+	STD_INPUT_HANDLE  = -10
+	STD_OUTPUT_HANDLE = -11
+	STD_ERROR_HANDLE  = -12
+)
+
+const (
+	MAX_PATH      = 260
+	MAX_LONG_PATH = 32768
+)
+
+// Invented values to support what package os expects.
+const (
+	O_RDONLY   = 0x00000
+	O_WRONLY   = 0x00001
+	O_RDWR     = 0x00002
+	O_CREAT    = 0x00040
+	O_EXCL     = 0x00080
+	O_NOCTTY   = 0x00100
+	O_TRUNC    = 0x00200
+	O_NONBLOCK = 0x00800
+	O_APPEND   = 0x00400
+	O_SYNC     = 0x01000
+	O_ASYNC    = 0x02000
+	O_CLOEXEC  = 0x80000
+)
+
+// Invented values to support what package os expects.
+const (
+	S_IFMT   = 0x1f000
+	S_IFIFO  = 0x1000
+	S_IFCHR  = 0x2000
+	S_IFDIR  = 0x4000
+	S_IFBLK  = 0x6000
+	S_IFREG  = 0x8000
+	S_IFLNK  = 0xa000
+	S_IFSOCK = 0xc000
+	S_ISUID  = 0x800
+	S_ISGID  = 0x400
+	S_ISVTX  = 0x200
+	S_IRUSR  = 0x100
+	S_IWRITE = 0x80
+	S_IWUSR  = 0x80
+	S_IXUSR  = 0x40
+)
+
 static STDIN = GetStdHandle(uintptr(u32(int(STD_INPUT_HANDLE))))
 static STDOUT = GetStdHandle(uintptr(u32(int(STD_OUTPUT_HANDLE))))
 static STDERR = GetStdHandle(uintptr(u32(int(STD_ERROR_HANDLE))))
 
 fn GetStdHandle(stdh: uintptr): Handle { ret Handle(cpp.GetStdHandle(stdh)) }
-unsafe fn CloseHandle(stdh: Handle): bool { ret cpp.CloseHandle(unsafe { (*unsafe)(stdh) }) }
+
+fn CloseHandle(stdh: Handle)! {
+	r := unsafe { cpp.CloseHandle(unsafe { (*unsafe)(stdh) }) }
+	if !r {
+		error(GetLastErrno())
+	}
+}
 
 // Wrapper for C's _wopen function.
-unsafe fn SetEndOfFile(h: Handle): bool {
-	ret cpp.SetEndOfFile(cpp.HANDLE(h))
+fn SetEndOfFile(h: Handle)! {
+	r := unsafe { cpp.SetEndOfFile(cpp.HANDLE(h)) }
+	if !r {
+		error(GetLastErrno())
+	}
 }
 
 // Creates an anonymous pipe, and returns handles to the read and write ends of the pipe.
@@ -87,8 +146,11 @@ unsafe fn CreatePipe(mut r: *Handle, mut w: *Handle, attrs: *SecurityAttributes,
 }
 
 // Flushes the buffers of a specified file and causes all buffered data to be written to a file.
-unsafe fn FlushFileBuffers(h: Handle): bool {
-	ret cpp.FlushFileBuffers(cpp.HANDLE(h))
+fn FlushFileBuffers(h: Handle)! {
+	r := unsafe { cpp.FlushFileBuffers(cpp.HANDLE(h)) }
+	if !r {
+		error(GetLastErrno())
+	}
 }
 
 // Returns last Windows error.
@@ -119,13 +181,25 @@ unsafe fn CreateFile(path: *u16, desiredAccess: u32, shareMode: u32, securityAtt
 }
 
 // Read file.
-unsafe fn ReadFile(h: Handle, buf: *unsafe, bytesToRead: u32, mut bytesRead: *u32, overlap: *unsafe): bool {
-	ret cpp.ReadFile(cpp.HANDLE(h), buf, cpp.DWORD(bytesToRead), (*cpp.DWORD)(bytesRead), (*cpp.OVERLAPPED)(overlap))
+// Passes nil for overlap.
+fn ReadFile(h: Handle, buf: []byte)!: int {
+	mut read := u32(0)
+	ok := unsafe { cpp.ReadFile(cpp.HANDLE(h), &buf[0], cpp.DWORD(len(buf)), (*cpp.DWORD)(&read), nil) }
+	if !ok {
+		error(GetLastErrno())
+	}
+	ret int(read)
 }
 
 // Write file.
-unsafe fn WriteFile(h: Handle, buf: *unsafe, bytesToWrite: u32, mut bytesWritten: *u32, overlap: *unsafe): bool {
-	ret cpp.WriteFile(cpp.HANDLE(h), buf, cpp.DWORD(bytesToWrite), (*cpp.DWORD)(bytesWritten), (*cpp.OVERLAPPED)(overlap))
+// Passes nil for overlap.
+fn WriteFile(h: Handle, buf: []byte)!: int {
+	mut written := u32(0)
+	ok := unsafe { cpp.WriteFile(cpp.HANDLE(h), &buf[0], cpp.DWORD(len(buf)), (*cpp.DWORD)(&written), nil) }
+	if !ok {
+		error(GetLastErrno())
+	}
+	ret int(written)
 }
 
 // Calls Windows's GetFileType function.
@@ -173,17 +247,22 @@ unsafe fn SetConsoleMode(handle: Handle, mode: u32): bool {
 
 // Calls Windows's WriteConsoleW function.
 unsafe fn WriteConsole(handle: Handle, buffer: *u16, toWrite: u32,
-	mut &written: u32, reserved: *unsafe): bool {
-	ret cpp.WriteConsoleW(cpp.HANDLE(handle), (*unsafe)(buffer),
+	mut &written: u32, reserved: *unsafe)! {
+	ok := cpp.WriteConsoleW(cpp.HANDLE(handle), (*unsafe)(buffer),
 		cpp.DWORD(toWrite), (*cpp.DWORD)(&written), reserved)
+	if !ok {
+		error(GetLastErrno())
+	}
 }
 
 // Calls Windows's ReadConsoleW function.
 // Passes nil pointer for input control.
-unsafe fn ReadConsole(handle: Handle, mut buffer: *u16, toRead: u32,
-	mut &read: u32): bool {
-	ret cpp.ReadConsoleW(cpp.HANDLE(handle), (*unsafe)(buffer),
+unsafe fn ReadConsole(handle: Handle, mut buffer: *u16, toRead: u32, mut &read: u32)! {
+	r := cpp.ReadConsoleW(cpp.HANDLE(handle), (*unsafe)(buffer),
 		cpp.DWORD(toRead), (*cpp.DWORD)(&read), nil)
+	if !r {
+		error(GetLastErrno())
+	}
 }
 
 // Calls Windows's WSAGetLastError function.
@@ -247,20 +326,15 @@ unsafe fn DuplicateHandle(hSourceProcessHandle: Handle, hSourceHandle: Handle,
 
 // Calls SetFilePointerEx.
 // See https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfilepointerex
-unsafe fn setFilePointerEx(handle: Handle, distToMove: i64, newFilePointer: *i64, whence: u32): (ok: bool) {
-	let mut newPos: i64
-	ok = cpp.SetFilePointerEx(cpp.HANDLE(handle), *(*cpp.LARGE_INTEGER)(&distToMove), (*cpp.LARGE_INTEGER)(&newPos), cpp.DWORD(whence))
+fn setFilePointerEx(handle: Handle, distToMove: i64, mut &newFilePointer: i64, whence: u32)! {
+	ok := unsafe { cpp.SetFilePointerEx(cpp.HANDLE(handle), *(*cpp.LARGE_INTEGER)(&distToMove), (*cpp.LARGE_INTEGER)(&newFilePointer), cpp.DWORD(whence)) }
 	if !ok {
-		ret false
+		error(GetLastErrno())
 	}
-	if newFilePointer != nil {
-		*newFilePointer = newPos
-	}
-	ret true
 }
 
 // Imitates the POSIX seek function.
-unsafe fn Seek(h: Handle, offset: i64, whence: int): (newoffset: i64) {
+fn Seek(h: Handle, offset: i64, whence: int)!: (newoffset: i64) {
 	let mut w: u32
 	match whence {
 	| 0: // io::SeekStart
@@ -270,23 +344,14 @@ unsafe fn Seek(h: Handle, offset: i64, whence: int): (newoffset: i64) {
 	| 2: // io::SeekEnd
 		w = FILE_END
 	}
-	ok := unsafe { setFilePointerEx(h, offset, &newoffset, w) }
-	if !ok {
-		newoffset = -1
-	}
+	setFilePointerEx(h, offset, newoffset, w) else { error(error) }
 	ret
 }
 
 // Imitates the POSIX ftruncate function.
-unsafe fn Ftruncate(h: Handle, size: i64): int {
-	w := Seek(h, size, 0)
-	if w == -1 {
-		ret -1
-	}
-	if SetEndOfFile(h) {
-		ret 0
-	}
-	ret -1
+fn Ftruncate(h: Handle, size: i64)! {
+	Seek(h, size, 0) else { error(error) }
+	SetEndOfFile(h) else { error(error) }
 }
 
 fn makeInheritSa(mut &sa: SecurityAttributes) {
@@ -382,12 +447,18 @@ fn Open(path: str, flag: int, perm: u32)!: Handle {
 	// Ignore O_TRUNC if the file has just been created.
 	if flag&O_TRUNC == O_TRUNC &&
 		(createmode == OPEN_EXISTING || (createmode == OPEN_ALWAYS && GetLastErrno() == ERROR_ALREADY_EXISTS)) {
-		w := unsafe { Ftruncate(h, 0) }
-		if w == -1 {
-			e := GetLastErrno()
-			unsafe { CloseHandle(h) }
-			error(e)
+		Ftruncate(h, 0) else {
+			CloseHandle(h) else { error(error) }
+			error(error)
 		}
 	}
 	ret h
+}
+
+fn ExitProcess(exitcode: u32) {
+	cpp.ExitProcess(exitcode)
+}
+
+fn Exit(code: int) {
+	ExitProcess(u32(code))
 }
