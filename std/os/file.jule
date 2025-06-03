@@ -84,33 +84,39 @@ fn Create(path: str)!: &File {
 // Then reads bytes and returns buffer.
 fn ReadFile(path: str)!: []byte {
 	mut f := Open(path) else { error(error) }
-	s := Stat(path) else { error(error) }
+	info := Stat(path) else { error(error) }
 
-	mut sz := int(s.Size())
-	if sz != int(s.Size()) {
-		sz = 0
+	let mut size: int
+	size64 := info.Size()
+	if i64(int(size64)) == size64 {
+		size = int(size64)
 	}
+	size++ // one byte for final read at EOF
+
 	// Following information adopted from Go:
 	//
 	// If a file claims a small size, read at least 512 bytes.
 	// In particular, files in Linux's /proc claim size 0 but
 	// then do not work right if read in small pieces,
 	// so an initial read of 1 byte would not work correctly.
-	if sz < 1<<9 {
-		sz = 1 << 9
+	if size < 512 {
+		size = 512
 	}
 
-	mut buf := make([]byte, sz)
-	mut n := 0
-	for n < sz {
-		rn := f.Read(buf[n:]) else { error(error) }
-		if rn == 0 {
-			break
+	mut data := make([]byte, 0, size)
+	for {
+		n := f.Read(data[len(data):cap(data)]) else { error(error) }
+		data = data[:len(data)+n]
+		if n == 0 { // EOF
+			f.Close() else { error(error) }
+			ret data
 		}
-		n += rn
+
+		if len(data) >= cap(data) {
+			mut d := append(data[:cap(data)], 0)
+			data = d[:len(data)]
+		}
 	}
-	f.Close() else { error(error) }
-	ret buf[:n]
 }
 
 // Writes data to the named file, creating it if necessary.
@@ -129,11 +135,7 @@ impl File {
 	// Writes bytes to handle and returns written byte count.
 	// The number of bytes written can never exceed the length of the buf.
 	fn Write(mut self, buf: []byte)!: (n: int) {
-		n, ok := self.fd.Write(buf)
-		if !ok {
-			error(sys::GetLastErrno())
-		}
-		ret
+		ret self.fd.Write(buf) else { error(error) }
 	}
 
 	// Like Write, but writes the contents of string s rather than a slice of bytes.
@@ -147,48 +149,31 @@ impl File {
 	// the buffer will not cause an overflow. Offset will be shifted
 	// by the number of bytes read.
 	fn Read(mut self, mut buf: []byte)!: (n: int) {
-		n, ok := self.fd.Read(buf)
-		if !ok {
-			error(sys::GetLastErrno())
-		}
-		ret
+		ret self.fd.Read(buf) else { error(error) }
 	}
 
 	// Sets offset to next Read/Write operation and returns the new offset.
 	// whence: 0 (io::SeekStart) means, relative to the whence of the file, 1 (io::SeekCurrent)
 	// means relative to the current offset, and 2 (io::SeekEnd) means relative to end.
 	fn Seek(mut self, offset: i64, whence: int)!: i64 {
-		pos, ok := self.fd.Seek(offset, whence)
-		if !ok {
-			error(sys::GetLastErrno())
-		}
-		ret pos
+		ret self.fd.Seek(offset, whence) else { error(error) }
 	}
 
 	// Commits the current contents of the file to stable storage.
 	// Typically, this means flushing the file system's in-memory copy
 	// of recently written data to disk.
 	fn Sync(mut self)! {
-		ok := self.fd.Fsync()
-		if !ok {
-			error(sys::GetLastErrno())
-		}
+		self.fd.Fsync() else { error(error) }
 	}
 
 	// Changes the size of the file.
 	// It does not change the I/O offset.
 	fn Truncate(mut self, size: i64)! {
-		ok := self.fd.Ftruncate(size)
-		if !ok {
-			error(sys::GetLastErrno())
-		}
+		self.fd.Ftruncate(size) else { error(error) }
 	}
 
 	// Closes file handle.
 	fn Close(mut self)! {
-		ok := self.fd.Close()
-		if !ok {
-			error(sys::GetLastErrno())
-		}
+		self.fd.Close() else { error(error) }
 	}
 }

@@ -120,12 +120,12 @@ impl Cmd {
 			}
 		}
 		self.attrs.hProcess = pi.hProcess
-		unsafe { sys::CloseHandle(pi.hThread) }
+		sys::CloseHandle(pi.hThread) else { error(error) }
 	}
 
 	fn kill(self)! {
 		if unsafe { cpp.TerminateProcess(cpp.HANDLE(self.attrs.hProcess), 0) } {
-			unsafe { sys::CloseHandle(sys::Handle(self.attrs.hProcess)) }
+			sys::CloseHandle(sys::Handle(self.attrs.hProcess)) else { error(error) }
 			self.attrs.hProcess = 0
 			ret
 		}
@@ -137,7 +137,7 @@ impl Cmd {
 		mut exitCode := unsafe { integ::LongLong(0) }
 		unsafe {
 			cpp.GetExitCodeProcess(cpp.HANDLE(self.attrs.hProcess), &exitCode)
-			sys::CloseHandle(sys::Handle(self.attrs.hProcess))
+			sys::CloseHandle(sys::Handle(self.attrs.hProcess)) else { error(error) }
 		}
 		self.attrs.hProcess = 0
 		ret unsafe { int(exitCode) }

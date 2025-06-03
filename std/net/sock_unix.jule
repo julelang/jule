@@ -8,38 +8,24 @@ use "std/mem"
 use "std/sys"
 use "std/time"
 
-fn lastErrorCode(): sys::Errno {
-	ret sys::GetLastErrno()
-}
-
 fn closeSocketBlockingMode(handle: poll::NetHandle)! {
-	mut arg := sys::Fcntl(handle, sys::F_GETFL, 0)
-	if arg < 0 {
-		error(lastErrorCode())
-	}
+	mut arg := sys::Fcntl(handle, sys::F_GETFL, 0) else { error(error) }
 	arg |= sys::O_NONBLOCK
-	if sys::Fcntl(handle, sys::F_SETFL, arg) < 0 {
-		error(lastErrorCode())
-	}
+	sys::Fcntl(handle, sys::F_SETFL, arg) else { error(error) }
 }
 
 fn openSocketBlockingMode(handle: poll::NetHandle)! {
-	mut arg := sys::Fcntl(handle, sys::F_GETFL, 0)
-	if arg < 0 {
-		error(lastErrorCode())
-	}
+	mut arg := sys::Fcntl(handle, sys::F_GETFL, 0) else { error(error) }
 	arg &= ^sys::O_NONBLOCK
-	if sys::Fcntl(handle, sys::F_SETFL, arg) < 0 {
-		error(lastErrorCode())
-	}
+	sys::Fcntl(handle, sys::F_SETFL, arg) else { error(error) }
 }
 
-unsafe fn connectSocket(handle: poll::NetHandle, sockAddr: *unsafe, sockLen: uint, timeout: time::Duration)! {
+fn connectSocket(handle: poll::NetHandle, sockAddr: uintptr, sockLen: sys::Socklen, timeout: time::Duration)! {
 	if timeout == 0 {
 		connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
 		ret
 	}
-	tv, ok := timevalFromDuration(timeout)
+	mut tv, ok := timevalFromDuration(timeout)
 	if !ok {
 		error(ErrInvalidTimeout)
 	}
@@ -48,36 +34,35 @@ unsafe fn connectSocket(handle: poll::NetHandle, sockAddr: *unsafe, sockLen: uin
 		ret
 	}
 	closeSocketBlockingMode(handle) else { error(error) }
-	mut res := sys::Connect(handle, sockAddr, sockLen)
-	if res < 0 {
-		err := lastErrorCode()
-		if err != sys::EINPROGRESS {
-			error(err)
+	sys::Connect(handle, sockAddr, sockLen) else {
+		if error != sys::EINPROGRESS {
+			error(error)
 		}
-	} else {
-		ret
+		goto Select
 	}
+	ret
+Select:
 	mut fd := sys::FdSet{}
 	fd.Zero()
 	fd.Set(handle)
-lookup:
+	mut emptyFD := sys::FdSet{}
+	emptyFD.Zero()
 	for {
-		res = sys::Select(handle+1, nil, &fd, nil, &tv)
-		err := lastErrorCode()
-		match {
-		| res < 0 && err != sys::EINTR:
-			error(err)
-		| res > 0:
-			len2 := (integ::UnsignedInt)(mem::SizeOf(int))
+		res := sys::Select(handle+1, emptyFD, fd, emptyFD, tv) else {
+			if error != sys::EINTR {
+				error(error)
+			}
+			use 0
+		}
+		if res > 0 {
+			len2 := sys::Socklen(mem::SizeOf(int))
 			opt := 0
-			if sys::Getsockopt(handle, sys::SOL_SOCKET, sys::SO_ERROR, &opt, &len2) < 0 {
-				error(lastErrorCode())
-			}
+			sys::Getsockopt(handle, sys::SOL_SOCKET, sys::SO_ERROR, uintptr(&opt), len2) else { error(error) }
 			if opt != 0 {
-				error(opt)
+				error(sys::Errno(opt))
 			}
-			break lookup
-		|:
+			break
+		} else {
 			// Timeout.
 			error(ErrTimeout)
 		}
@@ -90,30 +75,24 @@ fn setSocketTimeout(handle: poll::NetHandle, scope: int, timeout: time::Duration
 	if !ok {
 		error(ErrInvalidTimeout)
 	}
-	unsafe {
-		if sys::Setsockopt(handle, sys::SOL_SOCKET, scope, &tv, mem::SizeOf(tv)) < 0 {
-			error(lastErrorCode())
-		}
+	sys::Setsockopt(handle, sys::SOL_SOCKET, scope, uintptr(&tv), sys::Socklen(mem::SizeOf(tv))) else {
+		error(error)
 	}
 }
 
-unsafe fn accept(h: poll::NetHandle, addr: *unsafe, addrLen: *poll::AddrLen): (poll::NetHandle, ok: bool) {
+fn accept(h: poll::NetHandle, addr: uintptr, addrlen: sys::Socklen)!: poll::NetHandle {
 	for {
-		handle := sys::Accept(h, addr, addrLen)
-		ok = handle != -1
-		if ok {
-			ret handle, ok
+		ret sys::Accept(h, addr, addrlen) else {
+			match error {
+			| sys::EINTR:
+				continue
+			| sys::ECONNABORTED:
+				// This means that a socket on the listen
+				// queue was closed before we Accept()ed it;
+				// it's a silly error, so try again.
+				continue
+			}
+			error(error)
 		}
-		err := lastErrorCode()
-		match err {
-		| sys::EINTR:
-			continue
-		| sys::ECONNABORTED:
-			// This means that a socket on the listen
-			// queue was closed before we Accept()ed it;
-			// it's a silly error, so try again.
-			continue
-		}
-		ret 0, false
 	}
 }

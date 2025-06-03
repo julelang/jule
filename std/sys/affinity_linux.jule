@@ -1,0 +1,83 @@
+// Copyright 2023-2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// CPU affinity functions
+
+use "std/math/bits"
+use "std/mem"
+
+const cpuSetSize = _CPU_SETSIZE / _NCPUBITS
+
+// CPUSet represents a CPU affinity mask.
+type CPUSet: [cpuSetSize]cpuMask
+
+fn schedAffinity(trap: uintptr, pid: int, &set: CPUSet)! {
+	_, e := syscall(trap, uintptr(pid), uintptr(mem::SizeOf(set)), uintptr(&set[0]), 0, 0, 0)
+	if e != _NO_ERROR {
+		error(e)
+	}
+}
+
+// Gets the CPU affinity mask of the thread specified by pid.
+// If pid is 0 the calling thread is used.
+fn SchedGetaffinity(pid: int, mut &set: CPUSet)! {
+	schedAffinity(SYS_SCHED_GETAFFINITY, pid, set) else { error(error) }
+}
+
+// Sets the CPU affinity mask of the thread specified by pid.
+// If pid is 0 the calling thread is used.
+fn SchedSetaffinity(pid: int, &set: CPUSet)! {
+	schedAffinity(SYS_SCHED_SETAFFINITY, pid, set) else { error(error) }
+}
+
+fn cpuBitsIndex(cpu: int): int {
+	ret cpu / _NCPUBITS
+}
+
+fn cpuBitsMask(cpu: int): cpuMask {
+	ret cpuMask(1 << (uint(cpu) % _NCPUBITS))
+}
+
+impl CPUSet {
+	// Clears the set, so that it contains no CPUs.
+	fn Zero(mut self) {
+		for i in self {
+			self[i] = 0
+		}
+	}
+
+	// Adds cpu to the set.
+	fn Set(mut self, cpu: int) {
+		i := cpuBitsIndex(cpu)
+		if i < len(self) {
+			self[i] |= cpuBitsMask(cpu)
+		}
+	}
+
+	// Removes cpu from the set.
+	fn Clear(mut self, cpu: int) {
+		i := cpuBitsIndex(cpu)
+		if i < len(self) {
+			self[i] &= ^cpuBitsMask(cpu)
+		}
+	}
+
+	// Reports whether cpu is in the set.
+	fn IsSet(self, cpu: int): bool {
+		i := cpuBitsIndex(cpu)
+		if i < len(self) {
+			ret self[i]&cpuBitsMask(cpu) != 0
+		}
+		ret false
+	}
+
+	// Returns the number of CPUs in the set.
+	fn Count(self): int {
+		mut c := 0
+		for _, b in self {
+			c += bits::OnesCount64(u64(b))
+		}
+		ret c
+	}
+}

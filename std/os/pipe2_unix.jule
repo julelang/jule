@@ -5,17 +5,18 @@
 #build !darwin
 
 use "std/internal/poll"
-use integ "std/jule/integrated"
 use "std/sys"
 
-cpp unsafe fn pipe(mut *integ::Int): int
-cpp unsafe fn pipe2(mut *integ::Int, int): int
+fn ipipe()!: (r: int, w: int) {
+	mut p := make([]int, 2)
+	sys::Pipe2(p, sys::O_CLOEXEC) else { error(error) }
+	r, w = p[0], p[1]
+	ret
+}
 
 fn pipe()!: (r: &File, w: &File) {
-	let mut p: [2]integ::Int
-	if unsafe { cpp.pipe2(&p[0], sys::O_CLOEXEC) } == -1 {
-		error(sys::GetLastErrno())
-	}
+	mut p := make([]int, 2)
+	sys::Pipe2(p, sys::O_CLOEXEC) else { error(error) }
 	r = newFile(unsafe { u64(p[0]) }, poll::Pipe) else { error(error) }
 	w = newFile(unsafe { u64(p[1]) }, poll::Pipe) else { error(error) }
 	ret

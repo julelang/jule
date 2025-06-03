@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/internal/os"
 use integ "std/jule/integrated"
 use "std/os/filepath"
-use "std/os/internal"
 use "std/runtime"
 use "std/sys"
 
@@ -24,20 +24,15 @@ fn Args(): []str {
 	ret runtime::args()
 }
 
-// Returns environment variables.
-fn Environ(): []str {
-	ret environ()
-}
-
 // Returns an absolute path name of the current working
 // directory of the calling process.
 fn Getwd()!: str {
-	ret internal::Getwd() else { error(error) }
+	ret os::Getwd() else { error(error) }
 }
 
 // Changes the current working directory to the given directory.
 fn Chdir(path: str)! {
-	internal::Chdir(path) else { error(error) }
+	os::Chdir(path) else { error(error) }
 	// Update the working directory cache.
 	const match runtime::OS {
 	| "windows":
@@ -52,23 +47,19 @@ fn Chdir(path: str)! {
 	}
 }
 
+// Returns environment variables.
+fn Environ(): []str { ret os::Environ() }
+
 // Retrieves the value of the environment variable named by the key.
 // It returns the value, which will be empty if the variable is not present.
 // To distinguish between an empty value and an found value, use [LookupEnv].
-fn Getenv(key: str): str {
-	v, _ := LookupEnv(key)
-	ret v
-}
+fn Getenv(key: str): str { ret os::Getenv(key) }
 
 // Retrieves the value of the environment variable named by the key.
 // If the variable is present in the environment the value (which may be empty)
 // is returned and the boolean is true. Otherwise the returned value will be
 // empty and the boolean will be false.
-fn LookupEnv(key: str): (value: str, found: bool) {
-	ret lookupenv(key)
-}
+fn LookupEnv(key: str): (value: str, found: bool) { ret os::LookupEnv(key) }
 
 // Sets the value of the environment variable named by the key.
-fn Setenv(key: str, value: str)! {
-	setenv(key, value) else { error(error) }
-}
+fn Setenv(key: str, value: str)! { os::Setenv(key, value) else { error(error) } }
