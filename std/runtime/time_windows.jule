@@ -4,23 +4,14 @@
 
 use "std/sys"
 
-cpp unsafe fn GetSystemTimeAsFileTime(mut ft: *cpp.FILETIME)
-
-#typedef
-cpp struct FILETIME{}
-
 // Returns system-wide realtime clock in seconds and nanoseconds.
 // The nanoseconds is not a second yet, always in range (0, 999999999).
 fn timeNow(): (sec: i64, nsec: i64) {
 	mut ft := sys::Filetime{}
-	unsafe { cpp.GetSystemTimeAsFileTime((*cpp.FILETIME)(&ft)) } // Returns ticks in UTC
-	// Get the number of seconds since January 1, 1970 12:00am UTC
-	// FILETIME is in 100-nanosecond intervals since 1601-01-01
-	mut t := i64(ft.HighDateTime)<<32 | i64(ft.LowDateTime)
-	t -= 116444736000000000 // Convert from 1601 to 1970
-	t /= 10                 // Convert from 100-ns intervals to nanoseconds
-	sec = t / 1000000
-	nsec = t % 1000000
+	sys::GetSystemTimeAsFileTime(ft)
+	t := ft.Nanoseconds()
+	sec = t / _Second
+	nsec = t % _Second
 	ret
 }
 
