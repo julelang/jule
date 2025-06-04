@@ -5,13 +5,9 @@
 use "std/sys"
 
 cpp unsafe fn GetSystemTimeAsFileTime(mut ft: *cpp.FILETIME)
-cpp unsafe fn QueryPerformanceCounter(mut counter: *cpp.LARGE_INTEGER): bool
 
 #typedef
 cpp struct FILETIME{}
-
-#typedef
-cpp struct LARGE_INTEGER{}
 
 // Returns system-wide realtime clock in seconds and nanoseconds.
 // The nanoseconds is not a second yet, always in range (0, 999999999).
@@ -29,9 +25,7 @@ fn timeNow(): (sec: i64, nsec: i64) {
 }
 
 fn nanotime(): i64 {
-	mut counter := i64(0)
-	if unsafe { !cpp.QueryPerformanceCounter((*cpp.LARGE_INTEGER)(&counter)) } {
+	ret sys::QueryPerformanceCounter() else {
 		panic("runtime: nanotime failed")
 	}
-	ret counter
 }
