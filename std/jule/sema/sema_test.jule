@@ -1,0 +1,453 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/jule/parser"
+use "std/jule/token"
+use "std/testing"
+
+fn checkSema(data: str): (err: bool) {
+	mut fs := token::FileSet.New("sema/test")
+	fs.Fill([]byte(data))
+	mut logs := token::ScanAll(fs, token::Standard)
+	if len(logs) > 0 {
+		panic("sema: lexer issue")
+	}
+	mut fi := parser::ParseFile(fs)
+	if len(fi.Errors) > 0 {
+		panic("sema: parser issue")
+	}
+	_, logs := AnalyzeFile(fi.AST, nil, Default)
+	ret len(logs) > 0
+}
+
+struct missingRetCheckerTest {
+	code: str
+	err:  bool
+}
+
+static missingRetCheckerTests = []missingRetCheckerTest([
+	{
+		code: `
+fn test(): int {
+Foo:
+	goto Foo
+}
+`,
+		err: false,
+	},
+	{
+		code: `
+fn test(): int {
+	goto Foo
+Foo:
+}
+`,
+		err: true,
+	},
+	{
+		code: `
+fn test(): int {
+Bar:
+	for {
+	Foo:
+		match {
+		| true:
+			goto Foo
+		|:
+			goto Baz
+		}
+		goto Bar
+	Baz:
+	}
+}
+`,
+		err: false,
+	},
+	{
+		code: `
+fn test(): int {
+Bar:
+	for {
+	Foo:
+		match {
+		| true:
+			goto Foo
+		|:
+			break Bar
+		}
+		goto Bar
+	}
+}
+`,
+		err: true,
+	},
+	{
+		code: `
+fn test(): int {
+Bar:
+	{
+	Foo:
+		match {
+		| true:
+			goto Foo
+		|:
+			break
+		}
+		goto Bar
+	}
+}
+`,
+		err: false,
+	},
+	{
+		code: `
+fn test(): int {
+Bar:
+	{
+	Foo:
+		match {
+		| true:
+			goto Foo
+		|:
+			goto Baz
+		}
+		goto Bar
+	Baz:
+	}
+}
+`,
+		err: true,
+	},
+	{
+		code: `
+fn test(): int {
+Bar:
+	for {
+	Foo:
+		match {
+		| false:
+			goto Fizz
+		| true:
+			goto Foo
+		|:
+			goto Baz
+		}
+		goto Bar
+	Baz:
+	}
+Fizz:
+}
+`,
+		err: true,
+	},
+	{
+		code: `
+fn test(): int {
+Bar:
+	match {
+	|:
+		match {
+		| false:
+		| true:
+		|:
+		}
+		goto Bar
+	}
+}
+`,
+		err: false,
+	},
+	{
+		code: `
+fn test(): int {
+Bar:
+	match {
+	|:
+		for {
+		Foo:
+			match {
+			| false:
+				goto Fizz
+			| true:
+				goto Foo
+			|:
+				goto Baz
+			}
+			goto Bar
+		Baz:
+		}
+	}
+Fizz:
+}
+`,
+		err: true,
+	},
+	{
+		code: `
+fn test(): int {
+	if true {
+		ret 0
+	}
+}
+`,
+		err: true,
+	},
+	{
+		code: `
+fn test(): int {
+	if true {
+		ret 0
+	} else {
+		ret 0
+	}
+}
+`,
+		err: false,
+	},
+	{
+		code: `
+fn test(): int {
+	if true {
+		ret 0
+	} else if true {
+		ret 0
+	} else {
+		ret 0
+	}
+}
+`,
+		err: false,
+	},
+	{
+		code: `
+fn test(): int {
+	if true {
+		ret 0
+	} else if true {
+	} else {
+		ret 0
+	}
+}
+`,
+		err: true,
+	},
+	{
+		code: `
+fn test(): int {
+	match {
+	| true:
+		ret 0
+	}
+}
+`,
+		err: true,
+	},
+	{
+		code: `
+fn test(): int {
+	match {
+	| true:
+		ret 0
+	|:
+		ret 0
+	}
+}
+`,
+		err: false,
+	},
+	{
+		code: `
+fn test(): int {
+	match {
+	| true:
+		ret 0
+	| true:
+		ret 0
+	|:
+		ret 0
+	}
+}
+`,
+		err: false,
+	},
+	{
+		code: `
+fn test(): int {
+	match {
+	| true:
+		ret 0
+	| true:
+	|:
+		ret 0
+	}
+}
+`,
+		err: true,
+	},
+	{
+		code: `
+fn test(): int {
+	if true {
+		goto Bar
+	}
+	ret 0
+Bar:
+}
+`,
+		err: true,
+	},
+	{
+		code: `
+fn test(): int {
+	if true {
+		goto Bar
+	}
+Bar:
+	ret 0
+}
+`,
+		err: false,
+	},
+	{
+		code: `
+fn test(): int {
+	if true {
+		goto Bar
+	}
+	ret 0
+Bar:
+	select{}
+}
+`,
+		err: false,
+	},
+	{
+		code: `
+fn test(): int {
+	select{}
+}
+`,
+		err: false,
+	},
+	{
+		code: `
+fn test()!: int {
+	error("foo")
+}
+`,
+		err: false,
+	},
+	{
+		code: `
+fn foo()!: int {
+	ret 0
+}
+
+fn test()!: int {
+	ret foo()!
+}
+`,
+		err: false,
+	},
+	{
+		code: `
+fn foo()!: int {
+	ret 0
+}
+
+fn test()!: int {
+	ret foo() else { use 1 }
+}
+`,
+		err: false,
+	},
+	{
+		code: `
+fn foo()!: int {
+	ret 0
+}
+
+fn test()!: int {
+	ret foo() else { ret 1 }
+}
+`,
+		err: false,
+	},
+	{
+		code: `
+fn foo()!: int {
+	ret 0
+}
+
+fn test()!: int {
+	ret foo() else {
+		goto Foo
+	}
+Foo:
+}
+`,
+		err: true,
+	},
+	{
+		code: `
+fn foo()!: int {
+	ret 0
+}
+
+fn test()!: int {
+	for {
+		ret foo() else {
+			goto Foo
+		}
+	}
+Foo:
+}
+`,
+		err: true,
+	},
+	{
+		code: `
+fn foo()!: int {
+	ret 0
+}
+
+fn test()!: int {
+	for {
+		foo() else {
+			goto Foo
+		}
+	}
+Foo:
+}
+`,
+		err: true,
+	},
+	{
+		code: `
+fn foo()!: int {
+	ret 0
+}
+
+fn test()!: int {
+	for {
+		foo() else {
+			break
+		}
+	}
+}
+`,
+		err: true,
+	},
+])
+
+#test
+fn testMissingRetChecker(t: &testing::T) {
+	for i, test in missingRetCheckerTests {
+		err := checkSema(test.code)
+		if err != test.err {
+			t.Errorf("#{} expected {}, found {}", i, test.err, err)
+			println(test.code)
+		}
+	}
+}

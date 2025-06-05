@@ -2607,10 +2607,11 @@ impl sema {
 			sc.table.TypeAliases = f.env.generics[:len(f.env.generics):len(f.env.generics)]
 		}
 
+		n := len(self.errors)
 		sc.check(f.Decl.Scope, f.Scope)
 
-		// Check return statements if scopeChecker not forced to stop.
-		if !sc.stopped() {
+		// Check return statements if scopeChecker not forced to stop and no error.
+		if !sc.stopped() && len(self.errors) == n {
 			self.checkRets(f)
 		}
 	}
@@ -2910,13 +2911,28 @@ impl sema {
 	}
 }
 
+// Memoization state flags for missingRetChecker.
+const (
+	_LMEMO_FALSE = iota
+	_LMEMO_TRUE
+	_LMEMO_CHECKING
+)
+
 struct missingRetChecker {
-	mut breaked: []uintptr
+	mut breaked: map[uintptr]bool // break statement seen for iteration or match-case statement
+	mut labels:  map[uintptr]int  // memoization for labels, reports state of label's following statements
+	mut fell:    bool             // fall statement seen
+	mut hard:    bool             // hard register, this should be true for the final report
+	mut lead:    &Label           // goto's label which is closest one to root scope
 }
 
 impl missingRetChecker {
 	static fn new(): missingRetChecker {
-		ret missingRetChecker{}
+		ret missingRetChecker{
+			hard: true,
+			breaked: map[uintptr]bool{},
+			labels: map[uintptr]int{},
+		}
 	}
 
 	fn checkConditional(self, mut c: &Conditional): (ok: bool) {
@@ -2924,13 +2940,18 @@ impl missingRetChecker {
 		ok = true
 		for (_, mut elif) in c.Elifs {
 			if elif == nil {
-				ret false
+				ok = false
+				continue
 			}
-			if !self.checkScope(elif.Scope) {
+			if !self.checkScope(elif.Scope, 0) {
 				ok = false
 			}
 		}
-		if c.Default != nil && !self.checkScope(c.Default.Scope) {
+		// If there is no default case, there is no all-time return possibility, then report false.
+		// Otherwise evaluate the default scope.
+		if c.Default == nil {
+			ok = false
+		} else if !self.checkScope(c.Default.Scope, 0) {
 			ok = false
 		}
 		ret
@@ -2939,86 +2960,276 @@ impl missingRetChecker {
 	fn checkMatch(self, mut m: &Match): (ok: bool) {
 		// To collect all break and fall statements, check the all scopes.
 		ok = true
+		addr := uintptr(m)
 		for (_, mut c) in m.Cases {
 			if c == nil {
 				ok = false
 				continue
 			}
-			if !self.checkScope(c.Scope) {
+			if self.checkScope(c.Scope, 0) {
+				if self.fell {
+					// Scope reports true, but this is the `fall` statement.
+					// Catch break statements for the match.
+					if self.breaked[addr] {
+						ok = false
+					}
+				}
+			} else {
 				ok = false
 			}
+
+			self.fell = false
 		}
-		if m.Default != nil && !self.checkScope(m.Default.Scope) {
+		// If there is no default case, there is no all-time return possibility, then report false.
+		// Otherwise evaluate the default scope.
+		// No extra attention needed for the default case like other cases.
+		if m.Default == nil {
+			ok = false
+		} else if !self.checkScope(m.Default.Scope, 0) {
 			ok = false
 		}
 		ret
 	}
 
-	fn checkInfIter(self, it: uintptr, mut &s: &Scope): bool {
-		n := len(self.breaked)
-		defer { self.breaked = self.breaked[:n] }
-		if self.checkScope(s) {
-			ret true
+	// Reports we have infinite iteration.
+	fn checkInfinite(self, it: uintptr, mut s: &Scope): bool {
+		mut lead := self.lead
+		hard := self.hard
+		defer {
+			self.lead = lead
 		}
-		if n != len(self.breaked) {
-			for _, addr in self.breaked[n:] {
-				if it == addr {
+
+		// Clear lead label data for now.
+		self.lead = nil
+
+		// Check scope, but report is not a valid information.
+		// Because checkScope reports false for no-return.
+		// But we look for iteration breaker, not for return.
+		// Just check the scope and collect break statements.
+		self.checkScope(s, 0)
+
+		// We have lead label data, check it.
+		if self.lead != nil {
+			// If scopes are same, lead label is in iteration.
+			// Otherwise scopes are different, make them equal.
+			if s.ChildIndex > self.lead.Scope.ChildIndex {
+				// See documentation of the [scopeChecker.checkGoto].
+				mut itsc := s
+				for itsc.ChildIndex-1 > self.lead.Scope.ChildIndex {
+					itsc = itsc.Parent
+				}
+				// Scopes are same now, make sure the goto jumps down before report false.
+				//
+				// Scheme on pseudo AST
+				//	╭──────────────────────╮
+				//	│ fn example() {       │
+				//	│ Foo:                 │
+				//	│     for {            │
+				//	│         if true {    │
+				//	│             goto Foo │ > jumping to Foo is ok, repeats infinite iteration
+				//	│         }            │
+				//	│         goto Bar     │ > jumping to Bar is crucial, it breaks iteration
+				//	│     }                │
+				//	│ Bar:                 │
+				//	│ }                    │
+				//	╰──────────────────────╯
+				if itsc.StmtIndex < self.lead.Index {
 					ret false
 				}
 			}
 		}
-		// If infinit iteration never breaked, it makes the return value unavailable.
+
+		// Save the hard register, there is nothing to breaker for infinite loop.
+		// Avoid goto statements, because they are in this iteration.
+		self.hard = hard
+
+		// Time to catch break statements for the iteration.
+		if self.breaked[it] {
+			ret false
+		}
+
+		// If infinite iteration never breaked, it makes the return value unavailable.
 		// So do not complain about missing return statement.
 		ret true
 	}
 
-	fn checkScope(self, mut s: &Scope): bool {
+	// Checks the scope, starts from i.
+	// Reports whether return statement or infinite loop found.
+	fn checkScope(self, mut s: &Scope, i: int): bool {
 		if s == nil {
 			ret false
 		}
-		for (_, mut st) in s.Stmts {
+		for (_, mut st) in s.Stmts[i:] {
 			match type st {
-			| &Break:
-				// Store if break statements breaks an iteration.
-				// For match breaking match cases, no extra attention needed.
-				// Following statements will not be executed, ignore them, if any.
-				// So the match case is not return anything.
-				addr := st.(&Break).It
-				if addr != 0 {
-					self.breaked = append(self.breaked, addr)
+			| &Label:
+				mut l := st.(&Label)
+				laddr := uintptr(l)
+				// If label is already checked, return the memoized data.
+				mut r, mut ok := self.labels[laddr]
+				if ok {
+					ret r&_LMEMO_TRUE == _LMEMO_TRUE
 				}
+				// Temporarily memoize the label to avoid infinite recursion.
+				// Also this data used to catch in-check state:
+				self.labels[laddr] = _LMEMO_CHECKING
+				// Check rest of the statements following label.
+				// With `l.Index+1` skip the current label statement.
+				ok = self.checkScope(l.Scope, l.Index+1)
+				if ok {
+					r = _LMEMO_TRUE
+				} else {
+					r = _LMEMO_FALSE
+				}
+				// Memoize the actual result.
+				self.labels[laddr] = r
+				// Time to return.
+				ret ok
+			| &Goto:
+				// Goto statement appeared. We have to check statements by label.
+				// Following statements will not be executed, ignore them, if any.
+				mut g := st.(&Goto)
+				// Update lead label data. If it is nil, set to g's label.
+				// Otherwise make sure g's label is more close to the root.
+				if self.lead == nil || self.lead.Scope.ChildIndex > g.Label.Scope.ChildIndex {
+					self.lead = g.Label
+				}
+				r, ok := self.labels[uintptr(g.Label)]
+				if !ok {
+					// Label is not memoized yet, so this is the first time.
+					// Check scope by label index. Start from label index,
+					// because label statement will trigger the memoization.
+					// Save report to the hard register.
+					// Because label is not checked, even not in in-check state.
+					// So we jumping to below, we have to memoize "false" reports.
+					// Otherwise we may miss "false" reports.
+					//
+					// Example wrong "true" report on pseudo AST:
+					//	╭──────────────────╮
+					//	│ fn foo(): int  { │
+					//	│     if true {    │
+					//	│         goto Bar │ > this branch jumps below, reports no return
+					//	│     }            │
+					//	│     ret 0        │ > analysis sees this and assumes function returns
+					//	│ Bar:             │   we have to remember branch's report at this point
+					//	│ }                │
+					//	╰──────────────────╯
+					self.hard = self.checkScope(g.Label.Scope, g.Label.Index) && self.hard
+					ret self.hard
+				} else if r&_LMEMO_CHECKING != _LMEMO_CHECKING {
+					// Label is already memoized, report the result.
+					ret r&_LMEMO_TRUE == _LMEMO_TRUE
+				}
+				// Jumping into scope is not allowed.
+				// So goto jumps in the same scope or one of to parent scopes.
+				// Make label and goto scopes equal for analysis if they not.
+				if g.Scope.ChildIndex > g.Label.Scope.ChildIndex {
+					// Scopes are different, make them equal.
+					// See documentation of the [scopeChecker.checkGoto].
+					mut gtsc := g.Scope
+					for gtsc.ChildIndex-1 > g.Label.Scope.ChildIndex {
+						gtsc = gtsc.Parent
+					}
+					// Scopes are same now, make sure the goto jumps above.
+					ret gtsc.StmtIndex > g.Label.Index
+				} else {
+					// They are in the same scope. Report true anyway.
+					// If goto jumps above, this is an infinite loop.
+					// Otherwise goto jumps below, but this label is in-check state.
+					// So already checking, report true for now.
+					// If checking fails, root checker will report it with hard register.
+					ret true
+				}
+			| &Ret:
+				// Return statement appeared, report true for this scope.
+				// But check the return expression before reporting true.
+				mut r := st.(&Ret)
+				mut f, isFunc := r.Expr.(&FuncCallExpr)
+				// Function call appeared.
+				// We have to check exceptional handler scope, if exist.
+				// To collect break statements, it is needed.
+				// Also if it is reports false, do not report true, continue.
+				if isFunc && f.Except != nil && !self.checkScope(f.Except, 0) {
+					break
+				}
+				ret true
+			| &Use:
+				// Use expression appeared, we are in exceptional handler scope.
+				// This is fine, check this like return expression.
+				mut u := st.(&Use)
+				mut f, isFunc := u.Value.Model.(&FuncCallExpr)
+				// Function call appeared.
+				// We have to check exceptional handler scope, if exist.
+				// To collect break statements, it is needed.
+				// Also if it is reports false, do not report true, continue.
+				if isFunc && f.Except != nil && !self.checkScope(f.Except, 0) {
+					break
+				}
+				ret true
+			| &Break:
+				// Store if this break statement breaks an iteration or match-case.
+				// Following statements will not be executed, ignore them, if any.
+				brk := st.(&Break)
+				match {
+				| brk.It != 0:
+					self.breaked[brk.It] = true
+				| brk.Match != 0:
+					self.breaked[brk.Match] = true
+				}
+				// Following statements will not be executed, ignore them, if any.
 				ret false
 			| &Continue:
 				// Following statements will not be executed, ignore them, if any.
 				ret false
+			| &Fall:
+				// Falling to the next case of match statement.
+				// It may breaks iteration, if exist, or return.
+				// If this statement appeared, there is always a next case.
+				// Report true for this case, if following case is not reports false,
+				// then this case's report does not matter.
+				self.fell = true
+				ret true
 			| &InfIter:
+				// If this iteration will not be breaked, then report true.
+				// Because following statements will not be executed,
+				// so function will not be ended.
 				mut ii := st.(&InfIter)
-				if self.checkInfIter(uintptr(ii), ii.Scope) {
+				if self.checkInfinite(uintptr(ii), ii.Scope) {
 					ret true
 				}
 			| &WhileIter:
 				mut wn := st.(&WhileIter)
+				// Condition is nil, possible infinite iteration.
+				// If this iteration will not be breaked, then report true.
+				// Because following statements will not be executed,
+				// so function will not be ended.
 				if wn.IsWhileNext() && wn.Expr == nil {
-					// Condition is nil, possible infinite iteration.
-					if self.checkInfIter(uintptr(wn), wn.Scope) {
+					if self.checkInfinite(uintptr(wn), wn.Scope) {
 						ret true
 					}
 				}
-			| &Ret:
-				ret true
 			| &Scope:
-				// If case returns, then report true.
-				if self.checkScope(st.(&Scope)) {
+				// If scope reports true, then report true.
+				if self.checkScope(st.(&Scope), 0) {
 					ret true
 				}
 			| &Value:
-				match type st.(&Value).Model {
+				mut v := st.(&Value)
+				match type v.Model {
 				| &BuiltinPanicCallExpr
 				| &BuiltinErrorCallExpr:
 					// Following statements will not be executed, ignore them, if any.
 					// And panic or error call makes the return value unavailable.
 					ret true
+				| &FuncCallExpr:
+					// Function call appeared.
+					// We have to check exceptional handler scope, if exist.
+					// To collect break statements, it is needed.
+					mut f := v.Model.(&FuncCallExpr)
+					if f.Except != nil {
+						self.checkScope(f.Except, 0)
+					}
 				|:
+					// no-op
 					continue
 				}
 			| &Conditional:
@@ -3031,15 +3242,28 @@ impl missingRetChecker {
 				if self.checkMatch(st.(&Match)) {
 					ret true
 				}
+			| &Select:
+				// Select statement appeared.
+				// It might be empty, report true if so.
+				// Because empty select statement yields CPU or panics.
+				// Following statements will not be executed, ignore them, if any.
+				slct := st.(&Select)
+				if len(slct.Cases) == 0 && slct.Default == nil {
+					ret true
+				}
 			|:
+				// no-op
 				continue
 			}
 		}
+		// No return statement seen.
 		ret false
 	}
 
+	// Like checkScope, but it pays attention to the hard register.
+	// checkScope is intended for internal use.
 	fn check(self, mut s: &Scope): bool {
-		ret self.checkScope(s)
+		ret self.checkScope(s, 0) && self.hard
 	}
 }
 
