@@ -2995,9 +2995,6 @@ impl missingRetChecker {
 	fn checkInfinite(self, it: uintptr, mut s: &Scope): bool {
 		mut lead := self.lead
 		hard := self.hard
-		defer {
-			self.lead = lead
-		}
 
 		// Clear lead label data for now.
 		self.lead = nil
@@ -3037,10 +3034,27 @@ impl missingRetChecker {
 					ret false
 				}
 			}
+			// There is no old lead or the new lead more close to the root scope,
+			// do not fallback to the old lead, because we have report it to parent
+			// infinite loop analysis, if any. This lead might be breaker for it.
+			//
+			// Scheme on pseudo AST
+			//	╭──────────────────────╮
+			//	│ fn example() {       │
+			//	│     for {            │
+			//	│         for {        │
+			//  │             goto Foo │ < jumps to below, out of even the root infinite iteration
+			//	│         }            │   if we clear the current lead, analysis of the root iteration
+			//	│     }                │   will not be aware of it is breaked
+			//	│ Foo:                 │
+			//	│ }                    │
+			//	╰──────────────────────╯
+			if lead == nil || lead.Scope.ChildIndex > self.lead.Scope.ChildIndex {
+				lead = self.lead
+			}
 		}
 
-		// Save the hard register, there is nothing to breaker for infinite loop.
-		// Avoid goto statements, because they are in this iteration.
+		self.lead = lead
 		self.hard = hard
 
 		// Time to catch break statements for the iteration.
