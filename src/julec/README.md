@@ -11,14 +11,12 @@ That's why paths are adjusted accordingly.
 
 > Some important parts of the reference compiler are publicly available in the standard library. See [`std/jule`](https://github.com/julelang/jule/tree/master/std/jule) library.
 
-<img width="1617" alt="JuleC" src="https://github.com/julelang/jule/assets/54983926/648b9942-8662-4ba0-9ff8-bf66c32e0ba6">
-
 JuleC has a structure that handles processes step by step. \
 The working principle of the compiler roughly consists of the steps described below.
 
-After obtaining the source code, the first step is to perform lexical analysis
+After obtaining the source code, the first step is to perform lexical analysis.
 As a result of lexical analysis, the tokens of the source code are obtained. 
-These tokens are then used to generate AST.
+These tokens will be used to generate AST by parser.
 
 Parser, which performs the syntax check and builds the AST tree of the code, is responsible for the next step.
 Parser gives an AST as a result, which is ready for semantic analysis.
@@ -35,17 +33,17 @@ The middle-end performs possible optimizations on the IR independent of the targ
 Depending on the middle-end compiler configurations, it may produce different optimizations or not optimize at all.
 
 
-The final final stage is code generation. \
-This stage is the stage where the compiler generates object code.
+The final stage is code generation. \
+This stage is the stage where the compiler generates object code from IR.
 
 ### 1. Lexer
 
-The package [``./token``](https://github.com/julelang/jule/tree/master/std/jule/token) is Lexer. \
+The package [``./token``](https://github.com/julelang/jule/tree/master/std/jule/token) is the Lexer. \
 Makes lexical analysis and segments Jule source code into tokens.
 
 ### 2. Parser
 
-The package [``./parser``](https://github.com/julelang/jule/tree/master/std/jule/parser) is Parser. \
+The package [``./parser``](https://github.com/julelang/jule/tree/master/std/jule/parser) is the Parser. \
 Makes syntax analysis and builds abstract syntax tree (AST) of code.
 
 ### 3. Sema
@@ -63,7 +61,6 @@ These optimizations are optimizations that are independent of the target system,
 
 Stages such as generating machine code, generating C++ code are included here. \
 Actually, JuleC just generates C++ code for now.
-
 
 ## Developer Reference
 
