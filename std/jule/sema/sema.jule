@@ -1708,7 +1708,7 @@ impl sema {
 
 		// Methods.
 		for (_, mut f) in ipl.Methods {
-			if dest.FindMethod(f.Ident, f.Statically) != nil || dest.FindField(f.Ident) != nil {
+			if dest.FindMethod(f.Ident, f.Static) != nil || dest.FindField(f.Ident) != nil {
 				self.pushErr(f.Token, log::StructAlreadyHaveIdent, dest.Ident, f.Ident)
 				ok = false
 				continue
@@ -1848,7 +1848,7 @@ impl sema {
 			if decl.Constant {
 				self.pushErr(decl.Token, log::ConstRef)
 			}
-			if decl.Statically {
+			if decl.Static {
 				self.pushErr(decl.Token, log::StaticReference)
 			}
 		}
@@ -1857,7 +1857,7 @@ impl sema {
 			if groupError {
 				self.pushErr(decl.Token, log::ConstVarNotHaveExpr)
 			}
-			if decl.Statically {
+			if !decl.Binded && decl.Static {
 				self.pushErr(decl.Token, log::StaticNotHaveExpr)
 			}
 			if decl.Reference {
@@ -1876,7 +1876,7 @@ impl sema {
 		if decl.Binded && decl.Constant {
 			self.pushErr(decl.Token, log::BindedVarIsConst)
 		}
-		if !decl.Binded && !decl.Constant && !decl.Statically {
+		if !decl.Binded && !decl.Constant && !decl.Static {
 			self.pushErr(decl.Token, log::GlobalNotStatic)
 			self.pushSuggestion(log::UseStaticKeywordToDef)
 		}
@@ -1900,7 +1900,7 @@ impl sema {
 		ok = true
 		for (_, mut tf) in trt.Methods {
 			mut exist := false
-			mut sf := strct.FindMethod(tf.Ident, tf.Statically)
+			mut sf := strct.FindMethod(tf.Ident, tf.Static)
 			tfK := self.getTraitCheckFuncKind(tf)
 			if sf != nil {
 				mut sfK := self.getTraitCheckFuncKind(sf)
@@ -2120,6 +2120,17 @@ impl sema {
 
 	// Checks value of variable.
 	fn checkVarValue(mut &self, mut &v: &Var) {
+		// Catch the exceptional function calls for initialization value if variable static.
+		// If variable is constant, no need for extra attention.
+		// An exceptional function cannot return a constant value.
+		if v.Static && v.ValueSym != nil && v.ValueSym.Value != nil {
+			fc, isFuncCall := v.ValueSym.Value.Model.(&FuncCallExpr)
+			if isFuncCall && fc.Func.Decl != nil && fc.Func.Decl.Exceptional {
+				self.pushErr(v.ValueSym.Expr.Token, log::ExceptionalDisallowed)
+				self.pushSuggestion(log::WrapExceptional)
+			}
+		}
+
 		if v.IsTypeInferred() {
 			// Build new TypeSym because auto-type symbols are nil.
 			v.TypeSym = &TypeSym{Type: v.ValueSym.Value.Type}
@@ -2137,6 +2148,7 @@ impl sema {
 				v.ValueSym.Value,
 				v.ValueSym.Expr.Token)
 		} else {
+			// Set the size of the array if it is auto-sized.
 			mut arr := v.TypeSym.Type.Array()
 			if arr != nil {
 				if arr.Auto {
@@ -2261,11 +2273,7 @@ impl sema {
 		}
 
 		// Do not unwrap untyped literals, type analysis will check overflows.
-		mut flags := evalDefault
-		if !v.Statically && !v.Constant {
-			flags |= evalExceptional
-		}
-		v.ValueSym.Value = eval.evalExpr(v.ValueSym.Expr, flags)
+		v.ValueSym.Value = eval.evalExpr(v.ValueSym.Expr, evalDefault|evalExceptional)
 		ret true
 	}
 

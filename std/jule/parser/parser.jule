@@ -398,9 +398,6 @@ impl parser {
 	fn buildVarBegin(mut self, mut &v: &ast::Var, mut &tokens: []&token::Token) {
 		tok := tokens[0]
 		match tok.Id {
-		| token::Static:
-			v.Statically = true
-			fall
 		| token::Let:
 			// Initialize 1 for skip the let keyword
 			if len(tokens) == 1 {
@@ -808,17 +805,6 @@ impl parser {
 	fn buildFuncPrototype(mut &self, mut &tokens: []&token::Token, mut &i: int, method: bool): &ast::Func {
 		mut f := &ast::Func{
 			Token: tokens[i],
-		}
-
-		// Detect static keyword.
-		if f.Token.Id == token::Static {
-			f.Statically = true
-			i++
-			if i >= len(tokens) {
-				self.pushErr(f.Token, log::InvalidSyntax)
-				ret nil
-			}
-			f.Token = tokens[i]
 		}
 
 		// Detect unsafe keyword.
@@ -1298,22 +1284,20 @@ impl parser {
 		ret s
 	}
 
-	fn checkMethodReceiver(mut self, &f: &ast::Func) {
-		// Static methods cannot have receiver.
-		if f.Statically {
-			if len(f.Params) > 0 && f.Params[0].IsSelf() {
-				self.pushErr(f.Token, log::StaticFuncHasReceiver)
-			}
-			ret
-		}
+	fn checkMethodReceiver(mut self, mut &f: &ast::Func, mustRecv: bool) {
 		if len(f.Params) == 0 {
-			self.pushErr(f.Token, log::MissingReceiver)
+			f.Static = true
+			if mustRecv {
+				self.pushErr(f.Token, log::MissingReceiver)
+			}
 			ret
 		}
 		param := f.Params[0]
 		if !param.IsSelf() {
-			self.pushErr(f.Token, log::MissingReceiver)
-			ret
+			f.Static = true
+			if mustRecv {
+				self.pushErr(f.Token, log::MissingReceiver)
+			}
 		}
 	}
 
@@ -1330,7 +1314,7 @@ impl parser {
 				if f == nil {
 					break
 				}
-				self.checkMethodReceiver(f)
+				self.checkMethodReceiver(f, true)
 				if len(f.Generics) > 0 {
 					self.pushErr(f.Token, log::TraitMethodHasGenerics)
 				}
@@ -1395,6 +1379,7 @@ impl parser {
 		if v != nil {
 			v.Public = false
 			v.Binded = true
+			v.Static = true
 			if v.Expr != nil {
 				self.pushErr(v.Token, log::BindedVarHasExpr)
 			}
@@ -1472,15 +1457,6 @@ impl parser {
 	fn getMethod(mut &self, mut &tokens: []&token::Token): &ast::Func {
 		mut i := 0
 		mut token := tokens[i]
-		if token.Id == token::Static {
-			if i+1 >= len(tokens) {
-				self.pushErr(token, log::InvalidSyntax)
-				ret nil
-			}
-			i++
-			token = tokens[i]
-		}
-
 		if token.Id == token::Unsafe {
 			if i+1 >= len(tokens) {
 				self.pushErr(token, log::InvalidSyntax)
@@ -1510,12 +1486,11 @@ impl parser {
 			}
 
 			match token.Id {
-			| token::Static
 			| token::Fn
 			| token::Unsafe:
 				mut f := self.getMethod(tokens)
 				if f != nil {
-					self.checkMethodReceiver(f)
+					self.checkMethodReceiver(f, false)
 					self.applyFuncMeta(f)
 					ipl.Methods = append(ipl.Methods, f)
 				}
@@ -1609,9 +1584,12 @@ impl parser {
 			ret f
 		| token::Let
 		| token::Const
-		| token::Mut
-		| token::Static:
-			ret self.buildVar(tokens)
+		| token::Mut:
+			mut v := self.buildVar(tokens)
+			if v != nil {
+				v.Static = true
+			}
+			ret v
 		| token::Type:
 			ret self.buildTypeAliasDecl(tokens)
 		| token::Enum:
