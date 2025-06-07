@@ -323,21 +323,21 @@ impl eval {
 		}
 	}
 
-	fn findBuiltins(mut self, &ident: str): any {
-		if mod::IsPub(ident) {
+	fn findBuiltins(mut self, &name: str): any {
+		if mod::IsPub(name) {
 			match type self.lookup {
 			| &ImportInfo:
-				mut def := findBuiltinsImport(ident, self.lookup.(&ImportInfo))
+				mut def := findBuiltinsImport(name, self.lookup.(&ImportInfo))
 				if def != nil {
 					ret def
 				}
 			| &sema:
-				mut def := findBuiltinsSema(ident, self.lookup.(&sema))
+				mut def := findBuiltinsSema(name, self.lookup.(&sema))
 				if def != nil {
 					ret def
 				}
 			| &scopeChecker:
-				mut def := findBuiltinsSema(ident, self.lookup.(&scopeChecker).s)
+				mut def := findBuiltinsSema(name, self.lookup.(&scopeChecker).s)
 				if def != nil {
 					ret def
 				}
@@ -347,12 +347,12 @@ impl eval {
 		if self.disBuiltin {
 			ret nil
 		}
-		ret findBuiltinDef(ident)
+		ret findBuiltinDef(name)
 	}
 
-	fn getDef(mut self, &ident: str, binded: bool): any {
+	fn getDef(mut self, &name: str, _bind: bool): any {
 		// Return nil for blank identifiers.
-		if jule::IsBlank(ident) {
+		if jule::IsBlank(name) {
 			ret nil
 		}
 
@@ -360,45 +360,45 @@ impl eval {
 		// Because self.lookup might be a scopeChecker, and shadowing may occurred.
 		// If any variable or type aliases is shadowing other declarations such us structure,
 		// it will result as wrong expression evaluation.
-		mut v := self.lookup.FindVar(ident, binded)
+		mut v := self.lookup.FindVar(name, _bind)
 		if v != nil {
 			ret v
 		}
 
-		mut ta := self.lookup.FindTypeAlias(ident, binded)
+		mut ta := self.lookup.FindTypeAlias(name, _bind)
 		if ta != nil {
 			ret ta
 		}
 
-		if !binded {
-			mut t := self.lookup.FindTrait(ident)
+		if !_bind {
+			mut t := self.lookup.FindTrait(name)
 			if t != nil {
 				ret t
 			}
 
-			mut enm := self.lookup.FindEnum(ident)
+			mut enm := self.lookup.FindEnum(name)
 			if enm != nil {
 				ret enm
 			}
 
-			mut tenm := self.lookup.FindTypeEnum(ident)
+			mut tenm := self.lookup.FindTypeEnum(name)
 			if tenm != nil {
 				ret tenm
 			}
 		}
 
-		mut f := self.lookup.FindFunc(ident, binded)
+		mut f := self.lookup.FindFunc(name, _bind)
 		if f != nil {
 			ret f
 		}
 
-		mut s := self.lookup.FindStruct(ident, binded)
+		mut s := self.lookup.FindStruct(name, _bind)
 		if s != nil {
 			ret s
 		}
 
 		// Special variables.
-		match ident {
+		match name {
 		| "iota":
 			if self.varIota == nil {
 				ret nil
@@ -406,7 +406,7 @@ impl eval {
 			ret self.varIota
 		}
 
-		ret self.findBuiltins(ident)
+		ret self.findBuiltins(name)
 	}
 
 	fn getOwnerRefers(mut self): &ReferenceStack {
@@ -445,7 +445,7 @@ impl eval {
 
 	fn evalEnum(mut self, mut enm: &Enum, errorToken: &token::Token): &Value {
 		if !self.s.isAccessibleDefine(enm.Public, enm.Token) {
-			self.pushErr(errorToken, log::IdentIsNotAccessible, enm.Ident)
+			self.pushErr(errorToken, log::IdentIsNotAccessible, enm.Name)
 			self.pushSuggestion(log::MakePubToAccess)
 			ret nil
 		}
@@ -463,7 +463,7 @@ impl eval {
 
 	fn evalTypeEnum(mut self, mut enm: &TypeEnum, errorToken: &token::Token): &Value {
 		if !self.s.isAccessibleDefine(enm.Public, enm.Token) {
-			self.pushErr(errorToken, log::IdentIsNotAccessible, enm.Ident)
+			self.pushErr(errorToken, log::IdentIsNotAccessible, enm.Name)
 			self.pushSuggestion(log::MakePubToAccess)
 			ret nil
 		}
@@ -483,7 +483,7 @@ impl eval {
 
 	fn evalStruct(mut self, mut s: &Struct, mut errorToken: &token::Token): &Value {
 		if !self.s.isAccessibleDefine(s.Public, s.Token) {
-			self.pushErr(errorToken, log::IdentIsNotAccessible, s.Ident)
+			self.pushErr(errorToken, log::IdentIsNotAccessible, s.Name)
 			self.pushSuggestion(log::MakePubToAccess)
 			ret nil
 		}
@@ -520,7 +520,7 @@ impl eval {
 
 	fn evalFunc(mut self, mut f: &Func, errorToken: &token::Token): &Value {
 		if !self.s.isAccessibleDefine(f.Public, f.Token) {
-			self.pushErr(errorToken, log::IdentIsNotAccessible, f.Ident)
+			self.pushErr(errorToken, log::IdentIsNotAccessible, f.Name)
 			self.pushSuggestion(log::MakePubToAccess)
 			ret nil
 		}
@@ -543,7 +543,7 @@ impl eval {
 
 	fn evalVar(mut self, mut v: &Var, errorToken: &token::Token): &Value {
 		if !self.s.isAccessibleDefine(v.Public, v.Token) {
-			self.pushErr(errorToken, log::IdentIsNotAccessible, v.Ident)
+			self.pushErr(errorToken, log::IdentIsNotAccessible, v.Name)
 			self.pushSuggestion(log::MakePubToAccess)
 			ret nil
 		}
@@ -573,7 +573,7 @@ impl eval {
 			// But closures performs risky memory handling for references. So catch them.
 			// Just one exception: deferred scope functions safe for references.
 			if s.owner != nil && !s.owner.Scope.Deferred && s.owner.Anon && v.Scope != s.owner.Scope {
-				self.pushErr(errorToken, log::UsedRefInAnonFuncFromParentScope, v.Ident)
+				self.pushErr(errorToken, log::UsedRefInAnonFuncFromParentScope, v.Name)
 			}
 		}
 
@@ -588,7 +588,7 @@ impl eval {
 		// Do not check if v.Used is true. It means it already analyzed.
 		// If variable is global, it should be have initialize expression.
 		// So, nil value means something may be wrong.
-		if !v.Checked && !v.Binded && v.Scope == nil && (v.ValueSym == nil || v.ValueSym.Value == nil) {
+		if !v.Checked && !v.Bind && v.Scope == nil && (v.ValueSym == nil || v.ValueSym.Value == nil) {
 			// Save source file of global variable.
 			// Use it for evaluation and checking for correct analysis.
 			// Otherwise, evaluation problems may occur.
@@ -623,7 +623,7 @@ impl eval {
 			Model: v,
 		}
 		if v.ValueSym != nil && v.ValueSym.Value != nil {
-			if !v.Binded && v.IsInitialized() {
+			if !v.Bind && v.IsInitialized() {
 				val.IsRune = v.ValueSym.Value.IsRune
 			}
 			if v.Constant && v.ValueSym.Value.Constant != nil {
@@ -641,7 +641,7 @@ impl eval {
 
 	fn evalTypeAlias(mut self, mut ta: &TypeAlias, errorToken: &token::Token): &Value {
 		if !self.s.isAccessibleDefine(ta.Public, ta.Token) {
-			self.pushErr(errorToken, log::IdentIsNotAccessible, ta.Ident)
+			self.pushErr(errorToken, log::IdentIsNotAccessible, ta.Name)
 			self.pushSuggestion(log::MakePubToAccess)
 			ret nil
 		}
@@ -703,35 +703,35 @@ impl eval {
 		}
 	}
 
-	fn evalDef(mut self, mut &def: any, mut ident: &token::Token): &Value {
+	fn evalDef(mut self, mut &def: any, mut name: &token::Token): &Value {
 		match type def {
 		| &Var:
-			ret self.evalVar(def.(&Var), ident)
+			ret self.evalVar(def.(&Var), name)
 		| &Enum:
-			ret self.evalEnum(def.(&Enum), ident)
+			ret self.evalEnum(def.(&Enum), name)
 		| &TypeEnum:
-			ret self.evalTypeEnum(def.(&TypeEnum), ident)
+			ret self.evalTypeEnum(def.(&TypeEnum), name)
 		| &Struct:
-			ret self.evalStruct(def.(&Struct), ident)
+			ret self.evalStruct(def.(&Struct), name)
 		| &Func:
 			mut f := def.(&Func)
-			if f.Ident != jule::InitFunc {
-				ret self.evalFunc(f, ident)
+			if f.Name != jule::InitFunc {
+				ret self.evalFunc(f, name)
 			}
 		| &FuncIns:
 			ret self.evalFuncIns(def.(&FuncIns))
 		| &TypeAlias:
-			ret self.evalTypeAlias(def.(&TypeAlias), ident)
+			ret self.evalTypeAlias(def.(&TypeAlias), name)
 		| &Trait:
 			ret self.evalTrait(def.(&Trait))
 		}
-		self.pushErr(ident, log::IdentNotExist, ident.Kind)
+		self.pushErr(name, log::IdentNotExist, name.Kind)
 		ret nil
 	}
 
-	fn evalIdent(mut self, mut ident: &ast::IdentExpr): &Value {
-		mut def := self.getDef(ident.Ident, ident.Binded)
-		ret self.evalDef(def, ident.Token)
+	fn evalName(mut self, mut name: &ast::NameExpr): &Value {
+		mut def := self.getDef(name.Name, name.Bind)
+		ret self.evalDef(def, name.Token)
 	}
 
 	fn evalUnary(mut &self, mut u: &ast::UnaryExpr): &Value {
@@ -740,7 +740,7 @@ impl eval {
 	}
 
 	fn evalVariadic(mut &self, mut v: &ast::VariadicExpr): &Value {
-		if v.Expr == nil {
+		if v.X == nil {
 			self.pushErr(v.Token, log::InvalidExpr)
 			ret nil
 		}
@@ -749,7 +749,7 @@ impl eval {
 		self.prefix = nil
 		defer { self.prefix = prefix }
 
-		mut val := self.evalExpr(v.Expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+		mut val := self.evalExpr(v.X, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if val == nil {
 			ret nil
 		}
@@ -757,14 +757,14 @@ impl eval {
 			self.pushErr(v.Token, log::VariadicWithNonVariadicable, val.Type.Str())
 			ret nil
 		}
-		makeVariadic(val, val.Type.Slice().Elem)
+		makeVariadic(val, val.Type.Slice().Value)
 		ret val
 	}
 
 	fn evalUnsafe(mut &self, mut u: &ast::UnsafeExpr): &Value {
 		unsafety := self.unsafety
 		self.unsafety = true
-		mut v := self.evalExpr(u.Expr, evalDefault)
+		mut v := self.evalExpr(u.X, evalDefault)
 		self.unsafety = unsafety
 		ret v
 	}
@@ -776,25 +776,25 @@ impl eval {
 		mut arr := &Array{
 			Auto: false,
 			N: 0,
-			Elem: pt.Elem,
+			Value: pt.Value,
 		}
 
 		mut filled := false
 
-		if len(s.Exprs) == 2 {
-			vr, ok := s.Exprs[1].Kind.(&ast::VariadicExpr)
-			if ok && vr.Expr == nil {
+		if len(s.X) == 2 {
+			vr, ok := s.X[1].Data.(&ast::VariadicExpr)
+			if ok && vr.X == nil {
 				// Filled.
 				if pt.Auto {
 					self.pushErr(s.Token, log::AutoSizedArrFilled)
 					ret nil
 				}
 				filled = true
-				s.Exprs = s.Exprs[:1]
+				s.X = s.X[:1]
 			}
 		}
 
-		arr.N = len(s.Exprs)
+		arr.N = len(s.X)
 		if !pt.Auto {
 			if arr.N > pt.N {
 				self.pushErr(s.Token, log::OverflowLimits)
@@ -809,20 +809,20 @@ impl eval {
 		if filled {
 			model.Elems = make([]&Value, 0, 2)
 		} else {
-			model.Elems = make([]&Value, 0, len(s.Exprs))
+			model.Elems = make([]&Value, 0, len(s.X))
 		}
 
 		mut prefix := self.prefix
-		self.prefix = arr.Elem
-		for (_, mut elem) in s.Exprs {
+		self.prefix = arr.Value
+		for (_, mut x) in s.X {
 			// Do not unwrap untyped literals, type analysis will check overflows.
-			mut v := self.evalExpr(elem, evalDefault)
+			mut v := self.evalExpr(x, evalDefault)
 			if v == nil {
 				continue
 			}
 			const destIsRef = false
-			if self.s.checkValidityForInitExpr(self.target.mutable, destIsRef, arr.Elem, v, elem.Token) {
-				_ = self.s.checkAssignType(destIsRef, arr.Elem, v, elem.Token, self.getOwnerRefers())
+			if self.s.checkValidityForInitExpr(self.target.mutable, destIsRef, arr.Value, v, x.Token) {
+				_ = self.s.checkAssignType(destIsRef, arr.Value, v, x.Token, self.getOwnerRefers())
 			}
 			model.Elems = append(model.Elems, v)
 		}
@@ -844,13 +844,13 @@ impl eval {
 
 	fn evalExpSlice(mut &self, mut s: &ast::SliceExpr, mut t: &Type, mut first: &Value): &Value {
 		mut slc := &Slice{
-			Elem: t,
+			Value: t,
 		}
 
 		mut i := 0
 		mut model := &SliceExpr{
 			ElemType: t,
-			Elems: make([]&Value, 0, len(s.Exprs)),
+			Elems: make([]&Value, 0, len(s.X)),
 		}
 		if first != nil {
 			model.Elems = append(model.Elems, first)
@@ -858,14 +858,14 @@ impl eval {
 		}
 
 		mut prefix := self.prefix
-		self.prefix = slc.Elem
-		for (_, mut elem) in s.Exprs[i:] {
+		self.prefix = slc.Value
+		for (_, mut x) in s.X[i:] {
 			// Do not unwrap untyped literals, type analysis will check overflows.
-			mut v := self.evalExpr(elem, evalDefault)
+			mut v := self.evalExpr(x, evalDefault)
 			if v != nil {
 				const destIsRef = false
-				if self.s.checkValidityForInitExpr(self.target.mutable, destIsRef, slc.Elem, v, elem.Token) {
-					_ = self.s.checkAssignType(destIsRef, slc.Elem, v, elem.Token, self.getOwnerRefers())
+				if self.s.checkValidityForInitExpr(self.target.mutable, destIsRef, slc.Value, v, x.Token) {
+					_ = self.s.checkAssignType(destIsRef, slc.Value, v, x.Token, self.getOwnerRefers())
 				}
 				model.Elems = append(model.Elems, v)
 			}
@@ -888,7 +888,7 @@ impl eval {
 				v = self.evalArray(s)
 			| self.prefix.Slice() != nil:
 				mut pt := self.prefix.Slice()
-				v = self.evalExpSlice(s, pt.Elem, nil)
+				v = self.evalExpSlice(s, pt.Value, nil)
 			|:
 				goto autoDetermine
 			}
@@ -906,12 +906,12 @@ impl eval {
 		mut prefix := self.prefix
 		self.prefix = nil
 
-		if len(s.Exprs) == 0 {
+		if len(s.X) == 0 {
 			self.pushErr(s.Token, log::DynamicTypeAnnotationFailed)
 			ret nil
 		}
 
-		mut firstExpr := s.Exprs[0]
+		mut firstExpr := s.X[0]
 		mut firstElem := self.evalExpr(firstExpr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if firstElem == nil {
 			ret nil
@@ -928,8 +928,8 @@ impl eval {
 		ret v
 	}
 
-	fn checkIntegerIndexingByData(mut self, mut &v: &Value, mut token: &token::Token): bool {
-		errKey := checkDataForIntegerIndexing(self.s, v, token, self.getOwnerRefers())
+	fn checkIntegerIndexByData(mut self, mut &v: &Value, mut token: &token::Token): bool {
+		errKey := checkDataForIntegerIndex(self.s, v, token, self.getOwnerRefers())
 		match errKey {
 		| "":
 			ret true
@@ -941,8 +941,8 @@ impl eval {
 		ret false
 	}
 
-	fn indexingPtr(mut self, mut &v: &Value, mut &index: &Value, mut &i: &ast::IndexingExpr) {
-		self.checkIntegerIndexingByData(index, i.Token)
+	fn indexPtr(mut self, mut &v: &Value, mut &index: &Value, mut &i: &ast::IndexExpr) {
+		self.checkIntegerIndexByData(index, i.Token)
 		v.Lvalue = true
 
 		mut ptr := v.Type.Ptr()
@@ -955,27 +955,27 @@ impl eval {
 			self.pushSuggestion(log::WriteYourCodeInUnsafeJule)
 		}
 
-		v.Type = ptr.Elem
+		v.Type = ptr.Value
 	}
 
-	fn indexingArr(mut self, mut &v: &Value, mut &index: &Value, mut &i: &ast::IndexingExpr) {
+	fn indexArr(mut self, mut &v: &Value, mut &index: &Value, mut &i: &ast::IndexExpr) {
 		mut arr := v.Type.Array()
-		v.Type = arr.Elem
-		self.checkIntegerIndexingByData(index, i.Token)
+		v.Type = arr.Value
+		self.checkIntegerIndexByData(index, i.Token)
 		v.Lvalue = true
 		if index.IsConst() && index.Constant.AsF64() >= f64(arr.N) {
 			self.pushErr(i.Token, log::OverflowLimits)
 		}
 	}
 
-	fn indexingSlice(mut self, mut &v: &Value, mut &index: &Value, mut &i: &ast::IndexingExpr) {
+	fn indexSlice(mut self, mut &v: &Value, mut &index: &Value, mut &i: &ast::IndexExpr) {
 		mut slc := v.Type.Slice()
-		v.Type = slc.Elem
-		self.checkIntegerIndexingByData(index, i.Token)
+		v.Type = slc.Value
+		self.checkIntegerIndexByData(index, i.Token)
 		v.Lvalue = true
 	}
 
-	fn indexingMap(mut self, mut &v: &Value, mut &index: &Value, mut &i: &ast::IndexingExpr) {
+	fn indexMap(mut self, mut &v: &Value, mut &index: &Value, mut &i: &ast::IndexExpr) {
 		v.Lvalue = false
 		if index == nil {
 			ret
@@ -989,10 +989,10 @@ impl eval {
 			refers: self.getOwnerRefers(),
 		}
 		_ = atc.check()
-		v.Type = m.Val
+		v.Type = m.Value
 	}
 
-	fn indexingStr(mut self, mut &v: &Value, mut &index: &Value, mut &i: &ast::IndexingExpr) {
+	fn indexStr(mut self, mut &v: &Value, mut &index: &Value, mut &i: &ast::IndexExpr) {
 		v.Type = findBuiltinTypeAlias("byte").TypeSym.Type
 		v.Mutable = false
 		v.Lvalue = true
@@ -1001,7 +1001,7 @@ impl eval {
 			ret
 		}
 
-		self.checkIntegerIndexingByData(index, i.Token)
+		self.checkIntegerIndexByData(index, i.Token)
 
 		v.untyped = v.IsConst()
 		if !index.IsConst() {
@@ -1021,12 +1021,12 @@ impl eval {
 		}
 	}
 
-	fn comptimeRange(mut self, mut &v: &Value, mut &index: &Value, mut &i: &ast::IndexingExpr) {
+	fn comptimeRange(mut self, mut &v: &Value, mut &index: &Value, mut &i: &ast::IndexExpr) {
 		if index == nil {
 			v = nil
 			ret
 		}
-		if !self.checkIntegerIndexingByData(index, i.Index.Token) {
+		if !self.checkIntegerIndexByData(index, i.Index.Token) {
 			v = nil
 			ret
 		}
@@ -1046,25 +1046,25 @@ impl eval {
 		ci.kind.index(v, j)
 	}
 
-	fn toIndexing(mut self, mut &v: &Value, mut &index: &Value, mut &i: &ast::IndexingExpr) {
+	fn toIndex(mut self, mut &v: &Value, mut &index: &Value, mut &i: &ast::IndexExpr) {
 		match {
 		| v.Type.Ptr() != nil:
-			self.indexingPtr(v, index, i)
+			self.indexPtr(v, index, i)
 			ret
 		| v.Type.Array() != nil:
-			self.indexingArr(v, index, i)
+			self.indexArr(v, index, i)
 			ret
 		| v.Type.Slice() != nil:
-			self.indexingSlice(v, index, i)
+			self.indexSlice(v, index, i)
 			ret
 		| v.Type.Map() != nil:
-			self.indexingMap(v, index, i)
+			self.indexMap(v, index, i)
 			ret
 		| v.Type.Prim() != nil:
 			prim := v.Type.Prim()
 			match {
 			| prim.IsStr():
-				self.indexingStr(v, index, i)
+				self.indexStr(v, index, i)
 				ret
 			}
 		| v.Type.comptimeRange() != nil:
@@ -1074,14 +1074,14 @@ impl eval {
 		self.pushErr(i.Token, log::NotSupportsIndexing, v.Type.Str())
 	}
 
-	fn pushGenericsFromData(mut &self, mut &generics: []&InsGeneric, mut &indx: &ast::IndexingExpr): (ok: bool) {
+	fn pushGenericsFromData(mut &self, mut &generics: []&InsGeneric, mut &indx: &ast::IndexExpr): (ok: bool) {
 		mut tc := self.typeChecker()
 		ok = true
-		match type indx.Index.Kind {
+		match type indx.Index.Data {
 		| &ast::TupleExpr:
-			mut tup := indx.Index.Kind.(&ast::TupleExpr)
-			generics = make([]&InsGeneric, 0, len(tup.Expr))
-			for (_, mut typDecl) in tup.Expr {
+			mut tup := indx.Index.Data.(&ast::TupleExpr)
+			generics = make([]&InsGeneric, 0, len(tup.X))
+			for (_, mut typDecl) in tup.X {
 				mut typ := tc.checkDecl(typDecl)
 				if typ == nil {
 					ok = false
@@ -1100,10 +1100,10 @@ impl eval {
 		ret
 	}
 
-	fn evalIdentDeclFromIndexing(mut &self, mut &v: &Value, mut &i: &ast::IndexingExpr) {
+	fn evalIdentDeclFromIndex(mut &self, mut &v: &Value, mut &i: &ast::IndexExpr) {
 		mut s := v.Type.Struct()
 		if s == nil {
-			self.pushErr(i.Expr.Token, log::TypeNotSupportsGenerics, v.Type.Str())
+			self.pushErr(i.X.Token, log::TypeNotSupportsGenerics, v.Type.Str())
 			v = nil
 			ret
 		}
@@ -1139,7 +1139,7 @@ impl eval {
 		ret
 	}
 
-	fn evalFuncGenericFromIndexing(mut &self, mut &v: &Value, mut &i: &ast::IndexingExpr) {
+	fn evalFuncGenericFromIndex(mut &self, mut &v: &Value, mut &i: &ast::IndexExpr) {
 		mut f := v.Type.Func()
 		if !self.pushGenericsFromData(f.Generics, i) {
 			v = nil
@@ -1150,7 +1150,7 @@ impl eval {
 		if f.Decl != nil {
 			genericsLen = len(f.Decl.Generics)
 		}
-		if !self.s.checkGenericQuantity(genericsLen, len(f.Generics), i.Expr.Token) {
+		if !self.s.checkGenericQuantity(genericsLen, len(f.Generics), i.X.Token) {
 			v = nil
 			ret
 		}
@@ -1160,7 +1160,7 @@ impl eval {
 			ret
 		}
 
-		ok, _ := self.checkGenericFunc(f, i.Expr.Token, v.Model, nil)
+		ok, _ := self.checkGenericFunc(f, i.X.Token, v.Model, nil)
 		if ok {
 			v.Type.Kind = f
 		} else {
@@ -1168,24 +1168,24 @@ impl eval {
 		}
 	}
 
-	fn evalIndexing(mut &self, mut i: &ast::IndexingExpr): &Value {
+	fn evalIndex(mut &self, mut i: &ast::IndexExpr): &Value {
 		mut prefix := self.prefix
 		self.prefix = nil
 		defer { self.prefix = prefix }
 
-		mut v := self.evalExprPlain(i.Expr)
+		mut v := self.evalExprPlain(i.X)
 		if v == nil {
 			ret nil
 		}
 
 		// Catch types.
 		if v.Decl {
-			self.evalIdentDeclFromIndexing(v, i)
+			self.evalIdentDeclFromIndex(v, i)
 			ret v
 		}
 
 		if v.Type.Func() != nil {
-			self.evalFuncGenericFromIndexing(v, i)
+			self.evalFuncGenericFromIndex(v, i)
 			ret v
 		}
 
@@ -1211,7 +1211,7 @@ impl eval {
 		// Set by indexing eval.
 		v.Decl = false
 
-		self.toIndexing(v, index, i)
+		self.toIndex(v, index, i)
 		if v == nil {
 			ret nil
 		}
@@ -1240,10 +1240,10 @@ impl eval {
 		self.prefix = nil
 		defer { self.prefix = prefix }
 
-		if s.Start != nil {
-			l = self.evalExpr(s.Start, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+		if s.Low != nil {
+			l = self.evalExpr(s.Low, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 			if l != nil {
-				self.checkIntegerIndexingByData(l, s.Token)
+				self.checkIntegerIndexByData(l, s.Token)
 			} else {
 				ret nil, nil, nil
 			}
@@ -1256,19 +1256,19 @@ impl eval {
 			l.Model = l.Constant
 		}
 
-		if s.To != nil {
-			r = self.evalExpr(s.To, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+		if s.High != nil {
+			r = self.evalExpr(s.High, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 			if r != nil {
-				self.checkIntegerIndexingByData(r, s.Token)
+				self.checkIntegerIndexByData(r, s.Token)
 			} else {
 				ret nil, nil, nil
 			}
 		}
 
-		if s.Cap != nil {
-			c = self.evalExpr(s.Cap, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+		if s.Max != nil {
+			c = self.evalExpr(s.Max, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 			if r != nil {
-				self.checkIntegerIndexingByData(r, s.Token)
+				self.checkIntegerIndexByData(r, s.Token)
 			} else {
 				ret nil, nil, nil
 			}
@@ -1282,10 +1282,10 @@ impl eval {
 			self.pushErr(s.Token, log::UnsupportedTypeIndex3Slice, v.Type.Str())
 		}
 
-		mut elemType := v.Type.Array().Elem
+		mut valueTyp := v.Type.Array().Value
 		v.Type = &Type{
 			Kind: &Slice{
-				Elem: elemType,
+				Value: valueTyp,
 			},
 		}
 
@@ -1293,7 +1293,7 @@ impl eval {
 
 		// Keep mutability id already mutable.
 		// Be mutable, if element is not mutable-type.
-		v.Mutable = v.Mutable || !elemType.Mutable()
+		v.Mutable = v.Mutable || !valueTyp.Mutable()
 	}
 
 	fn slicingStr(mut self, &s: &ast::SlicingExpr, mut &v: &Value, &l: &Value, &c: &Value, &r: &Value) {
@@ -1359,7 +1359,7 @@ impl eval {
 	}
 
 	fn evalSlicing(mut &self, mut s: &ast::SlicingExpr): &Value {
-		mut v := self.evalExpr(s.Expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+		mut v := self.evalExpr(s.X, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if v == nil {
 			ret nil
 		}
@@ -1406,7 +1406,7 @@ impl eval {
 		v.untyped = false
 		sptr := v.Type.Sptr()
 		if sptr != nil {
-			if !t.Ptr().Elem.Equal(sptr.Elem) {
+			if !t.Ptr().Value.Equal(sptr.Value) {
 				self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
 			}
 			ret
@@ -1457,7 +1457,7 @@ impl eval {
 		mut sptr := t.Sptr()
 
 		mut ptr := v.Type.Ptr()
-		if ptr != nil && sptr.Elem.Equal(ptr.Elem) {
+		if ptr != nil && sptr.Value.Equal(ptr.Value) {
 			if !self.isUnsafe() {
 				self.pushErr(errorToken, log::UnsafeBehaviorAtOutOfUnsafeScope)
 				self.pushSuggestion(log::WriteYourCodeInUnsafeJule)
@@ -1484,7 +1484,7 @@ impl eval {
 			ret
 		}
 
-		t = t.Slice().Elem
+		t = t.Slice().Value
 		mut prim := t.Prim()
 		if prim == nil || (!prim.IsU8() && !prim.IsI32()) {
 			self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
@@ -1581,7 +1581,7 @@ impl eval {
 			ret
 		}
 
-		t = s.Elem
+		t = s.Value
 		prim = t.Prim()
 		if prim == nil || (!prim.IsU8() && !prim.IsI32()) {
 			self.pushErr(errorToken, log::TypeNotSupportsCastingTo, t.Str(), v.Type.Str())
@@ -1701,7 +1701,7 @@ impl eval {
 			ret
 		}
 		c := t.Chan()
-		if !vc.Elem.Equal(c.Elem) {
+		if !vc.Value.Equal(c.Value) {
 			self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
 			ret
 		}
@@ -1787,7 +1787,7 @@ impl eval {
 		}
 		// casting applied successfully
 
-		if t.Binded() || v.Type.Binded() {
+		if t.Bind() || v.Type.Bind() {
 			// if destination or expression type is binded, it requires Unsafe Jule for this.
 			// Push error if Unsafe Jule is not available. But do not return nil data,
 			// casting is valid, just Unsafe Jule is missing. Push only information error for that.
@@ -1838,13 +1838,13 @@ impl eval {
 		self.prefix = nil
 		defer { self.prefix = prefix }
 		if t.Slice() != nil || t.Array() != nil {
-			_, slice := e.Kind.(&ast::SliceExpr)
-			if slice {
+			_, isSlice := e.Data.(&ast::SliceExpr)
+			if isSlice {
 				self.prefix = t
 			}
 		} else if t.Map() != nil {
-			_, brace := e.Kind.(&ast::BraceLit)
-			if brace {
+			_, isBrace := e.Data.(&ast::BraceLit)
+			if isBrace {
 				self.prefix = t
 			}
 		}
@@ -1868,11 +1868,11 @@ impl eval {
 	}
 
 	fn evalCast(mut &self, mut c: &ast::CastExpr): &Value {
-		mut t := self.evalType1(c.Kind)
+		mut t := self.evalType1(c.Type)
 		if t == nil {
 			ret nil
 		}
-		ret self.evalCastT(t, c.Expr, c.Kind.Token)
+		ret self.evalCastT(t, c.X, c.Type.Token)
 	}
 
 	fn evalNamespace(mut self, mut s: &ast::NamespaceExpr): &Value {
@@ -1887,10 +1887,10 @@ impl eval {
 
 		const Binded = false
 		self.disallowBuiltin()
-		mut def := self.getDef(s.Ident.Kind, Binded)
+		mut def := self.getDef(s.Name.Kind, Binded)
 		self.allowBuiltin()
 		self.lookup = lookup
-		ret self.evalDef(def, s.Ident)
+		ret self.evalDef(def, s.Name)
 	}
 
 	// StructIns s is the struct type of literal.
@@ -1904,7 +1904,7 @@ impl eval {
 		// NOTICE: Instance already checked (just fields) if generic quantity passes.
 
 		if self.field != nil && self.field.Decl.Owner == s.Decl {
-			self.pushErr(errorToken, log::IllegalCycleRefersItself, s.Decl.Ident)
+			self.pushErr(errorToken, log::IllegalCycleRefersItself, s.Decl.Name)
 		}
 
 		self.pushReference[&StructIns](s)
@@ -1914,7 +1914,7 @@ impl eval {
 			errorToken: errorToken,
 			s: s,
 		}
-		slc.check(lit.Exprs)
+		slc.check(lit.X)
 
 		ret &Value{
 			Mutable: self.target.mutable,
@@ -1927,7 +1927,7 @@ impl eval {
 	}
 
 	fn evalTypedBraceLit(mut &self, mut lit: &ast::TypedBraceLit): &Value {
-		mut t := self.evalType1(lit.Kind)
+		mut t := self.evalType1(lit.Type)
 		if t == nil {
 			ret nil
 		}
@@ -1935,7 +1935,7 @@ impl eval {
 		mut s := t.Struct()
 		if s == nil {
 			if t.Sptr() != nil {
-				s = t.Sptr().Elem.Struct()
+				s = t.Sptr().Value.Struct()
 				if s != nil {
 					goto eval
 				}
@@ -1944,12 +1944,12 @@ impl eval {
 			if m != nil {
 				ret self.evalMap(m, t, lit.Lit)
 			}
-			self.pushErr(lit.Kind.Token, log::InvalidSyntax)
+			self.pushErr(lit.Type.Token, log::InvalidSyntax)
 			ret nil
 		}
 
 	eval:
-		mut v := self.evalStructLitExplicit(s, t, lit.Lit, lit.Kind.Token)
+		mut v := self.evalStructLitExplicit(s, t, lit.Lit, lit.Type.Token)
 		match type t.Kind {
 		| &Sptr:
 			mut model := v.Model.(&StructLitExpr)
@@ -1976,14 +1976,14 @@ impl eval {
 		// Push reference to owner if global.
 		if self.owner != nil && self.owner.Scope == nil {
 			tc.referencer = &referencer{
-				name: self.owner.Ident,
+				name: self.owner.Name,
 				owner: self.owner,
 			}
 		}
 		// If field exist, push reference to struct.
 		if self.field != nil {
 			tc.referencer = &referencer{
-				name: self.field.Owner.Decl.Ident,
+				name: self.field.Owner.Decl.Name,
 				owner: self.field.Owner,
 			}
 		}
@@ -2006,7 +2006,7 @@ impl eval {
 		}
 	}
 
-	fn callTypeFunc(mut &self, mut &fc: &ast::FuncCallExpr, mut &v: &Value) {
+	fn callTypeFunc(mut &self, mut &fc: &ast::CallExpr, mut &v: &Value) {
 		if len(fc.Args) < 1 {
 			self.pushErr(fc.Token, log::MissingExprFor, "v")
 		} else if len(fc.Args) > 1 {
@@ -2032,7 +2032,7 @@ impl eval {
 		}
 	}
 
-	fn callBuiltinFunc(mut &self, mut &fc: &ast::FuncCallExpr, mut &v: &Value) {
+	fn callBuiltinFunc(mut &self, mut &fc: &ast::CallExpr, mut &v: &Value) {
 		if !fc.Unhandled() { // Exceptional handled?
 			// Built-in functions are not exceptional.
 			self.pushErr(fc.Token, log::HandledUnexceptional)
@@ -2063,12 +2063,12 @@ impl eval {
 		}
 	}
 
-	fn processExceptionalHandler(mut self, mut &f: &FuncIns, mut &fc: &ast::FuncCallExpr, mut &v: &Value) {
+	fn processExceptionalHandler(mut self, mut &f: &FuncIns, mut &fc: &ast::CallExpr, mut &v: &Value) {
 		resultNeeded := !self.target.ignored && !f.Decl.IsVoid()
 		let mut csc: &scopeChecker = nil
 		let mut ch: &Scope = nil
 
-		mut model := v.Model.(&FuncCallExpr)
+		mut fcValue := v.Model.(&FuncCallExpr)
 
 		// self.lookup is always scopeChecker because exceptionals are
 		// not allowed in global scope due to static variables are not allowed.
@@ -2086,15 +2086,15 @@ impl eval {
 		csc.table.Vars = append(csc.table.Vars, buildErrorVar(ch, fc))
 		sc.checkChildSsc(fc.Exception, ch, csc)
 
-		model.Assigned = resultNeeded
-		model.Except = ch
+		fcValue.Assigned = resultNeeded
+		fcValue.Except = ch
 
 		if resultNeeded && csc.result != nil {
 			self.pushErr(fc.Token, log::MissingAssignRet)
 		}
 	}
 
-	fn callFunc(mut &self, mut &fc: &ast::FuncCallExpr, mut &v: &Value) {
+	fn callFunc(mut &self, mut &fc: &ast::CallExpr, mut &v: &Value) {
 		mut f := v.Type.Func()
 		if f.IsBuiltin() {
 			self.callBuiltinFunc(fc, v)
@@ -2123,7 +2123,7 @@ impl eval {
 					checkMutRiskOfStructLit(self.s, lit)
 				}
 			}
-		} else if !self.isUnsafe() && f.Decl.Unsafety {
+		} else if !self.isUnsafe() && f.Decl.Unsafe {
 			self.pushErr(fc.Token, log::UnsafeBehaviorAtOutOfUnsafeScope)
 			self.pushSuggestion(log::WriteYourCodeInUnsafeJule)
 		}
@@ -2253,59 +2253,59 @@ impl eval {
 		}
 	}
 
-	fn evalFuncCall(mut &self, mut fc: &ast::FuncCallExpr): &Value {
+	fn evalCall(mut &self, mut fc: &ast::CallExpr): &Value {
 		mut prefix := self.prefix
 		self.prefix = nil
 		defer { self.prefix = prefix }
 
-		_, ident := fc.Expr.Kind.(&ast::IdentExpr)
-		if ident {
+		_, isName := fc.Func.Data.(&ast::NameExpr)
+		if isName {
 			// Use fc.expr.Token.Kind instead of casting.
 			// Same thing, but more efficient and performant.
-			if fc.Expr.Token.Id == token::Error {
+			if fc.Func.Token.Id == token::Error {
 				ret builtinCallerError(self, fc)
 			}
 		}
 
-		mut v := self.evalExprPlain(fc.Expr)
-		if v == nil {
+		mut _func := self.evalExprPlain(fc.Func)
+		if _func == nil {
 			ret nil
 		}
 
-		if v.Decl {
-			self.callTypeFunc(fc, v)
-			ret v
+		if _func.Decl {
+			self.callTypeFunc(fc, _func)
+			ret _func
 		}
 
-		if v.Type.Func() == nil {
+		if _func.Type.Func() == nil {
 			self.pushErr(fc.Token, log::CallingNonFunc)
 			ret nil
 		}
 
-		self.callFunc(fc, v)
-		ret v
+		self.callFunc(fc, _func)
+		ret _func
 	}
 
-	fn evalEnumStatic(mut self, mut enm: &Enum, mut ident: &token::Token): &Value {
-		mut item := enm.FindItem(ident.Kind)
+	fn evalEnumStatic(mut self, mut enm: &Enum, mut name: &token::Token): &Value {
+		mut item := enm.FindItem(name.Kind)
 		if item == nil {
-			self.pushErr(ident, log::ObjHaveNotIdent, enm.Ident, ident.Kind)
+			self.pushErr(name, log::ObjHaveNotIdent, enm.Name, name.Kind)
 			ret nil
 		}
-		mut v := self.evalVar(item, ident)
+		mut v := self.evalVar(item, name)
 		if v != nil {
 			v.Type = &Type{Kind: enm}
 		}
 		ret v
 	}
 
-	fn evalStructStatic(mut self, mut s: &StructIns, ident: &token::Token): &Value {
+	fn evalStructStatic(mut self, mut s: &StructIns, name: &token::Token): &Value {
 		mut v := new(Value)
 		const Static = true
-		mut method := s.FindMethod(ident.Kind, Static)
+		mut method := s.FindMethod(name.Kind, Static)
 		if method != nil {
 			if !self.s.isAccessibleDefine(method.Public, method.Token) {
-				self.pushErr(ident, log::IdentIsNotAccessible, ident.Kind)
+				self.pushErr(name, log::IdentIsNotAccessible, name.Kind)
 				self.pushSuggestion(log::MakePubToAccess)
 			}
 
@@ -2322,14 +2322,14 @@ impl eval {
 			}
 			ret v
 		}
-		self.pushErr(ident, log::ObjHaveNotIdent, s.Decl.Ident, ident.Kind)
+		self.pushErr(name, log::ObjHaveNotIdent, s.Decl.Name, name.Kind)
 		ret nil
 	}
 
-	fn evalTraitSubIdent(mut self, mut v: &Value, mut trt: &Trait, mut ident: &token::Token): &Value {
-		mut f := trt.FindMethod(ident.Kind)
+	fn evalTraitSelector(mut self, mut v: &Value, mut trt: &Trait, mut name: &token::Token): &Value {
+		mut f := trt.FindMethod(name.Kind)
 		if f == nil {
-			self.pushErr(ident, log::ObjHaveNotIdent, trt.Ident, ident.Kind)
+			self.pushErr(name, log::ObjHaveNotIdent, trt.Name, name.Kind)
 			ret nil
 		}
 		ret &Value{
@@ -2338,7 +2338,7 @@ impl eval {
 				Kind: f.instance(),
 			},
 			Model: &TraitSubIdentExpr{
-				Token: ident,
+				Token: name,
 				Expr: v.Model,
 				Method: f,
 				Trt: trt,
@@ -2348,7 +2348,7 @@ impl eval {
 
 	// This method evaluates expressions, will not check public availability.
 	// The tok parameter should be identifier to accessed.
-	fn evalStructSubIdentField(mut self, mut &v: &Value, mut &s: &StructIns, mut &tok: &token::Token, mut &f: &FieldIns): &Value {
+	fn evalStructSelectorField(mut self, mut &v: &Value, mut &s: &StructIns, mut &tok: &token::Token, mut &f: &FieldIns): &Value {
 		mut model := &StructSubIdentExpr{
 			Token: tok,
 			Expr: new(Value, *v),
@@ -2371,22 +2371,22 @@ impl eval {
 		ret v
 	}
 
-	// Like evalStructSubIdent, but checks only for fields.
-	fn evalStructSubIdentFieldOnly(mut self, mut v: &Value, mut s: &StructIns, mut si: &ast::SubIdentExpr): (&Value, found: bool) {
-		mut f := s.FindField(si.Ident.Kind)
+	// Like evalStructSelector, but checks only for fields.
+	fn evalStructSelectorFieldOnly(mut self, mut v: &Value, mut s: &StructIns, mut si: &ast::SelectorExpr): (&Value, found: bool) {
+		mut f := s.FindField(si.Name.Kind)
 		if f != nil {
 			if !self.s.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
-				self.pushErr(si.Ident, log::IdentIsNotAccessible, f.Decl.Ident)
+				self.pushErr(si.Name, log::IdentIsNotAccessible, f.Decl.Name)
 				self.pushSuggestion(log::MakePubToAccess)
 			}
-			ret self.evalStructSubIdentField(v, s, si.Ident, f), true
+			ret self.evalStructSelectorField(v, s, si.Name, f), true
 		}
 		ret nil, false
 	}
 
 	// This method evaluates expressions, will not check public availability.
 	// The tok parameter should be identifier to accessed.
-	fn evalStructSubIdentMethod(mut self, mut &v: &Value, mut &s: &StructIns, mut &tok: &token::Token, mut &m: &Func, ref: bool): &Value {
+	fn evalStructSelectorMethod(mut self, mut &v: &Value, mut &s: &StructIns, mut &tok: &token::Token, mut &m: &Func, ref: bool): &Value {
 		if m.Params[0].IsRef() && !ref {
 			self.pushErr(tok, log::RefMethodUsedWithNotRefInstance)
 		}
@@ -2405,14 +2405,14 @@ impl eval {
 		ret v
 	}
 
-	fn evalStructSubIdent(mut self, mut v: &Value, mut s: &StructIns, mut si: &ast::SubIdentExpr, ref: bool): &Value {
+	fn evalStructSelector(mut self, mut v: &Value, mut s: &StructIns, mut si: &ast::SelectorExpr, ref: bool): &Value {
 		{
 			mut tempS := s
 			if s.Source != nil {
 				tempS = s.Source.Struct()
 			}
 			if tempS != nil {
-				mut r, found := self.evalStructSubIdentFieldOnly(v, tempS, si)
+				mut r, found := self.evalStructSelectorFieldOnly(v, tempS, si)
 				if found {
 					ret r
 				}
@@ -2420,22 +2420,22 @@ impl eval {
 		}
 
 		const Static = false
-		mut m := s.FindMethod(si.Ident.Kind, Static)
+		mut m := s.FindMethod(si.Name.Kind, Static)
 		if m == nil {
-			self.pushErr(si.Ident, log::ObjHaveNotIdent, s.Decl.Ident, si.Ident.Kind)
+			self.pushErr(si.Name, log::ObjHaveNotIdent, s.Decl.Name, si.Name.Kind)
 			ret nil
 		}
 		if !self.s.isAccessibleDefine(m.Public, m.Token) {
-			self.pushErr(si.Ident, log::IdentIsNotAccessible, m.Ident)
+			self.pushErr(si.Name, log::IdentIsNotAccessible, m.Name)
 			self.pushSuggestion(log::MakePubToAccess)
 		}
 
-		ret self.evalStructSubIdentMethod(v, s, si.Ident, m, ref)
+		ret self.evalStructSelectorMethod(v, s, si.Name, m, ref)
 	}
 
-	fn evalIntTypeStatic(mut self, ident: &token::Token): &Value {
+	fn evalIntTypeStatic(mut self, name: &token::Token): &Value {
 		const kind: str = types::Int
-		match ident.Kind {
+		match name.Kind {
 		| "Max":
 			mut c := constant::Const.NewI64(types::MaxI(kind))
 			c.Kind = kind
@@ -2455,14 +2455,14 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(ident, log::TypeHaveNotIdent, kind, ident.Kind)
+			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
 			ret nil
 		}
 	}
 
-	fn evalUintTypeStatic(mut self, ident: &token::Token): &Value {
+	fn evalUintTypeStatic(mut self, name: &token::Token): &Value {
 		const kind: str = types::Uint
-		match ident.Kind {
+		match name.Kind {
 		| "Max":
 			mut c := constant::Const.NewU64(types::MaxU(kind))
 			c.Kind = kind
@@ -2473,18 +2473,18 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(ident, log::TypeHaveNotIdent, kind, ident.Kind)
+			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
 			ret nil
 		}
 	}
 
-	fn evalI8TypeStatic(mut self, ident: &token::Token): &Value {
+	fn evalI8TypeStatic(mut self, name: &token::Token): &Value {
 		const (
 			kind: str = types::I8
 			min       = types::MinI8
 			max       = types::MaxI8
 		)
-		match ident.Kind {
+		match name.Kind {
 		| "Max":
 			mut c := constant::Const.NewI64(max)
 			c.Kind = kind
@@ -2504,18 +2504,18 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(ident, log::TypeHaveNotIdent, kind, ident.Kind)
+			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
 			ret nil
 		}
 	}
 
-	fn evalI16TypeStatic(mut self, ident: &token::Token): &Value {
+	fn evalI16TypeStatic(mut self, name: &token::Token): &Value {
 		const (
 			kind: str = types::I16
 			min       = types::MinI16
 			max       = types::MaxI16
 		)
-		match ident.Kind {
+		match name.Kind {
 		| "Max":
 			mut c := constant::Const.NewI64(max)
 			c.Kind = kind
@@ -2535,18 +2535,18 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(ident, log::TypeHaveNotIdent, kind, ident.Kind)
+			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
 			ret nil
 		}
 	}
 
-	fn evalI32TypeStatic(mut self, ident: &token::Token): &Value {
+	fn evalI32TypeStatic(mut self, name: &token::Token): &Value {
 		const (
 			kind: str = types::I32
 			min       = types::MinI32
 			max       = types::MaxI32
 		)
-		match ident.Kind {
+		match name.Kind {
 		| "Max":
 			mut c := constant::Const.NewI64(max)
 			c.Kind = kind
@@ -2566,18 +2566,18 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(ident, log::TypeHaveNotIdent, kind, ident.Kind)
+			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
 			ret nil
 		}
 	}
 
-	fn evalI64TypeStatic(mut self, ident: &token::Token): &Value {
+	fn evalI64TypeStatic(mut self, name: &token::Token): &Value {
 		const (
 			kind: str = types::I64
 			min       = types::MinI64
 			max       = types::MaxI64
 		)
-		match ident.Kind {
+		match name.Kind {
 		| "Max":
 			mut c := constant::Const.NewI64(max)
 			c.Kind = kind
@@ -2597,17 +2597,17 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(ident, log::TypeHaveNotIdent, kind, ident.Kind)
+			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
 			ret nil
 		}
 	}
 
-	fn evalU8TypeStatic(mut self, ident: &token::Token): &Value {
+	fn evalU8TypeStatic(mut self, name: &token::Token): &Value {
 		const (
 			kind: str = types::U8
 			max       = types::MaxU8
 		)
-		match ident.Kind {
+		match name.Kind {
 		| "Max":
 			mut c := constant::Const.NewU64(max)
 			c.Kind = kind
@@ -2618,17 +2618,17 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(ident, log::TypeHaveNotIdent, kind, ident.Kind)
+			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
 			ret nil
 		}
 	}
 
-	fn evalU16TypeStatic(mut self, ident: &token::Token): &Value {
+	fn evalU16TypeStatic(mut self, name: &token::Token): &Value {
 		const (
 			kind: str = types::U16
 			max       = types::MaxU16
 		)
-		match ident.Kind {
+		match name.Kind {
 		| "Max":
 			mut c := constant::Const.NewU64(max)
 			c.Kind = kind
@@ -2639,17 +2639,17 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(ident, log::TypeHaveNotIdent, kind, ident.Kind)
+			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
 			ret nil
 		}
 	}
 
-	fn evalU32TypeStatic(mut self, ident: &token::Token): &Value {
+	fn evalU32TypeStatic(mut self, name: &token::Token): &Value {
 		const (
 			kind: str = types::U32
 			max       = types::MaxU32
 		)
-		match ident.Kind {
+		match name.Kind {
 		| "Max":
 			mut c := constant::Const.NewU64(max)
 			c.Kind = kind
@@ -2660,17 +2660,17 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(ident, log::TypeHaveNotIdent, kind, ident.Kind)
+			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
 			ret nil
 		}
 	}
 
-	fn evalU64TypeStatic(mut self, ident: &token::Token): &Value {
+	fn evalU64TypeStatic(mut self, name: &token::Token): &Value {
 		const (
 			kind: str = types::U64
 			max       = types::MaxU64
 		)
-		match ident.Kind {
+		match name.Kind {
 		| "Max":
 			mut c := constant::Const.NewU64(max)
 			c.Kind = kind
@@ -2681,19 +2681,19 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(ident, log::TypeHaveNotIdent, kind, ident.Kind)
+			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
 			ret nil
 		}
 	}
 
-	fn evalF32TypeStatic(mut self, ident: &token::Token): &Value {
+	fn evalF32TypeStatic(mut self, name: &token::Token): &Value {
 		const (
 			kind: str       = types::F32
 			max             = types::MaxF32
 			min             = types::MinF32
 			smallestNonzero = types::SmallestNonzeroF32
 		)
-		match ident.Kind {
+		match name.Kind {
 		| "Max":
 			mut c := constant::Const.NewF64(max)
 			c.Kind = kind
@@ -2722,19 +2722,19 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(ident, log::TypeHaveNotIdent, kind, ident.Kind)
+			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
 			ret nil
 		}
 	}
 
-	fn evalF64TypeStatic(mut self, ident: &token::Token): &Value {
+	fn evalF64TypeStatic(mut self, name: &token::Token): &Value {
 		const (
 			kind: str       = types::F64
 			max             = types::MaxF64
 			min             = types::MinF64
 			smallestNonzero = types::SmallestNonzeroF64
 		)
-		match ident.Kind {
+		match name.Kind {
 		| "Max":
 			mut c := constant::Const.NewF64(max)
 			c.Kind = kind
@@ -2763,40 +2763,40 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(ident, log::TypeHaveNotIdent, kind, ident.Kind)
+			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
 			ret nil
 		}
 	}
 
-	fn evalPrimStatic(mut self, mut t: &Type, ident: &token::Token): (v: &Value) {
+	fn evalPrimStatic(mut self, mut t: &Type, name: &token::Token): (v: &Value) {
 		kind := t.Prim().Kind
 		match kind {
 		| types::Int:
-			v = self.evalIntTypeStatic(ident)
+			v = self.evalIntTypeStatic(name)
 		| types::Uint:
-			v = self.evalUintTypeStatic(ident)
+			v = self.evalUintTypeStatic(name)
 		| types::I8:
-			v = self.evalI8TypeStatic(ident)
+			v = self.evalI8TypeStatic(name)
 		| types::I16:
-			v = self.evalI16TypeStatic(ident)
+			v = self.evalI16TypeStatic(name)
 		| types::I32:
-			v = self.evalI32TypeStatic(ident)
+			v = self.evalI32TypeStatic(name)
 		| types::I64:
-			v = self.evalI64TypeStatic(ident)
+			v = self.evalI64TypeStatic(name)
 		| types::U8:
-			v = self.evalU8TypeStatic(ident)
+			v = self.evalU8TypeStatic(name)
 		| types::U16:
-			v = self.evalU16TypeStatic(ident)
+			v = self.evalU16TypeStatic(name)
 		| types::U32:
-			v = self.evalU32TypeStatic(ident)
+			v = self.evalU32TypeStatic(name)
 		| types::U64:
-			v = self.evalU64TypeStatic(ident)
+			v = self.evalU64TypeStatic(name)
 		| types::F32:
-			v = self.evalF32TypeStatic(ident)
+			v = self.evalF32TypeStatic(name)
 		| types::F64:
-			v = self.evalF64TypeStatic(ident)
+			v = self.evalF64TypeStatic(name)
 		|:
-			self.pushErr(ident, log::TypeHaveNotIdent, kind, ident.Kind)
+			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
 			ret nil
 		}
 		if v != nil && t.Kind != t.ActualKind() {
@@ -2806,68 +2806,68 @@ impl eval {
 		ret
 	}
 
-	fn evalTypeStatic(mut self, mut v: &Value, mut si: &ast::SubIdentExpr): &Value {
+	fn evalTypeStatic(mut self, mut v: &Value, mut si: &ast::SelectorExpr): &Value {
 		match {
 		| v.Type.SoftStruct() != nil:
 			// Eval soft structures first, because strict type aliases may
 			// jump into other cases. So caught they here.
-			ret self.evalStructStatic(v.Type.SoftStruct(), si.Ident)
+			ret self.evalStructStatic(v.Type.SoftStruct(), si.Name)
 		| v.Type.Prim() != nil:
-			ret self.evalPrimStatic(v.Type, si.Ident)
+			ret self.evalPrimStatic(v.Type, si.Name)
 		| v.Type.Enum() != nil:
-			ret self.evalEnumStatic(v.Type.Enum(), si.Ident)
+			ret self.evalEnumStatic(v.Type.Enum(), si.Name)
 		|:
-			self.pushErr(si.Ident, log::TypeNotSupportSubFields, v.Type.Str())
+			self.pushErr(si.Name, log::TypeNotSupportSubFields, v.Type.Str())
 			ret nil
 		}
 	}
 
-	fn comptimeObjSubIdent[ComptimeType](mut self, mut &ct: &ComptimeType, &v: &Value, &si: &ast::SubIdentExpr): &Value {
-		mut cd := ct.subIdent(si.Ident.Kind)
+	fn comptimeObjSelector[ComptimeType](mut self, mut &ct: &ComptimeType, &v: &Value, &si: &ast::SelectorExpr): &Value {
+		mut cd := ct.subIdent(si.Name.Kind)
 		if cd == nil {
-			self.pushErr(si.Ident, log::ObjHaveNotIdent, v.Type.Str(), si.Ident.Kind)
+			self.pushErr(si.Name, log::ObjHaveNotIdent, v.Type.Str(), si.Name.Kind)
 		}
 		ret cd
 	}
 
-	fn tryComptimeObjSubIdent(mut self, mut &v: &Value, mut si: &ast::SubIdentExpr): (&Value, bool) {
+	fn tryComptimeObjSelector(mut self, mut &v: &Value, mut si: &ast::SelectorExpr): (&Value, bool) {
 		match {
 		| v.Type.comptimeTypeInfo() != nil:
 			mut ct := v.Type.comptimeTypeInfo()
-			ret self.comptimeObjSubIdent(ct, v, si), true
+			ret self.comptimeObjSelector(ct, v, si), true
 		| v.Type.comptimeStructField() != nil:
 			mut ct := v.Type.comptimeStructField()
-			ret self.comptimeObjSubIdent(ct, v, si), true
+			ret self.comptimeObjSelector(ct, v, si), true
 		| v.Type.comptimeEnumField() != nil:
 			mut ct := v.Type.comptimeEnumField()
-			ret self.comptimeObjSubIdent(ct, v, si), true
+			ret self.comptimeObjSelector(ct, v, si), true
 		| v.Type.comptimeParam() != nil:
 			mut ct := v.Type.comptimeParam()
-			ret self.comptimeObjSubIdent(ct, v, si), true
+			ret self.comptimeObjSelector(ct, v, si), true
 		| v.Type.comptimeStatic() != nil:
 			mut ct := v.Type.comptimeStatic()
-			ret self.comptimeObjSubIdent(ct, v, si), true
+			ret self.comptimeObjSelector(ct, v, si), true
 		| v.Type.comptimeValue() != nil:
 			mut ct := v.Type.comptimeValue()
-			ret self.comptimeObjSubIdent(ct, v, si), true
+			ret self.comptimeObjSelector(ct, v, si), true
 		| v.Type.comptimeFile() != nil:
 			mut ct := v.Type.comptimeFile()
-			ret self.comptimeObjSubIdent(ct, v, si), true
+			ret self.comptimeObjSelector(ct, v, si), true
 		| v.Type.comptimeDecl() != nil:
 			mut ct := v.Type.comptimeDecl()
-			ret self.comptimeObjSubIdent(ct, v, si), true
+			ret self.comptimeObjSelector(ct, v, si), true
 		|:
 			ret nil, false
 		}
 	}
 
-	fn evalObjSubIdent(mut self, mut v: &Value, mut si: &ast::SubIdentExpr): &Value {
-		if jule::IsBlank(si.Ident.Kind) {
-			self.pushErr(si.Ident, log::InvalidSyntax)
+	fn evalObjSelector(mut self, mut v: &Value, mut si: &ast::SelectorExpr): &Value {
+		if jule::IsBlank(si.Name.Kind) {
+			self.pushErr(si.Name, log::InvalidSyntax)
 			ret nil
 		}
 		{
-			mut compData, ok := self.tryComptimeObjSubIdent(v, si)
+			mut compData, ok := self.tryComptimeObjSelector(v, si)
 			if ok {
 				ret compData
 			}
@@ -2880,15 +2880,15 @@ impl eval {
 				break
 			}
 			if !self.isUnsafe() {
-				self.pushErr(si.Ident, log::UnsafeBehaviorAtOutOfUnsafeScope)
+				self.pushErr(si.Name, log::UnsafeBehaviorAtOutOfUnsafeScope)
 				self.pushSuggestion(log::WriteYourCodeInUnsafeJule)
 			}
-			kind = ptr.Elem
-			makeImplicitDeref(v, si.Ident)
+			kind = ptr.Value
+			makeImplicitDeref(v, si.Name)
 		| &Sptr:
 			mut sptr := v.Type.Kind.(&Sptr)
-			kind = sptr.Elem
-			makeImplicitDeref(v, si.Ident)
+			kind = sptr.Value
+			makeImplicitDeref(v, si.Name)
 		}
 
 		match type kind.Kind {
@@ -2900,17 +2900,17 @@ impl eval {
 				| &Sptr:
 					usedReferenceElem = true
 				}
-				ret self.evalStructSubIdent(v, s, si, usedReferenceElem)
+				ret self.evalStructSelector(v, s, si, usedReferenceElem)
 			}
 		}
 		if v.Type.Trait() != nil {
-			ret self.evalTraitSubIdent(v, v.Type.Trait(), si.Ident)
+			ret self.evalTraitSelector(v, v.Type.Trait(), si.Name)
 		}
-		self.pushErr(si.Ident, log::ObjNotSupportSubFields, v.Type.Str())
+		self.pushErr(si.Name, log::ObjNotSupportSubFields, v.Type.Str())
 		ret nil
 	}
 
-	fn evalSubIdent(mut &self, mut si: &ast::SubIdentExpr): &Value {
+	fn evalSelector(mut &self, mut si: &ast::SelectorExpr): &Value {
 		mut prefix := self.prefix
 		self.prefix = nil
 		defer { self.prefix = prefix }
@@ -2921,20 +2921,20 @@ impl eval {
 		if v.Decl {
 			ret self.evalTypeStatic(v, si)
 		}
-		ret self.evalObjSubIdent(v, si)
+		ret self.evalObjSelector(v, si)
 	}
 
 	fn evalTupleFunc(mut &self, mut tup: &ast::TupleExpr, part: fn(mut &expr: &ast::Expr): &Value): &Value {
 		mut tupT := new(Tuple)
-		tupT.Types = make([]&Type, 0, len(tup.Expr))
+		tupT.Types = make([]&Type, 0, len(tup.X))
 
 		mut model := &TupleExpr{
-			Values: make([]&Value, 0, len(tup.Expr)),
+			Values: make([]&Value, 0, len(tup.X)),
 		}
 
 		mut ok := true
-		for (_, mut expr) in tup.Expr {
-			mut v := part(expr)
+		for (_, mut x) in tup.X {
+			mut v := part(x)
 			if v == nil {
 				ok = false
 				continue
@@ -2967,8 +2967,8 @@ impl eval {
 		}
 
 		mut prefix := self.prefix
-		for (_, mut expr) in lit.Exprs {
-			mut pair, ok := expr.Kind.(&ast::KeyValPair)
+		for (_, mut expr) in lit.X {
+			mut pair, ok := expr.Data.(&ast::KeyValueExpr)
 			if !ok {
 				self.pushErr(lit.Token, log::InvalidSyntax)
 				ret nil
@@ -2982,11 +2982,11 @@ impl eval {
 				ret nil
 			}
 
-			self.prefix = model.Kind.Val
+			self.prefix = model.Kind.Value
 			// Do not unwrap untyped literals, type analysis will check overflows.
-			mut val := self.evalExpr(pair.Val, evalDefault)
+			mut value := self.evalExpr(pair.Value, evalDefault)
 			self.prefix = prefix
-			if val == nil {
+			if value == nil {
 				ret nil
 			}
 
@@ -2994,13 +2994,13 @@ impl eval {
 			if self.s.checkValidityForInitExpr(self.target.mutable, destIsRef, m.Key, key, pair.Key.Token) {
 				_ = self.s.checkAssignType(destIsRef, m.Key, key, pair.Key.Token, self.getOwnerRefers())
 			}
-			if self.s.checkValidityForInitExpr(self.target.mutable, destIsRef, m.Val, val, pair.Val.Token) {
-				_ = self.s.checkAssignType(destIsRef, m.Val, val, pair.Val.Token, self.getOwnerRefers())
+			if self.s.checkValidityForInitExpr(self.target.mutable, destIsRef, m.Value, value, pair.Value.Token) {
+				_ = self.s.checkAssignType(destIsRef, m.Value, value, pair.Value.Token, self.getOwnerRefers())
 			}
 
-			model.Entries = append(model.Entries, &KeyValPairExpr{
+			model.Entries = append(model.Entries, &KeyValueExpr{
 				Key: key.Model,
-				Val: val.Model,
+				Value: value.Model,
 			})
 		}
 
@@ -3090,25 +3090,25 @@ impl eval {
 	}
 
 	fn evalChanRecv(mut &self, mut expr: &ast::ChanRecv): &Value {
-		mut v := self.evalExpr(expr.Expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+		mut v := self.evalExpr(expr.X, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if v == nil {
 			ret nil
 		}
 		mut ch := v.Type.Chan()
 		if ch == nil {
 			// Expression type is not channel.
-			self.s.pushErr(expr.Expr.Token, log::ExprNotChan)
+			self.s.pushErr(expr.X.Token, log::ExprNotChan)
 			self.s.pushSuggestion(log::RArrowOpExpectsChan)
 			ret nil
 		}
 		if !ch.Recv {
-			self.s.pushErr(expr.Expr.Token, log::RecvFromSendOnlyChan)
+			self.s.pushErr(expr.X.Token, log::RecvFromSendOnlyChan)
 		}
 		v.Model = &ChanRecv{
-			Token: expr.Expr.Token,
+			Token: expr.X.Token,
 			Expr: new(Value, *v),
 		}
-		v.Type = ch.Elem
+		v.Type = ch.Value
 		ret v
 	}
 
@@ -3129,11 +3129,11 @@ impl eval {
 		mut prefix := self.prefix
 		mut mutable := self.target.mutable
 		mut unsafety := self.unsafety
-		self.prefix = ch.Elem
+		self.prefix = ch.Value
 		self.target.mutable = l.Mutable
 		self.unsafety = self.isUnsafe()
 		// Do not unwrap untyped literals, type analysis will check overflows.
-		mut r := self.evalExpr(chs.Data, evalDefault)
+		mut r := self.evalExpr(chs.X, evalDefault)
 		self.prefix = prefix
 		self.target.mutable = mutable
 		self.unsafety = unsafety
@@ -3146,14 +3146,14 @@ impl eval {
 			sc.removeInteriorMutRisk(r)
 		}
 		if l.Mutable && !r.Mutable && r.Type.Mutable() {
-			self.s.pushErr(chs.Data.Token, log::ImmutDataSendViaMutChan, r.Type.Str())
+			self.s.pushErr(chs.X.Token, log::ImmutDataSendViaMutChan, r.Type.Str())
 		}
 		// Check assignment types and return.
 		mut checker := assignTypeChecker{
 			s: self.s,
-			dest: ch.Elem,
+			dest: ch.Value,
 			v: r,
-			errorToken: chs.Data.Token,
+			errorToken: chs.X.Token,
 			refers: self.getOwnerRefers(),
 		}
 		if !checker.check() {
@@ -3169,7 +3169,7 @@ impl eval {
 	}
 
 	fn evalTypeAssertion(mut &self, mut tae: &ast::TypeAssertionExpr): &Value {
-		mut t := self.evalType1(tae.Kind)
+		mut t := self.evalType1(tae.Type)
 		if t == nil {
 			ret nil
 		}
@@ -3177,11 +3177,11 @@ impl eval {
 		self.prefix = nil
 		defer { self.prefix = prefix }
 		flags := evalDefault | evalPhysicalMem | evalUnwrapUntyped
-		mut v := self.evalExpr(tae.Expr, flags)
+		mut v := self.evalExpr(tae.X, flags)
 		if v == nil {
 			ret v
 		}
-		mut errorToken := tae.Expr.Token
+		mut errorToken := tae.X.Token
 		if v != nil && v.Decl {
 			self.pushErr(errorToken, log::InvalidExpr)
 			ret nil
@@ -3202,7 +3202,7 @@ impl eval {
 			mut ts := t.SoftStruct()
 			if ts == nil {
 				if t.Sptr() != nil {
-					ts = t.Sptr().Elem.SoftStruct()
+					ts = t.Sptr().Value.SoftStruct()
 				}
 			}
 			if ts == nil {
@@ -3227,15 +3227,15 @@ impl eval {
 		ret r
 	}
 
-	fn evalExprKind(mut &self, mut kind: ast::ExprData): &Value {
+	fn evalExprData(mut &self, mut kind: ast::ExprData): &Value {
 		match type kind {
 		| &ast::RangeExpr:
 			mut e := kind.(&ast::RangeExpr)
-			ret self.evalExprKind(e.Expr.Kind)
+			ret self.evalExprData(e.X.Data)
 		| &ast::LitExpr:
 			ret self.evalLit(kind.(&ast::LitExpr))
-		| &ast::IdentExpr:
-			ret self.evalIdent(kind.(&ast::IdentExpr))
+		| &ast::NameExpr:
+			ret self.evalName(kind.(&ast::NameExpr))
 		| &ast::UnaryExpr:
 			ret self.evalUnary(kind.(&ast::UnaryExpr))
 		| &ast::VariadicExpr:
@@ -3244,8 +3244,8 @@ impl eval {
 			ret self.evalUnsafe(kind.(&ast::UnsafeExpr))
 		| &ast::SliceExpr:
 			ret self.evalSliceExpr(kind.(&ast::SliceExpr))
-		| &ast::IndexingExpr:
-			ret self.evalIndexing(kind.(&ast::IndexingExpr))
+		| &ast::IndexExpr:
+			ret self.evalIndex(kind.(&ast::IndexExpr))
 		| &ast::SlicingExpr:
 			ret self.evalSlicing(kind.(&ast::SlicingExpr))
 		| &ast::CastExpr:
@@ -3254,10 +3254,10 @@ impl eval {
 			ret self.evalNamespace(kind.(&ast::NamespaceExpr))
 		| &ast::TypedBraceLit:
 			ret self.evalTypedBraceLit(kind.(&ast::TypedBraceLit))
-		| &ast::FuncCallExpr:
-			ret self.evalFuncCall(kind.(&ast::FuncCallExpr))
-		| &ast::SubIdentExpr:
-			ret self.evalSubIdent(kind.(&ast::SubIdentExpr))
+		| &ast::CallExpr:
+			ret self.evalCall(kind.(&ast::CallExpr))
+		| &ast::SelectorExpr:
+			ret self.evalSelector(kind.(&ast::SelectorExpr))
 		| &ast::TupleExpr:
 			ret self.evalTuple(kind.(&ast::TupleExpr))
 		| &ast::BraceLit:
@@ -3277,16 +3277,16 @@ impl eval {
 		}
 	}
 
-	// Like evalExprKind, but it handles type declarations.
+	// Like evalExprData, but it handles type declarations.
 	fn evalExprPlain(mut &self, mut expr: &ast::Expr): &Value {
-		match type expr.Kind {
+		match type expr.Data {
 		| &ast::ArrayType
 		| &ast::SliceType
 		| &ast::ChanType
 		| &ast::MapType:
 			ret self.evalType(expr)
 		|:
-			ret self.evalExprKind(expr.Kind)
+			ret self.evalExprData(expr.Data)
 		}
 	}
 
@@ -3314,7 +3314,7 @@ impl eval {
 			if !f.Decl.Static && f.Decl.IsMethod() {
 				self.s.pushErr(expr.Token, log::MethodNotInvoked)
 			} else if findDirective(f.Decl.Directives, directive::Export) != nil {
-				self.s.pushErr(expr.Token, log::ExportedUsedAsAnonymous, f.Decl.Ident)
+				self.s.pushErr(expr.Token, log::ExportedUsedAsAnonymous, f.Decl.Name)
 			} else {
 				f.AsAnon = true
 			}
@@ -3707,10 +3707,10 @@ impl unaryEval {
 				self.v = nil
 				ret
 			}
-			self.v.Type = t.Elem
+			self.v.Type = t.Value
 			self.v.Mutable = true
 		| self.v.Type.Sptr() != nil:
-			self.v.Type = self.v.Type.Sptr().Elem
+			self.v.Type = self.v.Type.Sptr().Value
 		|:
 			self.v = nil
 			ret
@@ -3730,7 +3730,7 @@ impl unaryEval {
 			match {
 			| canGetPtr(self.v):
 				self.v.Type = &Type{
-					Kind: &Ptr{Elem: self.v.Type},
+					Kind: &Ptr{Value: self.v.Type},
 				}
 				self.v.Model = &UnaryExpr{
 					Expr: new(Value, *self.v),
@@ -3771,10 +3771,10 @@ impl unaryEval {
 		| token::Amper:
 			mut prefix := self.e.prefix
 			self.e.prefix = nil
-			self.v = self.e.eval(self.u.Expr, evalDefault)
+			self.v = self.e.eval(self.u.X, evalDefault)
 			self.e.prefix = prefix
 		|:
-			self.v = self.e.eval(self.u.Expr, evalDefault)
+			self.v = self.e.eval(self.u.X, evalDefault)
 		}
 	}
 
@@ -4087,7 +4087,7 @@ impl binaryEval {
 			if self.e.s.meta.runtime != nil {
 				// Add instance to relevant runtime function for array element type if not exist.
 				mut f := runtimeFindFunc(self.e.s.meta.runtime, "arrayCmp").instanceForce()
-				f.Generics = append(f.Generics, &InsGeneric{Type: self.l.Type.Array().Elem})
+				f.Generics = append(f.Generics, &InsGeneric{Type: self.l.Type.Array().Value})
 				ok, _ := self.e.s.checkGenericFunc(f, self.op)
 				if !ok {
 					panic("sema: arrayCmp evaluation failed, this is an implementation mistake")
@@ -4804,7 +4804,7 @@ impl binaryEval {
 			ret nil
 		}
 
-		mut l := self.e.evalExpr1(op.Left, evalDefault)
+		mut l := self.e.evalExpr1(op.X, evalDefault)
 		if l == nil || l.Type == nil {
 			ret nil
 		}
@@ -4814,14 +4814,14 @@ impl binaryEval {
 			self.e.prefix = l.Type
 			defer { self.e.prefix = prefix }
 		}
-		mut r := self.e.evalExpr1(op.Right, evalDefault)
+		mut r := self.e.evalExpr1(op.Y, evalDefault)
 		if r == nil || r.Type == nil {
 			ret nil
 		}
 
 		self.op = op.Op
-		self.lt = op.Left.Token
-		self.rt = op.Right.Token
+		self.lt = op.X.Token
+		self.rt = op.Y.Token
 
 		mut v := self.solveExplicit(l, r)
 
@@ -4844,14 +4844,14 @@ fn findDirective(mut &directives: []&ast::Directive, d: str): &ast::Directive {
 	ret nil
 }
 
-fn findBuiltinsImport(&ident: str, imp: &ImportInfo): any {
-	ret findPackageBuiltinDef(imp.LinkPath, ident)
+fn findBuiltinsImport(&name: str, imp: &ImportInfo): any {
+	ret findPackageBuiltinDef(imp.LinkPath, name)
 }
 
 fn makeStructLitAlloc(mut &v: &Value, mut &lit: &StructLitExpr) {
 	v.Type = &Type{
 		Kind: &Sptr{
-			Elem: &Type{Kind: lit.Strct},
+			Value: &Type{Kind: lit.Strct},
 		},
 	}
 	v.Model = &AllocStructLitExpr{
@@ -4859,12 +4859,12 @@ fn makeStructLitAlloc(mut &v: &Value, mut &lit: &StructLitExpr) {
 	}
 }
 
-fn buildErrorVar(mut &s: &Scope, mut &fc: &ast::FuncCallExpr): &Var {
+fn buildErrorVar(mut &s: &Scope, mut &fc: &ast::CallExpr): &Var {
 	ret &Var{
 		Used: true,
 		Reference: false,
 		Mutable: true,
-		Ident: "error",
+		Name: "error",
 		Token: fc.Token,
 		TypeSym: findBuiltinTypeAlias(types::Any).TypeSym,
 		Scope: s,
@@ -4874,7 +4874,7 @@ fn buildErrorVar(mut &s: &Scope, mut &fc: &ast::FuncCallExpr): &Var {
 	}
 }
 
-fn findBuiltinsSema(&ident: str, mut s: &sema): any {
+fn findBuiltinsSema(&name: str, mut s: &sema): any {
 	// If package is std, check for internal builtin defines.
 	mut ppath := s.file.File.Dir()
 	stdlib := build::PathStdlib()
@@ -4884,7 +4884,7 @@ fn findBuiltinsSema(&ident: str, mut s: &sema): any {
 		// Add "std" to beginning without separator
 		// because path has separator at beginning.
 		ppath = "std" + strings::ReplaceAll(ppath, str(filepath::Separator), jule::ImportPathSep)
-		ret findPackageBuiltinDef(ppath, ident)
+		ret findPackageBuiltinDef(ppath, name)
 	}
 
 	ret nil
@@ -4928,7 +4928,7 @@ fn isInstancedStruct(s: &StructIns): bool {
 fn isPtrArithmeticCompatible(mut &l: &Value, mut &r: &Value): bool {
 	ptr := r.Type.Ptr()
 	if ptr != nil {
-		ret l.Type.Ptr().Elem.Equal(ptr.Elem)
+		ret l.Type.Ptr().Value.Equal(ptr.Value)
 	}
 	if r.IsConst() && r.untyped {
 		ret intAssignable(types::Int, r) ||
@@ -5006,7 +5006,7 @@ fn applyCastKindModel(mut &s: &sema, mut &v: &Value, mut &t: &Type,
 		if arr != nil && v.Type.Comparable() {
 			// Add instance to relevant runtime function for array element type if not exist.
 			mut f := runtimeFindFunc(s.meta.runtime, "arrayCmp").instanceForce()
-			f.Generics = append(f.Generics, &InsGeneric{Type: arr.Elem})
+			f.Generics = append(f.Generics, &InsGeneric{Type: arr.Value})
 			ok, _ := s.checkGenericFunc(f, token)
 			if !ok {
 				panic("sema: arrayCmp evaluation failed, this is an implementation mistake")
@@ -5034,7 +5034,7 @@ fn buildVoidValue(): &Value {
 	}
 }
 
-fn checkDataForIntegerIndexing(mut &s: &sema, mut &v: &Value,
+fn checkDataForIntegerIndex(mut &s: &sema, mut &v: &Value,
 	mut &token: &token::Token, mut refers: &ReferenceStack): (errFmt: str) {
 	if v == nil {
 		ret ""

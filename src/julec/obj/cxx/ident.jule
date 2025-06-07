@@ -25,18 +25,18 @@ impl identCoder {
 	// Write identifiers to buf. If identifier contains unicode runes,
 	// handle as ASCII characters. Some backend compilers are not supports
 	// unicode identifiers and causes compile errors.
-	fn writeIdentTo(mut &buf: strings::Builder, &ident: str) {
-		for _, b in ident {
+	fn writeIdentTo(mut &buf: strings::Builder, &name: str) {
+		for _, b in name {
 			if b >= utf8::RuneSelf {
-				// ident contains unicode runes.
+				// identifier contains unicode runes.
 				goto unicode
 			}
 		}
-		// ident is ASCII, append directly.
-		buf.WriteStr(ident)!
+		// identifier is ASCII, append directly.
+		buf.WriteStr(name)!
 		ret
 	unicode:
-		for _, r in ident {
+		for _, r in name {
 			if r < utf8::RuneSelf { // ASCII
 				// Cast to byte to enable compiler optimization.
 				// Append directly to buf.
@@ -51,15 +51,15 @@ impl identCoder {
 	// Writes cpp output identifier form of given identifier.
 	//
 	// Parameters:
-	//	ident: Identifier.
+	//	name: Identifier.
 	//	addr:  Pointer address of package file handler.
-	fn toOut(mut &buf: strings::Builder, ident: str, addr: uintptr) {
+	fn toOut(mut &buf: strings::Builder, name: str, addr: uintptr) {
 		buf.WriteByte('_')!
 		if addr != 0 {
 			buf.WriteStr(conv::FormatUint(u64(addr), 0xF))!
 			buf.WriteByte('_')!
 		}
-		identCoder.writeIdentTo(buf, ident)
+		identCoder.writeIdentTo(buf, name)
 	}
 
 	// Writes cpp output local identifier form of given identifier.
@@ -67,19 +67,19 @@ impl identCoder {
 	// Parameters:
 	//	row:   Row of definition.
 	//	col:   Column of definition.
-	//	ident: Identifier of definition.
-	fn toLocal(mut &buf: strings::Builder, row: int, col: int, &ident: str) {
+	//	name: Identifier of definition.
+	fn toLocal(mut &buf: strings::Builder, row: int, col: int, &name: str) {
 		buf.WriteByte('_')!
 		buf.WriteStr(conv::Itoa(row))!
 		buf.WriteStr(conv::Itoa(col))!
 		buf.WriteByte('_')!
-		identCoder.writeIdentTo(buf, ident)
+		identCoder.writeIdentTo(buf, name)
 	}
 
 	fn func(mut &buf: strings::Builder, mut &f: &sema::Func) {
 		match {
-		| f.Binded:
-			buf.WriteStr(f.Ident)!
+		| f.Bind:
+			buf.WriteStr(f.Name)!
 			ret
 		| f.IsMethod():
 			if f.Static {
@@ -91,7 +91,7 @@ impl identCoder {
 			buf.WriteStr(export.Args[0].Kind)!
 			ret
 		}
-		identCoder.toOut(buf, f.Ident, uintptr(f))
+		identCoder.toOut(buf, f.Name, uintptr(f))
 	}
 
 	fn funcIns(mut &buf: strings::Builder, mut &f: &sema::FuncIns) {
@@ -99,22 +99,22 @@ impl identCoder {
 			// Do not use [identCoder.writeIdentTo] for this.
 			// Built-in functions are always ASCII.
 			buf.WriteStr("jule::")!
-			buf.WriteStr(f.Decl.Ident)!
+			buf.WriteStr(f.Decl.Name)!
 			ret
 		}
-		if f.Decl.Binded || len(f.Generics) == 0 {
+		if f.Decl.Bind || len(f.Generics) == 0 {
 			identCoder.func(buf, f.Decl)
 			ret
 		}
-		identCoder.toOut(buf, f.Decl.Ident, uintptr(f))
+		identCoder.toOut(buf, f.Decl.Name, uintptr(f))
 	}
 
 	fn traitDecl(mut &buf: strings::Builder, t: &sema::Trait) {
-		identCoder.toOut(buf, t.Ident, uintptr(t))
+		identCoder.toOut(buf, t.Name, uintptr(t))
 	}
 
 	fn param(mut &buf: strings::Builder, &p: &sema::Param) {
-		if jule::IsAnon(p.Ident) || jule::IsBlank(p.Ident) {
+		if jule::IsAnon(p.Name) || jule::IsBlank(p.Name) {
 			ret
 		}
 		if p.IsSelf() {
@@ -122,37 +122,37 @@ impl identCoder {
 			ret
 		}
 		if p.Token == nil {
-			identCoder.toLocal(buf, 0, 0, p.Ident)
+			identCoder.toLocal(buf, 0, 0, p.Name)
 			ret
 		}
-		identCoder.toLocal(buf, p.Token.Row, p.Token.Column, p.Ident)
+		identCoder.toLocal(buf, p.Token.Row, p.Token.Column, p.Name)
 	}
 
 	fn structure(mut &buf: strings::Builder, &s: &sema::Struct) {
-		if s.Binded {
+		if s.Bind {
 			if !obj::HasDirective(s.Directives, directive::Typedef) {
 				buf.WriteStr("struct ")!
 			}
-			buf.WriteStr(s.Ident)!
+			buf.WriteStr(s.Name)!
 			ret
 		}
-		identCoder.toOut(buf, s.Ident, uintptr(s))
+		identCoder.toOut(buf, s.Name, uintptr(s))
 	}
 
 	fn structureIns(mut &buf: strings::Builder, &s: &sema::StructIns) {
-		if s.Decl.Binded || len(s.Generics) == 0 {
+		if s.Decl.Bind || len(s.Generics) == 0 {
 			identCoder.structure(buf, s.Decl)
 			ret
 		}
-		identCoder.toOut(buf, s.Decl.Ident, uintptr(s))
+		identCoder.toOut(buf, s.Decl.Name, uintptr(s))
 	}
 
 	fn field(mut &buf: strings::Builder, &f: &sema::Field) {
-		if f.Owner.Binded {
-			buf.WriteStr(f.Ident)!
+		if f.Owner.Bind {
+			buf.WriteStr(f.Name)!
 			ret
 		}
-		if jule::IsBlank(f.Ident) {
+		if jule::IsBlank(f.Name) {
 			// If the identifier is blank, there may be other fields like that.
 			// So handle them with unique identifier, avoid duplication.
 			buf.WriteStr("_field_")!
@@ -160,7 +160,7 @@ impl identCoder {
 			ret
 		}
 		buf.WriteStr("_field_")!
-		identCoder.writeIdentTo(buf, f.Ident)
+		identCoder.writeIdentTo(buf, f.Name)
 	}
 
 	// Returns output identifier of captured variable by anonymous function.
@@ -169,7 +169,7 @@ impl identCoder {
 		| Tuple:
 			// This means variable one of the structure fields of multiple-return.
 			// To avoid generating invalid IR code, use the variable's unique identifier.
-			identCoder.toOut(buf, v.Ident, uintptr(v))
+			identCoder.toOut(buf, v.Name, uintptr(v))
 		| Single:
 			// Use the common identifier coder for single variable returns.
 			fall
@@ -195,21 +195,21 @@ impl identCoder {
 			ret
 		}
 		match {
-		| v.Binded:
-			buf.WriteStr(v.Ident)!
-		| v.Ident == "error":
+		| v.Bind:
+			buf.WriteStr(v.Name)!
+		| v.Name == "error":
 			buf.WriteStr("except.error")!
-		| v.Ident == "self":
+		| v.Name == "self":
 			buf.WriteStr(identSelf)!
 		| v.Scope != nil:
-			identCoder.toLocal(buf, v.Token.Row, v.Token.Column, v.Ident)
+			identCoder.toLocal(buf, v.Token.Row, v.Token.Column, v.Name)
 		|:
 			export := obj::FindDirective(v.Directives, directive::Export)
 			if export != nil {
 				buf.WriteStr(export.Args[0].Kind)!
 				ret
 			}
-			identCoder.toOut(buf, v.Ident, uintptr(v))
+			identCoder.toOut(buf, v.Name, uintptr(v))
 		}
 	}
 

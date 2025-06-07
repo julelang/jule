@@ -57,7 +57,7 @@ struct exprPart {
 // Scope.
 struct Scope {
 	Parent:   &Scope
-	Unsafety: bool
+	Unsafe:   bool
 	Deferred: bool
 	Stmts:    []Stmt
 
@@ -135,14 +135,14 @@ struct Break {
 
 // Label.
 struct Label {
-	Ident: str
+	Name:  str
 	Scope: &Scope // Owner scope.
 	Index: int    // Index of statement.
 }
 
 // Goto statement.
 struct Goto {
-	Ident: str
+	Name:  str
 	Token: &token::Token
 	Label: &Label
 	Scope: &Scope // Owner scope.
@@ -290,66 +290,66 @@ impl Lookup for scopeChecker {
 		ret self.s.SelectPackage(selector)
 	}
 
-	// Returns variable by identifier and binded state.
+	// Returns variable by identifier and bind state.
 	// Returns nil if not exist any variable in this identifier.
 	//
 	// Lookups:
 	//	- Current scope.
 	//	- Parent scopes.
 	//	- Sema.
-	fn FindVar(mut self, ident: str, binded: bool): &Var {
-		if !binded { // Local variables cannot be binded.
-			mut v := self.findVar(ident)
+	fn FindVar(mut self, name: str, _bind: bool): &Var {
+		if !_bind { // Local variables cannot be bind.
+			mut v := self.findVar(name)
 			if v != nil {
 				ret v
 			}
 		}
-		ret self.s.FindVar(ident, binded)
+		ret self.s.FindVar(name, _bind)
 	}
 
-	// Returns type alias by identifier and binded state.
+	// Returns type alias by identifier and bind state.
 	// Returns nil if not exist any type alias in this identifier.
 	//
 	// Lookups:
 	//	- Current scope.
 	//	- Parent scopes.
 	//	- Sema.
-	fn FindTypeAlias(mut self, ident: str, binded: bool): &TypeAlias {
+	fn FindTypeAlias(mut self, name: str, _bind: bool): &TypeAlias {
 		// Search reverse for correct shadowing.
 		const Reverse = true
-		mut ta := self.table.findTypeAlias(ident, binded, Reverse)
+		mut ta := self.table.findTypeAlias(name, _bind, Reverse)
 		if ta != nil {
 			ret ta
 		}
 
 		mut parent := self.parent
 		for parent != nil {
-			ta = parent.table.findTypeAlias(ident, binded, Reverse)
+			ta = parent.table.findTypeAlias(name, _bind, Reverse)
 			if ta != nil {
 				ret ta
 			}
 			parent = parent.parent
 		}
 
-		ret self.s.FindTypeAlias(ident, binded)
+		ret self.s.FindTypeAlias(name, _bind)
 	}
 
-	// Returns struct by identifier and binded state.
+	// Returns struct by identifier and bind state.
 	// Returns nil if not exist any struct in this identifier.
 	//
 	// Lookups:
 	//	- Sema.
-	fn FindStruct(mut self, ident: str, binded: bool): &Struct {
-		ret self.s.FindStruct(ident, binded)
+	fn FindStruct(mut self, name: str, _bind: bool): &Struct {
+		ret self.s.FindStruct(name, _bind)
 	}
 
-	// Returns function by identifier and binded state.
+	// Returns function by identifier and bind state.
 	// Returns nil if not exist any function in this identifier.
 	//
 	// Lookups:
 	//	- Sema.
-	fn FindFunc(mut self, ident: str, binded: bool): &Func {
-		ret self.s.FindFunc(ident, binded)
+	fn FindFunc(mut self, name: str, _bind: bool): &Func {
+		ret self.s.FindFunc(name, _bind)
 	}
 
 	// Returns trait by identifier.
@@ -357,8 +357,8 @@ impl Lookup for scopeChecker {
 	//
 	// Lookups:
 	//	- Sema.
-	fn FindTrait(mut self, ident: str): &Trait {
-		ret self.s.FindTrait(ident)
+	fn FindTrait(mut self, name: str): &Trait {
+		ret self.s.FindTrait(name)
 	}
 
 	// Returns enum by identifier.
@@ -366,8 +366,8 @@ impl Lookup for scopeChecker {
 	//
 	// Lookups:
 	//	- Sema.
-	fn FindEnum(mut self, ident: str): &Enum {
-		ret self.s.FindEnum(ident)
+	fn FindEnum(mut self, name: str): &Enum {
+		ret self.s.FindEnum(name)
 	}
 
 	// Returns type enum by identifier.
@@ -375,8 +375,8 @@ impl Lookup for scopeChecker {
 	//
 	// Lookups:
 	//	- Sema.
-	fn FindTypeEnum(mut self, ident: str): &TypeEnum {
-		ret self.s.FindTypeEnum(ident)
+	fn FindTypeEnum(mut self, name: str): &TypeEnum {
+		ret self.s.FindTypeEnum(name)
 	}
 }
 
@@ -386,7 +386,7 @@ impl scopeChecker {
 		mut scope := self
 
 	iter:
-		if scope.scope.Unsafety {
+		if scope.scope.Unsafe {
 			ret true
 		}
 
@@ -484,16 +484,16 @@ impl scopeChecker {
 	}
 
 	// Like [Lookup.FindVar] but designed for local variables only.
-	fn findVar(mut self, ident: str): &Var {
+	fn findVar(mut self, name: str): &Var {
 		const Reverse = true // Search reverse for correct shadowing.
-		const Binded = false // Local variables cannot be binded.
-		mut v := self.table.findVar(ident, Binded, Reverse)
+		const Bind = false   // Local variables cannot be bind.
+		mut v := self.table.findVar(name, Bind, Reverse)
 		if v != nil {
 			ret v
 		}
 		mut parent := self.parent
 		for parent != nil {
-			v = parent.table.findVar(ident, Binded, Reverse)
+			v = parent.table.findVar(name, Bind, Reverse)
 			if v != nil {
 				ret v
 			}
@@ -505,10 +505,10 @@ impl scopeChecker {
 	// Returns label by identifier.
 	// Returns nil if not exist any label in this identifier.
 	// Just lookups current scope.
-	fn findLabel(mut self, &ident: str): &Label {
+	fn findLabel(mut self, &name: str): &Label {
 		for (_, mut st) in self.scope.Stmts {
 			mut label, ok := st.(&Label)
-			if ok && label.Ident == ident {
+			if ok && label.Name == name {
 				ret label
 			}
 		}
@@ -518,8 +518,8 @@ impl scopeChecker {
 	// Returns label by identifier.
 	// Returns nil if not exist any label in this identifier.
 	// Just lookups current scope.
-	fn findLabelScope(mut &self, &ident: str): &scopeLabel {
-		mut label := self.findLabelAll(ident)
+	fn findLabelScope(mut &self, &name: str): &scopeLabel {
+		mut label := self.findLabelAll(name)
 		if label != nil && label.node.Scope == self.scope {
 			ret label
 		}
@@ -529,9 +529,9 @@ impl scopeChecker {
 	// Returns label by identifier.
 	// Returns nil if not exist any label in this identifier.
 	// Lookups all labels.
-	fn findLabelAll(mut self, &ident: str): &scopeLabel {
+	fn findLabelAll(mut self, &name: str): &scopeLabel {
 		for (_, mut lbl) in *self.labels {
-			if lbl.node.Ident == ident {
+			if lbl.node.Name == name {
 				ret lbl
 			}
 		}
@@ -541,8 +541,8 @@ impl scopeChecker {
 	// Reports this identifier duplicated in scope.
 	// The "self" parameter represents address of exception identifier.
 	// If founded identifier address equals to self, will be skipped.
-	fn isDuplicatedIdent(mut self, itself: uintptr, &ident: str): bool {
-		v := self.FindVar(ident, false)
+	fn isDuplicatedName(mut self, itself: uintptr, &name: str): bool {
+		v := self.FindVar(name, false)
 		if v != nil && uintptr(v) != itself {
 			if v.Scope == nil { // Ignore globals.
 				ret false
@@ -550,7 +550,7 @@ impl scopeChecker {
 			ret v.Scope == self.scope || !self.s.isFlag(Shadowing)
 		}
 
-		ta := self.FindTypeAlias(ident, false)
+		ta := self.FindTypeAlias(name, false)
 		if ta != nil && uintptr(ta) != itself {
 			if ta.Scope == nil { // Ignore globals.
 				ret false
@@ -567,8 +567,8 @@ impl scopeChecker {
 			self.scope.Stmts = append(self.scope.Stmts, v)
 		}
 
-		if !jule::IsBlank(v.Ident) && self.isDuplicatedIdent(uintptr(v), v.Ident) {
-			self.s.pushErr(v.Token, log::DuplicatedIdent, v.Ident)
+		if !jule::IsBlank(v.Name) && self.isDuplicatedName(uintptr(v), v.Name) {
+			self.s.pushErr(v.Token, log::DuplicatedIdent, v.Name)
 			self.s.pushSuggestion(log::RenameForAvoidDuplication)
 			self.stop()
 			ret
@@ -602,7 +602,7 @@ impl scopeChecker {
 	}
 
 	fn checkVarDecl(mut &self, mut decl: &ast::Var) {
-		if jule::IsBlank(decl.Ident) {
+		if jule::IsBlank(decl.Name) {
 			self.s.pushErr(decl.Token, log::IgnoreIdent)
 			ret
 		}
@@ -617,8 +617,8 @@ impl scopeChecker {
 	}
 
 	fn checkTypeAlias(mut &self, mut &ta: &TypeAlias) {
-		if self.isDuplicatedIdent(uintptr(ta), ta.Ident) {
-			self.s.pushErr(ta.Token, log::DuplicatedIdent, ta.Ident)
+		if self.isDuplicatedName(uintptr(ta), ta.Name) {
+			self.s.pushErr(ta.Token, log::DuplicatedIdent, ta.Name)
 			self.s.pushSuggestion(log::RenameForAvoidDuplication)
 			self.stop()
 			ret
@@ -668,7 +668,7 @@ impl scopeChecker {
 			self.getRoot().owner.Decl.HasDefer = true
 			mut f := &ast::Func{
 				Scope: tree,
-				Ident: jule::Anon,
+				Name: jule::Anon,
 				Result: new(ast::RetType),
 			}
 			mut e := self.s.eval(self)
@@ -732,14 +732,14 @@ impl scopeChecker {
 	fn checkIf(mut &self, mut i: &ast::If): &If {
 		mut s := self.checkChild(i.Scope)
 
-		mut v := self.s.eval(self).evalExpr(i.Expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+		mut v := self.s.eval(self).evalExpr(i.X, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if v == nil {
 			ret nil
 		}
 
 		mut prim := v.Type.Prim()
 		if prim == nil || !prim.IsBool() {
-			self.s.pushErr(i.Expr.Token, log::IfRequireBoolExpr)
+			self.s.pushErr(i.X.Token, log::IfRequireBoolExpr)
 			ret nil
 		}
 
@@ -761,7 +761,6 @@ impl scopeChecker {
 
 		c.Elifs = make([]&If, 0, len(conditional.Tail)+1)
 
-		c.Elifs = append(c.Elifs, self.checkIf(conditional.Head))
 		for (_, mut elif) in conditional.Tail {
 			c.Elifs = append(c.Elifs, self.checkIf(elif))
 		}
@@ -795,7 +794,7 @@ impl scopeChecker {
 
 	fn checkWhileIter(mut &self, mut &it: &ast::Iter) {
 		mut wh := it.Kind.(&ast::WhileKind)
-		if wh.Expr == nil && wh.Next == nil {
+		if wh.X == nil && wh.Next == nil {
 			self.checkInfIter(it)
 			ret
 		}
@@ -804,8 +803,8 @@ impl scopeChecker {
 		self.scope.Stmts = append(self.scope.Stmts, kind)
 		kind.Scope = self.checkIterScope(uintptr(kind), it.Scope)
 
-		if wh.Expr != nil {
-			mut v := self.s.eval(self).evalExpr(wh.Expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+		if wh.X != nil {
+			mut v := self.s.eval(self).evalExpr(wh.X, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 			if v == nil {
 				ret
 			}
@@ -845,14 +844,14 @@ impl scopeChecker {
 
 	fn checkComptimeRangeIter(mut &self, mut &it: &ast::Iter, mut &kind: &RangeIter, mut &v: &Value) {
 		if kind.KeyA != nil {
-			if !self.s.isFlag(Shadowing) && self.isDuplicatedIdent(0, kind.KeyA.Ident) {
-				self.s.pushErr(kind.KeyA.Token, log::DuplicatedIdent, kind.KeyA.Ident)
+			if !self.s.isFlag(Shadowing) && self.isDuplicatedName(0, kind.KeyA.Name) {
+				self.s.pushErr(kind.KeyA.Token, log::DuplicatedIdent, kind.KeyA.Name)
 				self.s.pushSuggestion(log::RenameForAvoidDuplication)
 			}
 		}
 		if kind.KeyB != nil {
-			if !self.s.isFlag(Shadowing) && self.isDuplicatedIdent(0, kind.KeyB.Ident) {
-				self.s.pushErr(kind.KeyB.Token, log::DuplicatedIdent, kind.KeyB.Ident)
+			if !self.s.isFlag(Shadowing) && self.isDuplicatedName(0, kind.KeyB.Name) {
+				self.s.pushErr(kind.KeyB.Token, log::DuplicatedIdent, kind.KeyB.Name)
 				self.s.pushSuggestion(log::RenameForAvoidDuplication)
 			}
 		}
@@ -860,7 +859,7 @@ impl scopeChecker {
 		mut rang := it.Kind.(&ast::RangeKind)
 		makeComptimeRange(v, false)
 		if v.Decl {
-			self.s.pushErr(rang.Expr.Token, log::InvalidTypeForComptimeIter, v.Type.Str())
+			self.s.pushErr(rang.X.Token, log::InvalidTypeForComptimeIter, v.Type.Str())
 			ret
 		}
 
@@ -910,14 +909,14 @@ impl scopeChecker {
 		mut eval := self.s.eval(self)
 		eval.target.mutable = true
 
-		mut v := eval.evalExpr1(rang.Expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+		mut v := eval.evalExpr1(rang.X, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if v == nil {
 			ret
 		}
 
 		mut kind := &RangeIter{
 			Expr: v,
-			ExprToken: rang.Expr.Token,
+			ExprToken: rang.X.Token,
 		}
 
 		if it.Comptime {
@@ -925,7 +924,7 @@ impl scopeChecker {
 			ret
 		}
 		if v.Type.comptime() {
-			self.s.pushErr(rang.Expr.Token, log::ComptimeExprForRuntimeIteration)
+			self.s.pushErr(rang.X.Token, log::ComptimeExprForRuntimeIteration)
 			self.s.pushSuggestion(log::DeclareComptimeForeach)
 			ret
 		}
@@ -947,8 +946,8 @@ impl scopeChecker {
 		mut scope := self.getChild()
 
 		if kind.KeyA != nil {
-			if !self.s.isFlag(Shadowing) && self.isDuplicatedIdent(0, kind.KeyA.Ident) {
-				self.s.pushErr(kind.KeyA.Token, log::DuplicatedIdent, kind.KeyA.Ident)
+			if !self.s.isFlag(Shadowing) && self.isDuplicatedName(0, kind.KeyA.Name) {
+				self.s.pushErr(kind.KeyA.Token, log::DuplicatedIdent, kind.KeyA.Name)
 				self.s.pushSuggestion(log::RenameForAvoidDuplication)
 			}
 			kind.KeyA.Scope = scope
@@ -956,8 +955,8 @@ impl scopeChecker {
 		}
 
 		if kind.KeyB != nil {
-			if !self.s.isFlag(Shadowing) && self.isDuplicatedIdent(0, kind.KeyB.Ident) {
-				self.s.pushErr(kind.KeyB.Token, log::DuplicatedIdent, kind.KeyB.Ident)
+			if !self.s.isFlag(Shadowing) && self.isDuplicatedName(0, kind.KeyB.Name) {
+				self.s.pushErr(kind.KeyB.Token, log::DuplicatedIdent, kind.KeyB.Name)
 				self.s.pushSuggestion(log::RenameForAvoidDuplication)
 			}
 			kind.KeyB.Scope = scope
@@ -969,7 +968,7 @@ impl scopeChecker {
 	}
 
 	fn checkIter(mut &self, mut it: &ast::Iter) {
-		if it.IsInf() {
+		if it.IsInfinite() {
 			if it.Comptime {
 				self.s.pushErr(it.Token, log::InvalidComptimeIter)
 				ret
@@ -1105,13 +1104,13 @@ impl scopeChecker {
 	}
 
 	fn checkLabel(mut &self, mut l: &ast::Label) {
-		if self.findLabel(l.Ident) != nil {
-			self.s.pushErr(l.Token, log::LabelExist, l.Ident)
+		if self.findLabel(l.Name) != nil {
+			self.s.pushErr(l.Token, log::LabelExist, l.Name)
 			ret
 		}
 
 		mut label := &Label{
-			Ident: l.Ident,
+			Name: l.Name,
 			Scope: self.scope,
 			Index: self.i,
 		}
@@ -1126,7 +1125,7 @@ impl scopeChecker {
 	fn pushGoto(mut &self, mut gt: &ast::Goto) {
 		mut st := &Goto{
 			Token: gt.Label,
-			Ident: gt.Label.Kind,
+			Name: gt.Label.Kind,
 			Scope: self.scope,
 			Index: self.i,
 		}
@@ -1135,46 +1134,46 @@ impl scopeChecker {
 	}
 
 	fn checkPostfix(mut &self, mut a: &ast::Assign) {
-		if len(a.Left) > 1 {
-			self.s.pushErr(a.Setter, log::InvalidSyntax)
+		if len(a.X) > 1 {
+			self.s.pushErr(a.Op, log::InvalidSyntax)
 			ret
 		}
 
 		mut eval := self.s.eval(self)
 		eval.target.mutable = true
 
-		mut expr := a.Left[0].Expr
-		mut v := eval.evalExpr(expr, evalDefault)
+		mut x := a.X[0].X
+		mut v := eval.evalExpr(x, evalDefault)
 		if v == nil {
 			ret
 		}
 
-		_ = checkAssign(self.s, v, nil, a.Setter)
+		_ = checkAssign(self.s, v, nil, a.Op)
 
 		if v.Type.Ptr() != nil {
 			mut ptr := v.Type.Ptr()
 			if ptr.IsUnsafe() {
-				self.s.pushErr(a.Setter, log::OperatorNotForJuleType, a.Setter.Kind, v.Type.Str())
+				self.s.pushErr(a.Op, log::OperatorNotForJuleType, a.Op.Kind, v.Type.Str())
 				ret
 			}
 		} else {
 			if v.Type.Prim() == nil || !types::IsNum(v.Type.Prim().Kind) {
-				self.s.pushErr(a.Setter, log::OperatorNotForJuleType, a.Setter.Kind, v.Type.Str())
+				self.s.pushErr(a.Op, log::OperatorNotForJuleType, a.Op.Kind, v.Type.Str())
 				ret
 			}
 		}
 
 		self.scope.Stmts = append(self.scope.Stmts, &Postfix{
 			Expr: v.Model,
-			Op: a.Setter.Kind,
+			Op: a.Op.Kind,
 		})
 	}
 
-	fn isNewAssignIdent(mut self, ident: str): bool {
-		if jule::IsBlank(ident) || ident == "" {
+	fn isNewAssignIdent(mut self, name: str): bool {
+		if jule::IsBlank(name) || name == "" {
 			ret false
 		}
-		ret self.table.defByIdent(ident, false) == nil
+		ret self.table.defByIdent(name, false) == nil
 	}
 
 	// Remove the interior mutability risk if the v represents a structure and
@@ -1203,11 +1202,11 @@ impl scopeChecker {
 	fn checkSingleAssign(mut &self, mut &a: &ast::Assign, flags: int) {
 		let mut l: &Value = nil
 
-		if !jule::IsBlank(a.Left[0].Ident) {
-			mut expr := a.Left[0].Expr
+		if !jule::IsBlank(a.X[0].Name) {
+			mut x := a.X[0].X
 			mut eval := self.s.eval(self)
 			eval.target.mutable = true
-			l = eval.evalExpr(expr, evalDefault)
+			l = eval.evalExpr(x, evalDefault)
 			if l == nil {
 				ret
 			}
@@ -1230,7 +1229,7 @@ impl scopeChecker {
 		if l == nil {
 			evalFlags |= evalUnwrapUntyped
 		}
-		mut r := eval.evalExpr(a.Right, evalFlags)
+		mut r := eval.evalExpr(a.Y, evalFlags)
 		if r == nil {
 			ret
 		}
@@ -1239,21 +1238,21 @@ impl scopeChecker {
 
 		if l == nil {
 			if r.Type.Void() {
-				self.s.pushErr(a.Right.Token, log::InvalidExpr)
+				self.s.pushErr(a.Y.Token, log::InvalidExpr)
 			}
-			if a.Setter.Id != token::Eq {
-				self.s.pushErr(a.Setter, log::InvalidSyntax)
+			if a.Op.Id != token::Eq {
+				self.s.pushErr(a.Op, log::InvalidSyntax)
 			}
 			self.scope.Stmts = append(self.scope.Stmts, r)
 			ret
 		}
 
-		if !checkAssign(self.s, l, r, a.Setter) {
+		if !checkAssign(self.s, l, r, a.Op) {
 			ret
 		}
 
 		if r.Type.Tuple() != nil {
-			self.s.pushErr(a.Setter, log::MissingMultiAssignIdents)
+			self.s.pushErr(a.Op, log::MissingMultiAssignIdents)
 			ret
 		}
 
@@ -1265,14 +1264,14 @@ impl scopeChecker {
 			Type: r.Type,
 			Model: r.Model,
 		}
-		self.scope.Stmts = append(self.scope.Stmts, &Assign{Left: lm, Right: rm, Op: a.Setter})
+		self.scope.Stmts = append(self.scope.Stmts, &Assign{Left: lm, Right: rm, Op: a.Op})
 
-		if a.Setter.Id == token::Eq {
+		if a.Op.Id == token::Eq {
 			mut checker := assignTypeChecker{
 				s: self.s,
 				dest: l.Type,
 				v: r,
-				errorToken: a.Setter,
+				errorToken: a.Op,
 				refers: self.getOwnerRefers(),
 			}
 			if checker.check() {
@@ -1281,27 +1280,27 @@ impl scopeChecker {
 			}
 			ret
 		}
-		id := a.Setter.Id
-		a.Setter.Id = removeEqFromOp(a.Setter.Id)
-		mut solver := binaryEval.new(eval, a.Setter, a.Setter, a.Right.Token)
+		id := a.Op.Id
+		a.Op.Id = removeEqFromOp(a.Op.Id)
+		mut solver := binaryEval.new(eval, a.Op, a.Op, a.Y.Token)
 		solver.l, solver.r = l, r
 		_ = solver.evalOp()
-		a.Setter.Id = id
+		a.Op.Id = id
 	}
 
 	fn processEndPartOfMultiAssign(mut &self, mut &st: &MultiAssign, mut &a: &ast::Assign,
 		mut &lexpr: &ast::AssignLeft, mut &l: &Value, mut &r: exprPart, strict: bool) {
-		if !lexpr.Reference && jule::IsBlank(lexpr.Ident) {
+		if !lexpr.Reference && jule::IsBlank(lexpr.Name) {
 			if r.data.Type.Void() {
-				self.s.pushErr(a.Right.Token, log::InvalidExpr)
+				self.s.pushErr(a.Y.Token, log::InvalidExpr)
 			}
 			st.Left = append(st.Left, nil)
 			ret
 		}
-		if a.Declarative {
-			match type lexpr.Expr.Kind {
-			| &ast::IdentExpr:
-				if !self.isNewAssignIdent(lexpr.Ident) {
+		if a.Decl {
+			match type lexpr.X.Data {
+			| &ast::NameExpr:
+				if !self.isNewAssignIdent(lexpr.Name) {
 					goto norm
 				}
 			|:
@@ -1311,19 +1310,19 @@ impl scopeChecker {
 				}
 				goto norm
 			}
-			if self.isDuplicatedIdent(0, lexpr.Ident) {
-				self.s.pushErr(lexpr.Token, log::DuplicatedIdent, lexpr.Ident)
+			if self.isDuplicatedName(0, lexpr.Name) {
+				self.s.pushErr(lexpr.Token, log::DuplicatedIdent, lexpr.Name)
 				self.s.pushSuggestion(log::RenameForAvoidDuplication)
 				self.stop()
 				ret
 			}
-			if jule::IsBlank(lexpr.Ident) {
+			if jule::IsBlank(lexpr.Name) {
 				self.s.pushErr(lexpr.Token, log::IgnoreIdent)
 			}
 
 			// Add new variable declaration statement.
 			mut v := &Var{
-				Ident: lexpr.Ident,
+				Name: lexpr.Name,
 				Token: lexpr.Token,
 				Mutable: lexpr.Mutable,
 				Reference: lexpr.Reference,
@@ -1347,7 +1346,7 @@ impl scopeChecker {
 		}
 	norm:
 		if lexpr.Mutable || lexpr.Reference {
-			self.s.pushErr(lexpr.Token, log::DuplicatedIdent, lexpr.Ident)
+			self.s.pushErr(lexpr.Token, log::DuplicatedIdent, lexpr.Name)
 			self.s.pushSuggestion(log::RenameForAvoidDuplication)
 		}
 
@@ -1368,20 +1367,20 @@ impl scopeChecker {
 	fn getRightExprsOfMultiAssign(mut &self, mut a: &ast::Assign,
 		mut eval: &eval): (parts: []exprPart, right: &Value, ok: bool) {
 		updateMut := fn(i: int) {
-			l := a.Left[i]
+			l := a.X[i]
 			// Mark target as mutable because if an expression can take assignment
 			// it should be a mutable memory, but set as immutable if variable declaring
 			// and it is not mutable.
 			//
 			// This is not actually a mutability safety checking.
 			// This just makes responsive-mutability possible and correct.
-			eval.target.mutable = !jule::IsBlank(l.Ident) // if assigned to blank identifier, there is no mutability risk
-			if a.Declarative && eval.target.mutable {
+			eval.target.mutable = !jule::IsBlank(l.Name) // if assigned to blank identifier, there is no mutability risk
+			if a.Decl && eval.target.mutable {
 				if l.Mutable && l.Reference {
 					eval.target.mutable = l.Mutable
 				} else {
-					_, ident := l.Expr.Kind.(&ast::IdentExpr)
-					if ident && self.isNewAssignIdent(l.Ident) {
+					_, isName := l.X.Data.(&ast::NameExpr)
+					if isName && self.isNewAssignIdent(l.Name) {
 						eval.target.mutable = l.Mutable
 					}
 				}
@@ -1389,23 +1388,23 @@ impl scopeChecker {
 		}
 
 		ok = true
-		match type a.Right.Kind {
+		match type a.Y.Data {
 		| &ast::TupleExpr:
-			mut tup := a.Right.Kind.(&ast::TupleExpr)
-			parts = make([]exprPart, 0, len(tup.Expr))
+			mut tup := a.Y.Data.(&ast::TupleExpr)
+			parts = make([]exprPart, 0, len(tup.X))
 			i := 0
 			mut _i := unsafe { (&int)(&i) }                // reference pointer for closure
 			mut _ok := unsafe { (&bool)(&ok) }             // reference pointer for closure
 			mut _parts := unsafe { (&[]exprPart)(&parts) } // reference pointer for closure
 			right = eval.evalTupleFunc(tup, fn(mut &expr: &ast::Expr): &Value {
-				if *_i >= len(a.Left) {
+				if *_i >= len(a.X) {
 					ret nil
 				}
 				updateMut(*_i)
 				// Do not unwrap untyped literals, type analysis will check overflows.
 				// Check only if assigned to blank identifier.
 				mut flags := evalDefault
-				if jule::IsBlank(a.Left[*_i].Ident) {
+				if jule::IsBlank(a.X[*_i].Name) {
 					flags |= evalPhysicalMem | evalUnwrapUntyped
 				}
 				mut v := eval.evalExpr(expr, flags)
@@ -1421,7 +1420,7 @@ impl scopeChecker {
 			// It is mutability safe even if map stored in immutable memory and have mutable type value.
 			// Because mutability will be checked by assignment analysis.
 			updateMut(0)
-			right = eval.evalExpr(a.Right, evalDefault|evalPhysicalMem|evalUnwrapUntyped|evalExceptional)
+			right = eval.evalExpr(a.Y, evalDefault|evalPhysicalMem|evalUnwrapUntyped|evalExceptional)
 			if right == nil {
 				ok = false
 				ret
@@ -1436,19 +1435,19 @@ impl scopeChecker {
 							Mutable: true, // Function return.
 							Type: kind,
 						},
-						a.Right,
+						a.Y,
 					})
 				}
 			} else {
-				parts = [{right, a.Right}]
+				parts = [{right, a.Y}]
 			}
 		}
 		ret
 	}
 
 	fn checkMultiAssign(mut &self, mut &a: &ast::Assign) {
-		if a.Setter.Id != token::Eq && a.Setter.Id != token::ColonEq {
-			self.s.pushErr(a.Setter, log::InvalidSyntax)
+		if a.Op.Id != token::Eq && a.Op.Id != token::ColonEq {
+			self.s.pushErr(a.Op, log::InvalidSyntax)
 			ret
 		}
 
@@ -1467,7 +1466,7 @@ impl scopeChecker {
 				if iem.Expr.Type.Map() != nil { // Is map lookup.
 					strict = true
 					right = [
-						{&Value{Mutable: right[0].data.Mutable, Type: iem.Expr.Type.Map().Val}, right[0].expr},
+						{&Value{Mutable: right[0].data.Mutable, Type: iem.Expr.Type.Map().Value}, right[0].expr},
 						{&Value{Type: primBool}, right[0].expr},
 					]
 				}
@@ -1506,7 +1505,7 @@ impl scopeChecker {
 				mut cr := right[0].data.Model.(&ChanRecv)
 				strict = true
 				right = [
-					{&Value{Mutable: right[0].data.Mutable, Type: cr.Expr.Type.Chan().Elem}, right[0].expr},
+					{&Value{Mutable: right[0].data.Mutable, Type: cr.Expr.Type.Chan().Value}, right[0].expr},
 					{&Value{Type: primBool}, right[0].expr},
 				]
 			|:
@@ -1515,11 +1514,11 @@ impl scopeChecker {
 		}
 
 		match {
-		| len(a.Left) > len(right):
-			self.s.pushErr(a.Setter, log::OverflowMultiAssignIdents)
+		| len(a.X) > len(right):
+			self.s.pushErr(a.Op, log::OverflowMultiAssignIdents)
 			ret
-		| len(a.Left) < len(right):
-			self.s.pushErr(a.Setter, log::MissingMultiAssignIdents)
+		| len(a.X) < len(right):
+			self.s.pushErr(a.Op, log::MissingMultiAssignIdents)
 			ret
 		}
 
@@ -1528,26 +1527,26 @@ impl scopeChecker {
 
 		mut st := &MultiAssign{
 			Right: rightData.Model,
-			Op: a.Setter,
+			Op: a.Op,
 		}
-		for i in a.Left {
-			mut lexpr := a.Left[i]
+		for i in a.X {
+			mut lexpr := a.X[i]
 			let mut l: &Value = nil
-			if !jule::IsBlank(lexpr.Ident) {
-				if !a.Declarative {
+			if !jule::IsBlank(lexpr.Name) {
+				if !a.Decl {
 					goto eval
 				}
 				if lexpr.Mutable && lexpr.Reference {
 					goto end
 				}
-				_, ok = lexpr.Expr.Kind.(&ast::IdentExpr)
+				_, ok = lexpr.X.Data.(&ast::NameExpr)
 				if ok {
-					if self.isNewAssignIdent(lexpr.Ident) {
+					if self.isNewAssignIdent(lexpr.Name) {
 						goto end
 					}
 				}
 			eval:
-				l = eval.evalExpr(lexpr.Expr, evalDefault)
+				l = eval.evalExpr(lexpr.X, evalDefault)
 				if l == nil {
 					continue
 				}
@@ -1562,9 +1561,9 @@ impl scopeChecker {
 
 	fn checkAssign(mut &self, mut a: &ast::Assign, flags: int) {
 		match {
-		| token::IsPostfixOp(a.Setter.Id):
+		| token::IsPostfixOp(a.Op.Id):
 			self.checkPostfix(a)
-		| len(a.Left) == 1:
+		| len(a.X) == 1:
 			self.checkSingleAssign(a, flags)
 		|:
 			self.checkMultiAssign(a)
@@ -1580,17 +1579,17 @@ impl scopeChecker {
 	fn checkCase(mut &self, mut m: &Match, mut astm: &ast::Match, i: int, mut c: &ast::Case, mut expr: &Value): &Case {
 		mut enm := getMatchEnum(m.Expr.Type)
 		mut case := m.Cases[i]
-		case.Exprs = make([]&Value, 0, len(c.Exprs))
+		case.Exprs = make([]&Value, 0, len(c.X))
 		mut constMatched := false
 		mut eval := self.s.eval(self)
-		for (_, mut e) in c.Exprs {
+		for (_, mut e) in c.X {
 			let mut v: &Value
 			if enm == nil {
 				v = eval.evalExprPlain(e)
 			} else {
-				mut ident, ok := e.Kind.(&ast::IdentExpr)
+				mut name, ok := e.Data.(&ast::NameExpr)
 				if ok {
-					v = eval.evalEnumStatic(enm, ident.Token)
+					v = eval.evalEnumStatic(enm, name.Token)
 				} else {
 					self.s.pushErr(e.Token, log::InvalidExpr)
 					self.s.pushSuggestion(log::UseFieldNameToMatchEnum)
@@ -1646,9 +1645,9 @@ impl scopeChecker {
 			case.Exprs = append(case.Exprs, v)
 			// If matching an enum, check for the duplicate cases.
 			if enm != nil {
-				name := e.Kind.(&ast::IdentExpr)
-				if countMatchEnum(astm, name.Ident, 2) > 1 {
-					self.s.pushErr(e.Token, log::DuplicateCase, name.Ident)
+				name := e.Data.(&ast::NameExpr)
+				if countMatchEnum(astm, name.Name, 2) > 1 {
+					self.s.pushErr(e.Token, log::DuplicateCase, name.Name)
 				}
 			}
 			if !m.Comptime ||
@@ -1816,7 +1815,7 @@ impl scopeChecker {
 	}
 
 	fn checkTypeMatch(mut &self, mut &m: &ast::Match) {
-		mut v := self.s.eval(self).eval1(m.Expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+		mut v := self.s.eval(self).eval1(m.X, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if v == nil {
 			ret
 		}
@@ -1826,14 +1825,14 @@ impl scopeChecker {
 			mut cti := v.Type.comptimeTypeInfo()
 			if cti == nil {
 				if !v.Decl {
-					self.s.pushErr(m.Expr.Token, log::InvalidComptimeTypeMatchExpr)
+					self.s.pushErr(m.X.Token, log::InvalidComptimeTypeMatchExpr)
 					ret
 				}
 			} else {
 				v.Type = cti.base
 			}
 		} else if v.Decl || !((v.Type.Prim() != nil && v.Type.Prim().IsAny()) || v.Type.Trait() != nil || te != nil) {
-			self.s.pushErr(m.Expr.Token, log::TypeCaseHasNotValidExpr)
+			self.s.pushErr(m.X.Token, log::TypeCaseHasNotValidExpr)
 			ret
 		}
 
@@ -1874,11 +1873,11 @@ impl scopeChecker {
 	fn checkAllEnumCasesHandled(mut &self, mut m: &ast::Match, mut enm: &Enum) {
 		mut sb := strings::Builder{}
 		for _, item in enm.Items {
-			if countMatchEnum(m, item.Ident, 1) == 0 {
+			if countMatchEnum(m, item.Name, 1) == 0 {
 				if sb.Len() > 0 {
 					sb.WriteStr(", ")!
 				}
-				sb.WriteStr(item.Ident)!
+				sb.WriteStr(item.Name)!
 			}
 		}
 		if sb.Len() > 0 {
@@ -1889,7 +1888,7 @@ impl scopeChecker {
 
 	fn checkCommonMatch(mut &self, mut &m: &ast::Match) {
 		let mut v: &Value = nil
-		if m.Expr == nil {
+		if m.X == nil {
 			v = &Value{
 				untyped: true,
 				Constant: constant::Const.NewBool(true),
@@ -1897,7 +1896,7 @@ impl scopeChecker {
 			}
 			v.Model = v.Constant
 		} else {
-			v = self.s.eval(self).evalExpr1(m.Expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+			v = self.s.eval(self).evalExpr1(m.X, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 			if v == nil {
 				ret
 			}
@@ -1905,12 +1904,12 @@ impl scopeChecker {
 
 		if m.Comptime {
 			if !canComptimeMatch(v) {
-				self.s.pushErr(m.Expr.Token, log::ExprNotConst)
+				self.s.pushErr(m.X.Token, log::ExprNotConst)
 				self.s.pushSuggestion(log::InvalidExprForConstMatch)
 				ret
 			}
 		} else if v.Type.comptime() {
-			self.s.pushErr(m.Expr.Token, log::ExprNotConst)
+			self.s.pushErr(m.X.Token, log::ExprNotConst)
 			self.s.pushSuggestion(log::InvalidExprForConstMatch)
 			ret
 		}
@@ -1952,7 +1951,7 @@ impl scopeChecker {
 	}
 
 	fn checkMatch(mut &self, mut m: &ast::Match) {
-		if m.TypeMatch {
+		if m.Type {
 			self.checkTypeMatch(m)
 			ret
 		}
@@ -1961,9 +1960,9 @@ impl scopeChecker {
 
 	fn checkSelectCase(mut &self, mut slct: &Select, i: int, mut c: &ast::Case): &Case {
 		mut case := slct.Cases[i]
-		case.Exprs = make([]&Value, 0, len(c.Exprs))
+		case.Exprs = make([]&Value, 0, len(c.X))
 		mut eval := self.s.eval(self)
-		for (_, mut e) in c.Exprs {
+		for (_, mut e) in c.X {
 			mut v := eval.evalExpr(e, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 			if v == nil {
 				continue
@@ -2168,12 +2167,12 @@ impl scopeChecker {
 			errorToken: r.Token,
 			mutable: true,
 		}
-		ok := rtc.check(r.Expr)
+		ok := rtc.check(r.X)
 		if !ok {
 			ret
 		}
 
-		if r.Expr != nil {
+		if r.X != nil {
 			rt.Expr = rtc.model
 		}
 	}
@@ -2241,10 +2240,10 @@ impl scopeChecker {
 			mut rtc := &retTypeChecker{
 				sc: self,
 				f: self.result.func,
-				errorToken: ue.Expr.Token,
+				errorToken: ue.X.Token,
 				mutable: self.result.mutable,
 			}
-			_ = rtc.check(ue.Expr)
+			_ = rtc.check(ue.X)
 			self.scope.Stmts = append(self.scope.Stmts, &Use{Value: rtc.expr})
 		| &ast::Expr:
 			mut expr := stmt.Data.(&ast::Expr)
@@ -2414,7 +2413,7 @@ impl scopeChecker {
 			for i >= n; i-- {
 				mut stmt := s.Stmts[i]
 				if stmtIsDef(stmt) {
-					self.s.pushErr(gt.Token, log::GotoJumpsDeclarations, gt.Ident)
+					self.s.pushErr(gt.Token, log::GotoJumpsDeclarations, gt.Name)
 					ret
 				}
 			}
@@ -2431,9 +2430,9 @@ impl scopeChecker {
 
 	fn checkGotos(mut self) {
 		for (_, mut gt) in *self.gotos {
-			mut label := self.findLabelAll(gt.Ident)
+			mut label := self.findLabelAll(gt.Name)
 			if label == nil {
-				self.s.pushErr(gt.Token, log::LabelNotExist, gt.Ident)
+				self.s.pushErr(gt.Token, log::LabelNotExist, gt.Name)
 				continue
 			}
 			gt.Label = label.node
@@ -2445,23 +2444,23 @@ impl scopeChecker {
 	fn checkLabels(mut self) {
 		for _, l in *self.labels {
 			if !l.used {
-				self.s.pushErr(l.token, log::DeclaredButNotUsed, l.node.Ident)
+				self.s.pushErr(l.token, log::DeclaredButNotUsed, l.node.Name)
 			}
 		}
 	}
 
 	fn checkVars(mut self) {
 		for _, v in self.table.Vars {
-			if !v.Used && !v.Constant && !jule::IsBlank(v.Ident) && !jule::IsAnon(v.Ident) {
-				self.s.pushErr(v.Token, log::DeclaredButNotUsed, v.Ident)
+			if !v.Used && !v.Constant && !jule::IsBlank(v.Name) && !jule::IsAnon(v.Name) {
+				self.s.pushErr(v.Token, log::DeclaredButNotUsed, v.Name)
 			}
 		}
 	}
 
 	fn checkAliases(mut self) {
 		for _, a in self.table.TypeAliases {
-			if !a.Used && !jule::IsBlank(a.Ident) && !jule::IsAnon(a.Ident) {
-				self.s.pushErr(a.Token, log::DeclaredButNotUsed, a.Ident)
+			if !a.Used && !jule::IsBlank(a.Name) && !jule::IsAnon(a.Name) {
+				self.s.pushErr(a.Token, log::DeclaredButNotUsed, a.Name)
 			}
 		}
 	}
@@ -2469,7 +2468,7 @@ impl scopeChecker {
 	// Checks scope tree.
 	fn check(mut &self, mut &tree: &ast::ScopeTree, mut &s: &Scope) {
 		s.Deferred = tree.Deferred
-		s.Unsafety = tree.Unsafety
+		s.Unsafe = tree.Unsafe
 
 		errors := len(self.s.errors)
 
@@ -2594,15 +2593,15 @@ fn stmtIsDef(&stmt: Stmt): bool {
 	}
 }
 
-// Counts matched fields with x and returns the result.
+// Counts matched fields with name and returns the result.
 // If limit=0, counts all fields, otherwise the count is limited by the limit.
-fn countMatchEnum(&m: &ast::Match, x: str, limit: int): int {
+fn countMatchEnum(&m: &ast::Match, name: str, limit: int): int {
 	mut n := 0
 loop:
 	for _, c in m.Cases {
-		for _, expr in c.Exprs {
-			name := expr.Kind.(&ast::IdentExpr)
-			if name.Ident == x {
+		for _, x in c.X {
+			_name := x.Data.(&ast::NameExpr)
+			if _name.Name == name {
 				n++
 				if limit != 0 && n >= limit {
 					break loop
@@ -2642,14 +2641,14 @@ loop:
 // Returns label by identifier.
 // Returns nil if not exist any label in this identifier.
 // Lookups given scope and parent scopes.
-fn findLabelParent(&ident: str, mut scope: &scopeChecker): &scopeLabel {
-	mut label := scope.findLabelScope(ident)
+fn findLabelParent(&name: str, mut scope: &scopeChecker): &scopeLabel {
+	mut label := scope.findLabelScope(name)
 	for label == nil {
 		if scope.parent == nil || scope.owner != nil {
 			ret nil
 		}
 		scope = scope.parent
-		label = scope.findLabelScope(ident)
+		label = scope.findLabelScope(name)
 	}
 	ret label
 }
@@ -2658,9 +2657,9 @@ fn getExprs(mut &m: ast::ExprData): []ast::ExprData {
 	match type m {
 	| &ast::TupleExpr:
 		mut tup := m.(&ast::TupleExpr)
-		mut models := make([]ast::ExprData, 0, len(tup.Expr))
-		for (_, mut expr) in tup.Expr {
-			models = append(models, expr.Kind)
+		mut models := make([]ast::ExprData, 0, len(tup.X))
+		for (_, mut x) in tup.X {
+			models = append(models, x.Data)
 		}
 		ret models
 	|:
@@ -2721,7 +2720,7 @@ fn checkAssign(mut &s: &sema, mut &left: &Value, mut right: &Value, op: &token::
 fn isValidStmtForNext(mut &n: ast::StmtData): bool {
 	match type n {
 	| &ast::Assign:
-		ret !n.(&ast::Assign).Declarative
+		ret !n.(&ast::Assign).Decl
 	| &ast::Expr:
 		ret true
 	|:

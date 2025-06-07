@@ -292,7 +292,7 @@ impl jsonEncoder {
 		| useIndent:
 			self.depth++
 		}
-		comptime::TypeAlias(valType, tt.Value())
+		comptime::TypeAlias(valueTyp, tt.Value())
 		mut next := '{'
 		for k, v in t {
 			self.buf.writeByte(next)
@@ -312,7 +312,7 @@ impl jsonEncoder {
 			| useIndent:
 				self.buf.writeByte(' ')
 			}
-			self.encode[valType, Flag](v) else { error(error) }
+			self.encode[valueTyp, Flag](v) else { error(error) }
 		}
 		const match {
 		| useIndent:
@@ -329,7 +329,7 @@ impl jsonEncoder {
 		| useIndent:
 			self.depth++
 		}
-		comptime::TypeAlias(elem, comptime::TypeOf(t).Elem())
+		comptime::TypeAlias(valueTyp, comptime::TypeOf(t).Value())
 		mut next := '['
 		for _, e in t {
 			self.buf.writeByte(next)
@@ -339,7 +339,7 @@ impl jsonEncoder {
 				self.buf.writeByte('\n')
 				self.buf.writeStr(strings::Repeat(self.indent, self.depth))
 			}
-			self.encode[elem, Flag](e) else { error(error) }
+			self.encode[valueTyp, Flag](e) else { error(error) }
 		}
 		if next == '[' {
 			self.buf.writeStr("[]")
@@ -362,7 +362,7 @@ impl jsonEncoder {
 			self.encodeNil()
 			ret
 		}
-		const match comptime::TypeOf(T).Elem().Kind() {
+		const match comptime::TypeOf(T).Value().Kind() {
 		| comptime::U8:
 			self.encodeByteSlice([]byte(t))
 		|:
@@ -431,8 +431,8 @@ impl jsonEncoder {
 			if t == nil {
 				self.encodeNil()
 			} else {
-				comptime::TypeAlias(elem, tt.Elem())
-				self.encode[elem, Flag](*t) else { error(error) }
+				comptime::TypeAlias(valueTyp, tt.Value())
+				self.encode[valueTyp, Flag](*t) else { error(error) }
 			}
 		| comptime::Struct:
 			self.encodeStruct[T, Flag](t) else { error(error) }
@@ -453,7 +453,7 @@ impl jsonEncoder {
 		// Prevent any compilation errors from being triggered.
 		const tt = comptime::TypeOf(T)
 		const match {
-		| tt.Binded():
+		| tt.Bind():
 			error(&UnsupportedTypeError{Type: tt.Str()})
 		|:
 			self.encodePlain[T, Flag](t) else { error(error) }

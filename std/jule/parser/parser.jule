@@ -280,7 +280,7 @@ impl parser {
 		}
 		mut tad := &ast::TypeAlias{
 			Token: tokens[1],
-			Ident: tokens[1].Kind,
+			Name: tokens[1].Kind,
 		}
 		mut token := tokens[i]
 		if !self.isIdent(token) {
@@ -310,11 +310,11 @@ impl parser {
 			ret tad
 		}
 		mut t, ok := unsafe { self.buildType(tokens, &i, true) }
-		tad.Kind = t
+		tad.Type = t
 		if ok && i < len(tokens) {
 			self.pushErr(tokens[i], log::InvalidSyntax)
 		}
-		tad.Public = mod::IsPub(tad.Ident)
+		tad.Public = mod::IsPub(tad.Name)
 		ret tad
 	}
 
@@ -332,7 +332,7 @@ impl parser {
 		mut group := make([]&ast::Var, 0, len(stmts))
 		for (_, mut stmt) in stmts {
 			mut v := &ast::Var{
-				Constant: true,
+				Const: true,
 				Token: tokens[0],
 			}
 			self.buildVarCommon(v, stmt.tokens)
@@ -357,7 +357,7 @@ impl parser {
 			}
 			mut t, ok := unsafe { self.buildType(tokens, &i, true) }
 			if ok {
-				v.Kind = t
+				v.Type = t
 				if i >= len(tokens) {
 					ret
 				}
@@ -369,14 +369,14 @@ impl parser {
 			self.pushErr(tok, log::InvalidSyntax)
 			ret
 		}
-		v.Setter = tok
+		v.Op = tok
 
 		mut exprTokens := tokens[i+1:]
 		if len(exprTokens) == 0 {
 			self.pushErr(tok, log::MissingExpr)
 			ret
 		}
-		v.Expr = self.buildExpr(exprTokens)
+		v.X = self.buildExpr(exprTokens)
 	}
 
 	fn buildVarCommon(mut &self, mut &v: &ast::Var, mut tokens: []&token::Token) {
@@ -386,9 +386,9 @@ impl parser {
 			self.pushSuggestion(log::ExpectedIdentifier)
 			ret
 		}
-		v.Ident = v.Token.Kind
-		v.Public = mod::IsPub(v.Ident)
-		v.Kind = nil // For auto-type.
+		v.Name = v.Token.Kind
+		v.Public = mod::IsPub(v.Name)
+		v.Type = nil // For auto-type.
 		if len(tokens) > 1 {
 			tokens = tokens[1:] // Remove identifier.
 			self.buildVarTypeAndExpr(v, tokens)
@@ -412,7 +412,7 @@ impl parser {
 				tokens = tokens[1:]
 			}
 		| token::Const:
-			v.Constant = true
+			v.Const = true
 			tokens = tokens[1:]
 		|:
 			tokens = nil
@@ -445,7 +445,7 @@ impl parser {
 			tokens = tokens[1:]
 		}
 		self.buildVarCommon(v, tokens)
-		if v.Kind == nil && v.Expr == nil {
+		if v.Type == nil && v.X == nil {
 			self.pushErr(v.Token, log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedTypeOrExpressionForVar)
 			ret nil
@@ -461,7 +461,7 @@ impl parser {
 			self.pushErr(g.Token, log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedIdentifier)
 		}
-		g.Ident = g.Token.Kind
+		g.Name = g.Token.Kind
 		if len(tokens) > 1 {
 			if tokens[1].Id != token::Colon {
 				self.pushErr(tokens[1], log::InvalidSyntax)
@@ -527,11 +527,11 @@ impl parser {
 			tokens = tokens[1:]
 		}
 
-		mut ident := strings::Builder{}
-		ident.Grow(5)
+		mut name := strings::Builder{}
+		name.Grow(5) // enough for the maximum length
 
 		if tokens[0].Id == token::Amper {
-			ident.WriteStr("&")!
+			name.WriteStr("&")!
 			if len(tokens) == 1 {
 				self.pushErr(tokens[0], log::InvalidSyntax)
 				ret nil
@@ -540,14 +540,14 @@ impl parser {
 		}
 
 		if tokens[0].Id == token::Self {
-			ident.WriteStr("self")!
+			name.WriteStr("self")!
 			param.Token = tokens[0]
 			if len(tokens) != 1 {
 				self.pushErr(tokens[1], log::InvalidSyntax)
 			}
 		}
 
-		param.Ident = ident.Str()
+		param.Name = name.Str()
 		ret param
 	}
 
@@ -573,7 +573,7 @@ impl parser {
 			ret
 		}
 
-		param.Kind, _ = unsafe { self.buildType(tokens, &i, true) }
+		param.Type, _ = unsafe { self.buildType(tokens, &i, true) }
 		if i < len(tokens) {
 			self.pushErr(tokens[i], log::InvalidSyntax)
 		}
@@ -583,18 +583,18 @@ impl parser {
 		mut tok := tokens[0]
 		if len(tokens) == 1 {
 			// Just identifier token.
-			param.Ident = tok.Kind
+			param.Name = tok.Kind
 			ret
 		} else if len(tokens) < 3 {
 			self.pushErr(tok, log::MissingType)
 			ret
 		}
 		if tokens[1].Id != token::Colon {
-			param.Ident = jule::Anon
+			param.Name = jule::Anon
 			self.buildParamType(param, tokens)
 			ret
 		}
-		param.Ident = tok.Kind
+		param.Name = tok.Kind
 		tokens = tokens[2:] // Skip colon
 		self.buildParamType(param, tokens)
 	}
@@ -633,7 +633,7 @@ impl parser {
 
 		if param.Token.Id != token::Name {
 			// Just data type
-			param.Ident = jule::Anon
+			param.Name = jule::Anon
 			self.buildParamType(param, tokens)
 		} else {
 			self.buildParamBody(param, tokens)
@@ -644,21 +644,21 @@ impl parser {
 
 	fn checkParams(mut self, mut &params: []&ast::Param) {
 		for (_, mut param) in params {
-			if param.IsSelf() || param.Kind != nil {
+			if param.IsSelf() || param.Type != nil {
 				continue
 			}
 			if param.Token == nil {
 				self.pushErr(param.Token, log::MissingType)
 			} else {
-				param.Kind = &ast::Expr{
+				param.Type = &ast::Expr{
 					Token: param.Token,
 					End: param.Token,
-					Kind: &ast::IdentExpr{
+					Data: &ast::NameExpr{
 						Token: param.Token,
-						Ident: param.Token.Kind,
+						Name: param.Token.Kind,
 					},
 				}
-				param.Ident = jule::Anon
+				param.Name = jule::Anon
 			}
 		}
 	}
@@ -697,7 +697,7 @@ impl parser {
 		i++
 		if i >= len(tokens) {
 			i--
-			t.Kind, ok = unsafe { self.buildType(tokens, &i, false) }
+			t.Type, ok = unsafe { self.buildType(tokens, &i, false) }
 			ret
 		}
 
@@ -711,7 +711,7 @@ impl parser {
 		}
 
 		mut types := make([]&ast::Expr, 0, len(parts))
-		t.Idents = make([]&token::Token, 0, len(parts))
+		t.Names = make([]&token::Token, 0, len(parts))
 		for (_, mut part) in parts {
 			if len(part) == 0 {
 				continue
@@ -735,9 +735,9 @@ impl parser {
 			if offset != 2 {
 				mut newToken := new(token::Token, *token)
 				newToken.Kind = jule::Anon
-				t.Idents = append(t.Idents, newToken)
+				t.Names = append(t.Names, newToken)
 			} else {
-				t.Idents = append(t.Idents, token)
+				t.Names = append(t.Names, token)
 			}
 
 			mut tk, _ := unsafe { self.buildType(part, &offset, true) }
@@ -748,15 +748,15 @@ impl parser {
 		}
 
 		if len(types) > 1 {
-			t.Kind = &ast::Expr{
+			t.Type = &ast::Expr{
 				Token: tokens[0],
 				End: types[len(types)-1].End,
-				Kind: &ast::TupleExpr{
-					Expr: types,
+				Data: &ast::TupleExpr{
+					X: types,
 				},
 			}
 		} else {
-			t.Kind = types[0]
+			t.Type = types[0]
 		}
 
 		ok = true
@@ -792,7 +792,7 @@ impl parser {
 				self.pushErr(token, log::MissingType)
 				ret
 			}
-			t.Kind, ok = unsafe { self.buildType(tokens, &i, true) }
+			t.Type, ok = unsafe { self.buildType(tokens, &i, true) }
 			// If result type analysis failed, set i to -1 for error mark.
 			if !ok {
 				i = -1
@@ -814,7 +814,7 @@ impl parser {
 
 		// Detect unsafe keyword.
 		if f.Token.Id == token::Unsafe {
-			f.Unsafety = true
+			f.Unsafe = true
 			i++
 			if i >= len(tokens) {
 				self.pushErr(f.Token, log::InvalidSyntax)
@@ -837,9 +837,9 @@ impl parser {
 				self.pushErr(f.Token, log::InvalidSyntax)
 				ret nil
 			}
-			f.Ident = tok.Kind
+			f.Name = tok.Kind
 		} else {
-			f.Ident = jule::Anon
+			f.Name = jule::Anon
 		}
 
 		errorToken := tokens[i]
@@ -866,7 +866,7 @@ impl parser {
 			}
 		}
 
-		f.Public = mod::IsPub(f.Ident)
+		f.Public = mod::IsPub(f.Name)
 		f.Result, _ = self.buildRetType(tokens, i)
 		ret f
 	}
@@ -899,7 +899,7 @@ impl parser {
 		mut blockTokens := range(i, token::LBrace, token::RBrace, tokens)
 		if blockTokens != nil {
 			f.Scope = self.buildScope(blockTokens, tokens[i-1])
-			f.Scope.Unsafety = f.Unsafety
+			f.Scope.Unsafe = f.Unsafe
 			if i < len(tokens) {
 				self.pushErr(tokens[i], log::InvalidSyntax)
 			}
@@ -921,12 +921,12 @@ impl parser {
 			self.pushErr(token, log::InvalidExpr)
 			ret
 		}
-		decl.Binded = true
+		decl.Bind = true
 		decl.Path = token
 	}
 
 	fn parseUseDecl(mut self, mut &decl: &ast::Use, mut tokens: []&token::Token) {
-		if decl.Binded {
+		if decl.Bind {
 			self.buildBindUseDecl(decl, tokens)
 			ret
 		}
@@ -960,10 +960,10 @@ impl parser {
 		decl.Path = token
 	}
 
-	fn buildUseDecl(mut self, mut tokens: []&token::Token, binded: bool): &ast::Use {
+	fn buildUseDecl(mut self, mut tokens: []&token::Token, _bind: bool): &ast::Use {
 		mut decl := &ast::Use{
 			Token: tokens[0], // See developer reference (8).
-			Binded: binded,
+			Bind: _bind,
 		}
 		if len(tokens) < 2 {
 			self.pushErr(decl.Token, log::MissingUsePath)
@@ -1027,7 +1027,7 @@ impl parser {
 					ret nil
 				}
 			}
-			item.Kind = self.buildTypeEnumItemKind(i, tokens)
+			item.Type = self.buildTypeEnumItemKind(i, tokens)
 			items = append(items, item)
 		}
 		ret items
@@ -1043,7 +1043,7 @@ impl parser {
 			self.pushErr(e.Token, log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedIdentifier)
 		}
-		e.Ident = e.Token.Kind
+		e.Name = e.Token.Kind
 		i += 3 // Skip "identifier: type" tokens.
 		mut itemTokens := range(i, token::LBrace, token::RBrace, tokens)
 		if itemTokens == nil {
@@ -1054,7 +1054,7 @@ impl parser {
 		} else if i < len(tokens) {
 			self.pushErr(tokens[i], log::InvalidSyntax)
 		}
-		e.Public = mod::IsPub(e.Ident)
+		e.Public = mod::IsPub(e.Name)
 		e.End = tokens[i-1]
 		e.Items = self.buildTypeEnumItems(itemTokens)
 		ret e
@@ -1103,7 +1103,7 @@ impl parser {
 				self.pushErr(item.Token, log::InvalidSyntax)
 				self.pushSuggestion(log::ExpectedIdentifier)
 			}
-			item.Ident = item.Token.Kind
+			item.Name = item.Token.Kind
 			if i+1 >= len(tokens) || tokens[i+1].Id == token::Comma {
 				if i+1 < len(tokens) {
 					i++
@@ -1123,7 +1123,7 @@ impl parser {
 				self.pushErr(t, log::MissingExpr)
 				continue
 			}
-			item.Expr = self.buildEnumItemExpr(i, tokens)
+			item.X = self.buildEnumItemExpr(i, tokens)
 			items = append(items, item)
 		}
 		ret items
@@ -1141,7 +1141,7 @@ impl parser {
 			self.pushErr(e.Token, log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedIdentifier)
 		}
-		e.Ident = e.Token.Kind
+		e.Name = e.Token.Kind
 		mut i := 2
 		if tokens[i].Id == token::Colon {
 			i++
@@ -1149,7 +1149,7 @@ impl parser {
 				self.pushErr(tokens[i-1], log::InvalidSyntax)
 				ret e
 			}
-			e.Kind, _ = unsafe { self.buildType(tokens, &i, true) }
+			e.Type, _ = unsafe { self.buildType(tokens, &i, true) }
 			if i >= len(tokens) {
 				self.stop()
 				self.pushErr(e.Token, log::BodyNotExist)
@@ -1157,7 +1157,7 @@ impl parser {
 				ret e
 			}
 		} else {
-			e.Kind = nil
+			e.Type = nil
 		}
 		mut itemTokens := range(i, token::LBrace, token::RBrace, tokens)
 		if itemTokens == nil {
@@ -1168,7 +1168,7 @@ impl parser {
 		} else if i < len(tokens) {
 			self.pushErr(tokens[i], log::InvalidSyntax)
 		}
-		e.Public = mod::IsPub(e.Ident)
+		e.Public = mod::IsPub(e.Name)
 		e.End = tokens[i-1]
 		e.Items = self.buildEnumItems(itemTokens)
 		ret e
@@ -1201,7 +1201,7 @@ impl parser {
 			self.pushSuggestion(log::ExpectedIdentifier)
 			ret nil
 		}
-		f.Ident = f.Token.Kind
+		f.Name = f.Token.Kind
 
 		if len(tokens) == 1 {
 			self.pushErr(tokens[0], log::MissingType)
@@ -1213,7 +1213,7 @@ impl parser {
 
 		tokens = tokens[2:] // Remove identifier and colon tokens.
 		mut i := 0
-		f.Kind, _ = unsafe { self.buildType(tokens, &i, true) }
+		f.Type, _ = unsafe { self.buildType(tokens, &i, true) }
 		if i < len(tokens) {
 			mut token := tokens[i]
 			if token.Id == token::Lit {
@@ -1226,7 +1226,7 @@ impl parser {
 				self.pushErr(tokens[i], log::InvalidSyntax)
 			}
 		}
-		f.Public = mod::IsPub(f.Ident)
+		f.Public = mod::IsPub(f.Name)
 		ret f
 	}
 
@@ -1260,7 +1260,7 @@ impl parser {
 			self.pushErr(tokens[i], log::InvalidSyntax)
 			ret s
 		}
-		s.Ident = s.Token.Kind
+		s.Name = s.Token.Kind
 
 		errorToken := tokens[i]
 		mut genericsTokens := range(i, token::LBracket, token::RBracket, tokens)
@@ -1283,7 +1283,7 @@ impl parser {
 		if i < len(tokens) {
 			self.pushErr(tokens[i], log::InvalidSyntax)
 		}
-		s.Public = mod::IsPub(s.Ident)
+		s.Public = mod::IsPub(s.Name)
 		s.Fields = self.buildStructDeclFields(bodyTokens)
 		s.End = tokens[i-1]
 		ret s
@@ -1350,7 +1350,7 @@ impl parser {
 			self.pushErr(t.Token, log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedIdentifier)
 		}
-		t.Ident = t.Token.Kind
+		t.Name = t.Token.Kind
 		mut i := 2
 		mut bodyTokens := range(i, token::LBrace, token::RBrace, tokens)
 		if bodyTokens == nil {
@@ -1362,7 +1362,7 @@ impl parser {
 		if i < len(tokens) {
 			self.pushErr(tokens[i], log::InvalidSyntax)
 		}
-		t.Public = mod::IsPub(t.Ident)
+		t.Public = mod::IsPub(t.Name)
 		self.buildTraitBody(t, bodyTokens)
 		t.End = tokens[i-1]
 		ret t
@@ -1373,7 +1373,7 @@ impl parser {
 		mut f := self.buildFunc(tokens, false, true)
 		if f != nil {
 			f.Public = false
-			f.Binded = true
+			f.Bind = true
 		}
 		ret f
 	}
@@ -1383,11 +1383,11 @@ impl parser {
 		mut v := self.buildVar(tokens)
 		if v != nil {
 			v.Public = false
-			v.Binded = true
-			if !v.Constant {
+			v.Bind = true
+			if !v.Const {
 				v.Static = true
 			}
-			if v.Expr != nil {
+			if v.X != nil {
 				self.pushErr(v.Token, log::BindedVarHasExpr)
 			}
 		}
@@ -1400,10 +1400,10 @@ impl parser {
 		if s != nil {
 			s.Public = false
 			for (_, mut f) in s.Fields {
-				// Binded structure's fields are always public by default.
+				// Bind structure's fields are always public by default.
 				f.Public = true
 			}
-			s.Binded = true
+			s.Bind = true
 		}
 		ret s
 	}
@@ -1413,7 +1413,7 @@ impl parser {
 		mut t := self.buildTypeAliasDecl(tokens)
 		if t != nil {
 			t.Public = false
-			t.Binded = true
+			t.Bind = true
 		}
 		ret t
 	}
@@ -1593,7 +1593,7 @@ impl parser {
 		| token::Const
 		| token::Mut:
 			mut v := self.buildVar(tokens)
-			if v != nil && !v.Constant {
+			if v != nil && !v.Const {
 				v.Static = true
 			}
 			ret v

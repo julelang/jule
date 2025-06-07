@@ -313,7 +313,7 @@ impl exprCoder {
 			// If this binary operator comparing array type.
 			// The left operand is will be array one always.
 			arr := lk.Array()
-			mut ins := obj::FindFuncGenericInstance(meta::Program.Runtime.ArrayCmp, arr.Elem)
+			mut ins := obj::FindFuncGenericInstance(meta::Program.Runtime.ArrayCmp, arr.Value)
 			if op == token::NotEq {
 				buf.WriteByte('!')!
 			}
@@ -460,7 +460,7 @@ impl exprCoder {
 				ret
 			}
 		}
-		if m.Binded {
+		if m.Bind {
 			d := obj::FindDirective(m.Directives, directive::Namespace)
 			if d != nil {
 				self.oc.writeBytes(concatAllParts(d.Args...))
@@ -513,7 +513,7 @@ impl exprCoder {
 	}
 
 	fn structureLit(mut &self, mut m: &sema::StructLitExpr) {
-		binded := obj::IsStructBinded(m.Strct)
+		binded := obj::IsBindStruct(m.Strct)
 		if binded {
 			self.oc.write("(")
 		}
@@ -592,16 +592,16 @@ impl exprCoder {
 			match {
 			| m.Type.Sptr() != nil:
 				self.oc.write("cast_ptr<")
-				self.oc.tc.kind(self.oc.Buf, m.Type.Sptr().Elem)
+				self.oc.tc.kind(self.oc.Buf, m.Type.Sptr().Value)
 			| m.Type.Map() != nil:
 				self.oc.write("cast_ptr<")
 				mp := m.Type.Map()
-				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Val)
+				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Value)
 				self.oc.tc.structureIns(self.oc.Buf, mps)
 			| m.Type.Chan() != nil:
 				self.oc.write("cast_ptr<")
 				ch := m.Type.Chan()
-				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
 				self.oc.tc.structureIns(self.oc.Buf, chs)
 			|:
 				self.oc.write("cast<")
@@ -627,16 +627,16 @@ impl exprCoder {
 			match {
 			| m.Type.Sptr() != nil:
 				self.oc.write("cast_ptr<")
-				self.oc.tc.kind(self.oc.Buf, m.Type.Sptr().Elem)
+				self.oc.tc.kind(self.oc.Buf, m.Type.Sptr().Value)
 			| m.Type.Map() != nil:
 				self.oc.write("cast_ptr<")
 				mp := m.Type.Map()
-				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Val)
+				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Value)
 				self.oc.tc.structureIns(self.oc.Buf, mps)
 			| m.Type.Chan() != nil:
 				self.oc.write("cast_ptr<")
 				ch := m.Type.Chan()
-				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
 				self.oc.tc.structureIns(self.oc.Buf, chs)
 			|:
 				self.oc.write("cast<")
@@ -710,16 +710,16 @@ impl exprCoder {
 			match {
 			| m.Type.Sptr() != nil:
 				self.oc.write("cast_ptr<")
-				self.oc.tc.kind(self.oc.Buf, m.Type.Sptr().Elem)
+				self.oc.tc.kind(self.oc.Buf, m.Type.Sptr().Value)
 			| m.Type.Map() != nil:
 				self.oc.write("cast_ptr<")
 				mp := m.Type.Map()
-				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Val)
+				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Value)
 				self.oc.tc.structureIns(self.oc.Buf, mps)
 			| m.Type.Chan() != nil:
 				self.oc.write("cast_ptr<")
 				ch := m.Type.Chan()
-				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
 				self.oc.tc.structureIns(self.oc.Buf, chs)
 			|:
 				self.oc.write("cast<")
@@ -776,7 +776,7 @@ impl exprCoder {
 			}
 			mut slc := m.Expr.Type.Slice()
 			if slc != nil {
-				eprim = slc.Elem.Prim()
+				eprim = slc.Value.Prim()
 				// []rune or []byte
 				if eprim.IsI32() {
 					self.oc.write("__jule_runesToStr(")
@@ -792,7 +792,7 @@ impl exprCoder {
 		if prim != nil && prim.IsStr() {
 			mut slc := m.Type.Slice()
 			if slc != nil {
-				prim = slc.Elem.Prim()
+				prim = slc.Value.Prim()
 				// []rune or []byte
 				if prim.IsI32() {
 					self.oc.write("__jule_strToRunes(")
@@ -862,7 +862,7 @@ impl exprCoder {
 		}
 		if m.Func.Anon {
 			ssie, _ := m.Expr.(&sema::StructSubIdentExpr)
-			if ssie != nil && obj::IsStructBinded(ssie.Field.Owner) {
+			if ssie != nil && obj::IsBindStruct(ssie.Field.Owner) {
 				self.oc.write("(")
 				ret
 			}
@@ -919,7 +919,7 @@ impl exprCoder {
 		wrapped := self.isWrapped(m)
 		self.modelForCall(m.Expr)
 		if !m.Func.IsBuiltin() {
-			if m.Func.Decl.Binded && len(m.Func.Generics) > 0 {
+			if m.Func.Decl.Bind && len(m.Func.Generics) > 0 {
 				if !obj::HasDirective(m.Func.Decl.Directives, directive::Cdef) {
 					self.oc.write("<")
 					for (i, mut g) in m.Func.Generics {
@@ -1128,8 +1128,8 @@ impl exprCoder {
 
 	fn handleExceptionalCallWithData(mut &self, mut m: &sema::FuncCallExpr, mut dest: useExprMemory) {
 		let mut destData: sema::Expr = &sema::Var{
-			Binded: true, // to use identifier directly
-			Ident: "except.result",
+			Bind: true, // to use identifier directly
+			Name: "except.result",
 		}
 
 		// Generate code for exceptional.
@@ -1276,7 +1276,7 @@ impl exprCoder {
 		match {
 		| m.Expr.Type.Map() != nil:
 			mut _map := m.Expr.Type.Map()
-			mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Val)
+			mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Value)
 			const Static = false
 			mut f := ins.FindMethod("get", Static).Instances[0]
 			identCoder.funcIns(self.oc.Buf, f)
@@ -1351,7 +1351,7 @@ impl exprCoder {
 	}
 
 	fn mapExpr(mut &self, mut m: &sema::MapExpr) {
-		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, m.Kind.Key, m.Kind.Val)
+		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, m.Kind.Key, m.Kind.Value)
 		const Static = true
 		mut maker := ins.FindMethod("make", Static).Instances[0]
 		if len(m.Entries) == 0 {
@@ -1378,7 +1378,7 @@ impl exprCoder {
 			self.oc.write(", ")
 			self.possibleRefExpr(pair.Key)
 			self.oc.write(")) = ")
-			self.possibleRefExpr(pair.Val)
+			self.possibleRefExpr(pair.Value)
 			self.oc.write("; ")
 		}
 		self.oc.write(mapVar)
@@ -1433,7 +1433,7 @@ impl exprCoder {
 	fn array(mut &self, mut m: &sema::ArrayExpr) {
 		// Plain initialization if array is zero-length or
 		// no specific expression and not able to init elements.
-		if m.Kind.N == 0 || len(m.Elems) == 0 && !ableToInit(m.Kind.Elem) {
+		if m.Kind.N == 0 || len(m.Elems) == 0 && !ableToInit(m.Kind.Value) {
 			self.oc.tc.array(self.oc.Buf, m.Kind)
 			self.oc.write("()")
 			ret
@@ -1470,8 +1470,8 @@ impl exprCoder {
 			self.possibleRefExpr(m.Elems[i].Model)
 			self.oc.write("; ")
 		}
-		if len(m.Elems) != m.Kind.N && ableToInit(m.Kind.Elem) {
-			self.fillCollectionByDefault(m.Kind.Elem)
+		if len(m.Elems) != m.Kind.N && ableToInit(m.Kind.Value) {
+			self.fillCollectionByDefault(m.Kind.Value)
 		}
 		self.oc.write(collectionIdent)
 		self.oc.write("; })")
@@ -1488,7 +1488,7 @@ impl exprCoder {
 	}
 
 	fn funcIns(mut &self, mut m: &sema::FuncIns) {
-		if m.Decl != nil && m.Decl.Binded {
+		if m.Decl != nil && m.Decl.Bind {
 			d := obj::FindDirective(m.Decl.Directives, directive::Namespace)
 			if d != nil {
 				self.oc.writeBytes(concatAllParts(d.Args...))
@@ -1560,7 +1560,7 @@ impl exprCoder {
 		hasDefer := m.Func.Decl != nil && m.Func.Decl.HasDefer
 		if m.Func.Decl.IsVoid() {
 			v, _ := m.Err.Model.(&sema::Var)
-			if v != nil && v.Ident == "error" {
+			if v != nil && v.Name == "error" {
 				if hasDefer {
 					self.oc.write(deferStackName + ".call();\n")
 					self.oc.indent()
@@ -1573,7 +1573,7 @@ impl exprCoder {
 			self.oc.write("return jule::Exceptional<")
 			self.oc.tc.rc.codeMut1(self.oc.Buf, m.Func.Result)
 			v, _ := m.Err.Model.(&sema::Var)
-			if v != nil && v.Ident == "error" {
+			if v != nil && v.Name == "error" {
 				self.oc.write(">{.error=except.error}")
 				ret
 			}
@@ -1610,7 +1610,7 @@ impl exprCoder {
 	fn lenCall(mut &self, mut m: &sema::BuiltinLenCallExpr) {
 		mut _map := m.Expr.Type.Map()
 		if _map != nil {
-			mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Val)
+			mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Value)
 			const Static = false
 			mut f := ins.FindMethod("len", Static).Instances[0]
 			identCoder.funcIns(self.oc.Buf, f)
@@ -1633,7 +1633,7 @@ impl exprCoder {
 		if _map == nil {
 			panic("cxx: deleteCall: destination is not map")
 		}
-		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Val)
+		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Value)
 		const Static = false
 		if m.Key != nil {
 			mut f := ins.FindMethod("del", Static).Instances[0]
@@ -1654,7 +1654,7 @@ impl exprCoder {
 
 	fn makeCallSlice(mut &self, mut &m: &sema::BuiltinMakeCallExpr) {
 		mut slice := m.Type.Slice()
-		init := ableToInit(slice.Elem)
+		init := ableToInit(slice.Value)
 		if init {
 			self.oc.write("({ auto " + collectionIdent + " = ")
 		}
@@ -1672,13 +1672,13 @@ impl exprCoder {
 			ret
 		}
 		self.oc.write("; ")
-		self.initCollection(slice.Elem)
+		self.initCollection(slice.Value)
 		self.oc.write(" " + collectionIdent + "; })")
 	}
 
 	fn makeCallChan(mut &self, mut &m: &sema::BuiltinMakeCallExpr) {
 		ch := m.Type.Chan()
-		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
 		const Static = true
 		mut f := ins.FindMethod("new", Static).Instances[0]
 		identCoder.funcIns(self.oc.Buf, f)
@@ -1815,7 +1815,7 @@ impl exprCoder {
 
 	fn chanRecv(mut &self, mut m: &sema::ChanRecv, ok: fn(), owned: bool) {
 		ch := m.Expr.Type.Chan()
-		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
 		const Static = false
 		mut f := ins.FindMethod("recv", Static).Instances[0]
 		identCoder.funcIns(self.oc.Buf, f)
@@ -1843,7 +1843,7 @@ impl exprCoder {
 
 	fn chanSend(mut &self, mut m: &sema::ChanSend, owned: bool) {
 		c := m.Chan.Type.Chan()
-		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, c.Elem)
+		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, c.Value)
 		const Static = false
 		mut f := ins.FindMethod("send", Static).Instances[0]
 		identCoder.funcIns(self.oc.Buf, f)
@@ -1864,7 +1864,7 @@ impl exprCoder {
 
 	fn closeCall(mut &self, mut m: &sema::BuiltinCloseCallExpr) {
 		ch := m.Chan.Type.Chan()
-		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
 		const Static = false
 		mut f := ins.FindMethod("close", Static).Instances[0]
 		identCoder.funcIns(self.oc.Buf, f)
@@ -1925,16 +1925,16 @@ impl exprCoder {
 			match {
 			| m.Base.Type.Sptr() != nil:
 				self.oc.write(".unsafe_cast_ptr<")
-				self.oc.tc.kind(self.oc.Buf, m.Base.Type.Sptr().Elem)
+				self.oc.tc.kind(self.oc.Buf, m.Base.Type.Sptr().Value)
 			| m.Base.Type.Map() != nil:
 				self.oc.write(".unsafe_cast_ptr<")
 				mp := m.Base.Type.Map()
-				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Val)
+				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Value)
 				self.oc.tc.structureIns(self.oc.Buf, mps)
 			| m.Base.Type.Chan() != nil:
 				self.oc.write(".unsafe_cast_ptr<")
 				ch := m.Base.Type.Chan()
-				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
 				self.oc.tc.structureIns(self.oc.Buf, chs)
 			|:
 				self.oc.write(".unsafe_cast<")
@@ -2117,7 +2117,7 @@ impl exprCoder {
 
 	// Writes default struct literal expression to initialize it by default.
 	fn initStructLit(mut &self, mut &s: &sema::StructIns) {
-		if obj::IsStructBinded(s) {
+		if obj::IsBindStruct(s) {
 			self.oc.write("(")
 			self.structureIns(s)
 			self.oc.write("){}")
@@ -2177,7 +2177,7 @@ impl exprCoder {
 		self.oc.write("({ auto " + collectionIdent + " = ")
 		self.oc.tc.array(self.oc.Buf, arr)
 		self.oc.write("(); ")
-		self.initCollection(arr.Elem)
+		self.initCollection(arr.Value)
 		self.oc.write(" " + collectionIdent + "; })")
 	}
 

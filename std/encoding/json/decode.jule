@@ -234,7 +234,7 @@ impl jsonDecoder {
 
 	fn array[T](self, mut &a: T)! {
 		const t = comptime::TypeOf(T)
-		comptime::TypeAlias(elem, t.Elem())
+		comptime::TypeAlias(valueTyp, t.Value())
 		self.i++
 		self.skipSpace()
 		mut i := 0
@@ -260,7 +260,7 @@ impl jsonDecoder {
 					}
 					self.value(a[i]) else { error(error) }
 				| comptime::Slice:
-					let mut v: elem
+					let mut v: valueTyp
 					self.value(v) else { error(error) }
 					a = append(a, v)
 				|:
@@ -289,7 +289,7 @@ impl jsonDecoder {
 			const match t.Kind() {
 			| comptime::Array:
 				// Assign to default value of array's zero remainder.
-				let mut default: elem
+				let mut default: valueTyp
 				for i < len(a); i++ {
 					a[i] = default
 				}
@@ -632,7 +632,7 @@ impl jsonDecoder {
 				}
 				ret
 			| tt.Kind() == comptime::Slice:
-				const match tt.Elem().Kind() {
+				const match tt.Value().Kind() {
 				| comptime::U8:
 					lit := self.scanLit() else { error(error) }
 					mut s2 := unquoteBytes(lit)
@@ -721,8 +721,8 @@ impl jsonDecoder {
 				ret
 			}
 			if t == nil {
-				comptime::TypeAlias(elem, tt.Elem())
-				t = T(new(elem))
+				comptime::TypeAlias(valueTyp, tt.Value())
+				t = T(new(valueTyp))
 			}
 			self.value1(*t) else { error(error) }
 		|:

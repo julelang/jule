@@ -163,7 +163,7 @@ impl typeCompatibilityChecker {
 			goto Struct
 		| self.src.Sptr() != nil:
 			ref = true
-			self.src = self.src.Sptr().Elem
+			self.src = self.src.Sptr().Value
 			if self.src.SoftStruct() == nil {
 				ret false
 			}
@@ -183,7 +183,7 @@ impl typeCompatibilityChecker {
 				ret false
 			}
 			for (_, mut m1) in trt.Methods {
-				mut m2 := base.FindMethod(m1.Ident)
+				mut m2 := base.FindMethod(m1.Name)
 				if m2 == nil {
 					ret false
 				}
@@ -316,7 +316,7 @@ impl assignTypeChecker {
 			| f.IsBuiltin():
 				self.pushErr(log::BuiltinAsNonFunc)
 				valid = false
-			| f.Decl.Binded:
+			| f.Decl.Bind:
 				self.pushErr(log::BindedFuncAsAnonFunc)
 				valid = false
 			| !f.Decl.Static && f.Decl.IsMethod():
@@ -437,7 +437,7 @@ impl assignTypeChecker {
 				break
 			}
 			vc := self.v.Type.Chan()
-			if !dc.Elem.Equal(vc.Elem) {
+			if !dc.Value.Equal(vc.Value) {
 				break
 			}
 			if dc.Recv && !vc.Recv || dc.Send && !vc.Send {
@@ -486,18 +486,18 @@ struct dynamicTypeAnnotation {
 
 impl dynamicTypeAnnotation {
 	fn annotateConstraintElem[T](mut self, mut &k: &Type): bool {
-		mut c, mut ok := self.c.Kind.(&T)
+		mut c, mut ok := self.c.Data.(&T)
 		if !ok {
 			ret false
 		}
 		mut elem := (&Type)(nil)
 		const match type T {
 		| ast::ArrayType:
-			elem = k.Array().Elem
-			self.c = c.Elem
+			elem = k.Array().Value
+			self.c = c.Value
 		| ast::SliceType:
-			elem = k.Slice().Elem
-			self.c = c.Elem
+			elem = k.Slice().Value
+			self.c = c.Value
 		| ast::UnaryExpr:
 			match c.Op.Id {
 			| token::Star:
@@ -509,27 +509,27 @@ impl dynamicTypeAnnotation {
 					self.e.pushErr(self.errorToken, log::UnsafePointerForAnnotation)
 					ret false
 				}
-				elem = p.Elem
-				self.c = c.Expr
+				elem = p.Value
+				self.c = c.X
 			| token::Amper:
 				mut p := k.Sptr()
 				if p == nil {
 					ret false
 				}
-				elem = p.Elem
-				self.c = c.Expr
+				elem = p.Value
+				self.c = c.X
 			|:
 				panic("unreachable")
 			}
 		| ast::ChanType:
-			elem = k.Chan().Elem
-			self.c = c.Elem
+			elem = k.Chan().Value
+			self.c = c.Value
 		}
 		ret self.annotateConstraint(elem)
 	}
 
 	fn annotateConstraintMap(mut self, mut &k: &Type): (ok: bool) {
-		mut m2, ok := self.c.Kind.(&ast::MapType)
+		mut m2, ok := self.c.Data.(&ast::MapType)
 		if !ok {
 			ret
 		}
@@ -538,17 +538,17 @@ impl dynamicTypeAnnotation {
 		if !self.annotateConstraint(m.Key) {
 			ret false
 		}
-		self.c = m2.Val
-		ret self.annotateConstraint(m.Val)
+		self.c = m2.Value
+		ret self.annotateConstraint(m.Value)
 	}
 
 	fn annotateConstraintTuple(mut self, mut &k: &Type): (ok: bool) {
-		mut tup, ok := self.c.Kind.(&ast::TupleExpr)
+		mut tup, ok := self.c.Data.(&ast::TupleExpr)
 		if ok {
 			mut tup2 := k.Tuple()
 			for (_, mut t2) in tup2.Types {
-				for (_, mut t) in tup.Expr {
-					self.c = t
+				for (_, mut x) in tup.X {
+					self.c = x
 					if self.annotateConstraint(t2) {
 						ret true
 					}
@@ -559,17 +559,17 @@ impl dynamicTypeAnnotation {
 	}
 
 	fn annotateConstraintFunc(mut self, mut &k: &Type): (ok: bool) {
-		mut pf, ok := self.c.Kind.(&ast::Func)
+		mut pf, ok := self.c.Data.(&ast::Func)
 		if ok {
 			mut f := k.Func()
 			for (i, mut fp) in f.Params {
-				self.c = pf.Params[i].Kind
+				self.c = pf.Params[i].Type
 				if self.annotateConstraint(fp.Type) {
 					ret true
 				}
 			}
 			if pf.Result != nil {
-				self.c = pf.Result.Kind
+				self.c = pf.Result.Type
 				if self.annotateConstraint(f.Result) {
 					ret true
 				}
@@ -578,11 +578,11 @@ impl dynamicTypeAnnotation {
 		ret false
 	}
 
-	fn annotateConstraintIdent(mut self, mut &k: &Type): bool {
-		mut ident := self.c.Kind.(&ast::IdentExpr)
+	fn annotateConstraintName(mut self, mut &k: &Type): bool {
+		mut name := self.c.Data.(&ast::NameExpr)
 		mut s := k.Struct()
 		for i, g in self.f.Decl.Generics {
-			if g.Ident == ident.Ident {
+			if g.Name == name.Name {
 				mut fg := self.f.Generics[i]
 				if fg != nil {
 					ret false
@@ -603,9 +603,9 @@ impl dynamicTypeAnnotation {
 	}
 
 	fn annotateConstraint(mut self, mut &k: &Type): bool {
-		match type self.c.Kind {
-		| &ast::IdentExpr:
-			ret self.annotateConstraintIdent(k)
+		match type self.c.Data {
+		| &ast::NameExpr:
+			ret self.annotateConstraintName(k)
 		|:
 			// no-op
 		}
@@ -635,7 +635,7 @@ impl dynamicTypeAnnotation {
 		self.f.Generics[i] = &InsGeneric{Type: k}
 		mut gd := self.f.Decl.Generics[i]
 		for (_, mut ignored) in self.ignored {
-			if gd.Ident == ignored.Str() {
+			if gd.Name == ignored.Str() {
 				ignored.Kind = k.Kind
 			}
 		}
@@ -656,8 +656,8 @@ impl dynamicTypeAnnotation {
 			ret false
 		}
 		mut arr := k.Array()
-		self.k = &parr.Elem
-		ret self.annotateKind(arr.Elem)
+		self.k = &parr.Value
+		ret self.annotateKind(arr.Value)
 	}
 
 	unsafe fn annotateSlice(mut self, mut &k: &Type): (ok: bool) {
@@ -666,8 +666,8 @@ impl dynamicTypeAnnotation {
 			ret false
 		}
 		mut slc := k.Slice()
-		self.k = &pslc.Elem
-		ret self.annotateKind(slc.Elem)
+		self.k = &pslc.Value
+		ret self.annotateKind(slc.Value)
 	}
 
 	unsafe fn checkMapKey(mut self, mut k: *&Type, mut &ck: &Type): (ok: bool) {
@@ -685,7 +685,7 @@ impl dynamicTypeAnnotation {
 		}
 		mut m := k.Map()
 		ret self.checkMapKey(&pmap.Key, m.Key) &&
-			self.checkMapKey(&pmap.Val, m.Val)
+			self.checkMapKey(&pmap.Value, m.Value)
 	}
 
 	unsafe fn annotateFunc(mut self, mut &k: &Type): (ok: bool) {
@@ -727,8 +727,8 @@ impl dynamicTypeAnnotation {
 			self.e.pushErr(self.errorToken, log::UnsafePointerForAnnotation)
 			ret false
 		}
-		self.k = &pptr.Elem
-		ret self.annotateKind(ptr.Elem)
+		self.k = &pptr.Value
+		ret self.annotateKind(ptr.Value)
 	}
 
 	unsafe fn annotateSptr(mut self, mut &k: &Type): (ok: bool) {
@@ -737,8 +737,8 @@ impl dynamicTypeAnnotation {
 			ret false
 		}
 		mut sptr := k.Sptr()
-		self.k = &ssptr.Elem
-		ret self.annotateKind(sptr.Elem)
+		self.k = &ssptr.Value
+		ret self.annotateKind(sptr.Value)
 	}
 
 	unsafe fn annotateStruct(mut self, mut &k: &Type): (ok: bool) {
@@ -769,14 +769,14 @@ impl dynamicTypeAnnotation {
 			ret false
 		}
 		mut c2 := k.Chan()
-		self.k = &c.Elem
-		ret self.annotateKind(c2.Elem)
+		self.k = &c.Value
+		ret self.annotateKind(c2.Value)
 	}
 
 	unsafe fn annotateAny(mut self, mut &k: &Type): (ok: bool) {
 		kind := (*self.k).Str()
 		for i, g in self.f.Decl.Generics {
-			if kind != g.Ident {
+			if kind != g.Name {
 				continue
 			}
 			t := self.f.Generics[i]
@@ -885,7 +885,7 @@ impl fnCallArgChecker {
 		}
 		mut err := strings::Builder{}
 		err.Grow(1 << 5)
-		err.WriteStr(self.f.Decl.Ident)!
+		err.WriteStr(self.f.Decl.Name)!
 		err.WriteStr("\n       want (")!
 		for i, p in params {
 			err.WriteStr(p.Type.Str())!
@@ -985,11 +985,11 @@ impl fnCallArgChecker {
 		for i < len(self.args); i++ {
 			mut arg := self.args[i]
 
-			match type arg.Kind {
+			match type arg.Data {
 			| &ast::VariadicExpr:
 				self.e.prefix = &Type{
 					Kind: &Slice{
-						Elem: p.Type,
+						Value: p.Type,
 					},
 				}
 			|:
@@ -1165,7 +1165,7 @@ impl structLitChecker {
 		// Check duplications.
 	dupLookup:
 		for (_, mut expr) in exprs {
-			mut dpair, ok := expr.Kind.(&ast::FieldExprPair)
+			mut dpair, ok := expr.Data.(&ast::FieldExprPair)
 			if ok {
 				match {
 				| pair == dpair:
@@ -1188,7 +1188,7 @@ impl structLitChecker {
 		self.e.prefix = f.Type
 
 		// Do not unwrap untyped literals, type analysis will check overflows.
-		mut v := self.e.evalExpr(pair.Expr, evalDefault)
+		mut v := self.e.evalExpr(pair.X, evalDefault)
 		if v == nil {
 			ret
 		}
@@ -1198,10 +1198,10 @@ impl structLitChecker {
 	fn readyExprs(mut self, mut &exprs: []&ast::Expr): bool {
 		mut ok := true
 		for (i, mut expr) in exprs {
-			mut pair, pairok := expr.Kind.(&ast::KeyValPair)
-			if pairok {
-				match type pair.Key.Kind {
-				| &ast::IdentExpr:
+			mut pair, isPair := expr.Data.(&ast::KeyValueExpr)
+			if isPair {
+				match type pair.Key.Data {
+				| &ast::NameExpr:
 					// Ok
 					break
 				|:
@@ -1209,9 +1209,9 @@ impl structLitChecker {
 					ok = false
 					continue
 				}
-				exprs[i].Kind = &ast::FieldExprPair{
+				exprs[i].Data = &ast::FieldExprPair{
 					Field: pair.Key.Token,
-					Expr: pair.Val,
+					X: pair.Value,
 				}
 			}
 		}
@@ -1227,9 +1227,9 @@ impl structLitChecker {
 		}
 		mut paired := false
 		for (i, mut expr) in exprs {
-			match type expr.Kind {
+			match type expr.Data {
 			| &ast::FieldExprPair:
-				mut pair := expr.Kind.(&ast::FieldExprPair)
+				mut pair := expr.Data.(&ast::FieldExprPair)
 				if i > 0 && !paired {
 					self.pushErr(pair.Field, log::InvalidSyntax)
 				}
@@ -1279,7 +1279,7 @@ impl structLitChecker {
 			idents.Grow(1 << 5)
 			for diff > 0; diff-- {
 				idents.WriteStr(", ")!
-				idents.WriteStr(self.s.Fields[n-diff].Decl.Ident)!
+				idents.WriteStr(self.s.Fields[n-diff].Decl.Name)!
 			}
 			self.pushErr(self.errorToken, log::MissingExprFor,
 				str(unsafe { idents.Buf() }[2:])) /* Remove first separator. */
@@ -1302,10 +1302,10 @@ impl rangeChecker {
 	}
 
 	fn setSizeKey(mut self) {
-		if self.rang.KeyA == nil || jule::IsBlank(self.rang.KeyA.Ident) {
+		if self.rang.A == nil || jule::IsBlank(self.rang.A.Name) {
 			ret
 		}
-		self.Kind.KeyA = self.buildVar(self.rang.KeyA)
+		self.Kind.KeyA = self.buildVar(self.rang.A)
 		self.Kind.KeyA.TypeSym = findBuiltinTypeAlias(types::Int).TypeSym
 	}
 
@@ -1330,37 +1330,37 @@ impl rangeChecker {
 
 	fn checkSlice(mut self) {
 		self.setSizeKey()
-		if self.rang.KeyB == nil || jule::IsBlank(self.rang.KeyB.Ident) {
+		if self.rang.B == nil || jule::IsBlank(self.rang.B.Name) {
 			ret
 		}
 
 		mut slc := self.v.Type.Slice()
-		self.Kind.KeyB = self.buildVar(self.rang.KeyB)
-		self.Kind.KeyB.TypeSym = &TypeSym{Type: slc.Elem}
+		self.Kind.KeyB = self.buildVar(self.rang.B)
+		self.Kind.KeyB.TypeSym = &TypeSym{Type: slc.Value}
 
-		self.checkRangeExprValidity(self.v, self.Kind.KeyB, slc.Elem)
+		self.checkRangeExprValidity(self.v, self.Kind.KeyB, slc.Value)
 	}
 
 	fn checkArray(mut self) {
 		self.setSizeKey()
-		if self.rang.KeyB == nil || jule::IsBlank(self.rang.KeyB.Ident) {
+		if self.rang.B == nil || jule::IsBlank(self.rang.B.Name) {
 			ret
 		}
 
 		mut arr := self.v.Type.Array()
-		self.Kind.KeyB = self.buildVar(self.rang.KeyB)
-		self.Kind.KeyB.TypeSym = &TypeSym{Type: arr.Elem}
+		self.Kind.KeyB = self.buildVar(self.rang.B)
+		self.Kind.KeyB.TypeSym = &TypeSym{Type: arr.Value}
 
-		self.checkRangeExprValidity(self.v, self.Kind.KeyB, arr.Elem)
+		self.checkRangeExprValidity(self.v, self.Kind.KeyB, arr.Value)
 	}
 
 	fn checkMapKeyA(mut self) {
-		if self.rang.KeyA == nil || jule::IsBlank(self.rang.KeyA.Ident) {
+		if self.rang.A == nil || jule::IsBlank(self.rang.A.Name) {
 			ret
 		}
 
 		mut m := self.v.Type.Map()
-		self.Kind.KeyA = self.buildVar(self.rang.KeyA)
+		self.Kind.KeyA = self.buildVar(self.rang.A)
 		self.Kind.KeyA.TypeSym = &TypeSym{Type: m.Key}
 
 		mut v := new(Value, *self.v)
@@ -1370,18 +1370,18 @@ impl rangeChecker {
 	}
 
 	fn checkMapKeyB(mut self) {
-		if self.rang.KeyB == nil || jule::IsBlank(self.rang.KeyB.Ident) {
+		if self.rang.B == nil || jule::IsBlank(self.rang.B.Name) {
 			ret
 		}
 
 		mut m := self.v.Type.Map()
-		self.Kind.KeyB = self.buildVar(self.rang.KeyB)
-		self.Kind.KeyB.TypeSym = &TypeSym{Type: m.Val}
+		self.Kind.KeyB = self.buildVar(self.rang.B)
+		self.Kind.KeyB.TypeSym = &TypeSym{Type: m.Value}
 
 		mut v := new(Value, *self.v)
-		v.Type = m.Val
+		v.Type = m.Value
 
-		self.checkRangeExprValidity(v, self.Kind.KeyB, m.Val)
+		self.checkRangeExprValidity(v, self.Kind.KeyB, m.Value)
 	}
 
 	fn checkMap(mut self) {
@@ -1391,10 +1391,10 @@ impl rangeChecker {
 
 	fn checkStr(mut self) {
 		self.setSizeKey()
-		if self.rang.KeyB == nil || jule::IsBlank(self.rang.KeyB.Ident) {
+		if self.rang.B == nil || jule::IsBlank(self.rang.B.Name) {
 			ret
 		}
-		self.Kind.KeyB = self.buildVar(self.rang.KeyB)
+		self.Kind.KeyB = self.buildVar(self.rang.B)
 		self.Kind.KeyB.TypeSym = findBuiltinTypeAlias("rune").TypeSym
 	}
 
@@ -1403,31 +1403,31 @@ impl rangeChecker {
 		if !c.Recv {
 			self.sc.s.pushErr(self.rang.InToken, log::RecvFromSendOnlyChan)
 		}
-		if self.rang.KeyB != nil && !jule::IsBlank(self.rang.KeyB.Ident) {
-			self.sc.s.pushErr(self.rang.KeyB.Token, log::IterPermitsNVar, c.Str(), "1")
+		if self.rang.B != nil && !jule::IsBlank(self.rang.B.Name) {
+			self.sc.s.pushErr(self.rang.B.Token, log::IterPermitsNVar, c.Str(), "1")
 		}
-		if self.rang.KeyA == nil || jule::IsBlank(self.rang.KeyA.Ident) {
+		if self.rang.A == nil || jule::IsBlank(self.rang.A.Name) {
 			ret
 		}
-		self.Kind.KeyA = self.buildVar(self.rang.KeyA)
-		self.Kind.KeyA.TypeSym = &TypeSym{Type: c.Elem}
+		self.Kind.KeyA = self.buildVar(self.rang.A)
+		self.Kind.KeyA.TypeSym = &TypeSym{Type: c.Value}
 		mut v := new(Value, *self.v)
-		v.Type = c.Elem
-		self.checkRangeExprValidity(v, self.Kind.KeyA, c.Elem)
+		v.Type = c.Value
+		self.checkRangeExprValidity(v, self.Kind.KeyA, c.Value)
 	}
 
 	fn checkComptime(mut self) {
 		self.setSizeKey()
-		if self.rang.KeyA != nil && self.rang.KeyA.Mutable {
-			self.sc.s.pushErr(self.rang.KeyA.Token, log::CannotBeMut, self.rang.KeyA.Ident)
+		if self.rang.A != nil && self.rang.A.Mutable {
+			self.sc.s.pushErr(self.rang.A.Token, log::CannotBeMut, self.rang.A.Name)
 		}
-		if self.rang.KeyB != nil && self.rang.KeyB.Mutable {
-			self.sc.s.pushErr(self.rang.KeyB.Token, log::CannotBeMut, self.rang.KeyB.Ident)
+		if self.rang.B != nil && self.rang.B.Mutable {
+			self.sc.s.pushErr(self.rang.B.Token, log::CannotBeMut, self.rang.B.Name)
 		}
-		if self.rang.KeyB == nil || jule::IsBlank(self.rang.KeyB.Ident) {
+		if self.rang.B == nil || jule::IsBlank(self.rang.B.Name) {
 			ret
 		}
-		self.Kind.KeyB = self.buildVar(self.rang.KeyB)
+		self.Kind.KeyB = self.buildVar(self.rang.B)
 	}
 
 	fn checkComptimeRange(mut self): bool {
@@ -1503,9 +1503,9 @@ impl retTypeChecker {
 		if e == nil {
 			ret true
 		}
-		match type e.Kind {
+		match type e.Data {
 		| &ast::TupleExpr:
-			self.exprDecls = e.Kind.(&ast::TupleExpr).Expr
+			self.exprDecls = e.Data.(&ast::TupleExpr).X
 		|:
 			self.exprDecls = [e]
 		}

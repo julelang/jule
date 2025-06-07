@@ -230,7 +230,7 @@ fn structToStr[T](x: T): str {
 			buf = append(buf, ", "...)
 		}
 		const match {
-		| field.Type().Binded():
+		| field.Type().Bind():
 			buf = append(buf, field.Type().Str()...)
 		|:
 			buf = append(buf, toStr(v.FieldByIndex(i).Unwrap())...)
@@ -245,7 +245,7 @@ fn structToStr[T](x: T): str {
 fn toStr[T](x: T): str {
 	const t = comptime::TypeOf(T)
 	const match {
-	| t.Binded():
+	| t.Bind():
 		ret t.Str()
 	| t.CanNil():
 		if x == nil {
@@ -288,9 +288,9 @@ fn toStr[T](x: T): str {
 		ret structToStr(x)
 	| comptime::SmartPtr:
 		// Handle element type of smart pointer.
-		const elem = t.Elem()
+		const value = t.Value()
 		const match {
-		| elem.Strict() | elem.Kind() == comptime::Struct:
+		| value.Strict() | value.Kind() == comptime::Struct:
 			r, ok := tryToCallStr(*x)
 			if ok {
 				ret r
@@ -300,8 +300,8 @@ fn toStr[T](x: T): str {
 	| comptime::Ptr | comptime::UnsafePtr:
 		ret ptrToStr(unsafe { (*unsafe)(uintptr(x)) })
 	| comptime::Enum:
-		comptime::TypeAlias(elemType, t.Elem())
-		ret toStr(elemType(x))
+		comptime::TypeAlias(valueTyp, t.Value())
+		ret toStr(valueTyp(x))
 	| comptime::Chan:
 		// Channels are smart pointers behind the scene.
 		// Take raw pointer, handle as &uintptr to read memory address of

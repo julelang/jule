@@ -54,7 +54,7 @@ const (
 // General pointer type for GC pointers.
 let mut generalGCPtr = &sema::Type{
 	Kind: &sema::Sptr{
-		Elem: &sema::Type{
+		Value: &sema::Type{
 			Kind: &sema::Prim{
 				Kind: types::Uintptr,
 			},
@@ -73,8 +73,8 @@ struct traitCast {
 }
 
 struct anonHash {
-	expr:  &sema::AnonFuncExpr
-	ident: str
+	expr: &sema::AnonFuncExpr
+	name: str
 }
 
 struct traitHash {
@@ -308,14 +308,14 @@ impl ObjectCoder {
 		// at machine code level.
 		match {
 		| t.Sptr() != nil:
-			self.tc.kind(self.deallocObj, t.Sptr().Elem)
+			self.tc.kind(self.deallocObj, t.Sptr().Value)
 		| t.Map() != nil:
 			mp := t.Map()
-			mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Val)
+			mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Value)
 			self.tc.structureIns(self.deallocObj, mps)
 		| t.Chan() != nil:
 			ch := t.Chan()
-			mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+			mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
 			self.tc.structureIns(self.deallocObj, chs)
 		|:
 			self.tc.kind(self.deallocObj, t)
@@ -324,7 +324,7 @@ impl ObjectCoder {
 		ret i
 	}
 
-	fn pushAnonFunc(mut &self, mut &m: &sema::AnonFuncExpr): (ident: str) {
+	fn pushAnonFunc(mut &self, mut &m: &sema::AnonFuncExpr): (name: str) {
 		self.meta.concurrent = self.meta.concurrent || m.Func.CalledCo
 
 		closure := obj::IsClosure(m)
@@ -334,7 +334,7 @@ impl ObjectCoder {
 			l := self.anonObj.Len()
 			self.anonObj.WriteStr("__jule_anon_")!
 			self.anonObj.WriteStr(conv::FormatUint(u64(uintptr(m.Func)), 0xF))!
-			ident = str(unsafe { self.anonObj.Buf()[l:] })
+			name = str(unsafe { self.anonObj.Buf()[l:] })
 			self.anonObj.WriteStr(anonFuncCtxSuffix + "{\n")!
 			for (_, mut v) in m.Captured {
 				self.anonObj.WriteByte(indentKind)! // 1x indent
@@ -350,18 +350,18 @@ impl ObjectCoder {
 
 			// Ctx handler function.
 			self.anonObj.WriteStr("static void ")!
-			self.anonObj.WriteStr(ident)!
+			self.anonObj.WriteStr(name)!
 			self.anonObj.WriteStr(anonFuncCtxHandlerSuffix + "(jule::Ptr<" + typeUintptr + "> &ptr) { ptr.__as<")!
-			self.anonObj.WriteStr(ident)!
+			self.anonObj.WriteStr(name)!
 			self.anonObj.WriteStr(anonFuncCtxSuffix + ">().dealloc(); }\n")!
 		} else {
-			ident = "__jule_anon"
-			ident += conv::FormatUint(u64(uintptr(m.Func)), 0xF)
+			name = "__jule_anon"
+			name += conv::FormatUint(u64(uintptr(m.Func)), 0xF)
 		}
 
 		// Anonymous function.
-		self.anons = append(self.anons, &anonHash{expr: m, ident: ident})
-		self.anonFuncInsDecl(m, ident)
+		self.anons = append(self.anons, &anonHash{expr: m, name: name})
+		self.anonFuncInsDecl(m, name)
 		self.anonObj.WriteByte('\n')!
 		ret
 	}
@@ -385,7 +385,7 @@ impl ObjectCoder {
 			mut sptr := t.Sptr()
 
 			// Whether we have to use generic runtime stringer function.
-			runtimeToStr := t.SoftStruct() != nil || sptr != nil && sptr.Elem.SoftStruct() != nil
+			runtimeToStr := t.SoftStruct() != nil || sptr != nil && sptr.Value.SoftStruct() != nil
 
 			// Write to_str function.
 			// If type is a soft struct type, or element of smart pointer is,
@@ -412,7 +412,7 @@ impl ObjectCoder {
 					if sptr != nil {
 						self.tc.kind(self.anyObj, t)
 						self.anyObj.WriteStr("::make(reinterpret_cast<")!
-						self.tc.kind(self.anyObj, sptr.Elem)
+						self.tc.kind(self.anyObj, sptr.Value)
 						self.anyObj.WriteStr("*>(alloc), nullptr)); }\n")!
 					} else {
 						self.anyObj.WriteStr("*reinterpret_cast<")!
@@ -450,7 +450,7 @@ impl ObjectCoder {
 			// Channels are just handled like pointers, no difference.
 			// But we have to handle special cases of maps here.
 			mp := t.Map()
-			mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Val)
+			mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Value)
 
 			// Get deallocator function based on map type for unique distribution.
 			di := self.pushDealloc(t)
@@ -644,7 +644,7 @@ impl ObjectCoder {
 	}
 
 	fn pushResult(mut &self, mut &f: &sema::Func) {
-		if f.IsVoid() || len(f.Result.Idents) <= 1 {
+		if f.IsVoid() || len(f.Result.Names) <= 1 {
 			ret
 		}
 		mut n := len(f.Instances)
@@ -804,7 +804,7 @@ impl ObjectCoder {
 	fn links(mut &self, std: bool) {
 		for _, used in self.ir.Used {
 			match {
-			| !used.Binded:
+			| !used.Bind:
 				continue
 			| build::IsStdHeaderPath(used.Path):
 				if !std {
@@ -879,7 +879,7 @@ impl ObjectCoder {
 		self.write(";")
 	}
 
-	fn structureOperatorEq(mut &self, ident: str, mut &s: &sema::StructIns, decl: bool) {
+	fn structureOperatorEq(mut &self, name: str, mut &s: &sema::StructIns, decl: bool) {
 		if !s.Comparable {
 			ret
 		}
@@ -888,12 +888,12 @@ impl ObjectCoder {
 			self.write("inline ")
 		}
 		self.write(typeBool + " ")
-		self.write(ident)
+		self.write(name)
 		self.write(structDefaultEqMethodSuffix)
 		self.write("(")
-		self.write(ident)
+		self.write(name)
 		self.write(" *_self_, ")
-		self.write(ident)
+		self.write(name)
 		self.write(" _other_)")
 		if decl {
 			// Declaration only.
@@ -919,7 +919,7 @@ impl ObjectCoder {
 		for (_, mut f) in s.Fields {
 			// Skip binded struct kinds.
 			strct := f.Type.Struct()
-			if strct != nil && strct.Decl != nil && strct.Decl.Binded {
+			if strct != nil && strct.Decl != nil && strct.Decl.Bind {
 				continue
 			}
 			if written {
@@ -929,14 +929,13 @@ impl ObjectCoder {
 			self.write("\n")
 			self.indent()
 
-			mut fIdent := strings::Builder{}
-			fIdent.Grow(len(f.Decl.Ident))
-			identCoder.field(fIdent, f.Decl)
-			lmodel += fIdent.Str()
-			rmodel += fIdent.Str()
+			mut fName := strings::Builder{}
+			identCoder.field(fName, f.Decl)
+			lmodel += fName.Str()
+			rmodel += fName.Str()
 			self.ec._unsafeBinaryNoDynamic(self.Buf, lmodel, rmodel, f.Type, f.Type, token::DblEq, "==")
-			lmodel = lmodel[:len(lmodel)-fIdent.Len()]
-			rmodel = rmodel[:len(rmodel)-fIdent.Len()]
+			lmodel = lmodel[:len(lmodel)-fName.Len()]
+			rmodel = rmodel[:len(rmodel)-fName.Len()]
 		}
 		self.doneIndent()
 		if !written {
@@ -1010,10 +1009,10 @@ impl ObjectCoder {
 		}
 	}
 
-	// The ident parameter means this function is anon, mostly.
+	// The identifier parameter means this function is anon, mostly.
 	// But this parameter not only for anonymous functions.
 	// It also useable as custom identifiers for functions.
-	fn funcHead(mut &self, mut &buf: strings::Builder, mut &f: &sema::FuncIns, ptr: bool, ident: str) {
+	fn funcHead(mut &self, mut &buf: strings::Builder, mut &f: &sema::FuncIns, ptr: bool, name: str) {
 		if !ptr && opt::Inline && !f.Decl.IsEntryPoint() {
 			buf.WriteStr("inline ")!
 		}
@@ -1024,10 +1023,10 @@ impl ObjectCoder {
 			buf.WriteByte(')')!
 		} else {
 			buf.WriteByte(' ')!
-			if ident == "" {
+			if name == "" {
 				identCoder.funcIns(buf, f)
 			} else {
-				buf.WriteStr(ident)!
+				buf.WriteStr(name)!
 			}
 		}
 	}
@@ -1059,7 +1058,7 @@ impl ObjectCoder {
 		obj::IterPackages(self.ir, fn(mut &pkg: &sema::Package) {
 			obj::IterFiles(pkg, fn(mut &file: &sema::SymTab) {
 				for (_, mut f) in file.Funcs {
-					if !f.Binded && f.Token != nil {
+					if !f.Bind && f.Token != nil {
 						self.pushResult(f)
 						self.funcDecl(f, false)
 					}
@@ -1072,8 +1071,8 @@ impl ObjectCoder {
 		for (_, mut m) in hash.methods {
 			mut ins := m.Instances[0]
 			for (i, mut ip) in ins.Params[1:] {
-				if jule::IsAnon(ip.Decl.Ident) {
-					ip.Decl.Ident = "_" + conv::Itoa(i)
+				if jule::IsAnon(ip.Decl.Name) {
+					ip.Decl.Name = "_" + conv::Itoa(i)
 				}
 			}
 			self.pushResult(m)
@@ -1175,7 +1174,7 @@ impl ObjectCoder {
 	}
 
 	fn var(mut &self, mut v: &sema::Var) {
-		if jule::IsBlank(v.Ident) {
+		if jule::IsBlank(v.Name) {
 			ret
 		}
 		if v.ValueSym != nil && v.ValueSym.Expr != nil {
@@ -1219,24 +1218,24 @@ impl ObjectCoder {
 		self.varInitExpr(v, nil)
 	}
 
-	fn anonFuncInsDecl(mut &self, mut &m: &sema::AnonFuncExpr, ident: str) {
-		self.funcHead(self.anonObj, m.Func, false, ident)
+	fn anonFuncInsDecl(mut &self, mut &m: &sema::AnonFuncExpr, name: str) {
+		self.funcHead(self.anonObj, m.Func, false, name)
 		self.paramsIns(self.anonObj, m.Func)
 		self.anonObj.WriteByte(';')!
 	}
 
-	fn anonFuncIns(mut &self, mut &m: &sema::AnonFuncExpr, ident: str) {
-		self.funcHead(self.Buf, m.Func, false, ident)
+	fn anonFuncIns(mut &self, mut &m: &sema::AnonFuncExpr, name: str) {
+		self.funcHead(self.Buf, m.Func, false, name)
 		self.paramsIns(self.Buf, m.Func)
 		self.write(" ")
-		self.sc.anonFuncScope(m, ident)
+		self.sc.anonFuncScope(m, name)
 		if m.Func.Scope != nil {
 			self.write("\n\n")
 		}
 	}
 
-	fn funcIns(mut &self, mut f: &sema::FuncIns, ident: str) {
-		self.funcHead(self.Buf, f, false, ident)
+	fn funcIns(mut &self, mut f: &sema::FuncIns, name: str) {
+		self.funcHead(self.Buf, f, false, name)
 		self.paramsIns(self.Buf, f)
 		self.write(" ")
 		self.sc.funcScope(f)
@@ -1254,16 +1253,16 @@ impl ObjectCoder {
 	fn funcTrait(mut &self, &s: &sema::StructIns, mut &f: &sema::FuncIns) {
 		f.Scope = nil
 
-		mut nident := strings::Builder{}
-		nident.Grow(30)
-		nident.WriteStr("__jule_trait_method_")!
-		nident.WriteStr(conv::FormatUint(u64(uintptr(f)), 0xF))!
-		nident.WriteStr("_")!
-		nident.WriteStr(conv::FormatUint(u64(uintptr(s)), 0xF))!
+		mut nname := strings::Builder{}
+		nname.Grow(30)
+		nname.WriteStr("__jule_trait_method_")!
+		nname.WriteStr(conv::FormatUint(u64(uintptr(f)), 0xF))!
+		nname.WriteStr("_")!
+		nname.WriteStr(conv::FormatUint(u64(uintptr(s)), 0xF))!
 
 		mut k := f.Params[0].Type
 		f.Params[0].Type = generalGCPtr
-		self.funcIns(f, nident.Str())
+		self.funcIns(f, nname.Str())
 		f.Params[0].Type = k
 	}
 
@@ -1271,7 +1270,7 @@ impl ObjectCoder {
 		mut mins := m.Instances[0]
 		for (mut f, _) in self.traitMetMap {
 			if f.Decl.Public == m.Public &&
-				f.Decl.Ident == m.Ident &&
+				f.Decl.Name == m.Name &&
 				f.EqualFunc(mins, false) {
 				ret f, true
 			}
@@ -1302,7 +1301,7 @@ impl ObjectCoder {
 				self.funcTrait(ins, mepf)
 
 				const Static = false
-				mut sm := ins.FindMethod(m.Ident, Static)
+				mut sm := ins.FindMethod(m.Name, Static)
 				if sm == nil || len(sm.Instances) == 0 {
 					ret
 				}
@@ -1332,20 +1331,20 @@ impl ObjectCoder {
 					//	Then pass address of the temporary variable to receiver.
 					if ptr && act.Sptr() != nil {
 						self.write("((jule::Ptr<")
-						self.tc.kind(self.Buf, act.Sptr().Elem)
+						self.tc.kind(self.Buf, act.Sptr().Value)
 						self.write(">*)&_self_)")
 						ptr = false // Avoid ".alloc" suffix. We have a pointer already.
 					} else if ptr && act.Map() != nil {
 						self.write("((jule::Ptr<")
 						mp := act.Map()
-						mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Val)
+						mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Value)
 						self.tc.structureIns(self.Buf, mps)
 						self.write(">*)&_self_)")
 						ptr = false // Avoid ".alloc" suffix. We have a pointer already.
 					} else if ptr && act.Chan() != nil {
 						self.write("((jule::Ptr<")
 						ch := act.Chan()
-						mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+						mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
 						self.tc.structureIns(self.Buf, chs)
 						self.write(">*)&_self_)")
 						ptr = false // Avoid ".alloc" suffix. We have a pointer already.
@@ -1410,16 +1409,15 @@ impl ObjectCoder {
 	// See memory handling of traits to understand trait type handling.
 	// https://manual.jule.dev/memory/memory-model#traits
 	fn traitDataForHash(mut &self, mut &hash: &traitHash, i: int, mut &s: &sema::StructIns) {
-		mut ident := strings::Builder{}
-		ident.Grow(len(hash.traitDecl.Ident))
-		identCoder.traitDecl(ident, hash.traitDecl)
+		mut name := strings::Builder{}
+		identCoder.traitDecl(name, hash.traitDecl)
 		// For: Type.
 		{
 			mut j := self.pushAnyType(&sema::Type{Kind: s})
 			self.write("static ")
-			self.writeBytes(unsafe { ident.Buf() })
+			self.writeBytes(unsafe { name.Buf() })
 			self.write("MptrData ")
-			self.writeBytes(unsafe { ident.Buf() })
+			self.writeBytes(unsafe { name.Buf() })
 			self.write("_mptr_data")
 			self.write(conv::Itoa(i))
 			self.write(" {\n")
@@ -1443,11 +1441,11 @@ impl ObjectCoder {
 		}
 		// For: &Type.
 		{
-			mut j := self.pushAnyType(&sema::Type{Kind: &sema::Sptr{Elem: &sema::Type{Kind: s}}})
+			mut j := self.pushAnyType(&sema::Type{Kind: &sema::Sptr{Value: &sema::Type{Kind: s}}})
 			self.write("static ")
-			self.writeBytes(unsafe { ident.Buf() })
+			self.writeBytes(unsafe { name.Buf() })
 			self.write("MptrData ")
-			self.writeBytes(unsafe { ident.Buf() })
+			self.writeBytes(unsafe { name.Buf() })
 			self.write("_mptr_data")
 			self.write(conv::Itoa(i + 1))
 			self.write(" {\n")
@@ -1489,7 +1487,7 @@ impl ObjectCoder {
 		for (_, mut v) in self.ir.Ordered.Globals {
 			// Skip blank identifiers, do not declare them.
 			// Initialization expressions will be executed when variables initializing.
-			if jule::IsBlank(v.Ident) {
+			if jule::IsBlank(v.Name) {
 				continue
 			}
 			self.tc.kind(self.Buf, v.TypeSym.Type)
@@ -1559,12 +1557,12 @@ impl ObjectCoder {
 					}
 					// skip special runtime functions
 					if unsafe { pkg == self.ir.Runtime.Package } {
-						match f.Ident {
+						match f.Name {
 						| "_RCAdd" | "_RCLoad" | "_RCDrop":
 							continue
 						}
 					}
-					if !f.Binded && f.Token != nil {
+					if !f.Bind && f.Token != nil {
 						self.func(f)
 						self.write("\n\n")
 					}
@@ -1576,7 +1574,7 @@ impl ObjectCoder {
 	fn pushInit(mut &self, mut &pkg: &sema::Package) {
 		obj::IterFiles(pkg, fn(mut &file: &sema::SymTab) {
 			for (_, mut f) in file.Funcs {
-				if f.Ident == jule::InitFunc {
+				if f.Name == jule::InitFunc {
 					self.indent()
 					identCoder.func(self.Buf, f)
 					self.write("();\n")
@@ -1593,7 +1591,7 @@ impl ObjectCoder {
 		mut anons := self.anons
 		self.anons = nil
 		for (_, mut h) in anons {
-			self.anonFuncIns(h.expr, h.ident)
+			self.anonFuncIns(h.expr, h.name)
 		}
 		if len(self.anons) > 0 {
 			goto repeat
@@ -1612,7 +1610,7 @@ impl ObjectCoder {
 			}
 			self.Buf.WriteByte(indentKind)!
 			// If variable have blank identifier, just execute the initialization expression.
-			if jule::IsBlank(v.Ident) {
+			if jule::IsBlank(v.Name) {
 				self.ec.model(v.ValueSym.Value.Model)
 				self.write(";\n")
 				continue

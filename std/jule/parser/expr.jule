@@ -24,10 +24,10 @@ impl exprBuilder {
 
 	fn buildTuple(mut self, mut &parts: [][]&token::Token): &ast::TupleExpr {
 		mut tuple := &ast::TupleExpr{
-			Expr: make([]&ast::Expr, 0, len(parts)),
+			X: make([]&ast::Expr, 0, len(parts)),
 		}
 		for (_, mut part) in parts {
-			tuple.Expr = append(tuple.Expr, self.buildFromTokens(part))
+			tuple.X = append(tuple.X, self.buildFromTokens(part))
 		}
 		ret tuple
 	}
@@ -56,7 +56,7 @@ impl exprBuilder {
 		ret nil
 	}
 
-	fn buildBindIdent(mut self, mut &tokens: []&token::Token): &ast::IdentExpr {
+	fn buildBindName(mut self, mut &tokens: []&token::Token): &ast::NameExpr {
 		if tokens[0].Id != token::Cpp {
 			ret nil
 		} else if tokens[1].Id != token::Dot {
@@ -80,7 +80,7 @@ impl exprBuilder {
 		}
 
 		mut expr := buildIdentExpr(token)
-		expr.Binded = true
+		expr.Bind = true
 		ret expr
 	}
 
@@ -101,21 +101,21 @@ impl exprBuilder {
 
 		ret &ast::UnaryExpr{
 			Op: op,
-			Expr: self.buildFromTokens(tokens),
+			X: self.buildFromTokens(tokens),
 		}
 	}
 
-	fn buildObjSubIdent(mut self, mut tokens: []&token::Token): &ast::SubIdentExpr {
+	fn buildObjSubIdent(mut self, mut tokens: []&token::Token): &ast::SelectorExpr {
 		mut i := len(tokens) - 1
-		mut identToken := tokens[i]
+		mut nameToken := tokens[i]
 		i--                 // Set offset to delimiter token.
 		tokens = tokens[:i] // Remove dot token and selected identifier token.
 		if len(tokens) == 0 {
-			self.pushErr(identToken, log::InvalidSyntax)
+			self.pushErr(nameToken, log::InvalidSyntax)
 			ret nil
 		}
-		ret &ast::SubIdentExpr{
-			Ident: identToken,
+		ret &ast::SelectorExpr{
+			Name: nameToken,
 			Expr: self.buildFromTokens(tokens),
 		}
 	}
@@ -145,9 +145,9 @@ impl exprBuilder {
 			self.pushSuggestion(log::ExpectedIdentifier)
 			ret nil
 		}
-		ns.Ident = tokens[2]
-		if ns.Ident.Id != token::Name {
-			self.pushErr(ns.Ident, log::InvalidSyntax)
+		ns.Name = tokens[2]
+		if ns.Name.Id != token::Name {
+			self.pushErr(ns.Name, log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedIdentifier)
 			ret nil
 		}
@@ -156,14 +156,14 @@ impl exprBuilder {
 
 	fn buildType(mut self, mut &tokens: []&token::Token): ast::ExprData {
 		mut i := 0
-		mut t, ok := unsafe { self.p.buildType(tokens, &i, true) }
+		mut typ, ok := unsafe { self.p.buildType(tokens, &i, true) }
 		if !ok {
 			ret nil
 		}
 		if i < len(tokens) {
 			self.pushErr(tokens[i], log::InvalidSyntax)
 		}
-		ret t.Kind
+		ret typ.Data
 	}
 
 	fn buildSubIdent(mut self, mut &tokens: []&token::Token): ast::ExprData {
@@ -193,7 +193,7 @@ impl exprBuilder {
 		tokens = tokens[:len(tokens)-1]    // Remove variadic operator token.
 		ret &ast::VariadicExpr{
 			Token: token,
-			Expr: self.buildFromTokens(tokens),
+			X: self.buildFromTokens(tokens),
 		}
 	}
 
@@ -205,7 +205,7 @@ impl exprBuilder {
 		}
 		tokens = tokens[1 : len(tokens)-1] // Remove parentheses.
 		ret &ast::RangeExpr{
-			Expr: self.buildFromTokens(tokens),
+			X: self.buildFromTokens(tokens),
 		}
 	}
 
@@ -258,13 +258,13 @@ impl exprBuilder {
 			} else {
 				typeTokens = typeTokens[1 : len(typeTokens)-1] // Remove parentheses.
 				mut typeIndex := 0
-				mut t, ok := unsafe { self.p.buildType(typeTokens, &typeIndex, true) }
+				mut typ, ok := unsafe { self.p.buildType(typeTokens, &typeIndex, true) }
 				if ok && typeIndex < len(typeTokens) {
 					self.pushErr(typeTokens[typeIndex], log::InvalidSyntax)
 				} else if !ok {
 					ret cast
 				}
-				cast.Kind = t
+				cast.Type = typ
 
 				if len(exprTokens) > 2 {
 					// Remove parentheses.
@@ -273,7 +273,7 @@ impl exprBuilder {
 					if len(exprTokens2) == 0 || j < len(exprTokens) {
 						ret nil
 					}
-					cast.Expr = self.buildFromTokens(exprTokens2)
+					cast.X = self.buildFromTokens(exprTokens2)
 				}
 			}
 			ret cast
@@ -299,31 +299,31 @@ impl exprBuilder {
 		ret args
 	}
 
-	fn buildFuncCall(mut self, mut &token: &token::Token, mut &expr: []&token::Token, mut &args: []&token::Token): &ast::FuncCallExpr {
-		ret &ast::FuncCallExpr{
+	fn buildCall(mut self, mut &token: &token::Token, mut &expr: []&token::Token, mut &args: []&token::Token): &ast::CallExpr {
+		ret &ast::CallExpr{
 			Token: token,
-			Expr: self.buildFromTokens(expr),
+			Func: self.buildFromTokens(expr),
 			Args: self.buildArgs(args),
 		}
 	}
 
 	fn buildTypeAssertion(mut self, mut &exprTokens: []&token::Token, mut &typeTokens: []&token::Token): &ast::TypeAssertionExpr {
 		exprTokens = exprTokens[:len(exprTokens)-1] // Remove trailing dot.
-		mut expr := self.buildFromTokens(exprTokens)
-		if expr == nil {
+		mut x := self.buildFromTokens(exprTokens)
+		if x == nil {
 			ret nil
 		}
 		typeTokens = typeTokens[1 : len(typeTokens)-1] // Remove parentheses.
-		mut t := self.buildType(typeTokens)
-		if t == nil {
+		mut typ := self.buildType(typeTokens)
+		if typ == nil {
 			ret nil
 		}
 		ret &ast::TypeAssertionExpr{
-			Expr: expr,
-			Kind: &ast::Expr{
+			X: x,
+			Type: &ast::Expr{
 				Token: typeTokens[0],
 				End: typeTokens[len(typeTokens)-1],
-				Kind: t,
+				Data: typ,
 			},
 		}
 	}
@@ -346,7 +346,7 @@ impl exprBuilder {
 		if exprTokens[len(exprTokens)-1].Id == token::Dot {
 			ret self.buildTypeAssertion(exprTokens, argsTokens)
 		}
-		ret self.buildFuncCall(token, exprTokens, argsTokens)
+		ret self.buildCall(token, exprTokens, argsTokens)
 	}
 
 	fn buildUnsafeExpr(mut self, mut tokens: []&token::Token): &ast::UnsafeExpr {
@@ -360,7 +360,7 @@ impl exprBuilder {
 		}
 		ret &ast::UnsafeExpr{
 			Token: token,
-			Expr: self.buildFromTokens(rangeTokens),
+			X: self.buildFromTokens(rangeTokens),
 		}
 	}
 
@@ -453,7 +453,7 @@ impl exprBuilder {
 			ret nil
 		}
 		ret &ast::TypedBraceLit{
-			Kind: t,
+			Type: t,
 			Lit: self.buildBraceLit(tokens),
 		}
 	}
@@ -470,10 +470,10 @@ impl exprBuilder {
 			ret &ast::Expr{
 				Token: tokens[0],
 				End: tokens[len(tokens)-1],
-				Kind: &ast::KeyValPair{
+				Data: &ast::KeyValueExpr{
 					Colon: tokens[len(l)],
 					Key: self.buildFromTokens(l),
-					Val: self.buildFromTokens(r),
+					Value: self.buildFromTokens(r),
 				},
 			}
 		}
@@ -491,9 +491,9 @@ impl exprBuilder {
 			ret lit
 		}
 
-		lit.Exprs = make([]&ast::Expr, 0, len(parts))
+		lit.X = make([]&ast::Expr, 0, len(parts))
 		for (_, mut part) in parts {
-			lit.Exprs = append(lit.Exprs, self.buildBraceLitPart(part))
+			lit.X = append(lit.X, self.buildBraceLitPart(part))
 		}
 
 		ret lit
@@ -518,7 +518,7 @@ impl exprBuilder {
 			if d == nil {
 				ret nil
 			}
-			mut model, ok := d.(&ast::FuncCallExpr)
+			mut model, ok := d.(&ast::CallExpr)
 			if !ok {
 				self.pushErr(exprTokens[0], log::InvalidSyntax)
 				ret nil
@@ -566,19 +566,19 @@ impl exprBuilder {
 			ret slc
 		}
 
-		slc.Exprs = make([]&ast::Expr, 0, len(parts))
+		slc.X = make([]&ast::Expr, 0, len(parts))
 		for (_, mut p) in parts {
 			if len(p) == 0 {
 				continue
 			}
-			slc.Exprs = append(slc.Exprs, self.buildFromTokens(p))
+			slc.X = append(slc.X, self.buildFromTokens(p))
 		}
 
 		ret slc
 	}
 
-	fn buildIndexing(mut self, mut exprTokens: []&token::Token,
-		mut tokens: []&token::Token, mut errorToken: &token::Token): &ast::IndexingExpr {
+	fn buildIndex(mut self, mut exprTokens: []&token::Token,
+		mut tokens: []&token::Token, mut errorToken: &token::Token): &ast::IndexExpr {
 		mut end := tokens[len(tokens)-1]
 		tokens = tokens[1 : len(tokens)-1] // Remove brackets.
 		if len(tokens) == 0 {
@@ -593,39 +593,39 @@ impl exprBuilder {
 		if index == nil {
 			ret nil
 		}
-		ret &ast::IndexingExpr{
+		ret &ast::IndexExpr{
 			Token: errorToken,
 			End: end,
-			Expr: expr,
+			X: expr,
 			Index: index,
 		}
 	}
 
-	fn buildSlicing(mut self, mut &exprTokens: []&token::Token, mut &start: []&token::Token,
-		mut to: []&token::Token, mut &errorToken: &token::Token, mut end: &token::Token): &ast::SlicingExpr {
+	fn buildSlicing(mut self, mut &x: []&token::Token, mut &low: []&token::Token,
+		mut high: []&token::Token, mut &errorToken: &token::Token, mut end: &token::Token): &ast::SlicingExpr {
 		mut slc := &ast::SlicingExpr{
 			Token: errorToken,
 			End: end,
-			Expr: self.buildFromTokens(exprTokens),
+			X: self.buildFromTokens(x),
 		}
-		if len(start) > 0 {
-			slc.Start = self.buildFromTokens(start)
+		if len(low) > 0 {
+			slc.Low = self.buildFromTokens(low)
 		}
-		if len(to) > 0 {
-			mut to2, mut cap := splitDelim(to, token::Colon) // Catch cap-limit index.
-			if len(to2) > 0 || len(cap) > 0 {
-				if len(to2) > 0 {
-					slc.To = self.buildFromTokens(to2)
+		if len(high) > 0 {
+			mut high2, mut max := splitDelim(high, token::Colon) // Catch max index.
+			if len(high2) > 0 || len(max) > 0 {
+				if len(high2) > 0 {
+					slc.High = self.buildFromTokens(high2)
 				} else {
 					panic("unreachable")
 				}
-				if len(cap) > 0 {
-					slc.Cap = self.buildFromTokens(cap)
+				if len(max) > 0 {
+					slc.Max = self.buildFromTokens(max)
 				} else {
 					self.pushErr(errorToken, log::FinalIndexRequired)
 				}
 			} else {
-				slc.To = self.buildFromTokens(to)
+				slc.High = self.buildFromTokens(high)
 			}
 		}
 		ret slc
@@ -658,7 +658,7 @@ impl exprBuilder {
 			self.pushErr(errorToken, log::MiddleIndexRequired)
 			ret nil
 		}
-		ret self.buildIndexing(exprTokens, bracketTokens, errorToken)
+		ret self.buildIndex(exprTokens, bracketTokens, errorToken)
 	}
 
 	fn buildExclRight(mut self, mut &tokens: []&token::Token): ast::ExprData {
@@ -668,7 +668,7 @@ impl exprBuilder {
 		if d == nil {
 			ret nil
 		}
-		mut f, ok := d.(&ast::FuncCallExpr)
+		mut f, ok := d.(&ast::CallExpr)
 		if !ok {
 			self.pushErr(token, log::InvalidSyntax)
 			ret nil
@@ -694,12 +694,12 @@ impl exprBuilder {
 			self.pushErr(tokens[0], log::InvalidSyntax)
 			ret nil
 		}
-		mut expr := self.buildFromTokens(tokens[1:])
-		if expr == nil {
+		mut x := self.buildFromTokens(tokens[1:])
+		if x == nil {
 			ret nil
 		}
 		ret &ast::ChanRecv{
-			Expr: expr,
+			X: x,
 		}
 	}
 
@@ -711,7 +711,7 @@ impl exprBuilder {
 			ret self.buildSingle(tokens[0])
 		| 3:
 			if tokens[0].Id == token::Cpp {
-				ret self.buildBindIdent(tokens)
+				ret self.buildBindName(tokens)
 			}
 		}
 
@@ -782,25 +782,25 @@ impl exprBuilder {
 
 	fn buildBinary(mut self, mut &tokens: []&token::Token, i: int): ast::ExprData {
 		mut op := tokens[i]
-		mut leftTokens := tokens[:i]
-		if isTypeOp(op.Id) && isTypeRange(leftTokens) {
+		mut x := tokens[:i]
+		if isTypeOp(op.Id) && isTypeRange(x) {
 			// Catch slice and array types.
 			ret self.buildType(tokens)
 		}
-		if len(leftTokens) == 0 {
+		if len(x) == 0 {
 			self.pushErr(tokens[i], log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedLeftOperand)
 			ret nil
 		}
-		mut rightTokens := tokens[i+1:]
-		if len(rightTokens) == 0 {
+		mut y := tokens[i+1:]
+		if len(y) == 0 {
 			self.pushErr(tokens[i], log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedRightOperand)
 			ret nil
 		}
 		ret &ast::BinaryExpr{
-			Left: self.buildFromTokens(leftTokens),
-			Right: self.buildFromTokens(rightTokens),
+			X: self.buildFromTokens(x),
+			Y: self.buildFromTokens(y),
 			Op: op,
 		}
 	}
@@ -830,14 +830,14 @@ impl exprBuilder {
 		if len(tokens) == 0 {
 			ret nil
 		}
-		mut kind := self.buildKind(tokens)
-		if kind == nil {
+		mut typ := self.buildKind(tokens)
+		if typ == nil {
 			ret nil
 		}
 		ret &ast::Expr{
 			Token: tokens[0],
 			End: tokens[len(tokens)-1],
-			Kind: kind,
+			Data: typ,
 		}
 	}
 }
@@ -1071,11 +1071,11 @@ fn findLowestPrecOp(tokens: []&token::Token): int {
 	ret precPos
 }
 
-fn buildIdentExpr(mut &token: &token::Token): &ast::IdentExpr {
-	ret &ast::IdentExpr{
+fn buildIdentExpr(mut &token: &token::Token): &ast::NameExpr {
+	ret &ast::NameExpr{
 		Token: token,
-		Ident: token.Kind,
-		Binded: false,
+		Name: token.Kind,
+		Bind: false,
 	}
 }
 

@@ -12,7 +12,7 @@ struct Field {
 	Token:   &token::Token
 	Public:  bool
 	Mutable: bool // Interior mutability.
-	Ident:   str
+	Name:    str
 	TypeSym: &TypeSym
 	Tag:     &token::Token // Tag declaration.
 	Tags:    map[str]str   // Tags in key:value format.
@@ -41,11 +41,11 @@ struct Struct {
 	Depends: []&Struct
 
 	Token:      &token::Token
-	Ident:      str
+	Name:       str
 	Fields:     []&Field
 	Methods:    []&Func
 	Public:     bool
-	Binded:     bool
+	Bind:       bool
 	Directives: []&ast::Directive
 	Generics:   []&ast::Generic
 	Implements: []&Trait
@@ -146,9 +146,9 @@ impl Struct {
 
 	// Returns method by identifier.
 	// Returns nil if not exist any method in this identifier.
-	fn FindMethod(mut self, ident: str, _static: bool): &Func {
+	fn FindMethod(mut self, name: str, _static: bool): &Func {
 		for (_, mut f) in self.Methods {
-			if f.Static == _static && f.Ident == ident {
+			if f.Static == _static && f.Name == name {
 				ret f
 			}
 		}
@@ -157,9 +157,9 @@ impl Struct {
 
 	// Returns field by identifier.
 	// Returns nil if not exist any field in this identifier.
-	fn FindField(mut self, ident: str): &Field {
+	fn FindField(mut self, name: str): &Field {
 		for (_, mut f) in self.Fields {
-			if f.Ident == ident {
+			if f.Name == name {
 				ret f
 			}
 		}
@@ -215,10 +215,10 @@ impl Kind for StructIns {
 	fn Str(self): str {
 		mut kind := strings::Builder{}
 		kind.Grow(1 << 5)
-		if self.Decl.Binded {
+		if self.Decl.Bind {
 			kind.WriteStr("cpp.")!
 		}
-		kind.WriteStr(self.Decl.Ident)!
+		kind.WriteStr(self.Decl.Name)!
 		if len(self.Generics) > 0 {
 			kind.WriteByte('[')!
 			for i, g in self.Generics {
@@ -297,9 +297,9 @@ impl StructIns {
 
 	// Returns method by identifier.
 	// Returns nil if not exist any method in this identifier.
-	fn FindMethod(mut self, ident: str, _static: bool): &Func {
+	fn FindMethod(mut self, name: str, _static: bool): &Func {
 		for (_, mut f) in self.Methods {
-			if f.Static == _static && f.Ident == ident {
+			if f.Static == _static && f.Name == name {
 				ret f
 			}
 		}
@@ -308,9 +308,9 @@ impl StructIns {
 
 	// Returns field by identifier.
 	// Returns nil if not exist any field in this identifier.
-	fn FindField(mut self, ident: str): &FieldIns {
+	fn FindField(mut self, name: str): &FieldIns {
 		for (_, mut f) in self.Fields {
-			if f.Decl.Ident == ident {
+			if f.Decl.Name == name {
 				ret f
 			}
 		}
@@ -330,7 +330,7 @@ impl StructIns {
 			for (i, mut g) in self.Generics {
 				mut decl := self.Decl.Generics[i]
 				self.env.generics = append(self.env.generics, &TypeAlias{
-					Ident: decl.Ident,
+					Name: decl.Name,
 					Token: decl.Token,
 					TypeSym: &TypeSym{Type: g.Type},
 				})

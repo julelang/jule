@@ -95,10 +95,10 @@ fn buildTypeAlias(mut decl: &ast::TypeAlias): &TypeAlias {
 		Scope: decl.Scope,
 		Strict: decl.Strict,
 		Public: decl.Public,
-		Binded: decl.Binded,
+		Bind: decl.Bind,
 		Token: decl.Token,
-		Ident: decl.Ident,
-		TypeSym: buildType(decl.Kind),
+		Name: decl.Name,
+		TypeSym: buildType(decl.Type),
 	}
 }
 
@@ -107,8 +107,8 @@ fn buildField(mut decl: &ast::Field): &Field {
 		Token: decl.Token,
 		Public: decl.Public,
 		Mutable: decl.Mutable,
-		Ident: decl.Ident,
-		TypeSym: buildType(decl.Kind),
+		Name: decl.Name,
+		TypeSym: buildType(decl.Type),
 		Tag: decl.Tag,
 	}
 }
@@ -124,10 +124,10 @@ fn buildFields(mut &decls: []&ast::Field): []&Field {
 fn buildStruct(mut decl: &ast::Struct): &Struct {
 	ret &Struct{
 		Token: decl.Token,
-		Ident: decl.Ident,
+		Name: decl.Name,
 		Fields: buildFields(decl.Fields),
 		Public: decl.Public,
-		Binded: decl.Binded,
+		Bind: decl.Bind,
 		Directives: decl.Directives,
 		Generics: decl.Generics,
 	}
@@ -139,8 +139,8 @@ fn buildParam(mut decl: &ast::Param): &Param {
 		Mutable: decl.Mutable,
 		Variadic: decl.Variadic,
 		Reference: decl.Reference,
-		TypeSym: buildType(decl.Kind),
-		Ident: decl.Ident,
+		TypeSym: buildType(decl.Type),
+		Name: decl.Name,
 	}
 }
 
@@ -153,12 +153,12 @@ fn buildParams(mut &decls: []&ast::Param): []&Param {
 }
 
 fn buildRetType(mut decl: &ast::RetType): &RetType {
-	if decl.Idents == nil && decl.Kind == nil {
+	if decl.Names == nil && decl.Type == nil {
 		ret nil // Void type.
 	}
 	ret &RetType{
-		TypeSym: buildType(decl.Kind),
-		Idents: decl.Idents,
+		TypeSym: buildType(decl.Type),
+		Names: decl.Names,
 	}
 }
 
@@ -166,12 +166,12 @@ fn buildFunc(mut decl: &ast::Func): &Func {
 	ret &Func{
 		Token: decl.Token,
 		Global: decl.Global,
-		Unsafety: decl.Unsafety,
+		Unsafe: decl.Unsafe,
 		Public: decl.Public,
-		Binded: decl.Binded,
+		Bind: decl.Bind,
 		Static: decl.Static,
 		Exceptional: decl.Exceptional,
-		Ident: decl.Ident,
+		Name: decl.Name,
 		Directives: decl.Directives,
 		Scope: decl.Scope,
 		Generics: decl.Generics,
@@ -199,7 +199,7 @@ fn buildTraitInherits(mut &inherits: []&ast::Expr): []&TypeSym {
 fn buildTrait(mut decl: &ast::Trait): &Trait {
 	ret &Trait{
 		Token: decl.Token,
-		Ident: decl.Ident,
+		Name: decl.Name,
 		Public: decl.Public,
 		Methods: buildMethods(decl.Methods),
 		Inherits: buildTraitInherits(decl.Inherits),
@@ -213,8 +213,8 @@ fn buildEnumItems(mut &decls: []&ast::EnumItem): []&Var {
 			Public: true,
 			Constant: true,
 			Token: decl.Token,
-			Ident: decl.Ident,
-			ValueSym: buildExpr(decl.Expr),
+			Name: decl.Name,
+			ValueSym: buildExpr(decl.X),
 			Group: items,
 			GroupIndex: i,
 			Refers: ReferenceStack.new(),
@@ -230,8 +230,8 @@ fn buildEnum(mut decl: &ast::Enum): &Enum {
 	ret &Enum{
 		Token: decl.Token,
 		Public: decl.Public,
-		Ident: decl.Ident,
-		TypeSym: buildType(decl.Kind),
+		Name: decl.Name,
+		TypeSym: buildType(decl.Type),
 		Items: buildEnumItems(decl.Items),
 	}
 }
@@ -239,7 +239,7 @@ fn buildEnum(mut decl: &ast::Enum): &Enum {
 fn buildTypeEnumItem(mut decl: &ast::TypeEnumItem): &TypeEnumItem {
 	ret &TypeEnumItem{
 		Token: decl.Token,
-		TypeSym: buildType(decl.Kind),
+		TypeSym: buildType(decl.Type),
 	}
 }
 
@@ -255,7 +255,7 @@ fn buildTypeEnum(mut decl: &ast::TypeEnum): &TypeEnum {
 	ret &TypeEnum{
 		Token: decl.Token,
 		Public: decl.Public,
-		Ident: decl.Ident,
+		Name: decl.Name,
 		Items: buildTypeEnumItems(decl.Items),
 	}
 }
@@ -263,17 +263,17 @@ fn buildTypeEnum(mut decl: &ast::TypeEnum): &TypeEnum {
 fn buildVar(mut decl: &ast::Var): &Var {
 	ret &Var{
 		Token: decl.Token,
-		Ident: decl.Ident,
-		Binded: decl.Binded,
-		Constant: decl.Constant,
+		Name: decl.Name,
+		Bind: decl.Bind,
+		Constant: decl.Const,
 		Mutable: decl.Mutable,
 		Public: decl.Public,
 		Static: decl.Static,
 		Reference: decl.Reference,
 		Directives: decl.Directives,
 		Refers: ReferenceStack.new(),
-		TypeSym: buildType(decl.Kind),
-		ValueSym: buildExpr(decl.Expr),
+		TypeSym: buildType(decl.Type),
+		ValueSym: buildExpr(decl.X),
 	}
 }
 
@@ -359,7 +359,7 @@ impl symBuilder {
 			Decl: decl,
 			Path: path,
 			LinkPath: decl.Path.Kind,
-			Binded: true,
+			Bind: true,
 			Std: false,
 			Package: nil, // Cpp headers haven't symbol table.
 		}
@@ -460,7 +460,7 @@ impl symBuilder {
 	}
 
 	fn buildImport(mut &self, mut &decl: &ast::Use): &ImportInfo {
-		if decl.Binded {
+		if decl.Bind {
 			ret self.buildCppHeaderImport(decl)
 		}
 		std, filepath := self.checkImpPath(decl)
@@ -472,7 +472,7 @@ impl symBuilder {
 			Decl: decl,
 			Path: filepath,
 			LinkPath: decl.Path.Kind[1 : len(decl.Path.Kind)-1],
-			Binded: false,
+			Bind: false,
 			Std: std,
 			Package: &Package{
 				Files: nil, // Appends by import algorithm.
@@ -613,7 +613,7 @@ impl symBuilder {
 	}
 
 	fn importPackage(mut &self, mut &imp: &ImportInfo, mut &decl: &ast::Use): (ok: bool) {
-		if imp.Binded {
+		if imp.Bind {
 			ret true
 		}
 

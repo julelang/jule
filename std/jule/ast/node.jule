@@ -31,41 +31,41 @@ struct Directive {
 
 // Channel type.
 struct ChanType {
-	Recv: bool
-	Send: bool
-	Elem: &Expr
+	Recv:  bool
+	Send:  bool
+	Value: &Expr // Value type.
 }
 
 // Slice type.
 struct SliceType {
-	Elem: &Expr
+	Value: &Expr // Value type.
 }
 
 // Array type.
 // Size expression is nil for auto-sized array.
 struct ArrayType {
-	Elem: &Expr
-	Size: &Expr
+	Value: &Expr // Value type.
+	Size:  &Expr
 }
 
 impl ArrayType {
 	// Reports whether array is auto-sized.
-	fn AutoSized(self): bool {
+	fn IsAutoSized(self): bool {
 		ret self.Size == nil
 	}
 }
 
 // Map type.
 struct MapType {
-	Key: &Expr
-	Val: &Expr
+	Key:   &Expr
+	Value: &Expr
 }
 
 // Return type.
-// Kind and Idents is nil for void type.
+// Field are nil for the void type.
 struct RetType {
-	Kind:   &Expr
-	Idents: []&token::Token
+	Type:  &Expr
+	Names: []&token::Token
 }
 
 // Type of Expr's data.
@@ -73,23 +73,23 @@ enum ExprData: type {
 	&RangeExpr,
 	&TupleExpr,
 	&LitExpr,
-	&IdentExpr,
+	&NameExpr,
 	&UnaryExpr,
-	&SubIdentExpr,
+	&SelectorExpr,
 	&NamespaceExpr,
 	&VariadicExpr,
 	&CastExpr,
-	&FuncCallExpr,
+	&CallExpr,
 	&TypedBraceLit,
 	&BraceLit,
 	&SlicingExpr,
 	&SliceExpr,
 	&BinaryExpr,
 	&UnsafeExpr,
-	&IndexingExpr,
+	&IndexExpr,
 	&Func,
 	&FieldExprPair,
-	&KeyValPair,
+	&KeyValueExpr,
 	&ChanRecv,
 	&ChanSend,
 	&TypeAssertionExpr,
@@ -103,28 +103,28 @@ enum ExprData: type {
 struct Expr {
 	Token: &token::Token
 	End:   &token::Token
-	Kind:  ExprData
+	Data:  ExprData
 }
 
 // Channel receive expression.
 struct ChanRecv {
-	Expr: &Expr
+	X: &Expr // Expression.
 }
 
-// Range expression between parentheses.
+// Range expression represents an expression between parentheses.
 struct RangeExpr {
-	Expr: &Expr
+	X: &Expr // Expression.
 }
 
 // Use expression.
 struct UseExpr {
 	Token: &token::Token
-	Expr:  &Expr
+	X:     &Expr // Expression.
 }
 
 // Tuple expression.
 struct TupleExpr {
-	Expr: []&Expr
+	X: []&Expr // Expressions.
 }
 
 // Literal expression.
@@ -135,85 +135,85 @@ struct LitExpr {
 
 // Unsafe expression.
 struct UnsafeExpr {
-	Token: &token::Token // Token of unsafe keyword.
-	Expr:  &Expr
+	Token: &token::Token // Token of the unsafe keyword.
+	X:     &Expr         // Expression.
 }
 
 // Identifier expression.
-struct IdentExpr {
-	Token:  &token::Token // Token of identifier.
-	Ident:  str
-	Binded: bool
+struct NameExpr {
+	Token: &token::Token // Token of identifier.
+	Name:  str           // The name.
+	Bind:  bool          // It is in the bind namespace.
 }
 
-impl IdentExpr {
+impl NameExpr {
 	// Reports whether identifier is self keyword.
 	fn IsSelf(self): bool {
-		ret self.Ident == "self"
+		ret self.Name == "self"
 	}
 }
 
 // Unary expression.
 // For the unsafe pointer (*unsafe) type, Op is star and Expr is nil.
 struct UnaryExpr {
-	Op:   &token::Token
-	Expr: &Expr
+	Op: &token::Token // Token of the operator.
+	X:  &Expr         // Expression.
 }
 
 impl UnaryExpr {
 	// Reports whether the unary expression is the unsafe pointer type declaration.
 	fn IsUnsafePtr(self): bool {
-		ret self.Op.Id == token::Star && self.Expr == nil
+		ret self.Op.Id == token::Star && self.X == nil
 	}
 }
 
 // Variadiced expression.
 struct VariadicExpr {
 	Token: &token::Token
-	Expr:  &Expr
+	X:     &Expr // Expression to variadic.
 }
 
 // Casting expression.
 struct CastExpr {
-	Kind: &Expr
-	Expr: &Expr
+	Type: &Expr
+	X:    &Expr // Expression to cast.
 }
 
 // Type assertion expression.
 struct TypeAssertionExpr {
-	Kind: &Expr
-	Expr: &Expr
+	Type: &Expr
+	X:    &Expr // Expression to assert.
 }
 
 // Namespace identifier selection expression.
 struct NamespaceExpr {
-	Namespace: &token::Token // Tokens of namespace identifier.
-	Ident:     &token::Token // Token of selected identifier.
+	Namespace: &token::Token // Tokens of the namespace identifier.
+	Name:      &token::Token // Token of the selected identifier.
 }
 
-// Object sub identifier selection expression.
-struct SubIdentExpr {
-	Expr:  &Expr         // Selected object.
-	Ident: &token::Token // Token of selected identifier.
+// Identifier selector expression.
+struct SelectorExpr {
+	Expr: &Expr         // Memory selection based on.
+	Name: &token::Token // Token of the selected identifier.
 }
 
 // Binary operation.
 struct BinaryExpr {
-	Left:  &Expr
-	Right: &Expr
-	Op:    &token::Token
+	X:  &Expr         // Left operand.
+	Y:  &Expr         // Right operand.
+	Op: &token::Token // Operator.
 }
 
 // Function call expression kind.
-struct FuncCallExpr {
+struct CallExpr {
 	Token:     &token::Token
-	Expr:      &Expr
-	Args:      []&Expr
-	Exception: &ScopeTree // Exception handling scope.
-	IsCo:      bool
+	Func:      &Expr      // Function expression.
+	Args:      []&Expr    // Function arguments, or nil.
+	Exception: &ScopeTree // Exception handling scope, or nil.
+	IsCo:      bool       // Whether this is the concurrent call.
 }
 
-impl FuncCallExpr {
+impl CallExpr {
 	// Reports whether exception is not handled.
 	fn Unhandled(self): bool {
 		ret self.Exception == nil
@@ -230,7 +230,7 @@ impl FuncCallExpr {
 // Field-Expression pair.
 struct FieldExprPair {
 	Field: &token::Token // Field identifier token.
-	Expr:  &Expr
+	X:     &Expr
 }
 
 impl FieldExprPair {
@@ -242,7 +242,7 @@ impl FieldExprPair {
 
 // Typed brace instantiating expression.
 struct TypedBraceLit {
-	Kind: &Expr
+	Type: &Expr
 	Lit:  &BraceLit
 }
 
@@ -250,20 +250,20 @@ struct TypedBraceLit {
 struct BraceLit {
 	Token: &token::Token
 	End:   &token::Token
-	Exprs: []&Expr
+	X:     []&Expr // Expression.
 }
 
 impl BraceLit {
 	// Reports whether literal is empty ( {} ).
 	fn IsEmpty(self): bool {
-		ret len(self.Exprs) == 0
+		ret len(self.X) == 0
 	}
 }
 
-// Key-value pair expression.
-struct KeyValPair {
+// Key-value expression.
+struct KeyValueExpr {
 	Key:   &Expr
-	Val:   &Expr
+	Value: &Expr
 	Colon: &token::Token
 }
 
@@ -272,21 +272,21 @@ struct KeyValPair {
 struct SliceExpr {
 	Token: &token::Token
 	End:   &token::Token
-	Exprs: []&Expr
+	X:     []&Expr // Elements.
 }
 
 impl SliceExpr {
 	// Reports whether slice is empty.
 	fn IsEmpty(self): bool {
-		ret len(self.Exprs) == 0
+		ret len(self.X) == 0
 	}
 }
 
-// Indexing expression.
-struct IndexingExpr {
+// Index expression.
+struct IndexExpr {
 	Token: &token::Token
 	End:   &token::Token
-	Expr:  &Expr // Value expression to indexing.
+	X:     &Expr // Value expression to indexing.
 	Index: &Expr // Index value expression.
 }
 
@@ -294,10 +294,10 @@ struct IndexingExpr {
 struct SlicingExpr {
 	Token: &token::Token
 	End:   &token::Token
-	Expr:  &Expr // Value expression to slicing.
-	Start: &Expr // Start index value expression.
-	To:    &Expr // To index value expression.
-	Cap:   &Expr // Cap index value expression.
+	X:     &Expr // Value expression to slicing.
+	Low:   &Expr // Low index value expression, or nil.
+	High:  &Expr // High index value expression, or nil.
+	Max:   &Expr // Max index value expression, or nil.
 }
 
 // Constraint.
@@ -308,14 +308,14 @@ struct Constraint {
 // Generic type declaration.
 struct Generic {
 	Token:      &token::Token
-	Ident:      str
+	Name:       str
 	Constraint: &Constraint
 }
 
 // Label statement.
 struct Label {
 	Token: &token::Token
-	Ident: str
+	Name:  str
 }
 
 // Goto statement.
@@ -334,16 +334,16 @@ struct AssignLeft {
 	Token:     &token::Token
 	Mutable:   bool
 	Reference: bool
-	Ident:     str
-	Expr:      &Expr
+	Name:      str
+	X:         &Expr // Expression.
 }
 
 // Assign statement.
 struct Assign {
-	Declarative: bool
-	Setter:      &token::Token
-	Left:        []&AssignLeft
-	Right:       &Expr
+	Decl: bool          // Whether the assignment may declare variable.
+	Op:   &token::Token // Setter operator.
+	X:    []&AssignLeft // Lvalue expressions.
+	Y:    &Expr         // Expression to be assigned.
 }
 
 // Type of Stmt's data.
@@ -376,7 +376,7 @@ struct Stmt {
 // Scope tree.
 struct ScopeTree {
 	Parent:   &ScopeTree // Nil if scope is root.
-	Unsafety: bool
+	Unsafe:   bool
 	Deferred: bool
 	Stmts:    []Stmt
 	End:      &token::Token
@@ -385,7 +385,7 @@ struct ScopeTree {
 // Channel send data statement.
 struct ChanSend {
 	Chan: &Expr
-	Data: &Expr
+	X:    &Expr // Expression.
 }
 
 // Parameter.
@@ -394,19 +394,19 @@ struct Param {
 	Mutable:   bool
 	Variadic:  bool
 	Reference: bool
-	Kind:      &Expr
-	Ident:     str
+	Type:      &Expr
+	Name:      str
 }
 
 impl Param {
 	// Reports whether parameter is self (receiver) parameter.
 	fn IsSelf(self): bool {
-		ret self.Ident == "&self" || self.Ident == "self"
+		ret self.Name == "&self" || self.Name == "self"
 	}
 
 	// Reports whether self (receiver) parameter is reference.
 	fn IsRef(self): bool {
-		ret self.Ident != "" && self.Ident[0] == '&'
+		ret self.Name != "" && self.Name[0] == '&'
 	}
 }
 
@@ -415,12 +415,12 @@ impl Param {
 struct Func {
 	Token:       &token::Token
 	Global:      bool
-	Unsafety:    bool
+	Unsafe:      bool
 	Public:      bool
-	Binded:      bool
+	Bind:        bool
 	Static:      bool
 	Exceptional: bool
-	Ident:       str
+	Name:        str
 	Directives:  []&Directive
 	Scope:       &ScopeTree
 	Generics:    []&Generic
@@ -431,7 +431,7 @@ struct Func {
 impl Func {
 	// Reports whether function is anonymous.
 	fn IsAnon(self): bool {
-		ret self.Ident == jule::Anon
+		ret self.Name == jule::Anon
 	}
 
 	// Reports whether function is type declaration.
@@ -444,17 +444,17 @@ impl Func {
 struct Var {
 	Scope:      &ScopeTree // nil for global scopes
 	Token:      &token::Token
-	Setter:     &token::Token
-	Ident:      str
-	Binded:     bool
+	Op:         &token::Token // Expression assign operator token.
+	Name:       str
+	Bind:       bool
 	Public:     bool
 	Mutable:    bool
-	Constant:   bool
+	Const:      bool
 	Static:     bool
 	Reference:  bool
 	Directives: []&Directive
-	Kind:       &Expr // nil for type inferred
-	Expr:       &Expr
+	Type:       &Expr // Type declaration, or nil if type inferred.
+	X:          &Expr // Initializer expression, or nil.
 
 	// See developer reference (12).
 	GroupIndex: int    // Index of variable in the group, if variable is grouped.
@@ -464,7 +464,7 @@ struct Var {
 // Return statement.
 struct Ret {
 	Token: &token::Token
-	Expr:  &Expr
+	X:     &Expr // Expression.
 }
 
 // Type of Iter's kind.
@@ -482,13 +482,13 @@ struct Iter {
 }
 
 impl Iter {
-	// Reports whether iteration is infinity.
-	fn IsInf(self): bool { ret self.Kind == nil }
+	// Reports whether iteration is infinite.
+	fn IsInfinite(self): bool { ret self.Kind == nil }
 }
 
 // While iteration kind.
 struct WhileKind {
-	Expr:      &Expr
+	X:         &Expr    // Condition expression.
 	Next:      StmtData // Nil if kind is while-next iteration.
 	NextToken: &token::Token
 }
@@ -503,28 +503,28 @@ impl WhileKind {
 // Range iteration kind.
 struct RangeKind {
 	InToken: &token::Token // Token of "in" keyword
-	Expr:    &Expr
-	KeyA:    &Var // first key of range
-	KeyB:    &Var // second key of range
+	X:       &Expr         // Range expression.
+	A:       &Var          // First key of range.
+	B:       &Var          // Second key of range.
 }
 
 // Break statement.
 struct Break {
 	Token: &token::Token
-	Label: &token::Token
+	Label: &token::Token // Label to break, or nil.
 }
 
 // Continue statement.
 struct Continue {
 	Token: &token::Token
-	Label: &token::Token
+	Label: &token::Token // Label to continue, or nil.
 }
 
 // If condition.
 struct If {
 	Token: &token::Token
-	Expr:  &Expr
 	Scope: &ScopeTree
+	X:     &Expr
 }
 
 // Else condition.
@@ -535,8 +535,7 @@ struct Else {
 
 // Condition chain.
 struct Conditional {
-	Head:    &If
-	Tail:    []&If
+	Tail:    []&If // First one is the head condition.
 	Default: &Else
 }
 
@@ -544,11 +543,11 @@ struct Conditional {
 struct TypeAlias {
 	Scope:  &ScopeTree
 	Public: bool
-	Binded: bool
+	Bind:   bool
 	Token:  &token::Token
-	Ident:  str
+	Name:   str
 	Strict: bool
-	Kind:   &Expr
+	Type:   &Expr
 }
 
 // Case of match-case.
@@ -558,47 +557,47 @@ struct Case {
 
 	// Holds expression.
 	// Expressions holds *Type if If type matching.
-	Exprs: []&Expr
+	X: []&Expr
 }
 
 // Match statement.
 struct Match {
-	Comptime:  bool
-	Token:     &token::Token
-	End:       &token::Token
-	TypeMatch: bool
-	Expr:      &Expr
-	Cases:     []&Case
-	Default:   &Else
+	Comptime: bool
+	Token:    &token::Token
+	End:      &token::Token
+	Type:     bool    // Type matching.
+	X:        &Expr   // Expression to match.
+	Cases:    []&Case // First one is the head case.
+	Default:  &Else
 }
 
 // Select statement.
 struct Select {
 	Token:   &token::Token
 	End:     &token::Token
-	Cases:   []&Case
+	Cases:   []&Case // First one is the head condition.
 	Default: &Else
 }
 
 // Use declaration statement.
 struct Use {
-	Token:  &token::Token
-	Path:   &token::Token // Use declaration path token.
-	Alias:  &token::Token // Custom alias. Nil if not given.
-	Binded: bool          // Bind use declaration.
+	Token: &token::Token
+	Path:  &token::Token // Use declaration path token.
+	Alias: &token::Token // Custom alias. Nil if not given.
+	Bind:  bool          // Bind use declaration.
 }
 
 // Enum item.
 struct EnumItem {
 	Token: &token::Token
-	Ident: str
-	Expr:  &Expr // Nil for auto expression.
+	Name:  str
+	X:     &Expr // Nil for auto expression.
 }
 
 impl EnumItem {
 	// Reports whether item has auto expression.
-	fn AutoExpr(self): bool {
-		ret self.Expr == nil
+	fn IsAutoExpr(self): bool {
+		ret self.X == nil
 	}
 }
 
@@ -606,30 +605,30 @@ impl EnumItem {
 struct Enum {
 	Token:  &token::Token
 	Public: bool
-	Ident:  str
-	Kind:   &Expr
+	Name:   str
+	Type:   &Expr
 	Items:  []&EnumItem
 	End:    &token::Token
 }
 
 impl Enum {
 	// Reports whether enum's type is default.
-	fn DefaultTyped(self): bool {
-		ret self.Kind == nil
+	fn IsDefaultTyped(self): bool {
+		ret self.Type == nil
 	}
 }
 
 // TypeEnum item.
 struct TypeEnumItem {
 	Token: &token::Token
-	Kind:  &Expr
+	Type:  &Expr
 }
 
 // TypeEnum declaration.
 struct TypeEnum {
 	Token:  &token::Token
 	Public: bool
-	Ident:  str
+	Name:   str
 	Items:  []&TypeEnumItem
 	End:    &token::Token
 }
@@ -639,8 +638,8 @@ struct Field {
 	Token:   &token::Token
 	Public:  bool
 	Mutable: bool // Interior mutability.
-	Ident:   str
-	Kind:    &Expr
+	Name:    str
+	Type:    &Expr
 	Tag:     &token::Token // Nil if not given.
 }
 
@@ -648,10 +647,10 @@ struct Field {
 struct Struct {
 	Token:      &token::Token
 	End:        &token::Token
-	Ident:      str
+	Name:       str
 	Fields:     []&Field
 	Public:     bool
-	Binded:     bool
+	Bind:       bool
 	Directives: []&Directive
 	Generics:   []&Generic
 }
@@ -660,7 +659,7 @@ struct Trait {
 	// Trait declaration.
 	Token:    &token::Token
 	End:      &token::Token
-	Ident:    str
+	Name:     str
 	Public:   bool
 	Inherits: []&Expr
 	Methods:  []&Func

@@ -10,7 +10,7 @@ use "std/strings"
 // Return type.
 struct RetType {
 	TypeSym: &TypeSym
-	Idents:  []&token::Token
+	Names:   []&token::Token
 }
 
 // Parameter.
@@ -20,7 +20,7 @@ struct Param {
 	Variadic:  bool
 	Reference: bool
 	TypeSym:   &TypeSym
-	Ident:     str
+	Name:      str
 }
 
 impl Param {
@@ -32,12 +32,12 @@ impl Param {
 
 	// Reports whether parameter is self (receiver) parameter.
 	fn IsSelf(self): bool {
-		ret self.Ident == "&self" || self.Ident == "self"
+		ret self.Name == "&self" || self.Name == "self"
 	}
 
 	// Reports whether self (receiver) parameter is reference.
 	fn IsRef(self): bool {
-		ret self.Ident != "" && self.Ident[0] == '&'
+		ret self.Name != "" && self.Name[0] == '&'
 	}
 }
 
@@ -50,13 +50,13 @@ struct Func {
 	Token: &token::Token
 
 	Global:      bool
-	Unsafety:    bool
+	Unsafe:      bool
 	Public:      bool
-	Binded:      bool
+	Bind:        bool
 	Static:      bool
 	Exceptional: bool
 	HasDefer:    bool // Whether function has at least one deferred scope.
-	Ident:       str
+	Name:        str
 	Directives:  []&ast::Directive
 
 	// Scope is the scope of function, aka body.
@@ -97,24 +97,24 @@ impl Func {
 
 	// Reports whether function is entry point.
 	fn IsEntryPoint(self): bool {
-		ret self.Ident == jule::EntryPoint
+		ret self.Name == jule::EntryPoint
 	}
 
 	// Reports whether function is initializer function.
 	fn IsInit(self): bool {
-		ret self.Ident == jule::InitFunc
+		ret self.Name == jule::InitFunc
 	}
 
 	// Reports whether function is anonymous function.
 	fn IsAnon(self): bool {
-		ret jule::IsAnon(self.Ident)
+		ret jule::IsAnon(self.Name)
 	}
 
 	// Reports whether function has return variable(s).
 	fn AnyVar(self): bool {
 		if self.Result != nil {
-			for _, ident in self.Result.Idents {
-				if !jule::IsAnon(ident.Kind) {
+			for _, name in self.Result.Names {
+				if !jule::IsAnon(name.Kind) {
 					ret true
 				}
 			}
@@ -262,7 +262,7 @@ impl FuncIns {
 		if self.Decl.Exceptional != f.Decl.Exceptional {
 			ret false
 		}
-		if self.Decl.Unsafety != f.Decl.Unsafety {
+		if self.Decl.Unsafe != f.Decl.Unsafe {
 			ret false
 		}
 		if self.Decl.IsVoid() != f.Decl.IsVoid() {
@@ -329,7 +329,7 @@ impl FuncIns {
 		if self.Decl.Public != other.Decl.Public {
 			ret false
 		}
-		if self.Decl.Ident != other.Decl.Ident {
+		if self.Decl.Name != other.Decl.Name {
 			ret false
 		}
 		if !self.EqualFunc(other, true) {
@@ -385,19 +385,19 @@ impl FuncIns {
 	// Returns kind string of function instance.
 	// Appends identifier to kind of this instance.
 	// Does not appends identifier of this instance to kind if self.Decl is nil.
-	fn GetKindStr(self, ident: bool): str {
+	fn GetKindStr(self, name: bool): str {
 		mut s := strings::Builder{}
 		s.Grow(1 << 5)
 
-		if self.Decl != nil && self.Decl.Unsafety {
+		if self.Decl != nil && self.Decl.Unsafe {
 			s.WriteStr("unsafe ")!
 		}
 
 		s.WriteStr("fn")!
 
-		if ident && self.Decl != nil {
+		if name && self.Decl != nil {
 			s.WriteByte(' ')!
-			s.WriteStr(self.Decl.Ident)!
+			s.WriteStr(self.Decl.Name)!
 		}
 
 		s.WriteByte('(')!

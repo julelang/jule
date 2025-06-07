@@ -21,9 +21,9 @@ fn HasDirective(&directives: []&ast::Directive, tag: str): bool {
 }
 
 // Reports whether trait have method in this identifier.
-fn ContainsTraitMethod(mut &t: &sema::Trait, &ident: str): bool {
+fn ContainsTraitMethod(mut &t: &sema::Trait, &name: str): bool {
 	for _, m in t.Methods {
-		if m.Ident == ident {
+		if m.Name == name {
 			ret true
 		}
 	}
@@ -35,7 +35,7 @@ fn ContainsTraitMethod(mut &t: &sema::Trait, &ident: str): bool {
 fn FindStructFromType(mut t: &sema::Type): (&sema::StructIns, ptr: bool) {
 	match type t.Kind {
 	| &sema::Sptr:
-		t = t.Kind.(&sema::Sptr).Elem
+		t = t.Kind.(&sema::Sptr).Value
 		match type t.Kind {
 		| &sema::StructIns:
 			ret t.Kind.(&sema::StructIns), true
@@ -158,17 +158,17 @@ fn FindVar(v: &sema::Var, vars: []&sema::Var): int {
 	ret -1
 }
 
-// Returns bind identifier of type if binded.
-// Returns empty string if t is not binded.
-fn GetBindIdent(t: &sema::Type): str {
+// Returns bind identifier of type if it is bind.
+// Returns empty string if t is not not bind.
+fn GetBindName(t: &sema::Type): str {
 	match type t.Kind {
 	| &sema::StructIns:
 		s := t.Kind.(&sema::StructIns)
-		if s.Decl.Binded {
-			ret s.Decl.Ident
+		if s.Decl.Bind {
+			ret s.Decl.Name
 		}
 		if s.Source != nil {
-			ret GetBindIdent(s.Source)
+			ret GetBindName(s.Source)
 		}
 	}
 	ret ""

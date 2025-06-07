@@ -76,12 +76,12 @@ impl IR {
 	fn appendStructs(self, mut &p: &sema::Package, mut &buffer: []&sema::Struct) {
 		for (_, mut f) in p.Files {
 			for (_, mut s) in f.Structs {
-				if !s.Binded {
+				if !s.Bind {
 					buffer = append(buffer, s)
 				}
 			}
 			for (_, mut ta) in f.TypeAliases {
-				if !ta.Binded && ta.Strict {
+				if !ta.Bind && ta.Strict {
 					buffer = append(buffer, ta.TypeSym.Type.Kind.(&sema::StructIns).Decl)
 				}
 			}
@@ -94,7 +94,7 @@ impl IR {
 	fn GetAllStructures(mut self): []&sema::Struct {
 		let mut buffer: []&sema::Struct = nil
 		for (_, mut u) in self.Used {
-			if !u.Binded {
+			if !u.Bind {
 				self.appendStructs(u.Package, buffer)
 			}
 		}
@@ -105,7 +105,7 @@ impl IR {
 	fn appendGlobals(self, mut &p: &sema::Package, mut &buffer: []&sema::Var) {
 		for (_, mut f) in p.Files {
 			for (_, mut v) in f.Vars {
-				if v.Token != nil && !v.Binded && !v.Constant {
+				if v.Token != nil && !v.Bind && !v.Constant {
 					buffer = append(buffer, v)
 				}
 			}
@@ -128,7 +128,7 @@ impl IR {
 		let mut buffer: []&sema::Var = nil
 		mut n := len(buffer)
 		for (_, mut u) in self.Used {
-			if !u.Binded {
+			if !u.Bind {
 				self.appendGlobals(u.Package, buffer)
 				if orderDefs {
 					order(buffer[n:], true)
@@ -183,7 +183,7 @@ fn getAllUniquePasses(mut &pkg: &sema::Package, mut uses: []&sema::ImportInfo): 
 
 	pushPasses(pkg, passes)
 	for (_, mut u) in uses {
-		if !u.Binded {
+		if !u.Bind {
 			pushPasses(u.Package, passes)
 		}
 	}
@@ -222,7 +222,7 @@ fn pushRuntimeToAST(mut &f: &ast::AST) {
 		Token: nil, // Nil token is a flag for implicit declaration.
 		Path: &token::Token{Id: token::Lit, Kind: `"std/runtime"`},
 		Alias: nil,
-		Binded: false,
+		Bind: false,
 	}
 	f.UseDecls = append(f.UseDecls, decl)
 	if len(f.UseDecls) > 1 {

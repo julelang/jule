@@ -89,16 +89,16 @@ impl typeCoder {
 	}
 
 	// Generates C++ code of smart pointer type with element type.
-	fn asSptr(mut self, mut &buf: strings::Builder, elem: []byte) {
+	fn asSptr(mut self, mut &buf: strings::Builder, valueTyp: []byte) {
 		buf.WriteStr(typePtr + "<")!
-		buf.Write(elem)!
+		buf.Write(valueTyp)!
 		buf.WriteByte('>')!
 	}
 
 	// Generates C++ code of smart pointer type.
 	fn sptr(mut self, mut &buf: strings::Builder, mut sptr: &sema::Sptr) {
 		buf.WriteStr(typePtr + "<")!
-		self.kind(buf, sptr.Elem)
+		self.kind(buf, sptr.Value)
 		buf.WriteByte('>')!
 	}
 
@@ -108,7 +108,7 @@ impl typeCoder {
 		if p.IsUnsafe() {
 			buf.WriteStr("void" + CppPointerMask)!
 		} else {
-			self.kind(buf, p.Elem)
+			self.kind(buf, p.Value)
 			buf.WriteStr(CppPointerMask)!
 		}
 	}
@@ -123,20 +123,20 @@ impl typeCoder {
 		buf.WriteStr(typeAny)!
 	}
 
-	fn asSlice(mut self, mut &buf: strings::Builder, mut elem: &sema::Type) {
+	fn asSlice(mut self, mut &buf: strings::Builder, mut valueTyp: &sema::Type) {
 		buf.WriteStr(typeSlice + "<")!
-		self.kind(buf, elem)
+		self.kind(buf, valueTyp)
 		buf.WriteByte('>')!
 	}
 
 	// Generates C++ code of Slice type.
 	fn slice(mut self, mut &buf: strings::Builder, mut s: &sema::Slice) {
-		self.asSlice(buf, s.Elem)
+		self.asSlice(buf, s.Value)
 	}
 
 	// Generates C++ code of Map type.
 	fn mapType(mut self, mut &buf: strings::Builder, mut m: &sema::Map) {
-		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, m.Key, m.Val)
+		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, m.Key, m.Value)
 		buf.WriteStr("jule::Ptr<")!
 		identCoder.structureIns(buf, ins)
 		buf.WriteStr(">")!
@@ -149,7 +149,7 @@ impl typeCoder {
 
 	// Generates C++ code of Struct instance type.
 	fn structureIns(mut self, mut &buf: strings::Builder, mut s: &sema::StructIns) {
-		if !s.Decl.Binded {
+		if !s.Decl.Bind {
 			if s.Source != nil {
 				self.kind(buf, s.Source)
 			} else {
@@ -178,7 +178,7 @@ impl typeCoder {
 	// Generates C++ code of Arr type.
 	fn array(mut self, mut &buf: strings::Builder, mut a: &sema::Array) {
 		buf.WriteStr(typeArray + "<")!
-		self.kind(buf, a.Elem)
+		self.kind(buf, a.Value)
 		buf.WriteByte(',')!
 		buf.WriteStr(conv::Itoa(a.N))!
 		buf.WriteByte('>')!
@@ -277,7 +277,7 @@ impl typeCoder {
 	}
 
 	fn channel(mut self, mut &buf: strings::Builder, mut ch: &sema::Chan) {
-		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
 		buf.WriteStr("jule::Ptr<")!
 		identCoder.structureIns(buf, ins)
 		buf.WriteStr(">")!
@@ -289,11 +289,11 @@ impl typeCoder {
 		| k.Struct() != nil:
 			self.structureIns(buf, k.Struct())
 			ret
-		| k.Binded():
+		| k.Bind():
 			// As we can see here, bind defines use pure identifiers directly.
 			// So, if you hesitate about a type that causes wrong code generation,
 			// write relevant algorithms above this case.
-			buf.WriteStr(obj::GetBindIdent(k))!
+			buf.WriteStr(obj::GetBindName(k))!
 			ret
 		| k.Prim() != nil:
 			self.prim(buf, k.Prim())
@@ -364,29 +364,29 @@ impl resultCoder {
 
 	fn ptr(mut self, mut &s: strings::Builder, mut p: &sema::Ptr) {
 		s.WriteStr(resultPtr)!
-		self.codeMut(s, p.Elem)
+		self.codeMut(s, p.Value)
 	}
 
 	fn sptr(mut self, mut &s: strings::Builder, mut p: &sema::Sptr) {
 		s.WriteStr(resultSptr)!
-		self.codeMut(s, p.Elem)
+		self.codeMut(s, p.Value)
 	}
 
 	fn mapType(mut self, mut &s: strings::Builder, mut p: &sema::Map) {
 		s.WriteStr(resultMap)!
 		self.codeMut(s, p.Key)
-		self.codeMut(s, p.Val)
+		self.codeMut(s, p.Value)
 	}
 
 	fn slice(mut self, mut &s: strings::Builder, mut slc: &sema::Slice) {
 		s.WriteStr(resultSlice)!
-		self.codeMut(s, slc.Elem)
+		self.codeMut(s, slc.Value)
 	}
 
 	fn array(mut self, mut &s: strings::Builder, mut arr: &sema::Array) {
 		s.WriteStr(resultArray)!
 		s.WriteStr(conv::FormatInt(i64(arr.N), 16))!
-		self.codeMut(s, arr.Elem)
+		self.codeMut(s, arr.Value)
 	}
 
 	fn func(mut self, mut &s: strings::Builder, mut f: &sema::FuncIns) {
@@ -404,7 +404,7 @@ impl resultCoder {
 
 	fn channel(mut self, mut &s: strings::Builder, mut ch: &sema::Chan) {
 		s.WriteStr(resultChan)!
-		self.codeMut(s, ch.Elem)
+		self.codeMut(s, ch.Value)
 	}
 
 	fn tuple(mut self, mut &s: strings::Builder, mut tup: &sema::Tuple) {
@@ -415,7 +415,7 @@ impl resultCoder {
 	}
 
 	fn codeMut(mut self, mut &s: strings::Builder, mut &t: &sema::Type) {
-		if t.Binded() {
+		if t.Bind() {
 			// TODO:
 			//	this method should be handle structures separately
 			//	because they are may use namespace directive,
@@ -424,7 +424,7 @@ impl resultCoder {
 			//	if namespace directive will not be removed in the future,
 			//	fix this conflict issues
 			s.WriteStr(resultBindPrefix)!
-			s.WriteStr(obj::GetBindIdent(t))!
+			s.WriteStr(obj::GetBindName(t))!
 			ret
 		}
 		match type t.Kind {
@@ -444,10 +444,10 @@ impl resultCoder {
 			self.func(s, t.Kind.(&sema::FuncIns))
 		| &sema::Enum:
 			te := t.Kind.(&sema::Enum)
-			identCoder.toOut(s, te.Ident, uintptr(te))
+			identCoder.toOut(s, te.Name, uintptr(te))
 		| &sema::TypeEnum:
 			te := t.Kind.(&sema::TypeEnum)
-			identCoder.toOut(s, te.Ident, uintptr(te))
+			identCoder.toOut(s, te.Name, uintptr(te))
 		| &sema::StructIns:
 			mut si := t.Kind.(&sema::StructIns)
 			identCoder.structureIns(s, si)
@@ -482,7 +482,7 @@ impl resultCoder {
 
 // Reports whether type supports initialization.
 fn ableToInit(mut &t: &sema::Type): bool {
-	ret !t.Binded()
+	ret !t.Bind()
 }
 
 // Reports whether type should initialized.
@@ -511,7 +511,7 @@ fn shouldInitialized(mut &t: &sema::Type): bool {
 		ret false
 	| t.Array() != nil:
 		mut arr := t.Array()
-		ret ableToInit(arr.Elem)
+		ret ableToInit(arr.Value)
 	| t.Struct() != nil:
 		ret true
 	|:

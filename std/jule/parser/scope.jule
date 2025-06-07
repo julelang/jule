@@ -196,7 +196,7 @@ impl scopeParser {
 		}
 		if len(tokens) > 1 {
 			tokens = tokens[1:] // Remove ret keyword.
-			st.Expr = self.p.buildExpr(tokens)
+			st.X = self.p.buildExpr(tokens)
 		}
 		ret st
 	}
@@ -209,7 +209,7 @@ impl scopeParser {
 		mut kind := new(ast::WhileKind)
 
 		if len(tokens) > 0 {
-			kind.Expr = self.p.buildExpr(tokens)
+			kind.X = self.p.buildExpr(tokens)
 		}
 
 		if self.isLastSt() {
@@ -248,7 +248,7 @@ impl scopeParser {
 
 	fn buildWhileIterKind(mut self, mut &tokens: []&token::Token): &ast::WhileKind {
 		ret &ast::WhileKind{
-			Expr: self.p.buildExpr(tokens),
+			X: self.p.buildExpr(tokens),
 		}
 	}
 
@@ -264,7 +264,7 @@ impl scopeParser {
 		}
 		mut key := &ast::Var{
 			Token: tokens[0],
-			Setter: tokens[0],
+			Op: tokens[0],
 		}
 		if key.Token.Id == token::Mut {
 			key.Mutable = true
@@ -280,7 +280,7 @@ impl scopeParser {
 			self.pushSuggestion(log::ExpectedIdentifier)
 			ret nil
 		}
-		key.Ident = key.Token.Kind
+		key.Name = key.Token.Kind
 		ret key
 	}
 
@@ -301,9 +301,9 @@ impl scopeParser {
 			self.pushErr(rng.InToken, log::MuchRangeVars)
 		}
 		mut keys := self.buildRangeKindKeys(keyTokens)
-		rng.KeyA = keys[0]
+		rng.A = keys[0]
 		if len(keys) > 1 {
-			rng.KeyB = keys[1]
+			rng.B = keys[1]
 		}
 	}
 
@@ -333,7 +333,7 @@ impl scopeParser {
 			self.pushErr(rng.InToken, log::MissingExpr)
 			ret rng
 		}
-		rng.Expr = self.p.buildExpr(exprTokens)
+		rng.X = self.p.buildExpr(exprTokens)
 		if len(varTokens) > 0 {
 			self.setupRangeKindKeys(rng, varTokens)
 		}
@@ -468,7 +468,7 @@ impl scopeParser {
 				tokens = nil
 			}
 		}
-		model.Expr = self.p.buildExpr(exprTokens)
+		model.X = self.p.buildExpr(exprTokens)
 		model.Scope = self.buildScope(scopeTokens, end)
 		ret model
 	}
@@ -498,10 +498,9 @@ impl scopeParser {
 	}
 
 	fn buildIfElseChain(mut self, mut tokens: []&token::Token): &ast::Conditional {
-		mut chain := &ast::Conditional{
-			Head: self.buildIf(tokens),
-		}
-		if chain.Head == nil {
+		mut chain := new(ast::Conditional)
+		chain.Tail = append(chain.Tail, self.buildIf(tokens))
+		if len(chain.Tail) == 0 || chain.Tail[0] == nil {
 			ret nil
 		}
 		for len(tokens) != 0 {
@@ -531,9 +530,9 @@ impl scopeParser {
 		if e == nil {
 			ret e
 		}
-		match type e.Kind {
-		| &ast::FuncCallExpr:
-			e.Kind.(&ast::FuncCallExpr).IsCo = true
+		match type e.Data {
+		| &ast::CallExpr:
+			e.Data.(&ast::CallExpr).IsCo = true
 		|:
 			self.pushErr(token, log::ExprNotFuncCall)
 		}
@@ -681,12 +680,12 @@ impl scopeParser {
 			self.pushErr(c.Token, log::InvalidSyntax)
 			ret nil, false
 		}
-		c.Exprs, ok := self.buildCaseExprs(tokens, colon, typeMatch)
+		c.X, ok := self.buildCaseExprs(tokens, colon, typeMatch)
 		c.Scope = self.buildCaseScope(tokens)
 		if c.Scope.End == nil {
 			c.Scope.End = colon
 		}
-		isDefault := ok && len(c.Exprs) == 0
+		isDefault := ok && len(c.X) == 0
 		ret c, isDefault
 	}
 
@@ -731,14 +730,14 @@ impl scopeParser {
 		tokens = tokens[1:] // Remove "match" keyword.
 
 		if len(tokens) > 0 && tokens[0].Id == token::Type {
-			m.TypeMatch = true
+			m.Type = true
 			tokens = tokens[1:] // Skip "type" keyword
 		}
 
 		mut exprTokens := getBlockExpr(tokens)
 		if len(exprTokens) > 0 {
-			m.Expr = self.p.buildExpr(exprTokens)
-		} else if m.TypeMatch {
+			m.X = self.p.buildExpr(exprTokens)
+		} else if m.Type {
 			self.pushErr(m.Token, log::MissingExpr)
 		}
 
@@ -753,7 +752,7 @@ impl scopeParser {
 			self.pushErr(tokens[i], log::InvalidSyntax)
 		}
 		m.End = tokens[i-1]
-		m.Cases, m.Default = self.buildCases(blockToks, m.TypeMatch)
+		m.Cases, m.Default = self.buildCases(blockToks, m.Type)
 		ret m
 	}
 
@@ -820,12 +819,12 @@ impl scopeParser {
 			self.pushErr(c.Token, log::InvalidSyntax)
 			ret nil, false
 		}
-		c.Exprs, ok := self.buildSelectCaseExpr(tokens, colon)
+		c.X, ok := self.buildSelectCaseExpr(tokens, colon)
 		c.Scope = self.buildCaseScope(tokens)
 		if c.Scope.End == nil {
 			c.Scope.End = colon
 		}
-		isDefault := ok && len(c.Exprs) == 0
+		isDefault := ok && len(c.X) == 0
 		ret c, isDefault
 	}
 
@@ -918,7 +917,7 @@ impl scopeParser {
 			self.pushErr(tokens[i], log::InvalidSyntax)
 		}
 		mut scope := self.buildScope(scopeTokens, tokens[i-1])
-		scope.Unsafety = isUnsafe
+		scope.Unsafe = isUnsafe
 		scope.Deferred = isDeferred
 		ret scope
 	}
@@ -926,7 +925,7 @@ impl scopeParser {
 	fn buildLabel(mut self, mut &tokens: []&token::Token): &ast::Label {
 		mut lbl := &ast::Label{
 			Token: tokens[0],
-			Ident: tokens[0].Kind,
+			Name: tokens[0].Kind,
 		}
 
 		// Save followed statement
@@ -1003,9 +1002,9 @@ impl scopeParser {
 			Token: tokens[0],
 		}
 		if tokens[0].Id == token::Name {
-			l.Ident = l.Token.Kind
+			l.Name = l.Token.Kind
 		}
-		l.Expr = self.p.buildExpr(tokens)
+		l.X = self.p.buildExpr(tokens)
 		ret l
 	}
 
@@ -1030,7 +1029,7 @@ impl scopeParser {
 		ret &ast::Expr{
 			Token: info.l[0],
 			End: info.r[len(info.r)-1],
-			Kind: &ast::ChanSend{Chan: ch, Data: data},
+			Data: &ast::ChanSend{Chan: ch, X: data},
 		}, true
 	}
 
@@ -1046,33 +1045,33 @@ impl scopeParser {
 		}
 
 		mut assign := &ast::Assign{
-			Setter: info.setter,
+			Op: info.setter,
 		}
 
 		// Caught declaration assignments.
 		if info.setter.Id == token::ColonEq {
-			assign.Declarative = true
-			assign.Right = self.p.buildExpr(info.r)
+			assign.Decl = true
+			assign.Y = self.p.buildExpr(info.r)
 			ok := self.buildDeclAssign1(info.l, assign)
 			if !ok {
 				// Return with true to avoid duplicate error.
 				ret nil, true
 			}
-			if len(assign.Left) > 1 {
+			if len(assign.X) > 1 {
 				ret assign, true
 			}
 			// Single left, use &Var instead if possible.
-			mut left := assign.Left[0]
-			_, ident := left.Expr.Kind.(&ast::IdentExpr)
-			if ident {
+			mut left := assign.X[0]
+			_, isIdent := left.X.Data.(&ast::NameExpr)
+			if isIdent {
 				mut decl := &ast::Var{
 					Token: left.Token,
-					Setter: assign.Setter,
-					Ident: left.Ident,
+					Op: assign.Op,
+					Name: left.Name,
 					Mutable: left.Mutable,
 					Reference: left.Reference,
 					Scope: self.s,
-					Expr: assign.Right,
+					X: assign.Y,
 				}
 				ret decl, true
 			}
@@ -1085,9 +1084,9 @@ impl scopeParser {
 			ret nil, false
 		}
 
-		assign.Left = self.buildAssignLs(parts)
+		assign.X = self.buildAssignLs(parts)
 		if info.r != nil {
-			assign.Right = self.p.buildExpr(info.r)
+			assign.Y = self.p.buildExpr(info.r)
 		}
 
 		ret assign, true
@@ -1129,13 +1128,13 @@ impl scopeParser {
 				ret false
 			}
 
-			mut l := self.buildAssignL(part)
-			if l.Expr == nil {
+			mut x := self.buildAssignL(part)
+			if x.X == nil {
 				ret false
 			}
-			l.Mutable = isMut
-			l.Reference = isRef
-			assign.Left = append(assign.Left, l)
+			x.Mutable = isMut
+			x.Reference = isRef
+			assign.X = append(assign.X, x)
 		}
 
 		ret true
@@ -1153,7 +1152,7 @@ impl scopeParser {
 		}
 
 		mut assign := &ast::Assign{
-			Declarative: true,
+			Decl: true,
 		}
 
 		mut i := 0
@@ -1162,13 +1161,13 @@ impl scopeParser {
 			self.pushErr(token, log::InvalidSyntax)
 			ret nil, false
 		} else if i+1 < len(tokens) {
-			assign.Setter = tokens[i]
-			if assign.Setter.Id != token::Eq {
-				self.pushErr(assign.Setter, log::InvalidSyntax)
+			assign.Op = tokens[i]
+			if assign.Op.Id != token::Eq {
+				self.pushErr(assign.Op, log::InvalidSyntax)
 			}
 			i++
 			mut exprTokens := tokens[i:]
-			assign.Right = self.p.buildExpr(exprTokens)
+			assign.Y = self.p.buildExpr(exprTokens)
 		}
 
 		ok := self.buildDeclAssign1(rang, assign)
@@ -1197,7 +1196,7 @@ impl scopeParser {
 			Token: tokens[0],
 		}
 		tokens = tokens[1:] // Ignore "use" keyword.
-		ue.Expr = self.p.buildExpr(tokens)
+		ue.X = self.p.buildExpr(tokens)
 		ret ue
 	}
 

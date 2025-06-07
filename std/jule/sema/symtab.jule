@@ -36,34 +36,34 @@ impl Lookup for SymTab {
 		ret nil
 	}
 
-	// Returns variable by identifier and binded state.
+	// Returns variable by identifier and bind state.
 	// Returns nil if refenrece not exist any variable in this identifier.
-	fn FindVar(mut self, ident: str, binded: bool): &Var {
-		ret self.findVar(ident, binded, false)
+	fn FindVar(mut self, name: str, _bind: bool): &Var {
+		ret self.findVar(name, _bind, false)
 	}
 
-	// Returns type alias by identifier and binded state.
+	// Returns type alias by identifier and bind state.
 	// Returns nil if not exist any type alias in this identifier.
-	fn FindTypeAlias(mut self, ident: str, binded: bool): &TypeAlias {
-		ret self.findTypeAlias(ident, binded, false)
+	fn FindTypeAlias(mut self, name: str, _bind: bool): &TypeAlias {
+		ret self.findTypeAlias(name, _bind, false)
 	}
 
-	// Returns struct by identifier and binded state.
+	// Returns struct by identifier and bind state.
 	// Returns nil if not exist any struct in this identifier.
-	fn FindStruct(mut self, ident: str, binded: bool): &Struct {
+	fn FindStruct(mut self, name: str, _bind: bool): &Struct {
 		for (_, mut s) in self.Structs {
-			if s.Ident == ident && s.Binded == binded {
+			if s.Name == name && s.Bind == _bind {
 				ret s
 			}
 		}
 		ret nil
 	}
 
-	// Returns function by identifier and binded state.
+	// Returns function by identifier and bind state.
 	// Returns nil if not exist any function in this identifier.
-	fn FindFunc(mut self, ident: str, binded: bool): &Func {
+	fn FindFunc(mut self, name: str, _bind: bool): &Func {
 		for (_, mut f) in self.Funcs {
-			if f.Ident == ident && f.Binded == binded {
+			if f.Name == name && f.Bind == _bind {
 				ret f
 			}
 		}
@@ -72,9 +72,9 @@ impl Lookup for SymTab {
 
 	// Returns trait by identifier.
 	// Returns nil if not exist any trait in this identifier.
-	fn FindTrait(mut self, ident: str): &Trait {
+	fn FindTrait(mut self, name: str): &Trait {
 		for (_, mut t) in self.Traits {
-			if t.Ident == ident {
+			if t.Name == name {
 				ret t
 			}
 		}
@@ -83,9 +83,9 @@ impl Lookup for SymTab {
 
 	// Returns enum by identifier.
 	// Returns nil if not exist any enum in this identifier.
-	fn FindEnum(mut self, ident: str): &Enum {
+	fn FindEnum(mut self, name: str): &Enum {
 		for (_, mut e) in self.Enums {
-			if e.Ident == ident {
+			if e.Name == name {
 				ret e
 			}
 		}
@@ -94,9 +94,9 @@ impl Lookup for SymTab {
 
 	// Returns type enum by identifier.
 	// Returns nil if not exist any type enum in this identifier.
-	fn FindTypeEnum(mut self, ident: str): &TypeEnum {
+	fn FindTypeEnum(mut self, name: str): &TypeEnum {
 		for (_, mut e) in self.TypeEnums {
-			if e.Ident == ident {
+			if e.Name == name {
 				ret e
 			}
 		}
@@ -114,18 +114,18 @@ impl SymTab {
 		ret -1
 	}
 
-	fn findVar(mut self, &ident: str, binded: bool, reverse: bool): &Var {
+	fn findVar(mut self, &name: str, _bind: bool, reverse: bool): &Var {
 		if reverse {
 			mut i := len(self.Vars) - 1
 			for i >= 0; i-- {
 				mut v := self.Vars[i]
-				if v.Ident == ident && v.Binded == binded {
+				if v.Name == name && v.Bind == _bind {
 					ret v
 				}
 			}
 		} else {
 			for (_, mut v) in self.Vars {
-				if v.Ident == ident && v.Binded == binded {
+				if v.Name == name && v.Bind == _bind {
 					ret v
 				}
 			}
@@ -133,18 +133,18 @@ impl SymTab {
 		ret nil
 	}
 
-	fn findTypeAlias(mut self, &ident: str, binded: bool, reverse: bool): &TypeAlias {
+	fn findTypeAlias(mut self, &name: str, _bind: bool, reverse: bool): &TypeAlias {
 		if reverse {
 			mut i := len(self.TypeAliases) - 1
 			for i >= 0; i-- {
 				mut ta := self.TypeAliases[i]
-				if ta.Ident == ident && ta.Binded == binded {
+				if ta.Name == name && ta.Bind == _bind {
 					ret ta
 				}
 			}
 		} else {
 			for (_, mut ta) in self.TypeAliases {
-				if ta.Ident == ident && ta.Binded == binded {
+				if ta.Name == name && ta.Bind == _bind {
 					ret ta
 				}
 			}
@@ -154,49 +154,49 @@ impl SymTab {
 
 	// Returns define by identifier.
 	// Returns nil if not exist any define in this identifier.
-	fn defByIdent(mut self, &ident: str, binded: bool): any {
+	fn defByIdent(mut self, &name: str, _bind: bool): any {
 		for (_, mut v) in self.Vars {
-			if v.Ident == ident && v.Binded == binded {
+			if v.Name == name && v.Bind == _bind {
 				ret v
 			}
 		}
 
 		for (_, mut ta) in self.TypeAliases {
-			if ta.Ident == ident && ta.Binded == binded {
+			if ta.Name == name && ta.Bind == _bind {
 				ret ta
 			}
 		}
 
 		for (_, mut s) in self.Structs {
-			if s.Ident == ident && s.Binded == binded {
+			if s.Name == name && s.Bind == _bind {
 				ret s
 			}
 		}
 
 		for (_, mut f) in self.Funcs {
-			if f.Ident == ident && f.Binded == binded {
+			if f.Name == name && f.Bind == _bind {
 				ret f
 			}
 		}
 
-		if binded {
+		if _bind {
 			ret nil
 		}
 
 		for (_, mut t) in self.Traits {
-			if t.Ident == ident {
+			if t.Name == name {
 				ret t
 			}
 		}
 
 		for (_, mut e) in self.Enums {
-			if e.Ident == ident {
+			if e.Name == name {
 				ret e
 			}
 		}
 
 		for (_, mut te) in self.TypeEnums {
-			if te.Ident == ident {
+			if te.Name == name {
 				ret te
 			}
 		}
@@ -207,49 +207,49 @@ impl SymTab {
 	// Reports this identifier duplicated in symbol table.
 	// The "self" parameter represents address of exception identifier.
 	// If founded identifier address equals to self, will be skipped.
-	fn isDuplicatedIdent(self, itself: uintptr, &ident: str, binded: bool): bool {
+	fn isDuplicatedName(self, itself: uintptr, &name: str, _bind: bool): bool {
 		for _, v in self.Vars {
-			if uintptr(v) != itself && v.Ident == ident && v.Binded == binded {
+			if uintptr(v) != itself && v.Name == name && v.Bind == _bind {
 				ret true
 			}
 		}
 
 		for _, ta in self.TypeAliases {
-			if uintptr(ta) != itself && ta.Ident == ident && ta.Binded == binded {
+			if uintptr(ta) != itself && ta.Name == name && ta.Bind == _bind {
 				ret true
 			}
 		}
 
 		for _, s in self.Structs {
-			if uintptr(s) != itself && s.Ident == ident && s.Binded == binded {
+			if uintptr(s) != itself && s.Name == name && s.Bind == _bind {
 				ret true
 			}
 		}
 
 		for _, f in self.Funcs {
-			if uintptr(f) != itself && f.Ident == ident && f.Binded == binded {
+			if uintptr(f) != itself && f.Name == name && f.Bind == _bind {
 				ret true
 			}
 		}
 
-		if binded {
+		if _bind {
 			ret false
 		}
 
 		for _, t in self.Traits {
-			if uintptr(t) != itself && t.Ident == ident {
+			if uintptr(t) != itself && t.Name == name {
 				ret true
 			}
 		}
 
 		for _, e in self.Enums {
-			if uintptr(e) != itself && e.Ident == ident {
+			if uintptr(e) != itself && e.Name == name {
 				ret true
 			}
 		}
 
 		for _, te in self.TypeEnums {
-			if uintptr(te) != itself && te.Ident == ident {
+			if uintptr(te) != itself && te.Name == name {
 				ret true
 			}
 		}
