@@ -17,49 +17,11 @@ use "std/jule/types"
 //	d: Data instance for evaluated expression of function.
 type builtinCaller = fn(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Value
 
-let mut hehe = map[str]&FuncIns{
-	"print": &FuncIns{caller: builtinCallerPrint},
-}
-
-let mut funcPrint: &FuncIns = nil
-let mut funcPrintln: &FuncIns = nil
-let mut funcNew: &FuncIns = nil
-let mut funcPanic: &FuncIns = nil
-let mut funcMake: &FuncIns = nil
-let mut funcAppend: &FuncIns = nil
-let mut funcCopy: &FuncIns = nil
-let mut funcLen: &FuncIns = nil
-let mut funcCap: &FuncIns = nil
-let mut funcDelete: &FuncIns = nil
-let mut funcClose: &FuncIns = nil
+// Initialized by the init function.
+let mut builtinFuncs = map[str]&FuncIns{}
 
 fn findBuiltinFunc(&name: str): &FuncIns {
-	match name {
-	| "print":
-		ret funcPrint
-	| "println":
-		ret funcPrintln
-	| "new":
-		ret funcNew
-	| "panic":
-		ret funcPanic
-	| "make":
-		ret funcMake
-	| "append":
-		ret funcAppend
-	| "copy":
-		ret funcCopy
-	| "len":
-		ret funcLen
-	| "cap":
-		ret funcCap
-	| "delete":
-		ret funcDelete
-	| "close":
-		ret funcClose
-	|:
-		ret nil
-	}
+	ret builtinFuncs[name]
 }
 
 fn primTypeAlias(name: str, mut &k: &Type, strict: bool): &TypeAlias {
@@ -103,119 +65,73 @@ let mut primU64 = &Type{Kind: buildPrimType(types::U64)}
 let mut primF32 = &Type{Kind: buildPrimType(types::F32)}
 let mut primF64 = &Type{Kind: buildPrimType(types::F64)}
 
-let mut varNil = &Var{
-	Public: true,
-	Mutable: false,
-	TypeSym: &TypeSym{
-		Type: primNil,
-	},
-	Constant: true,
-	ValueSym: &ValueSym{
-		Value: &Value{
-			Constant: constant::Const.NewNil(),
+let mut builtinVars = map[str]&Var{
+	"nil": &Var{
+		Public: true,
+		Mutable: false,
+		TypeSym: &TypeSym{
+			Type: primNil,
+		},
+		Constant: true,
+		ValueSym: &ValueSym{
+			Value: &Value{
+				Constant: constant::Const.NewNil(),
+			},
 		},
 	},
-}
-
-let mut varTrue = &Var{
-	Public: true,
-	Mutable: false,
-	TypeSym: findBuiltinTypeAlias("bool").TypeSym,
-	Constant: true,
-	ValueSym: &ValueSym{
-		Value: &Value{
-			Constant: constant::Const.NewBool(true),
-			untyped: true,
+	"true": &Var{
+		Public: true,
+		Mutable: false,
+		TypeSym: findBuiltinTypeAlias("bool").TypeSym,
+		Constant: true,
+		ValueSym: &ValueSym{
+			Value: &Value{
+				Constant: constant::Const.NewBool(true),
+				untyped: true,
+			},
 		},
 	},
-}
-
-let mut varFalse = &Var{
-	Public: true,
-	Mutable: false,
-	TypeSym: findBuiltinTypeAlias("bool").TypeSym,
-	Constant: true,
-	ValueSym: &ValueSym{
-		Value: &Value{
-			Constant: constant::Const.NewBool(false),
-			untyped: true,
+	"false": &Var{
+		Public: true,
+		Mutable: false,
+		TypeSym: findBuiltinTypeAlias("bool").TypeSym,
+		Constant: true,
+		ValueSym: &ValueSym{
+			Value: &Value{
+				Constant: constant::Const.NewBool(false),
+				untyped: true,
+			},
 		},
 	},
 }
 
 fn findBuiltinVar(&name: str): &Var {
-	match name {
-	| "nil":
-		ret varNil
-	| "true":
-		ret varTrue
-	| "false":
-		ret varFalse
-	|:
-		ret nil
-	}
+	ret builtinVars[name]
 }
 
-let mut typAny = primTypeAlias("any", primAny, false)
-let mut typStr = primTypeAlias("str", primStr, false)
-let mut typBool = primTypeAlias("bool", primBool, false)
-let mut typUintptr = primTypeAlias("uintptr", primUintptr, false)
-let mut typUint = primTypeAlias("uint", primUint, false)
-let mut typInt = primTypeAlias("int", primInt, false)
-let mut typI8 = primTypeAlias("i8", primI8, false)
-let mut typI16 = primTypeAlias("i16", primI16, false)
-let mut typI32 = primTypeAlias("i32", primI32, false)
-let mut typI64 = primTypeAlias("i64", primI64, false)
-let mut typU8 = primTypeAlias("u8", primU8, false)
-let mut typU16 = primTypeAlias("u16", primU16, false)
-let mut typU32 = primTypeAlias("u32", primU32, false)
-let mut typU64 = primTypeAlias("u64", primU64, false)
-let mut typF32 = primTypeAlias("f32", primF32, false)
-let mut typF64 = primTypeAlias("f64", primF64, false)
-let mut typByte = primTypeAlias("byte", primU8, true)
-let mut typRune = primTypeAlias("rune", primI32, false)
+let mut builtinTypeAliases: map[str]&TypeAlias = {
+	"any": primTypeAlias("any", primAny, false),
+	"str": primTypeAlias("str", primStr, false),
+	"bool": primTypeAlias("bool", primBool, false),
+	"uintptr": primTypeAlias("uintptr", primUintptr, false),
+	"uint": primTypeAlias("uint", primUint, false),
+	"int": primTypeAlias("int", primInt, false),
+	"i8": primTypeAlias("i8", primI8, false),
+	"i16": primTypeAlias("i16", primI16, false),
+	"i32": primTypeAlias("i32", primI32, false),
+	"i64": primTypeAlias("i64", primI64, false),
+	"u8": primTypeAlias("u8", primU8, false),
+	"u16": primTypeAlias("u16", primU16, false),
+	"u32": primTypeAlias("u32", primU32, false),
+	"u64": primTypeAlias("u64", primU64, false),
+	"f32": primTypeAlias("f32", primF32, false),
+	"f64": primTypeAlias("f64", primF64, false),
+	"byte": primTypeAlias("byte", primU8, true),
+	"rune": primTypeAlias("rune", primI32, false),
+}
 
 fn findBuiltinTypeAlias(name: str): &TypeAlias {
-	match name {
-	| "any":
-		ret typAny
-	| "str":
-		ret typStr
-	| "bool":
-		ret typBool
-	| "uintptr":
-		ret typUintptr
-	| "uint":
-		ret typUint
-	| "int":
-		ret typInt
-	| "i8":
-		ret typI8
-	| "i16":
-		ret typI16
-	| "i32":
-		ret typI32
-	| "i64":
-		ret typI64
-	| "u8":
-		ret typU8
-	| "u16":
-		ret typU16
-	| "u32":
-		ret typU32
-	| "u64":
-		ret typU64
-	| "f32":
-		ret typF32
-	| "f64":
-		ret typF64
-	| "byte":
-		ret typByte
-	| "rune":
-		ret typRune
-	|:
-		ret nil
-	}
+	ret builtinTypeAliases[name]
 }
 
 fn findBuiltinDef(&name: str): any {
@@ -234,55 +150,43 @@ fn findBuiltinDef(&name: str): any {
 	ret nil
 }
 
-let mut funcSizeOf: &FuncIns = nil
-let mut funcAlignOf: &FuncIns = nil
+// Initialized by the init function.
+let mut builtinFuncsStdMem = map[str]&FuncIns{}
 
 fn findBuiltinDefStdMem(&name: str): any {
-	match name {
-	| "SizeOf":
-		ret funcSizeOf
-	| "AlignOf":
-		ret funcAlignOf
-	|:
-		ret nil
+	mut r, ok := builtinFuncsStdMem[name]
+	if ok {
+		ret r
 	}
+	ret nil
 }
 
-let mut funcTypeOf: &FuncIns = nil
-let mut funcValueOf: &FuncIns = nil
-let mut funcLine: &FuncIns = nil
-let mut funcFile: &FuncIns = nil
-let mut funcFiles: &FuncIns = nil
-let mut funcTypeAlias: &FuncIns = nil
+// Initialized by the init function.
+let mut builtinFuncsStdComptime = map[str]&FuncIns{}
 
 fn findBuiltinDefStdComptime(&name: str): any {
-	match name {
-	| "TypeOf":
-		ret funcTypeOf
-	| "ValueOf":
-		ret funcValueOf
-	| "Line":
-		ret funcLine
-	| "File":
-		ret funcFile
-	| "Files":
-		ret funcFiles
-	| "TypeAlias":
-		ret funcTypeAlias
-	|:
-		ret nil
+	mut r, ok := builtinFuncsStdComptime[name]
+	if ok {
+		ret r
 	}
+	ret nil
 }
 
-let mut funcEmit: &FuncIns = nil
+// Initialized by the init function.
+let mut builtinFuncsStdInteg = map[str]&FuncIns{}
 
 fn findBuiltinDefStdJuleIntegrated(&name: str): any {
 	match name {
 	| "Emit":
+		mut funcEmit := builtinFuncsStdInteg[name]
 		// Reset generics for every reference because of common instance.
 		funcEmit.Generics = nil
 		ret funcEmit
 	|:
+		mut r, ok := builtinFuncsStdComptime[name]
+		if ok {
+			ret r
+		}
 		ret nil
 	}
 }
@@ -1282,32 +1186,32 @@ fn buildIota(i: i64): &Var {
 
 fn init() {
 	// Initialize built-in functions.
-	funcPrint = &FuncIns{caller: builtinCallerPrint}
-	funcPrintln = &FuncIns{caller: builtinCallerPrintln}
-	funcNew = &FuncIns{caller: builtinCallerNew}
-	funcPanic = &FuncIns{caller: builtinCallerPanic}
-	funcMake = &FuncIns{caller: builtinCallerMake}
-	funcAppend = &FuncIns{caller: builtinCallerAppend}
-	funcCopy = &FuncIns{caller: builtinCallerCopy}
-	funcLen = &FuncIns{caller: builtinCallerLen}
-	funcCap = &FuncIns{caller: builtinCallerCap}
-	funcDelete = &FuncIns{caller: builtinCallerDelete}
-	funcClose = &FuncIns{caller: builtinCallerClose}
+	builtinFuncs["print"] = &FuncIns{caller: builtinCallerPrint}
+	builtinFuncs["println"] = &FuncIns{caller: builtinCallerPrintln}
+	builtinFuncs["new"] = &FuncIns{caller: builtinCallerNew}
+	builtinFuncs["panic"] = &FuncIns{caller: builtinCallerPanic}
+	builtinFuncs["make"] = &FuncIns{caller: builtinCallerMake}
+	builtinFuncs["append"] = &FuncIns{caller: builtinCallerAppend}
+	builtinFuncs["copy"] = &FuncIns{caller: builtinCallerCopy}
+	builtinFuncs["len"] = &FuncIns{caller: builtinCallerLen}
+	builtinFuncs["cap"] = &FuncIns{caller: builtinCallerCap}
+	builtinFuncs["delete"] = &FuncIns{caller: builtinCallerDelete}
+	builtinFuncs["close"] = &FuncIns{caller: builtinCallerClose}
 
-	// Initialize built-in function of the "std/mem" package.
-	funcSizeOf = &FuncIns{caller: builtinCallerStdMemSizeOf}
-	funcAlignOf = &FuncIns{caller: builtinCallerStdMemAlignOf}
+	// Initialize built-in functions of the "std/mem" package.
+	builtinFuncsStdMem["SizeOf"] = &FuncIns{caller: builtinCallerStdMemSizeOf}
+	builtinFuncsStdMem["AlignOf"] = &FuncIns{caller: builtinCallerStdMemAlignOf}
 
-	// Initialize built-in function of the "std/comptime" package.
-	funcTypeOf = &FuncIns{caller: builtinCallerStdComptimeTypeOf}
-	funcValueOf = &FuncIns{caller: builtinCallerStdComptimeValueOf}
-	funcLine = &FuncIns{caller: builtinCallerStdComptimeLine}
-	funcFile = &FuncIns{caller: builtinCallerStdComptimeFile}
-	funcFiles = &FuncIns{caller: builtinCallerStdComptimeFiles}
-	funcTypeAlias = &FuncIns{caller: builtinCallerStdComptimeTypeAlias}
+	// Initialize built-in functions of the "std/comptime" package.
+	builtinFuncsStdComptime["TypeOf"] = &FuncIns{caller: builtinCallerStdComptimeTypeOf}
+	builtinFuncsStdComptime["ValueOf"] = &FuncIns{caller: builtinCallerStdComptimeValueOf}
+	builtinFuncsStdComptime["Line"] = &FuncIns{caller: builtinCallerStdComptimeLine}
+	builtinFuncsStdComptime["File"] = &FuncIns{caller: builtinCallerStdComptimeFile}
+	builtinFuncsStdComptime["Files"] = &FuncIns{caller: builtinCallerStdComptimeFiles}
+	builtinFuncsStdComptime["TypeAlias"] = &FuncIns{caller: builtinCallerStdComptimeTypeAlias}
 
-	// Initialize built-in function of the "std/jule/integrated" package.
-	funcEmit = &FuncIns{
+	// Initialize built-in functions of the "std/jule/integrated" package.
+	builtinFuncsStdInteg["Emit"] = &FuncIns{
 		Decl: &Func{
 			Generics: make([]&ast::Generic, 1),
 		},
