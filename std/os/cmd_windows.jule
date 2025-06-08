@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/internal/os/filepathlite"
 use integ "std/jule/integrated"
 use "std/mem"
-use "std/os/filepath"
 use "std/strings"
 use "std/sys"
 use "std/unicode/utf16"
@@ -312,11 +312,11 @@ fn pathExt(): (exts: []str) {
 // "C:\foo\example.com" would be returned as-is even if the
 // program is actually "C:\foo\example.com.exe".
 fn lookExtensions(mut path: str, dir: str)!: str {
-	if filepath::Base(path) == path {
-		path = "." + str(filepath::Separator) + path
+	if filepathlite::Base(path) == path {
+		path = "." + str(PathSeparator) + path
 	}
 	exts := pathExt()
-	mut ext := filepath::Ext(path)
+	mut ext := filepathlite::Ext(path)
 	if ext != "" {
 		for _, e in exts {
 			if strings::EqualFold(ext, e) {
@@ -328,13 +328,13 @@ fn lookExtensions(mut path: str, dir: str)!: str {
 	if dir == "" {
 		ret _lookPath(path, exts) else { error(error) }
 	}
-	if filepath::VolumeName(path) != "" {
+	if filepathlite::VolumeName(path) != "" {
 		ret _lookPath(path, exts) else { error(error) }
 	}
-	if len(path) > 1 && filepath::IsPathSep(path[0]) {
+	if len(path) > 1 && filepathlite::IsPathSeparator(path[0]) {
 		ret _lookPath(path, exts) else { error(error) }
 	}
-	dirandpath := filepath::Join(dir, path)
+	dirandpath := filepathlite::Join(dir, path)
 	// We assume that LookPath will only add file extension.
 	lp := _lookPath(dirandpath, exts) else { error(error) }
 	ext = strings::TrimPrefix(lp, dirandpath)
@@ -362,7 +362,7 @@ fn _lookPath(file: str, exts: []str)!: str {
 	// See also go.dev/issue/43947.
 	_, found := LookupEnv("NoDefaultCurrentDirectoryInExePath")
 	if !found {
-		f := findExecutable(filepath::Join(".", file), exts) else { use "><" }
+		f := findExecutable(filepathlite::Join(".", file), exts) else { use "><" }
 		if f != "><" {
 			ret f
 		}
@@ -371,14 +371,14 @@ fn _lookPath(file: str, exts: []str)!: str {
 	mut dotf := ""
 	mut dotErr := any(nil)
 	path := Getenv("path")
-	for _, dir in filepath::SplitList(path) {
+	for _, dir in filepathlite::SplitList(path) {
 		if dir == "" {
 			// Skip empty entries, consistent with what PowerShell does.
 			// (See https://go.dev/issue/61493#issuecomment-1649724826.)
 			continue
 		}
 
-		f := findExecutable(filepath::Join(dir, file), exts) else { continue }
+		f := findExecutable(filepathlite::Join(dir, file), exts) else { continue }
 		if dotErr != nil {
 			// https://go.dev/issue/53536: if we resolved a relative path implicitly,
 			// and it is the same executable that would be resolved from the explicit %PATH%,
@@ -407,7 +407,7 @@ fn _lookPath(file: str, exts: []str)!: str {
 			}
 		}
 
-		if !filepath::IsAbs(f) {
+		if !filepathlite::IsAbs(f) {
 			// If this is the same relative path that we already found,
 			// dotErr is non-nil and we already checked it above.
 			// Otherwise, record this path as the one to which we must resolve,

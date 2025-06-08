@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/internal/os/filepathlite"
 use integ "std/jule/integrated"
-use "std/os/filepath"
 use "std/sys"
 
 fn readDir(path: str)!: (dirents: []DirEntry) {
-	utf16Path := integ::UTF16FromStr(filepath::Join(path, "*"))
+	utf16Path := integ::UTF16FromStr(filepathlite::Join(path, "*"))
 	mut data := sys::Win32FindData{}
 	handle := unsafe { sys::FindFirstFile(&utf16Path[0], &data) }
 	if handle == sys::InvalidHandle {
@@ -17,7 +17,7 @@ fn readDir(path: str)!: (dirents: []DirEntry) {
 		mut entry := DirEntry{
 			Name: unsafe { integ::UTF16PtrToStr(&data.FileName[0]) },
 		}
-		entry.Stat = Stat(filepath::Join(path, entry.Name)) else { error(error) }
+		entry.Stat = Stat(filepathlite::Join(path, entry.Name)) else { error(error) }
 		dirents = append(dirents, entry)
 		if unsafe { sys::FindNextFile(handle, &data) } == 0 {
 			break

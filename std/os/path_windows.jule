@@ -4,9 +4,9 @@
 
 use "std/internal/byteslite"
 use "std/internal/os"
+use "std/internal/os/filepathlite"
 use "std/internal/os/windows"
 use integ "std/jule/integrated"
-use "std/os/filepath"
 use "std/runtime"
 use "std/sys"
 
@@ -38,7 +38,9 @@ fn addExtendedPrefix(path: str): str {
 			// Already extended with \??\
 			ret path
 		}
-		if filepath::IsPathSep(path[0]) && filepath::IsPathSep(path[1]) && path[2] == '?' && filepath::IsPathSep(path[3]) {
+		if filepathlite::IsPathSeparator(path[0]) &&
+			filepathlite::IsPathSeparator(path[1]) &&
+			path[2] == '?' && filepathlite::IsPathSeparator(path[3]) {
 			// Already extended with \\?\ or any combination of directory separators.
 			ret path
 		}
@@ -56,7 +58,7 @@ fn addExtendedPrefix(path: str): str {
 	// The MSDN docs appear to say that a normal path that is 248 bytes long
 	// will work; empirically the path must be less then 248 bytes long.
 	mut pathLength := len(path)
-	if !filepath::IsAbs(path) {
+	if !filepathlite::IsAbs(path) {
 		// If the path is relative, we need to prepend the working directory
 		// plus a separator to the path before we can determine if it's too long.
 		// We don't want to call sys::Getwd equivalent here, as that call is expensive to do
@@ -80,8 +82,8 @@ fn addExtendedPrefix(path: str): str {
 
 	let mut isUNC: bool
 	let mut isDevice: bool
-	if len(path) >= 2 && filepath::IsPathSep(path[0]) && filepath::IsPathSep(path[1]) {
-		if len(path) >= 4 && path[2] == '.' && filepath::IsPathSep(path[3]) {
+	if len(path) >= 2 && filepathlite::IsPathSeparator(path[0]) && filepathlite::IsPathSeparator(path[1]) {
+		if len(path) >= 4 && path[2] == '.' && filepathlite::IsPathSeparator(path[3]) {
 			// Starts with //./
 			isDevice = true
 		} else {
