@@ -4012,7 +4012,7 @@ fn Faccessat(dirfd: int, path: str, mut mode: u32, flags: int)! {
 
 fn SchedYield()! {
 	_, e1 := syscall(SYS_SCHED_YIELD, 0, 0, 0, 0, 0, 0)
-	if e1 != _NO_ERROR {
+	if e1 < _NO_ERROR {
 		error(e1)
 	}
 }
@@ -4056,7 +4056,27 @@ fn Dup2(oldfd: int, newfd: int)! {
 
 fn Dup3(oldfd: int, newfd: int, flags: int)! {
 	_, e1 := syscall(SYS_DUP3, uintptr(oldfd), uintptr(newfd), uintptr(flags), 0, 0, 0)
-	if e1 != 0 {
+	if e1 != _NO_ERROR {
 		error(e1)
 	}
+}
+
+fn Readlinkat(dirfd: int, path: str, mut buf: []byte)!: (n: int) {
+	cpath := integ::StrToBytes(path)
+	mut _p0 := uintptr(0)
+	if len(buf) > 0 {
+		_p0 = uintptr(&buf[0])
+	} else {
+		_p0 = uintptr(&_zero)
+	}
+	r0, e1 := syscall(SYS_READLINKAT, uintptr(dirfd), uintptr(&cpath[0]), uintptr(_p0), uintptr(len(buf)), 0, 0)
+	n = int(r0)
+	if e1 != _NO_ERROR {
+		error(e1)
+	}
+	ret
+}
+
+fn Readlink(path: str, mut buf: []byte)!: (n: int) {
+	ret Readlinkat(AT_FDCWD, path, buf) else { error(error) }
 }
