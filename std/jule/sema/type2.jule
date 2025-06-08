@@ -1149,36 +1149,37 @@ impl structLitChecker {
 		})
 	}
 
-	fn checkPair(mut self, mut &pair: &ast::FieldExprPair, mut &exprs: []&ast::Expr) {
+	fn checkPair(mut self, mut &pair: &ast::KeyValueExpr, mut &exprs: []&ast::Expr) {
+		name := pair.Key.Data.(&ast::NameExpr)
 		// Check existing.
-		mut f := self.s.FindField(pair.Field.Kind)
+		mut f := self.s.FindField(name.Name)
 		if f == nil {
-			self.pushErr(pair.Field, log::IdentNotExist, pair.Field.Kind)
+			self.pushErr(pair.Key.Token, log::IdentNotExist, name.Name)
 			ret
 		}
 
-		if jule::IsBlank(pair.Field.Kind) {
-			self.pushErr(pair.Field, log::IgnoreIdent)
+		if jule::IsBlank(name.Name) {
+			self.pushErr(pair.Key.Token, log::IgnoreIdent)
 			ret
 		}
 
 		// Check duplications.
 	dupLookup:
 		for (_, mut expr) in exprs {
-			mut dpair, ok := expr.Data.(&ast::FieldExprPair)
+			mut dpair, ok := expr.Data.(&ast::KeyValueExpr)
 			if ok {
 				match {
 				| pair == dpair:
 					break dupLookup
-				| pair.Field.Kind == dpair.Field.Kind:
-					self.pushErr(pair.Field, log::AlreadyHasExpr, pair.Field.Kind)
+				| name.Name == dpair.Key.Data.(&ast::NameExpr).Name:
+					self.pushErr(pair.Key.Token, log::AlreadyHasExpr, name.Name)
 					ret
 				}
 			}
 		}
 
 		if !self.e.s.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
-			self.pushErr(pair.Field, log::IdentIsNotAccessible, pair.Field.Kind)
+			self.pushErr(pair.Key.Token, log::IdentIsNotAccessible, name.Name)
 			self.pushSuggestion(log::MakePubToAccess)
 			ret
 		}
@@ -1188,30 +1189,22 @@ impl structLitChecker {
 		self.e.prefix = f.Type
 
 		// Do not unwrap untyped literals, type analysis will check overflows.
-		mut v := self.e.evalExpr(pair.X, evalDefault)
+		mut v := self.e.evalExpr(pair.Value, evalDefault)
 		if v == nil {
 			ret
 		}
-		self.pushMatch(f, v, pair.Field)
+		self.pushMatch(f, v, pair.Key.Token)
 	}
 
 	fn readyExprs(mut self, mut &exprs: []&ast::Expr): bool {
 		mut ok := true
-		for (i, mut expr) in exprs {
+		for (_, mut expr) in exprs {
 			mut pair, isPair := expr.Data.(&ast::KeyValueExpr)
 			if isPair {
-				match type pair.Key.Data {
-				| &ast::NameExpr:
-					// Ok
-					break
-				|:
+				_, isName := pair.Key.Data.(&ast::NameExpr)
+				if !isName {
 					self.pushErr(pair.Colon, log::InvalidSyntax)
 					ok = false
-					continue
-				}
-				exprs[i].Data = &ast::FieldExprPair{
-					Field: pair.Key.Token,
-					X: pair.Value,
 				}
 			}
 		}
@@ -1228,10 +1221,10 @@ impl structLitChecker {
 		mut paired := false
 		for (i, mut expr) in exprs {
 			match type expr.Data {
-			| &ast::FieldExprPair:
-				mut pair := expr.Data.(&ast::FieldExprPair)
+			| &ast::KeyValueExpr:
+				mut pair := expr.Data.(&ast::KeyValueExpr)
 				if i > 0 && !paired {
-					self.pushErr(pair.Field, log::InvalidSyntax)
+					self.pushErr(pair.Key.Token, log::InvalidSyntax)
 				}
 				paired = true
 				self.checkPair(pair, exprs)
