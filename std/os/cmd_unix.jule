@@ -108,8 +108,12 @@ impl Cmd {
 	}
 
 	fn wait(self)!: int {
-		mut stat := i32(0)
-		sys::Waitpid(self.attrs.pid, stat, 0) else { error(error) }
+		pid := self.attrs.pid
+		stat := ignoringEINTR2(fn()!: i32 {
+			mut stat := i32(0)
+			sys::Waitpid(pid, stat, 0) else { error(error) }
+			ret stat
+		}) else { error(error) }
 		self.attrs.pid = invalidPid
 		ret cpp.WEXITSTATUS(stat)
 	}

@@ -8,8 +8,11 @@ fn stat(path: str)!: FileInfo {
 	if path == "" {
 		error(sys::ENOENT)
 	}
-	mut handle := sys::SysStat{}
-	sys::Stat(path, handle) else { error(error) }
+	handle := ignoringEINTR2(fn()!: sys::SysStat {
+		mut handle := sys::SysStat{}
+		sys::Stat(path, handle) else { error(error) }
+		ret handle
+	}) else { error(error) }
 	mut stat := FileInfo{}
 	fillFileStatFromSys(stat, handle)
 	stat.sys = handle
@@ -20,8 +23,11 @@ fn lstat(path: str)!: FileInfo {
 	if path == "" {
 		error(sys::ENOENT)
 	}
-	mut handle := sys::SysStat{}
-	sys::Lstat(path, handle) else { error(error) }
+	handle := ignoringEINTR2(fn()!: sys::SysStat {
+		mut handle := sys::SysStat{}
+		sys::Lstat(path, handle) else { error(error) }
+		ret handle
+	}) else { error(error) }
 	mut stat := FileInfo{}
 	fillFileStatFromSys(stat, handle)
 	stat.sys = handle

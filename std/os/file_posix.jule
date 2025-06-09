@@ -20,3 +20,39 @@ fn syscallMode(i: FileMode): (o: u32) {
 	}
 	ret
 }
+
+// Implementation adopted from the Go programming language.
+//
+// It makes a function call and repeats it if it returns an
+// EINTR error. This appears to be required even though we install all
+// signal handlers with SA_RESTART: see Go's #22838, #38033, #38836, #40846.
+// Also #20400 and #36644 are issues in which a signal handler is
+// installed without setting SA_RESTART. None of these are the common case,
+// but there are enough of them that it seems that we can't avoid
+// an EINTR loop.
+fn ignoringEINTR(f: fn()!)! {
+	for {
+		f() else {
+			if error == sys::EINTR {
+				continue
+			}
+			error(error)
+		}
+		break
+	}
+}
+
+// Implementation adopted from the Go programming language.
+//
+// This is ignoringEINTR, but returning an additional value.
+fn ignoringEINTR2[T](f: fn()!: T)!: T {
+	for {
+		mut v := f() else {
+			if error == sys::EINTR {
+				continue
+			}
+			error(error)
+		}
+		ret v
+	}
+}

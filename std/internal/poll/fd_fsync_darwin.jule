@@ -9,13 +9,16 @@ impl FD {
 	// on OS X, SYS_FSYNC doesn't fully flush contents to disk.
 	// See the man page for fsync on OS X.
 	fn Fsync(mut self)! {
-		sys::Fcntl(int(self.File), sys::F_FULLFSYNC, 0) else {
-			// There are scenarios such as SMB mounts where fcntl will fail
-			// with ENOTSUP. In those cases fallback to fsync.
-			if error != sys::ENOTSUP {
-				error(error)
+		fd := int(self.File)
+		ignoringEINTR(fn()! {
+			sys::Fcntl(fd, sys::F_FULLFSYNC, 0) else {
+				// There are scenarios such as SMB mounts where fcntl will fail
+				// with ENOTSUP. In those cases fallback to fsync.
+				if error != sys::ENOTSUP {
+					error(error)
+				}
+				sys::Fsync(fd) else { error(error) }
 			}
-			sys::Fsync(int(self.File)) else { error(error) }
-		}
+		}) else { error(error) }
 	}
 }
