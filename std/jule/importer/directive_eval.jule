@@ -39,10 +39,10 @@ impl directiveEval {
 		for i < len(tokens)-1; i++ {
 			b := tokens[i]
 			match b.Id {
-			| token::LParent:
+			| token::LPAREN:
 				rangeN++
 				continue
-			| token::RParent:
+			| token::RPAREN:
 				rangeN--
 			}
 			if rangeN > 0 || b.Id != op {
@@ -69,7 +69,7 @@ impl directiveEval {
 	// Eval directive expression part.
 	// Accepts unary operators.
 	fn evalDirectivePart(mut self, mut part: []&token::Token): bool {
-		logicalNot := part[0].Id == token::Excl
+		logicalNot := part[0].Id == token::NOT
 		if logicalNot {
 			part = part[1:]
 		}
@@ -94,25 +94,25 @@ impl directiveEval {
 
 		mut result := false
 
-		mut logicalOrParts := self.splitOperans(token::DblVline, self.d.Args)
+		mut logicalOrParts := self.splitOperans(token::LOR, self.d.Args)
 		if logicalOrParts == nil {
 			ret false
 		}
 
 		for (_, mut part) in logicalOrParts {
 			mut and := true
-			mut logicalAndParts := self.splitOperans(token::DblAmper, part)
+			mut logicalAndParts := self.splitOperans(token::LAND, part)
 			if logicalAndParts == nil {
 				ret false
 			}
 
 			for (_, mut andPart) in logicalAndParts {
 				first := andPart[0]
-				if first.Id == token::LParent {
+				if first.Id == token::LPAREN {
 					end := andPart[len(andPart)-1]
 
 					// Missing close.
-					if end.Id != token::RParent {
+					if end.Id != token::RPAREN {
 						self.pushErr(first, log::WaitCloseParent)
 						ret false
 					}

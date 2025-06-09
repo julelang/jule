@@ -41,15 +41,15 @@ impl exprBuilder {
 
 	fn buildSingle(mut self, mut token: &token::Token): ast::ExprData {
 		match token.Id {
-		| token::Lit:
+		| token::LIT:
 			ret self.buildLit(token)
-		| token::TripleDot:
+		| token::ELLIPSIS:
 			ret &ast::VariadicExpr{
 				Token: token,
 			}
-		| token::Name
-		| token::Self
-		| token::Error:
+		| token::NAME
+		| token::SELF
+		| token::ERROR:
 			ret buildIdentExpr(token)
 		}
 		self.pushErr(token, log::InvalidSyntax)
@@ -57,9 +57,9 @@ impl exprBuilder {
 	}
 
 	fn buildBindName(mut self, mut &tokens: []&token::Token): &ast::NameExpr {
-		if tokens[0].Id != token::Cpp {
+		if tokens[0].Id != token::CPP {
 			ret nil
-		} else if tokens[1].Id != token::Dot {
+		} else if tokens[1].Id != token::PERIOD {
 			self.pushErr(tokens[1], log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedDotForBind)
 			ret nil
@@ -126,7 +126,7 @@ impl exprBuilder {
 			self.pushErr(tokens[3], log::InvalidSyntax)
 		}
 		ns.Namespace = tokens[0]
-		if ns.Namespace.Id != token::Name && ns.Namespace.Id != token::Unsafe {
+		if ns.Namespace.Id != token::NAME && ns.Namespace.Id != token::UNSAFE {
 			self.pushErr(ns.Namespace, log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedIdentifier)
 		}
@@ -135,7 +135,7 @@ impl exprBuilder {
 			self.pushSuggestion(log::ExpectedDblColon)
 			ret nil
 		}
-		if tokens[1].Id != token::DblColon {
+		if tokens[1].Id != token::SEP {
 			self.pushErr(tokens[1], log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedDblColon)
 			ret nil
@@ -146,7 +146,7 @@ impl exprBuilder {
 			ret nil
 		}
 		ns.Name = tokens[2]
-		if ns.Name.Id != token::Name {
+		if ns.Name.Id != token::NAME {
 			self.pushErr(ns.Name, log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedIdentifier)
 			ret nil
@@ -170,11 +170,11 @@ impl exprBuilder {
 		i := len(tokens) - 2 // Set offset to delimiter token.
 		token := tokens[i]
 		match token.Id {
-		| token::Dot:
+		| token::PERIOD:
 			ret self.buildObjSubIdent(tokens)
-		| token::DblColon:
+		| token::SEP:
 			ret self.buildNamespace(tokens)
-		| token::RBracket:
+		| token::RBRACK:
 			// Catch slice, array, and map types.
 			ret self.buildType(tokens)
 		}
@@ -213,14 +213,14 @@ impl exprBuilder {
 		mut rangeN := 0
 		for i, token in tokens {
 			match token.Id {
-			| token::LBrace
-			| token::LBracket
-			| token::LParent:
+			| token::LBRACE
+			| token::LBRACK
+			| token::LPAREN:
 				rangeN++
 				continue
-			| token::RBrace
-			| token::RBracket
-			| token::RParent:
+			| token::RBRACE
+			| token::RBRACK
+			| token::RPAREN:
 				rangeN--
 			}
 
@@ -239,7 +239,7 @@ impl exprBuilder {
 			}
 
 			tok := exprTokens[0]
-			if tok.Id != token::LParent {
+			if tok.Id != token::LPAREN {
 				ret nil
 			}
 
@@ -269,7 +269,7 @@ impl exprBuilder {
 				if len(exprTokens) > 2 {
 					// Remove parentheses.
 					mut j := 0
-					mut exprTokens2 := range(j, token::LParent, token::RParent, exprTokens)
+					mut exprTokens2 := range(j, token::LPAREN, token::RPAREN, exprTokens)
 					if len(exprTokens2) == 0 || j < len(exprTokens) {
 						ret nil
 					}
@@ -288,7 +288,7 @@ impl exprBuilder {
 			ret nil
 		}
 		tokens = tokens[1 : len(tokens)-1] // Remove parentheses.
-		mut parts, errs := parts(tokens, token::Comma, true)
+		mut parts, errs := parts(tokens, token::COMMA, true)
 		self.p.errors = append(self.p.errors, errs...)
 		mut args := make([]&ast::Expr, 0, len(parts))
 		for (_, mut part) in parts {
@@ -330,7 +330,7 @@ impl exprBuilder {
 
 	fn buildParenthesesRange(mut self, mut &tokens: []&token::Token): ast::ExprData {
 		mut token := tokens[0]
-		if token.Id == token::LParent {
+		if token.Id == token::LPAREN {
 			mut expr := self.tryBuildCast(tokens)
 			if expr != nil {
 				ret expr
@@ -343,7 +343,7 @@ impl exprBuilder {
 			ret self.buildBetweenParentheses(argsTokens)
 		}
 		// Catch type assertions.
-		if exprTokens[len(exprTokens)-1].Id == token::Dot {
+		if exprTokens[len(exprTokens)-1].Id == token::PERIOD {
 			ret self.buildTypeAssertion(exprTokens, argsTokens)
 		}
 		ret self.buildCall(token, exprTokens, argsTokens)
@@ -353,7 +353,7 @@ impl exprBuilder {
 		mut token := tokens[0]
 		tokens = tokens[1:] // Remove unsafe keyword.
 		mut i := 0
-		mut rangeTokens := range(i, token::LBrace, token::RBrace, tokens)
+		mut rangeTokens := range(i, token::LBRACE, token::RBRACE, tokens)
 		if len(rangeTokens) == 0 {
 			self.pushErr(tokens[0], log::MissingExpr)
 			ret nil
@@ -375,7 +375,7 @@ impl exprBuilder {
 
 	fn buildUnsafe(mut self, mut &tokens: []&token::Token): ast::ExprData {
 		match tokens[1].Id {
-		| token::Fn:
+		| token::FN:
 			// Unsafe anonymous function.
 			ret self.buildAnonFunc(tokens)
 		|:
@@ -407,16 +407,16 @@ impl exprBuilder {
 		tokens = tokens[1 : len(tokens)-1] // Remove parentheses.
 		for i, token in tokens {
 			match token.Id {
-			| token::LBrace
-			| token::LBracket
-			| token::LParent:
+			| token::LBRACE
+			| token::LBRACK
+			| token::LPAREN:
 				rangeN++
-			| token::RBrace
-			| token::RBracket
-			| token::RParent:
+			| token::RBRACE
+			| token::RBRACK
+			| token::RPAREN:
 				rangeN--
 			}
-			if rangeN > 0 || token.Id != token::Comma {
+			if rangeN > 0 || token.Id != token::COMMA {
 				continue
 			}
 			self.pushRangeLitPart(tokens[last:i], token, parts)
@@ -448,7 +448,7 @@ impl exprBuilder {
 
 		tokens = tokens[i:] // Remove type tokens.
 		token := tokens[0]
-		if token.Id != token::LBrace {
+		if token.Id != token::LBRACE {
 			self.pushErr(token, log::InvalidSyntax)
 			ret nil
 		}
@@ -459,7 +459,7 @@ impl exprBuilder {
 	}
 
 	fn buildBraceLitPart(mut self, mut &tokens: []&token::Token): &ast::Expr {
-		mut l, mut r := splitDelim(tokens, token::Colon)
+		mut l, mut r := splitDelim(tokens, token::COLON)
 		// If left is not nil, colon token found.
 		if l != nil {
 			if len(r) == 0 {
@@ -512,7 +512,7 @@ impl exprBuilder {
 
 		// Exceptional handling.
 		elseToken := exprTokens[len(exprTokens)-1]
-		if exprTokens[len(exprTokens)-1].Id == token::Else {
+		if exprTokens[len(exprTokens)-1].Id == token::ELSE {
 			exprTokens = exprTokens[:len(exprTokens)-1] // Ignore keyword "else"
 			mut d := self.build(exprTokens)
 			if d == nil {
@@ -525,7 +525,7 @@ impl exprBuilder {
 			}
 			tokens = tokens[len(exprTokens)+1:] // Get range: {...}
 			mut i := 0
-			mut rangeTokens := range(i, token::LBrace, token::RBrace, tokens)
+			mut rangeTokens := range(i, token::LBRACE, token::RBRACE, tokens)
 			if model.Ignored() {
 				self.pushErr(elseToken, log::InvalidSyntax)
 				self.pushSuggestion(log::JustIgnoreOrHandle)
@@ -535,11 +535,11 @@ impl exprBuilder {
 		}
 
 		match exprTokens[0].Id {
-		| token::Unsafe:
+		| token::UNSAFE:
 			ret self.buildUnsafe(tokens)
-		| token::Fn:
+		| token::FN:
 			ret self.buildAnonFunc(tokens)
-		| token::Map | token::Name | token::Cpp:
+		| token::MAP | token::NAME | token::CPP:
 			ret self.buildTypedStructLiteral(tokens)
 		|:
 			self.pushErr(exprTokens[0], log::InvalidSyntax)
@@ -550,7 +550,7 @@ impl exprBuilder {
 	// Tokens is should be store enumerable range tokens.
 	fn getEnumerableParts(mut self, mut tokens: []&token::Token): [][]&token::Token {
 		tokens = tokens[1 : len(tokens)-1] // Remove range tokens.
-		mut parts, errors := parts(tokens, token::Comma, true)
+		mut parts, errors := parts(tokens, token::COMMA, true)
 		self.p.errors = append(self.p.errors, errors...)
 		ret parts
 	}
@@ -612,7 +612,7 @@ impl exprBuilder {
 			slc.Low = self.buildFromTokens(low)
 		}
 		if len(high) > 0 {
-			mut high2, mut max := splitDelim(high, token::Colon) // Catch max index.
+			mut high2, mut max := splitDelim(high, token::COLON) // Catch max index.
 			if len(high2) > 0 || len(max) > 0 {
 				if len(high2) > 0 {
 					slc.High = self.buildFromTokens(high2)
@@ -649,11 +649,11 @@ impl exprBuilder {
 
 		// Catch slicing expressions.
 		mut splitTokens := bracketTokens[1 : len(bracketTokens)-1] // Remove brackets.
-		mut start, mut to := splitDelim(splitTokens, token::Colon)
+		mut start, mut to := splitDelim(splitTokens, token::COLON)
 		if start != nil || to != nil {
 			ret self.buildSlicing(exprTokens, start, to, errorToken, bracketTokens[len(bracketTokens)-1])
 		}
-		if bracketTokens[1].Id == token::DblColon {
+		if bracketTokens[1].Id == token::SEP {
 			// Special case: catch x[::] and x[::index3] like expressions.
 			self.pushErr(errorToken, log::MiddleIndexRequired)
 			ret nil
@@ -710,24 +710,24 @@ impl exprBuilder {
 		| 1:
 			ret self.buildSingle(tokens[0])
 		| 3:
-			if tokens[0].Id == token::Cpp {
+			if tokens[0].Id == token::CPP {
 				ret self.buildBindName(tokens)
 			}
 		}
 
 		mut token := tokens[len(tokens)-1]
-		if token.Id == token::TripleDot {
+		if token.Id == token::ELLIPSIS {
 			ret self.buildVariadic(tokens)
 		}
 
 		token = tokens[0]
 		match token.Id {
-		| token::RArrow:
-			if len(tokens) > 1 && tokens[1].Id != token::Chan {
+		| token::ARROW:
+			if len(tokens) > 1 && tokens[1].Id != token::CHAN {
 				ret self.buildChanRecv(tokens)
 			}
 			fall
-		| token::Chan:
+		| token::CHAN:
 			// Handle channel type declaration.
 			ret self.buildType(tokens)
 		}
@@ -737,7 +737,7 @@ impl exprBuilder {
 			// Handle pointer to primitive type.
 			if len(tokens) > 1 {
 				token = tokens[1]
-				if token.Id == token::Unsafe {
+				if token.Id == token::UNSAFE {
 					ret self.buildType(tokens)
 				}
 			}
@@ -747,17 +747,17 @@ impl exprBuilder {
 		if len(tokens) >= 3 {
 			token = tokens[0]
 			match token.Id {
-			| token::LParent
-			| token::LBrace
-			| token::LBracket:
+			| token::LPAREN
+			| token::LBRACE
+			| token::LBRACK:
 				// Catch type casting.
 				if len(tokens) > 3 {
 					t := tokens[len(tokens)-1]
-					if t.Id == token::RParent {
+					if t.Id == token::RPAREN {
 						break
 					}
 				}
-				if tokens[1].Id == token::RBracket {
+				if tokens[1].Id == token::RBRACK {
 					ret self.buildType(tokens)
 				}
 			}
@@ -765,15 +765,15 @@ impl exprBuilder {
 
 		token = tokens[len(tokens)-1]
 		match token.Id {
-		| token::Name:
+		| token::NAME:
 			ret self.buildSubIdent(tokens)
-		| token::Excl:
+		| token::NOT:
 			ret self.buildExclRight(tokens)
-		| token::RParent:
+		| token::RPAREN:
 			ret self.buildParenthesesRange(tokens)
-		| token::RBrace:
+		| token::RBRACE:
 			ret self.buildBraceRange(tokens)
-		| token::RBracket:
+		| token::RBRACK:
 			ret self.buildBracketRange(tokens)
 		}
 		self.pushErr(token, log::InvalidSyntax)
@@ -815,7 +815,7 @@ impl exprBuilder {
 
 	fn buildKind(mut self, mut &tokens: []&token::Token): ast::ExprData {
 		if isTupleExpr(tokens) {
-			mut parts, errors := parts(tokens, token::Comma, true)
+			mut parts, errors := parts(tokens, token::COMMA, true)
 			if errors != nil {
 				self.p.errors = append(self.p.errors, errors...)
 				ret nil
@@ -844,18 +844,18 @@ impl exprBuilder {
 
 // Reports whether kind is potentially part of a type declaration.
 fn isTypeOp(id: int): bool {
-	ret id == token::Amper ||
-		id == token::DblAmper ||
-		id == token::Star ||
-		id == token::Chan ||
-		id == token::RArrow
+	ret id == token::AND ||
+		id == token::LAND ||
+		id == token::MUL ||
+		id == token::CHAN ||
+		id == token::ARROW
 }
 
 // Reports whether range is potentially part of a type declaration.
 fn isTypeRange(mut &tokens: []&token::Token): bool {
 	mut op := false
 	for i, token in tokens {
-		if token.Id == token::LBracket {
+		if token.Id == token::LBRACK {
 			if op {
 				ret true
 			}
@@ -863,10 +863,10 @@ fn isTypeRange(mut &tokens: []&token::Token): bool {
 			mut lTokens := tokens[i:]
 			for _, lToken in lTokens {
 				match lToken.Id {
-				| token::LBracket:
+				| token::LBRACK:
 					rangeN++
 					continue
-				| token::RBracket:
+				| token::RBRACK:
 					rangeN--
 					continue
 				}
@@ -890,11 +890,11 @@ fn getBlockExpr(mut &tokens: []&token::Token): []&token::Token {
 	mut skipToNextBraceClose := 0
 	for i, tok in tokens {
 		match tok.Id {
-		| token::Unsafe:
-			if len(tokens)-i > 1 && tokens[i+1].Id == token::LBrace {
+		| token::UNSAFE:
+			if len(tokens)-i > 1 && tokens[i+1].Id == token::LBRACE {
 				skipToNextBraceClose++
 			}
-		| token::LBrace:
+		| token::LBRACE:
 			if braceN > 0 || skipToNextBraceClose > 0 {
 				if skipToNextBraceClose > 0 {
 					skipToNextBraceClose--
@@ -903,12 +903,12 @@ fn getBlockExpr(mut &tokens: []&token::Token): []&token::Token {
 				break
 			}
 			ret tokens[:i]
-		| token::LBracket
-		| token::LParent:
+		| token::LBRACK
+		| token::LPAREN:
 			braceN++
-		| token::RBrace
-		| token::RBracket
-		| token::RParent:
+		| token::RBRACE
+		| token::RBRACK
+		| token::RPAREN:
 			braceN--
 		}
 	}
@@ -924,25 +924,25 @@ fn splitDelim(mut &tokens: []&token::Token, delim: int): ([]&token::Token, []&to
 	for i < len(tokens); i++ {
 		token := tokens[i]
 		match token.Id {
-		| token::Fn:
+		| token::FN:
 			func = rangeN
-		| token::LBrace
-		| token::LBracket
-		| token::LParent:
+		| token::LBRACE
+		| token::LBRACK
+		| token::LPAREN:
 			rangeN++
 			continue
-		| token::RParent:
+		| token::RPAREN:
 			rangeN--
 			if func == rangeN {
 				func = -1
 				// Skip colon token if function built.
-				if len(tokens)-i > 1 && tokens[i+1].Id == token::Colon {
+				if len(tokens)-i > 1 && tokens[i+1].Id == token::COLON {
 					i++
 					continue
 				}
 			}
-		| token::RBrace
-		| token::RBracket:
+		| token::RBRACE
+		| token::RBRACK:
 			rangeN--
 		}
 		if token.Id == delim && rangeN == 0 {
@@ -997,36 +997,36 @@ fn findLowestPrecOp(tokens: []&token::Token): int {
 	for i < len(tokens); i++ {
 		token := tokens[i]
 		match token.Id {
-		| token::Map:
+		| token::MAP:
 			mapType++
-		| token::LBrace
-		| token::LParent
-		| token::LBracket:
+		| token::LBRACE
+		| token::LPAREN
+		| token::LBRACK:
 			op = true
 			braceN++
 			skipunary(i) // Skip the unary expressions of the range's beginning.
 			continue
-		| token::RParent:
+		| token::RPAREN:
 			// For the closing parentheses range, it might be a function call.
 			// Therefore, we need to handle ! operators.
 			// Allow multiple EXCL operator here,
 			// error logging should be handled by expression parser.
 			i++ // Skip the range closer token.
 			for i < len(tokens); i++ {
-				if tokens[i].Id != token::Excl {
+				if tokens[i].Id != token::NOT {
 					break
 				}
 			}
 			i-- // Fallback to the range closer token or last skipped unary operator.
 			fall // Fallback to ordinary range closing algorithm.
-		| token::RBracket:
+		| token::RBRACK:
 			op = mapType == 0
 			if mapType > 0 {
 				mapType--
 			}
 			braceN--
 			continue
-		| token::RBrace:
+		| token::RBRACE:
 			op = true
 			braceN--
 			continue
@@ -1045,14 +1045,14 @@ fn findLowestPrecOp(tokens: []&token::Token): int {
 
 		// Skip type annotations.
 		left := tokens[i-1]
-		if left.Id == token::Colon {
+		if left.Id == token::COLON {
 			continue
 		}
-		if i > 1 && left.Id == token::RBracket {
+		if i > 1 && left.Id == token::RBRACK {
 			lleft := tokens[i-2]
-			if lleft.Id == token::LBracket {
+			if lleft.Id == token::LBRACK {
 				// Skip potential type annotations.
-				if token.Id == token::Amper || token.Id == token::Star {
+				if token.Id == token::AND || token.Id == token::MUL {
 					continue
 				}
 			}
@@ -1085,13 +1085,13 @@ fn getRangeExprTokens(mut &tokens: []&token::Token): ([]&token::Token, int) {
 	for i >= 0; i-- {
 		tok := tokens[i]
 		match tok.Id {
-		| token::RBrace
-		| token::RBracket
-		| token::RParent:
+		| token::RBRACE
+		| token::RBRACK
+		| token::RPAREN:
 			rangeN++
-		| token::LBrace
-		| token::LBracket
-		| token::LParent:
+		| token::LBRACE
+		| token::LBRACK
+		| token::LPAREN:
 			rangeN--
 		}
 
@@ -1104,13 +1104,13 @@ fn getRangeExprTokens(mut &tokens: []&token::Token): ([]&token::Token, int) {
 
 fn isAnonFuncHead(&tokens: []&token::Token): bool {
 	match tokens[0].Id {
-	| token::Unsafe:
-		if len(tokens) == 1 || tokens[1].Id != token::Fn {
+	| token::UNSAFE:
+		if len(tokens) == 1 || tokens[1].Id != token::FN {
 			break
 		}
 		fall
-	| token::Fn:
-		if tokens[len(tokens)-1].Id == token::RBrace {
+	| token::FN:
+		if tokens[len(tokens)-1].Id == token::RBRACE {
 			// Not function type declaration, anonymous function expression.
 			break
 		}

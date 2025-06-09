@@ -65,9 +65,9 @@ fn rangeLast(mut &tokens: []&token::Token): (rest: []&token::Token, cut: []&toke
 		ret tokens, nil
 	}
 	first := tokens[len(tokens)-1].Id
-	if first != token::RBrace &&
-		first != token::LBracket &&
-		first != token::RParent {
+	if first != token::RBRACE &&
+		first != token::LBRACK &&
+		first != token::RPAREN {
 		ret tokens, nil
 	}
 	mut braceN := 0
@@ -75,14 +75,14 @@ fn rangeLast(mut &tokens: []&token::Token): (rest: []&token::Token, cut: []&toke
 	for i >= 0; i-- {
 		token := tokens[i]
 		match token.Id {
-		| token::RBrace
-		| token::RBracket
-		| token::RParent:
+		| token::RBRACE
+		| token::RBRACK
+		| token::RPAREN:
 			braceN++
 			continue
-		| token::LBrace
-		| token::LBracket
-		| token::LParent:
+		| token::LBRACE
+		| token::LBRACK
+		| token::LPAREN:
 			braceN--
 		}
 		if braceN == 0 {
@@ -106,9 +106,9 @@ fn parts(mut &tokens: []&token::Token, id: int, exprMust: bool): (parts: [][]&to
 	mut last := 0
 	for i, token in tokens {
 		match token.Id {
-		| token::LBrace | token::LBracket | token::LParent:
+		| token::LBRACE | token::LBRACK | token::LPAREN:
 			rangeN++
-		| token::RBrace | token::RBracket | token::RParent:
+		| token::RBRACE | token::RBRACK | token::RPAREN:
 			rangeN--
 		| id:
 			if rangeN > 0 {
@@ -135,11 +135,11 @@ fn isTupleExpr(mut &tokens: []&token::Token): bool {
 	mut rangeN := 0
 	for _, token in tokens {
 		match token.Id {
-		| token::LBrace | token::LBracket | token::LParent:
+		| token::LBRACE | token::LBRACK | token::LPAREN:
 			rangeN++
-		| token::RBrace | token::RBracket | token::RParent:
+		| token::RBRACE | token::RBRACK | token::RPAREN:
 			rangeN--
-		| token::Comma:
+		| token::COMMA:
 			if rangeN > 0 {
 				continue
 			}
@@ -151,12 +151,12 @@ fn isTupleExpr(mut &tokens: []&token::Token): bool {
 
 fn getCloseOfBrace(left: int): int {
 	match left {
-	| token::RParent:
-		ret token::LParent
-	| token::RBrace:
-		ret token::LBrace
-	| token::RBracket:
-		ret token::LBracket
+	| token::RPAREN:
+		ret token::LPAREN
+	| token::RBRACE:
+		ret token::LBRACE
+	| token::RBRACK:
+		ret token::LBRACK
 	|:
 		ret left
 	}
@@ -208,7 +208,7 @@ impl parser {
 	// Reports whether tok is identifier.
 	// Must be used by definitions that must support the AllowKeywordIdentifiers mode.
 	fn isIdent(mut self, &tok: &token::Token): bool {
-		ret tok.Id == token::Name ||
+		ret tok.Id == token::NAME ||
 			self.mode&allowKeywordIdentifiers == allowKeywordIdentifiers && token::IsKeyword(tok.Kind)
 	}
 
@@ -294,10 +294,10 @@ impl parser {
 		}
 		token = tokens[i]
 		match token.Id {
-		| token::Colon:
+		| token::COLON:
 			tad.Strict = true
 			break
-		| token::Eq:
+		| token::ASSIGN:
 			break
 		|:
 			self.pushErr(tokens[i-1], log::InvalidSyntax)
@@ -320,7 +320,7 @@ impl parser {
 
 	fn buildConstVarGroup(mut &self, mut &tokens: []&token::Token): &ast::Var {
 		mut i := 1 // Point to open parentheses.
-		mut rangeTokens := range(i, token::LParent, token::RParent, tokens)
+		mut rangeTokens := range(i, token::LPAREN, token::RPAREN, tokens)
 		if i < len(tokens) {
 			self.pushErr(tokens[i], log::InvalidSyntax)
 		}
@@ -349,9 +349,9 @@ impl parser {
 	fn buildVarTypeAndExpr(mut &self, mut &v: &ast::Var, mut &tokens: []&token::Token) {
 		mut i := 0
 		mut tok := tokens[i]
-		if tok.Id == token::Colon {
+		if tok.Id == token::COLON {
 			i++ // Skip type annotation operator (:)
-			if i >= len(tokens) || tokens[i].Id == token::Eq {
+			if i >= len(tokens) || tokens[i].Id == token::ASSIGN {
 				self.pushErr(tok, log::MissingType)
 				ret
 			}
@@ -365,7 +365,7 @@ impl parser {
 			}
 		}
 
-		if tok.Id != token::Eq {
+		if tok.Id != token::ASSIGN {
 			self.pushErr(tok, log::InvalidSyntax)
 			ret
 		}
@@ -398,7 +398,7 @@ impl parser {
 	fn buildVarBegin(mut self, mut &v: &ast::Var, mut &tokens: []&token::Token) {
 		tok := tokens[0]
 		match tok.Id {
-		| token::Let:
+		| token::LET:
 			// Initialize 1 for skip the let keyword
 			if len(tokens) == 1 {
 				tokens = nil
@@ -406,12 +406,12 @@ impl parser {
 				ret
 			}
 			tokens = tokens[1:]
-			if tokens[0].Id == token::Mut {
+			if tokens[0].Id == token::MUT {
 				v.Mutable = true
 				// Skip the mut keyword
 				tokens = tokens[1:]
 			}
-		| token::Const:
+		| token::CONST:
 			v.Const = true
 			tokens = tokens[1:]
 		|:
@@ -422,7 +422,7 @@ impl parser {
 
 	fn buildVar(mut &self, mut tokens: []&token::Token): &ast::Var {
 		// Catch constant groups
-		if len(tokens) >= 2 && tokens[0].Id == token::Const && tokens[1].Id == token::LParent {
+		if len(tokens) >= 2 && tokens[0].Id == token::CONST && tokens[1].Id == token::LPAREN {
 			ret self.buildConstVarGroup(tokens)
 		}
 		mut v := &ast::Var{
@@ -437,7 +437,7 @@ impl parser {
 			}
 			ret nil
 		}
-		if tokens[0].Id == token::Amper {
+		if tokens[0].Id == token::AND {
 			v.Reference = true
 			if len(tokens) == 1 {
 				ret nil
@@ -457,13 +457,13 @@ impl parser {
 		mut g := &ast::Generic{
 			Token: tokens[0],
 		}
-		if g.Token.Id != token::Name {
+		if g.Token.Id != token::NAME {
 			self.pushErr(g.Token, log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedIdentifier)
 		}
 		g.Name = g.Token.Kind
 		if len(tokens) > 1 {
-			if tokens[1].Id != token::Colon {
+			if tokens[1].Id != token::COLON {
 				self.pushErr(tokens[1], log::InvalidSyntax)
 				ret nil
 			}
@@ -472,7 +472,7 @@ impl parser {
 				ret nil
 			}
 			mut constraintTokens := tokens[2:]
-			mut parts, errors := parts(constraintTokens, token::Vline, true)
+			mut parts, errors := parts(constraintTokens, token::OR, true)
 			if len(errors) > 0 {
 				self.errors = append(self.errors, errors...)
 				ret nil
@@ -496,7 +496,7 @@ impl parser {
 			ret nil
 		}
 
-		mut parts, errors := parts(tokens, token::Comma, true)
+		mut parts, errors := parts(tokens, token::COMMA, true)
 		if len(errors) > 0 {
 			self.errors = append(self.errors, errors...)
 			ret nil
@@ -518,7 +518,7 @@ impl parser {
 		mut param := new(ast::Param)
 
 		// Detects mut keyword.
-		if tokens[0].Id == token::Mut {
+		if tokens[0].Id == token::MUT {
 			param.Mutable = true
 			if len(tokens) == 1 {
 				self.pushErr(tokens[0], log::InvalidSyntax)
@@ -530,7 +530,7 @@ impl parser {
 		mut name := strings::Builder{}
 		name.Grow(5) // enough for the maximum length
 
-		if tokens[0].Id == token::Amper {
+		if tokens[0].Id == token::AND {
 			name.WriteStr("&")!
 			if len(tokens) == 1 {
 				self.pushErr(tokens[0], log::InvalidSyntax)
@@ -539,7 +539,7 @@ impl parser {
 			tokens = tokens[1:]
 		}
 
-		if tokens[0].Id == token::Self {
+		if tokens[0].Id == token::SELF {
 			name.WriteStr("self")!
 			param.Token = tokens[0]
 			if len(tokens) != 1 {
@@ -554,7 +554,7 @@ impl parser {
 	fn paramTypeBegin(mut self, mut &param: &ast::Param, mut &i: int, &tokens: []&token::Token) {
 		for i < len(tokens); i++ {
 			token := tokens[i]
-			if token.Id != token::TripleDot {
+			if token.Id != token::ELLIPSIS {
 				ret
 			}
 
@@ -589,7 +589,7 @@ impl parser {
 			self.pushErr(tok, log::MissingType)
 			ret
 		}
-		if tokens[1].Id != token::Colon {
+		if tokens[1].Id != token::COLON {
 			param.Name = jule::Anon
 			self.buildParamType(param, tokens)
 			ret
@@ -605,7 +605,7 @@ impl parser {
 		}
 
 		// Detects mut keyword.
-		if param.Token.Id == token::Mut {
+		if param.Token.Id == token::MUT {
 			param.Mutable = true
 			if len(tokens) == 1 {
 				self.pushErr(tokens[0], log::InvalidSyntax)
@@ -617,13 +617,13 @@ impl parser {
 
 		// Catch reference parameters.
 		if len(tokens) >= 3 {
-			if param.Token.Id == token::Amper {
+			if param.Token.Id == token::AND {
 				if len(tokens) == 1 {
 					self.pushErr(tokens[0], log::InvalidSyntax)
 					ret nil
 				}
 
-				if tokens[1].Id == token::Name && tokens[2].Id == token::Colon {
+				if tokens[1].Id == token::NAME && tokens[2].Id == token::COLON {
 					param.Reference = true
 					tokens = tokens[1:]
 					param.Token = tokens[0]
@@ -631,7 +631,7 @@ impl parser {
 			}
 		}
 
-		if param.Token.Id != token::Name {
+		if param.Token.Id != token::NAME {
 			// Just data type
 			param.Name = jule::Anon
 			self.buildParamType(param, tokens)
@@ -664,7 +664,7 @@ impl parser {
 	}
 
 	fn buildParams(mut &self, mut &tokens: []&token::Token, method: bool): []&ast::Param {
-		mut parts, errs := parts(tokens, token::Comma, true)
+		mut parts, errs := parts(tokens, token::COMMA, true)
 		self.errors = append(self.errors, errs...)
 		if len(parts) == 0 {
 			ret nil
@@ -702,9 +702,9 @@ impl parser {
 		}
 
 		i-- // For point to parentheses - ( -
-		mut rangeTokens := range(i, token::LParent, token::RParent, tokens)
+		mut rangeTokens := range(i, token::LPAREN, token::RPAREN, tokens)
 
-		mut parts, errs := parts(rangeTokens, token::Comma, true)
+		mut parts, errs := parts(rangeTokens, token::COMMA, true)
 		self.errors = append(self.errors, errs...)
 		if len(parts) == 0 {
 			ret
@@ -722,7 +722,7 @@ impl parser {
 			// Check type annotation.
 			if len(part) > 1 {
 				token = part[1]
-				if token.Id == token::Colon {
+				if token.Id == token::COLON {
 					offset = 2
 					if len(part) < 3 {
 						self.pushErr(token, log::MissingType)
@@ -772,11 +772,11 @@ impl parser {
 
 		mut token := tokens[i]
 		match token.Id {
-		| token::LBrace:
+		| token::LBRACE:
 			ret
-		| token::Eq:
+		| token::ASSIGN:
 			ret
-		| token::Colon:
+		| token::COLON:
 			if i+1 >= len(tokens) {
 				self.pushErr(token, log::MissingType)
 				ret
@@ -785,10 +785,10 @@ impl parser {
 			i++
 			token = tokens[i]
 			match token.Id {
-			| token::LParent:
+			| token::LPAREN:
 				ok = self.buildMultiRetType(t, tokens, i)
 				ret
-			| token::LBrace:
+			| token::LBRACE:
 				self.pushErr(token, log::MissingType)
 				ret
 			}
@@ -813,7 +813,7 @@ impl parser {
 		}
 
 		// Detect unsafe keyword.
-		if f.Token.Id == token::Unsafe {
+		if f.Token.Id == token::UNSAFE {
 			f.Unsafe = true
 			i++
 			if i >= len(tokens) {
@@ -843,24 +843,24 @@ impl parser {
 		}
 
 		errorToken := tokens[i]
-		mut genericsTokens := range(i, token::LBracket, token::RBracket, tokens)
+		mut genericsTokens := range(i, token::LBRACK, token::RBRACK, tokens)
 		if genericsTokens != nil {
 			f.Generics = self.buildGenerics(genericsTokens, errorToken)
 		}
 
-		if tokens[i].Id != token::LParent {
+		if tokens[i].Id != token::LPAREN {
 			self.pushErr(tokens[i], log::MissingFuncParentheses)
 			ret nil
 		}
 
-		mut paramsToks := range(i, token::LParent, token::RParent, tokens)
+		mut paramsToks := range(i, token::LPAREN, token::RPAREN, tokens)
 		if len(paramsToks) > 0 {
 			f.Params = self.buildParams(paramsToks, method)
 		}
 
 		if i < len(tokens) {
 			token := tokens[i]
-			if token.Id == token::Excl {
+			if token.Id == token::NOT {
 				f.Exceptional = true
 				i++
 			}
@@ -896,7 +896,7 @@ impl parser {
 			self.pushSuggestion(log::ExpectedBody)
 			ret nil
 		}
-		mut blockTokens := range(i, token::LBrace, token::RBrace, tokens)
+		mut blockTokens := range(i, token::LBRACE, token::RBRACE, tokens)
 		if blockTokens != nil {
 			f.Scope = self.buildScope(blockTokens, tokens[i-1])
 			f.Scope.Unsafe = f.Unsafe
@@ -917,7 +917,7 @@ impl parser {
 			self.pushErr(tokens[1], log::InvalidSyntax)
 		}
 		mut token := tokens[0]
-		if token.Id != token::Lit || !token::IsStr(token.Kind) || token::IsRawStr(token.Kind) {
+		if token.Id != token::LIT || !token::IsStr(token.Kind) || token::IsRawStr(token.Kind) {
 			self.pushErr(token, log::InvalidExpr)
 			ret
 		}
@@ -932,13 +932,13 @@ impl parser {
 		}
 
 		mut token := tokens[0]
-		if token.Id != token::Name && token.Id != token::Lit &&
+		if token.Id != token::NAME && token.Id != token::LIT &&
 			!token::IsStr(token.Kind) || token::IsRawStr(token.Kind) {
 			self.pushErr(token, log::InvalidSyntax)
 			ret
 		}
 
-		if token.Id == token::Name { // custom alias exist
+		if token.Id == token::NAME { // custom alias exist
 			decl.Alias = token
 			tokens = tokens[1:]
 			if len(tokens) == 0 {
@@ -946,7 +946,7 @@ impl parser {
 				ret
 			}
 			token = tokens[0]
-			if token.Id != token::Lit || !token::IsStr(token.Kind) {
+			if token.Id != token::LIT || !token::IsStr(token.Kind) {
 				self.pushErr(token, log::InvalidSyntax)
 				ret
 			}
@@ -980,22 +980,22 @@ impl parser {
 		for i < len(tokens); i++ {
 			t := tokens[i]
 			match t.Id {
-			| token::LBrace
-			| token::LBracket
-			| token::LParent:
+			| token::LBRACE
+			| token::LBRACK
+			| token::LPAREN:
 				braceN++
 				continue
-			| token::RBrace
-			| token::RBracket
-			| token::RParent:
+			| token::RBRACE
+			| token::RBRACK
+			| token::RPAREN:
 				braceN--
 			}
 			if braceN > 0 {
 				continue
 			}
-			if t.Id == token::Comma || i+1 >= len(tokens) {
+			if t.Id == token::COMMA || i+1 >= len(tokens) {
 				let mut kindTokens: []&token::Token = nil
-				if t.Id == token::Comma {
+				if t.Id == token::COMMA {
 					kindTokens = tokens[exprStart:i]
 				} else {
 					kindTokens = tokens[exprStart:]
@@ -1020,9 +1020,9 @@ impl parser {
 			item.Token = t
 			// For more describing error messages, handle ordinary enum cases.
 			// User may attempt to use named fields like ordinary enums for type enums.
-			if item.Token.Id == token::Name && len(tokens)-i > 2 {
+			if item.Token.Id == token::NAME && len(tokens)-i > 2 {
 				t = tokens[i+1]
-				if t.Id == token::Colon {
+				if t.Id == token::COLON {
 					self.pushErr(t, log::InvalidEnumKindForNamedFields)
 					ret nil
 				}
@@ -1039,13 +1039,13 @@ impl parser {
 			// Skip "enum" tokens.
 			Token: tokens[i],
 		}
-		if e.Token.Id != token::Name {
+		if e.Token.Id != token::NAME {
 			self.pushErr(e.Token, log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedIdentifier)
 		}
 		e.Name = e.Token.Kind
 		i += 3 // Skip "identifier: type" tokens.
-		mut itemTokens := range(i, token::LBrace, token::RBrace, tokens)
+		mut itemTokens := range(i, token::LBRACE, token::RBRACE, tokens)
 		if itemTokens == nil {
 			self.stop()
 			self.pushErr(e.Token, log::BodyNotExist)
@@ -1066,22 +1066,22 @@ impl parser {
 		for i < len(tokens); i++ {
 			t := tokens[i]
 			match t.Id {
-			| token::LBrace
-			| token::LBracket
-			| token::LParent:
+			| token::LBRACE
+			| token::LBRACK
+			| token::LPAREN:
 				braceN++
 				continue
-			| token::RBrace
-			| token::RBracket
-			| token::RParent:
+			| token::RBRACE
+			| token::RBRACK
+			| token::RPAREN:
 				braceN--
 			}
 			if braceN > 0 {
 				continue
 			}
-			if t.Id == token::Comma || i+1 >= len(tokens) {
+			if t.Id == token::COMMA || i+1 >= len(tokens) {
 				let mut exprTokens: []&token::Token = nil
-				if t.Id == token::Comma {
+				if t.Id == token::COMMA {
 					exprTokens = tokens[exprStart:i]
 				} else {
 					exprTokens = tokens[exprStart:]
@@ -1099,12 +1099,12 @@ impl parser {
 			mut t := tokens[i]
 			mut item := new(ast::EnumItem)
 			item.Token = t
-			if item.Token.Id != token::Name {
+			if item.Token.Id != token::NAME {
 				self.pushErr(item.Token, log::InvalidSyntax)
 				self.pushSuggestion(log::ExpectedIdentifier)
 			}
 			item.Name = item.Token.Kind
-			if i+1 >= len(tokens) || tokens[i+1].Id == token::Comma {
+			if i+1 >= len(tokens) || tokens[i+1].Id == token::COMMA {
 				if i+1 < len(tokens) {
 					i++
 				}
@@ -1114,12 +1114,12 @@ impl parser {
 			i++
 			t = tokens[i]
 			i++
-			if t.Id != token::Colon {
+			if t.Id != token::COLON {
 				self.pushErr(t, log::InvalidSyntax)
 				self.pushSuggestion(log::ExpectedColonForAssign)
 				continue
 			}
-			if i >= len(tokens) || tokens[i].Id == token::Comma {
+			if i >= len(tokens) || tokens[i].Id == token::COMMA {
 				self.pushErr(t, log::MissingExpr)
 				continue
 			}
@@ -1137,13 +1137,13 @@ impl parser {
 		mut e := &ast::Enum{
 			Token: tokens[1],
 		}
-		if e.Token.Id != token::Name {
+		if e.Token.Id != token::NAME {
 			self.pushErr(e.Token, log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedIdentifier)
 		}
 		e.Name = e.Token.Kind
 		mut i := 2
-		if tokens[i].Id == token::Colon {
+		if tokens[i].Id == token::COLON {
 			i++
 			if i >= len(tokens) {
 				self.pushErr(tokens[i-1], log::InvalidSyntax)
@@ -1159,7 +1159,7 @@ impl parser {
 		} else {
 			e.Type = nil
 		}
-		mut itemTokens := range(i, token::LBrace, token::RBrace, tokens)
+		mut itemTokens := range(i, token::LBRACE, token::RBRACE, tokens)
 		if itemTokens == nil {
 			self.stop()
 			self.pushErr(e.Token, log::BodyNotExist)
@@ -1175,8 +1175,8 @@ impl parser {
 	}
 
 	fn buildNodeEnum(mut &self, mut &tokens: []&token::Token): ast::NodeData {
-		if len(tokens) > 3 && tokens[2].Id == token::Colon {
-			if tokens[3].Id == token::Type {
+		if len(tokens) > 3 && tokens[2].Id == token::COLON {
+			if tokens[3].Id == token::TYPE {
 				ret self.buildTypeEnum(tokens)
 			}
 		}
@@ -1186,7 +1186,7 @@ impl parser {
 	fn buildField(mut &self, mut tokens: []&token::Token): &ast::Field {
 		mut f := new(ast::Field)
 
-		f.Mutable = tokens[0].Id == token::Mut
+		f.Mutable = tokens[0].Id == token::MUT
 		if f.Mutable {
 			if len(tokens) == 1 {
 				self.pushErr(tokens[0], log::InvalidSyntax)
@@ -1196,7 +1196,7 @@ impl parser {
 		}
 
 		f.Token = tokens[0]
-		if f.Token.Id != token::Name {
+		if f.Token.Id != token::NAME {
 			self.pushErr(f.Token, log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedIdentifier)
 			ret nil
@@ -1206,7 +1206,7 @@ impl parser {
 		if len(tokens) == 1 {
 			self.pushErr(tokens[0], log::MissingType)
 			ret nil
-		} else if len(tokens) < 3 || tokens[1].Id != token::Colon {
+		} else if len(tokens) < 3 || tokens[1].Id != token::COLON {
 			self.pushErr(tokens[1], log::MissingType)
 			ret nil
 		}
@@ -1216,7 +1216,7 @@ impl parser {
 		f.Type, _ = unsafe { self.buildType(tokens, &i, true) }
 		if i < len(tokens) {
 			mut token := tokens[i]
-			if token.Id == token::Lit {
+			if token.Id == token::LIT {
 				f.Tag = token
 				i++
 				if i < len(tokens) {
@@ -1263,7 +1263,7 @@ impl parser {
 		s.Name = s.Token.Kind
 
 		errorToken := tokens[i]
-		mut genericsTokens := range(i, token::LBracket, token::RBracket, tokens)
+		mut genericsTokens := range(i, token::LBRACK, token::RBRACK, tokens)
 		if genericsTokens != nil {
 			s.Generics = self.buildGenerics(genericsTokens, errorToken)
 		}
@@ -1273,7 +1273,7 @@ impl parser {
 			ret s
 		}
 
-		mut bodyTokens := range(i, token::LBrace, token::RBrace, tokens)
+		mut bodyTokens := range(i, token::LBRACE, token::RBRACE, tokens)
 		if bodyTokens == nil {
 			self.stop()
 			self.pushErr(s.Token, log::BodyNotExist)
@@ -1314,7 +1314,7 @@ impl parser {
 				continue
 			}
 			match tokens[0].Id {
-			| token::Fn:
+			| token::FN:
 				mut f := self.buildFunc(tokens, true, true)
 				if f == nil {
 					break
@@ -1346,13 +1346,13 @@ impl parser {
 		mut t := &ast::Trait{
 			Token: tokens[1],
 		}
-		if t.Token.Id != token::Name {
+		if t.Token.Id != token::NAME {
 			self.pushErr(t.Token, log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedIdentifier)
 		}
 		t.Name = t.Token.Kind
 		mut i := 2
-		mut bodyTokens := range(i, token::LBrace, token::RBrace, tokens)
+		mut bodyTokens := range(i, token::LBRACE, token::RBRACE, tokens)
 		if bodyTokens == nil {
 			self.stop()
 			self.pushErr(t.Token, log::BodyNotExist)
@@ -1444,15 +1444,15 @@ impl parser {
 
 		token = tokens[1]
 		match token.Id {
-		| token::Fn
-		| token::Unsafe:
+		| token::FN
+		| token::UNSAFE:
 			data = self.buildBindFunc(tokens)
-		| token::Const
-		| token::Let:
+		| token::CONST
+		| token::LET:
 			data = self.buildBindVar(tokens)
-		| token::Struct:
+		| token::STRUCT:
 			data = self.buildBindStruct(tokens)
-		| token::Type:
+		| token::TYPE:
 			data = self.buildBindTypeAlias(tokens)
 		|:
 			self.pushErr(token, log::InvalidSyntax)
@@ -1464,7 +1464,7 @@ impl parser {
 	fn getMethod(mut &self, mut &tokens: []&token::Token): &ast::Func {
 		mut i := 0
 		mut token := tokens[i]
-		if token.Id == token::Unsafe {
+		if token.Id == token::UNSAFE {
 			if i+1 >= len(tokens) {
 				self.pushErr(token, log::InvalidSyntax)
 				ret nil
@@ -1473,7 +1473,7 @@ impl parser {
 			token = tokens[i]
 		}
 
-		if token.Id != token::Fn {
+		if token.Id != token::FN {
 			self.pushErr(token, log::InvalidSyntax)
 			ret nil
 		}
@@ -1487,14 +1487,14 @@ impl parser {
 			tokens = stmt.tokens
 			mut token := tokens[0]
 			match token.Id {
-			| token::Hash:
+			| token::HASH:
 				self.pushDirective(self.buildDirective(tokens))
 				continue
 			}
 
 			match token.Id {
-			| token::Fn
-			| token::Unsafe:
+			| token::FN
+			| token::UNSAFE:
 				mut f := self.getMethod(tokens)
 				if f != nil {
 					self.checkMethodReceiver(f, false)
@@ -1531,8 +1531,8 @@ impl parser {
 		}
 
 		token = tokens[i]
-		if token.Id != token::For {
-			if token.Id == token::LBrace {
+		if token.Id != token::FOR {
+			if token.Id == token::LBRACE {
 				// This implementation is single.
 				// Just implements to destination.
 				// Therefore, swap Base and Dest tokens.
@@ -1564,7 +1564,7 @@ impl parser {
 		}
 
 	body:
-		mut bodyTokens := range(i, token::LBrace, token::RBrace, tokens)
+		mut bodyTokens := range(i, token::LBRACE, token::RBRACE, tokens)
 		if bodyTokens == nil {
 			self.stop()
 			self.pushErr(token, log::BodyNotExist)
@@ -1582,32 +1582,32 @@ impl parser {
 	fn buildNodeData(mut &self, mut &tokens: []&token::Token): ast::NodeData {
 		mut token := tokens[0]
 		match token.Id {
-		| token::Fn
-		| token::Unsafe:
+		| token::FN
+		| token::UNSAFE:
 			mut f := self.buildFunc(tokens, false, false)
 			if f != nil {
 				f.Global = true
 			}
 			ret f
-		| token::Let
-		| token::Const
-		| token::Mut:
+		| token::LET
+		| token::CONST
+		| token::MUT:
 			mut v := self.buildVar(tokens)
 			if v != nil && !v.Const {
 				v.Static = true
 			}
 			ret v
-		| token::Type:
+		| token::TYPE:
 			ret self.buildTypeAliasDecl(tokens)
-		| token::Enum:
+		| token::ENUM:
 			ret self.buildNodeEnum(tokens)
-		| token::Struct:
+		| token::STRUCT:
 			ret self.buildStructDecl(tokens)
-		| token::Trait:
+		| token::TRAIT:
 			ret self.buildTraitDecl(tokens)
-		| token::Impl:
+		| token::IMPL:
 			ret self.buildImpl(tokens)
-		| token::Cpp:
+		| token::CPP:
 			ret self.buildBind(tokens)
 		|:
 			self.pushErr(token, log::InvalidSyntax)
@@ -1657,18 +1657,18 @@ impl parser {
 
 	fn pushMetaNodes(mut &self, mut &tokens: []&token::Token): bool {
 		match tokens[0].Id {
-		| token::Use:
+		| token::USE:
 			const Binded = false
 			mut decl := self.buildUseDecl(tokens, Binded)
 			self.pushUseDecl(decl)
 			ret true
-		| token::Cpp:
-			if len(tokens) > 1 && tokens[1].Id == token::Use {
+		| token::CPP:
+			if len(tokens) > 1 && tokens[1].Id == token::USE {
 				mut decl := self.buildBindUse(tokens)
 				self.pushUseDecl(decl)
 				ret true
 			}
-		| token::Hash:
+		| token::HASH:
 			self.pushDirective(self.buildDirective(tokens))
 			ret true
 		}
@@ -1723,11 +1723,11 @@ impl parser {
 
 	fn pushWrongOrderCloseErr(mut self, &t: &token::Token, &tokens: []&token::Token, &ranges: []int) {
 		match tokens[ranges[len(ranges)-1]].Id {
-		| token::LParent:
+		| token::LPAREN:
 			self.pushErr(t, log::ExpectedParentClose)
-		| token::LBrace:
+		| token::LBRACE:
 			self.pushErr(t, log::ExpectedBraceClose)
-		| token::LBracket:
+		| token::LBRACK:
 			self.pushErr(t, log::ExpectedBracketClose)
 		}
 	}
@@ -1736,11 +1736,11 @@ impl parser {
 		n := len(ranges)
 		if n == 0 {
 			match t.Id {
-			| token::RBracket:
+			| token::RBRACK:
 				self.pushErr(t, log::ExtraClosedBracket)
-			| token::RBrace:
+			| token::RBRACE:
 				self.pushErr(t, log::ExtraClosedBrace)
-			| token::RParent:
+			| token::RPAREN:
 				self.pushErr(t, log::ExtraClosedParent)
 			}
 			ret
@@ -1755,27 +1755,27 @@ impl parser {
 
 		for i, token in tokens {
 			match token.Id {
-			| token::LParent
-			| token::LBrace
-			| token::LBracket:
+			| token::LPAREN
+			| token::LBRACE
+			| token::LBRACK:
 				ranges = append(ranges, i)
-			| token::RParent:
-				self.pushRangeClose(token, token::LParent, tokens, ranges)
-			| token::RBrace:
-				self.pushRangeClose(token, token::LBrace, tokens, ranges)
-			| token::RBracket:
-				self.pushRangeClose(token, token::LBracket, tokens, ranges)
+			| token::RPAREN:
+				self.pushRangeClose(token, token::LPAREN, tokens, ranges)
+			| token::RBRACE:
+				self.pushRangeClose(token, token::LBRACE, tokens, ranges)
+			| token::RBRACK:
+				self.pushRangeClose(token, token::LBRACK, tokens, ranges)
 			}
 		}
 
 		for _, i in ranges {
 			token := tokens[i]
 			match token.Id {
-			| token::LParent:
+			| token::LPAREN:
 				self.pushErr(token, log::WaitCloseParent)
-			| token::LBrace:
+			| token::LBRACE:
 				self.pushErr(token, log::WaitCloseBrace)
-			| token::LBracket:
+			| token::LBRACK:
 				self.pushErr(token, log::WaitCloseBracket)
 			}
 		}
@@ -1803,7 +1803,7 @@ impl parser {
 			if len(stmt.tokens) < 2 {
 				break
 			}
-			if stmt.tokens[0].Id != token::Hash {
+			if stmt.tokens[0].Id != token::HASH {
 				break
 			}
 			if !directive::IsTop(stmt.tokens[1].Kind) {

@@ -6,86 +6,86 @@ use "std/strings"
 
 // Token identities.
 const (
-	Illegal = iota
-	Name
-	Ret
-	Semicolon
-	Lit
-	Comma
-	Const
-	Type
-	Colon
-	For
-	Break
-	Cont
-	In
-	If
-	Else
-	Comment
-	Use
-	Dot
-	Goto
-	DblColon
-	Enum
-	Struct
-	Co
-	Match
-	Self
-	Trait
-	Impl
-	Chan
-	Cpp
-	Fall
-	Fn
-	Let
-	Unsafe
-	Mut
-	Defer
-	Hash
-	Error
-	Map
-	ColonEq
-	TripleDot
-	PlusEq
-	MinusEq
-	StarEq
-	SolidusEq
-	PercentEq
-	ShlEq
-	ShrEq
-	CaretEq
-	AmperEq
-	VlineEq
-	DblEq
-	NotEq
-	GtEq
-	LtEq
-	DblAmper
-	DblVline
-	Shl
-	Shr
-	DblPlus
-	DblMinus
-	Plus
-	Minus
-	Star
-	Solidus
-	Percent
-	Amper
-	Vline
-	Caret
-	Excl
-	Lt
-	Gt
-	Eq
-	LBrace
-	RBrace
-	LParent
-	RParent
-	LBracket
-	RBracket
-	RArrow
-	Select
+	ILLEGAL    = iota // illegal token
+	NAME              // identifier
+	RET               // ret
+	SEMICOLON         // ;
+	LIT               // integer, floating-point, string, rune
+	COMMA             // ,
+	CONST             // const
+	TYPE              // type
+	COLON             // :
+	FOR               // for
+	BREAK             // break
+	CONTINUE          // continue
+	IN                // int
+	IF                // if
+	ELSE              // else
+	COMMENT           // /*..*/ or //...
+	USE               // use
+	PERIOD            // .
+	GOTO              // goto
+	SEP               // ::
+	ENUM              // enum
+	STRUCT            // struct
+	CO                // co
+	MATCH             // match
+	SELF              // self
+	TRAIT             // trait
+	IMPL              // impl
+	CHAN              // chan
+	CPP               // cpp
+	FALL              // fall
+	FN                // fn
+	LET               // let
+	UNSAFE            // unsafe
+	MUT               // mut
+	DEFER             // defer
+	HASH              // #
+	ERROR             // error
+	MAP               // map
+	SELECT            // select
+	DEFINE            // :=
+	ELLIPSIS          // ...
+	ADD_ASSIGN        // +=
+	SUB_ASSIGN        // -=
+	MUL_ASSIGN        // *=
+	QUO_ASSIGN        // /=
+	REM_ASSIGN        // %=
+	SHL_ASSIGN        // <<=
+	SHR_ASSIGN        // >>=
+	XOR_ASSIGN        // ^=
+	AND_ASSIGN        // &=
+	OR_ASSIGN         // |=
+	EQL               // ==
+	NEQ               // !=
+	GEQ               // >=
+	LEQ               // <=
+	LAND              // &&
+	LOR               // ||
+	SHL               // <<
+	SHR               // >>
+	INC               // ++
+	DEC               // --
+	ADD               // +
+	SUB               // -
+	MUL               // *
+	QUO               // /
+	REM               // %
+	AND               // &
+	OR                // |
+	XOR               // ^
+	NOT               // !
+	LSS               // <
+	GTR               // >
+	ASSIGN            // =
+	ARROW             // <-
+	LPAREN            // (
+	LBRACK            // [
+	LBRACE            // {
+	RPAREN            // )
+	RBRACK            // ]
+	RBRACE            // }
 )
 
 // Token.
@@ -105,34 +105,7 @@ impl Token {
 	// Accepts assignment tokens (like equals [=]) as precedenced operator
 	// to handle expression assignments.
 	fn Prec(self): byte {
-		match self.Id {
-		| Star
-		| Percent
-		| Solidus
-		| Shr
-		| Shl
-		| Amper:
-			ret 5
-		| Plus
-		| Minus
-		| Vline
-		| Caret:
-			ret 4
-		| DblEq
-		| NotEq
-		| Eq
-		| Lt
-		| LtEq
-		| Gt
-		| GtEq:
-			ret 3
-		| DblAmper:
-			ret 2
-		| DblVline:
-			ret 1
-		|:
-			ret 0
-		}
+		ret prec(self.Id)
 	}
 }
 
@@ -183,20 +156,20 @@ fn IsKeyword(s: str): bool {
 
 // Reports whether operator kind is postfix operator.
 fn IsPostfixOp(id: int): bool {
-	ret id == DblPlus || id == DblMinus
+	ret id == INC || id == DEC
 }
 
 // Reports given token id is allow for
 // assignment left-expression or not.
 fn IsAssign(id: int): bool {
-	ret id == Name ||
-		id == Cpp ||
-		id == Let ||
-		id == Mut ||
-		id == Self ||
-		id == LParent ||
-		id == Star ||
-		id == Amper
+	ret id == NAME ||
+		id == CPP ||
+		id == LET ||
+		id == MUT ||
+		id == SELF ||
+		id == LPAREN ||
+		id == MUL ||
+		id == AND
 }
 
 // Reports whether operator kind is assignment operator.
@@ -204,47 +177,48 @@ fn IsAssignOp(id: int): bool {
 	if IsPostfixOp(id) {
 		ret true
 	}
-	ret id == Eq ||
-		id == PlusEq ||
-		id == MinusEq ||
-		id == SolidusEq ||
-		id == StarEq ||
-		id == PercentEq ||
-		id == ShrEq ||
-		id == ShlEq ||
-		id == VlineEq ||
-		id == AmperEq ||
-		id == CaretEq
+	ret id == ASSIGN ||
+		id == ADD_ASSIGN ||
+		id == SUB_ASSIGN ||
+		id == QUO_ASSIGN ||
+		id == MUL_ASSIGN ||
+		id == REM_ASSIGN ||
+		id == SHR_ASSIGN ||
+		id == SHL_ASSIGN ||
+		id == OR_ASSIGN ||
+		id == AND_ASSIGN ||
+		id == XOR_ASSIGN
 }
 
 // Reports whether kind is unary operator.
 fn IsUnaryOp(id: int): bool {
-	ret id == Minus ||
-		id == Plus ||
-		id == Caret ||
-		id == Excl ||
-		id == Star ||
-		id == Amper
+	ret id == SUB ||
+		id == ADD ||
+		id == XOR ||
+		id == NOT ||
+		id == MUL ||
+		id == AND
 }
 
 // Reports whether kind is binary operator.
 fn IsBinOp(id: int): bool {
-	ret id == Plus ||
-		id == Minus ||
-		id == Star ||
-		id == Solidus ||
-		id == Percent ||
-		id == Amper ||
-		id == Vline ||
-		id == Caret ||
-		id == Shl ||
-		id == Shr ||
-		id == Lt ||
-		id == Gt ||
-		id == LtEq ||
-		id == GtEq ||
-		id == DblAmper ||
-		id == DblVline ||
-		id == DblEq ||
-		id == NotEq
+	ret prec(id) > 0
+}
+
+// Implementation of the Token.Prec.
+fn prec(id: int): byte {
+	match id {
+	| MUL | REM | QUO | SHR | SHL | AND:
+		ret 5
+	| ADD | SUB | OR | XOR:
+		ret 4
+	| EQL | NEQ | LSS | LEQ | GTR | GEQ:
+		ret 3
+	| LAND:
+		ret 2
+	| LOR:
+		ret 1
+	|:
+		ret 0
+	}
 }

@@ -643,8 +643,8 @@ impl scopeCoder {
 		// handle it like the equal operator
 		mut op := a.Op.Id
 		mut kind := a.Op.Kind
-		if a.Op.Id == token::ColonEq {
-			op = token::Eq
+		if a.Op.Id == token::DEFINE {
+			op = token::ASSIGN
 			kind = "="
 		}
 
@@ -661,15 +661,15 @@ impl scopeCoder {
 		}
 
 		match a.Op.Id {
-		| token::SolidusEq | token::PercentEq:
+		| token::QUO_ASSIGN | token::REM_ASSIGN:
 			if env::Safety {
 				self.divByZeroAssign(a)
 				ret
 			}
-		| token::ShlEq:
+		| token::SHL_ASSIGN:
 			self.shl(a)
 			ret
-		| token::ShrEq:
+		| token::SHR_ASSIGN:
 			self.shr(a)
 			ret
 		}
@@ -826,7 +826,7 @@ impl scopeCoder {
 					Name: assignResultName,
 				},
 				Type: useExprPlain,
-				OpId: token::Eq,
+				OpId: token::ASSIGN,
 				OpKind: "=",
 			}
 			self.oc.write(" " + assignResultName + ";\n")
@@ -971,7 +971,7 @@ impl scopeCoder {
 						Model: expr.Model,
 						Type: expr.Type,
 					}
-					self.oc.ec._unsafeBinary(self.oc.Buf, l, r, token::DblEq, "==")
+					self.oc.ec._unsafeBinary(self.oc.Buf, l, r, token::EQL, "==")
 				|:
 					self.oc.write(matchExpr)
 					mut tk := expr.Type
@@ -1268,7 +1268,7 @@ impl scopeCoder {
 					Name: resultName,
 				},
 				Type: useExprPlain,
-				OpId: token::Eq,
+				OpId: token::ASSIGN,
 				OpKind: "=",
 			}
 			self.oc.ec.handleExceptionalCallWithData(fc, dest)
@@ -1329,7 +1329,7 @@ impl scopeCoder {
 				DestType: r.Func.Result,
 				Model: rv,
 				Type: useExprPlain,
-				OpId: token::Eq,
+				OpId: token::ASSIGN,
 				OpKind: "=",
 			}
 			self.oc.ec.handleExceptionalCallWithData(fc, dest)

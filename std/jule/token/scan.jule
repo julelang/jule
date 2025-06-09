@@ -26,35 +26,35 @@ struct kindPair {
 }
 
 let keywords = map[str]int{
-	"const": Const,
-	"ret": Ret,
-	"type": Type,
-	"for": For,
-	"break": Break,
-	"continue": Cont,
-	"in": In,
-	"if": If,
-	"else": Else,
-	"use": Use,
-	"goto": Goto,
-	"enum": Enum,
-	"struct": Struct,
-	"co": Co,
-	"match": Match,
-	"self": Self,
-	"trait": Trait,
-	"impl": Impl,
-	"chan": Chan,
-	"cpp": Cpp,
-	"fall": Fall,
-	"fn": Fn,
-	"let": Let,
-	"unsafe": Unsafe,
-	"mut": Mut,
-	"defer": Defer,
-	"error": Error,
-	"map": Map,
-	"select": Select,
+	"const": CONST,
+	"ret": RET,
+	"type": TYPE,
+	"for": FOR,
+	"break": BREAK,
+	"continue": CONTINUE,
+	"in": IN,
+	"if": IF,
+	"else": ELSE,
+	"use": USE,
+	"goto": GOTO,
+	"enum": ENUM,
+	"struct": STRUCT,
+	"co": CO,
+	"match": MATCH,
+	"self": SELF,
+	"trait": TRAIT,
+	"impl": IMPL,
+	"chan": CHAN,
+	"cpp": CPP,
+	"fall": FALL,
+	"fn": FN,
+	"let": LET,
+	"unsafe": UNSAFE,
+	"mut": MUT,
+	"defer": DEFER,
+	"error": ERROR,
+	"map": MAP,
+	"select": SELECT,
 }
 
 // Scanner scans tokens from FileSet data.
@@ -173,7 +173,7 @@ impl Scanner {
 
 	fn scanLineComment(mut self, mut &token: &Token) {
 		offs := self.offset - 1 // leading '/' consumed
-		token.Id = Comment
+		token.Id = COMMENT
 		for {
 			self.next()
 			if self.r == eof || self.r == '\n' {
@@ -194,7 +194,7 @@ impl Scanner {
 				self.next()
 				if self.r != eof && self.r == '/' {
 					self.next()
-					token.Id = Comment
+					token.Id = COMMENT
 					token.Kind = unsafe::StrFromBytes(self.buf.Slice2(offs, self.offset))
 					ret
 				}
@@ -252,7 +252,7 @@ impl Scanner {
 		self.r = eof
 
 	exit:
-		token.Id = Name
+		token.Id = NAME
 		token.Kind = unsafe::StrFromBytes(self.buf.Slice2(offs, self.offset))
 		ret true
 	}
@@ -368,7 +368,7 @@ impl Scanner {
 			}
 		}
 
-		token.Id = Lit
+		token.Id = LIT
 		token.Kind = lit
 	}
 
@@ -464,7 +464,7 @@ impl Scanner {
 			if n != 1 {
 				self.pushErr(offs, "illegal rune literal")
 			}
-			token.Id = Lit
+			token.Id = LIT
 			token.Kind = unsafe::StrFromBytes(self.buf.Slice2(offs, self.offset))
 		}
 	}
@@ -492,7 +492,7 @@ impl Scanner {
 		}
 
 		if valid {
-			token.Id = Lit
+			token.Id = LIT
 			token.Kind = unsafe::StrFromBytes(self.buf.Slice2(offs, self.offset))
 		}
 	}
@@ -525,7 +525,7 @@ impl Scanner {
 			if hasCR {
 				lit = stripCR(lit, false)
 			}
-			token.Id = Lit
+			token.Id = LIT
 			token.Kind = unsafe::StrFromBytes(lit)
 		}
 	}
@@ -539,7 +539,7 @@ impl Scanner {
 		}
 		token = new(Token)
 		token.File = self.f
-		token.Id = Illegal
+		token.Id = ILLEGAL
 		token.Row = self.row
 		token.Column = self.col
 		match {
@@ -573,200 +573,200 @@ impl Scanner {
 						ret self.Scan()
 					}
 				} else if self.r == '=' {
-					token.Id = SolidusEq
+					token.Id = QUO_ASSIGN
 					token.Kind = "/="
 					self.next()
 				} else {
-					token.Id = Solidus
+					token.Id = QUO
 					token.Kind = "/"
 				}
 			| ':':
 				if self.r == ':' {
-					token.Id = DblColon
+					token.Id = SEP
 					token.Kind = "::"
 					self.next()
 				} else if self.r == '=' {
-					token.Id = ColonEq
+					token.Id = DEFINE
 					token.Kind = ":="
 					self.next()
 				} else {
-					token.Id = Colon
+					token.Id = COLON
 					token.Kind = ":"
 				}
 			| ';':
-				token.Id = Semicolon
+				token.Id = SEMICOLON
 				token.Kind = ";"
 			| ',':
-				token.Id = Comma
+				token.Id = COMMA
 				token.Kind = ","
 			| '#':
-				token.Id = Hash
+				token.Id = HASH
 				token.Kind = "#"
 			| '{':
-				token.Id = LBrace
+				token.Id = LBRACE
 				token.Kind = "{"
 			| '}':
-				token.Id = RBrace
+				token.Id = RBRACE
 				token.Kind = "}"
 			| '[':
-				token.Id = LBracket
+				token.Id = LBRACK
 				token.Kind = "["
 			| ']':
-				token.Id = RBracket
+				token.Id = RBRACK
 				token.Kind = "]"
 			| '(':
-				token.Id = LParent
+				token.Id = LPAREN
 				token.Kind = "("
 			| ')':
-				token.Id = RParent
+				token.Id = RPAREN
 				token.Kind = ")"
 			| '.':
 				if self.r == '.' && self.peek() == '.' {
-					token.Id = TripleDot
+					token.Id = ELLIPSIS
 					token.Kind = "..."
 					self.next()
 					self.next()
 				} else {
-					token.Id = Dot
+					token.Id = PERIOD
 					token.Kind = "."
 				}
 			| '<':
 				if self.r == '-' {
-					token.Id = RArrow
+					token.Id = ARROW
 					token.Kind = "<-"
 					self.next()
 				} else if self.r == '<' {
 					self.next()
 					if self.r == '=' {
-						token.Id = ShlEq
+						token.Id = SHL_ASSIGN
 						token.Kind = "<<="
 						self.next()
 					} else {
-						token.Id = Shl
+						token.Id = SHL
 						token.Kind = "<<"
 					}
 				} else if self.r == '=' {
-					token.Id = LtEq
+					token.Id = LEQ
 					token.Kind = "<="
 					self.next()
 				} else {
-					token.Id = Lt
+					token.Id = LSS
 					token.Kind = "<"
 				}
 			| '>':
 				if self.r == '>' {
 					self.next()
 					if self.r == '=' {
-						token.Id = ShrEq
+						token.Id = SHR_ASSIGN
 						token.Kind = ">>="
 						self.next()
 					} else {
-						token.Id = Shr
+						token.Id = SHR
 						token.Kind = ">>"
 					}
 				} else if self.r == '=' {
-					token.Id = GtEq
+					token.Id = GEQ
 					token.Kind = ">="
 					self.next()
 				} else {
-					token.Id = Gt
+					token.Id = GTR
 					token.Kind = ">"
 				}
 			| '+':
 				if self.r == '=' {
-					token.Id = PlusEq
+					token.Id = ADD_ASSIGN
 					token.Kind = "+="
 					self.next()
 				} else if self.r == '+' {
-					token.Id = DblPlus
+					token.Id = INC
 					token.Kind = "++"
 					self.next()
 				} else {
-					token.Id = Plus
+					token.Id = ADD
 					token.Kind = "+"
 				}
 			| '-':
 				if self.r == '=' {
-					token.Id = MinusEq
+					token.Id = SUB_ASSIGN
 					token.Kind = "-="
 					self.next()
 				} else if self.r == '-' {
-					token.Id = DblMinus
+					token.Id = DEC
 					token.Kind = "--"
 					self.next()
 				} else {
-					token.Id = Minus
+					token.Id = SUB
 					token.Kind = "-"
 				}
 			| '*':
 				if self.r == '=' {
-					token.Id = StarEq
+					token.Id = MUL_ASSIGN
 					token.Kind = "*="
 					self.next()
 				} else {
-					token.Id = Star
+					token.Id = MUL
 					token.Kind = "*"
 				}
 			| '%':
 				if self.r == '=' {
-					token.Id = PercentEq
+					token.Id = REM_ASSIGN
 					token.Kind = "%="
 					self.next()
 				} else {
-					token.Id = Percent
+					token.Id = REM
 					token.Kind = "%"
 				}
 			| '^':
 				if self.r == '=' {
-					token.Id = CaretEq
+					token.Id = XOR_ASSIGN
 					token.Kind = "^="
 					self.next()
 				} else {
-					token.Id = Caret
+					token.Id = XOR
 					token.Kind = "^"
 				}
 			| '&':
 				if self.r == '=' {
-					token.Id = AmperEq
+					token.Id = AND_ASSIGN
 					token.Kind = "&="
 					self.next()
 				} else if self.r == '&' {
-					token.Id = DblAmper
+					token.Id = LAND
 					token.Kind = "&&"
 					self.next()
 				} else {
-					token.Id = Amper
+					token.Id = AND
 					token.Kind = "&"
 				}
 			| '|':
 				if self.r == '=' {
-					token.Id = VlineEq
+					token.Id = OR_ASSIGN
 					token.Kind = "|="
 					self.next()
 				} else if self.r == '|' {
-					token.Id = DblVline
+					token.Id = LOR
 					token.Kind = "||"
 					self.next()
 				} else {
-					token.Id = Vline
+					token.Id = OR
 					token.Kind = "|"
 				}
 			| '!':
 				if self.r == '=' {
-					token.Id = NotEq
+					token.Id = NEQ
 					token.Kind = "!="
 					self.next()
 				} else {
-					token.Id = Excl
+					token.Id = NOT
 					token.Kind = "!"
 				}
 			| '=':
 				if self.r == '=' {
-					token.Id = DblEq
+					token.Id = EQL
 					token.Kind = "=="
 					self.next()
 				} else {
-					token.Id = Eq
+					token.Id = ASSIGN
 					token.Kind = "="
 				}
 			|:
@@ -775,7 +775,7 @@ impl Scanner {
 			}
 		}
 		EOF = self.r == eof
-		if token.Id == Illegal {
+		if token.Id == ILLEGAL {
 			token = nil
 		}
 		ret

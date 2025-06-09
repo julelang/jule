@@ -2262,7 +2262,7 @@ impl eval {
 		if isName {
 			// Use fc.expr.Token.Kind instead of casting.
 			// Same thing, but more efficient and performant.
-			if fc.Func.Token.Id == token::Error {
+			if fc.Func.Token.Id == token::ERROR {
 				ret builtinCallerError(self, fc)
 			}
 		}
@@ -3751,10 +3751,10 @@ impl unaryEval {
 	fn typeDecl(mut self) {
 		mut tc := self.e.typeChecker()
 		match self.u.Op.Id {
-		| token::Star:
+		| token::MUL:
 			self.v.Type = &Type{Kind: tc.buildPtrFromType(self.v.Type)}
 			self.v.Model = self.v.Type
-		| token::Amper:
+		| token::AND:
 			self.v.Type = &Type{Kind: tc.buildSptrFromType(self.v.Type)}
 			self.v.Model = self.v.Type
 		|:
@@ -3767,8 +3767,8 @@ impl unaryEval {
 
 	fn evalData(mut self) {
 		match self.u.Op.Id {
-		| token::Star
-		| token::Amper:
+		| token::MUL
+		| token::AND:
 			mut prefix := self.e.prefix
 			self.e.prefix = nil
 			self.v = self.e.eval(self.u.X, evalDefault)
@@ -3796,17 +3796,17 @@ impl unaryEval {
 		// returns nil.
 		kind := self.v.Type
 		match self.u.Op.Id {
-		| token::Minus:
+		| token::SUB:
 			self.minus()
-		| token::Plus:
+		| token::ADD:
 			self.plus()
-		| token::Caret:
+		| token::XOR:
 			self.caret()
-		| token::Excl:
+		| token::NOT:
 			self.excl()
-		| token::Star:
+		| token::MUL:
 			self.star()
-		| token::Amper:
+		| token::AND:
 			self.amper()
 		|:
 			self.v = nil
@@ -3875,7 +3875,7 @@ impl binaryEval {
 		}
 		mut l := self.l.Type.comptimeTypeInfo()
 		match self.op.Id {
-		| token::DblEq:
+		| token::EQL:
 			mut constant := constant::Const.NewBool(l.base.Equal(r.base))
 			ret &Value{
 				untyped: true,
@@ -3883,7 +3883,7 @@ impl binaryEval {
 				Constant: constant,
 				Model: constant,
 			}
-		| token::NotEq:
+		| token::NEQ:
 			mut constant := constant::Const.NewBool(!l.base.Equal(r.base))
 			ret &Value{
 				untyped: true,
@@ -3904,8 +3904,8 @@ impl binaryEval {
 		}
 
 		match self.op.Id {
-		| token::DblEq
-		| token::NotEq:
+		| token::EQL
+		| token::NEQ:
 			ret &Value{
 				untyped: true,
 				Type: primBool,
@@ -3918,8 +3918,8 @@ impl binaryEval {
 
 	fn evalEnum(mut self): &Value {
 		match self.op.Id {
-		| token::DblEq
-		| token::NotEq:
+		| token::EQL
+		| token::NEQ:
 			mut rkind := self.r.Type
 			if self.r.Type.Enum() != nil {
 				rkind = self.r.Type.Enum().TypeSym.Type
@@ -3939,10 +3939,10 @@ impl binaryEval {
 		}
 
 		match self.op.Id {
-		| token::Gt
-		| token::Lt
-		| token::GtEq
-		| token::LtEq:
+		| token::GTR
+		| token::LSS
+		| token::GEQ
+		| token::LEQ:
 			if !types::IsNum(self.l.Type.Enum().TypeSym.Type.Prim().Str()) {
 				self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 				ret nil
@@ -3951,7 +3951,7 @@ impl binaryEval {
 				untyped: true,
 				Type: primBool,
 			}
-		| token::Amper:
+		| token::AND:
 			mut first := self.l.Type.Enum().Items[0]
 			i := first.ValueSym.Value.Constant.ReadInt()
 			match {
@@ -3973,8 +3973,8 @@ impl binaryEval {
 			self.e.pushSuggestion(log::DefineZeroDefaultToUseAmper)
 		next:
 			fall
-		| token::Vline
-		| token::Caret:
+		| token::OR
+		| token::XOR:
 			mut enm := self.l.Type.Enum()
 			if enm.TypeSym.Type.Prim() == nil || !types::IsInt(enm.TypeSym.Type.Prim().Str()) {
 				self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
@@ -3992,8 +3992,8 @@ impl binaryEval {
 		}
 
 		match self.op.Id {
-		| token::DblEq
-		| token::NotEq:
+		| token::EQL
+		| token::NEQ:
 			ret &Value{
 				untyped: true,
 				Type: primBool,
@@ -4010,8 +4010,8 @@ impl binaryEval {
 		}
 
 		match self.op.Id {
-		| token::DblEq
-		| token::NotEq:
+		| token::EQL
+		| token::NEQ:
 			ret &Value{
 				untyped: true,
 				Type: primBool,
@@ -4028,8 +4028,8 @@ impl binaryEval {
 		}
 
 		match self.op.Id {
-		| token::DblEq
-		| token::NotEq:
+		| token::EQL
+		| token::NEQ:
 			ret &Value{
 				untyped: true,
 				Type: primBool,
@@ -4042,12 +4042,12 @@ impl binaryEval {
 
 	fn evalPtr(mut self): &Value {
 		match self.op.Id {
-		| token::DblEq
-		| token::NotEq
-		| token::Lt
-		| token::Gt
-		| token::LtEq
-		| token::GtEq:
+		| token::EQL
+		| token::NEQ
+		| token::LSS
+		| token::GTR
+		| token::LEQ
+		| token::GEQ:
 			if !self.checkTypeCompatibility() {
 				ret nil
 			}
@@ -4055,8 +4055,8 @@ impl binaryEval {
 				untyped: true,
 				Type: primBool,
 			}
-		| token::Plus
-		| token::Minus:
+		| token::ADD
+		| token::SUB:
 			if self.l.Type.Ptr() == nil {
 				self.l, self.r = self.r, self.l
 			}
@@ -4080,8 +4080,8 @@ impl binaryEval {
 		}
 
 		match self.op.Id {
-		| token::DblEq
-		| token::NotEq:
+		| token::EQL
+		| token::NEQ:
 			// We will not have to check whether array type is comparable.
 			// Binary eval already checked comparable special cases, so operands should be comparable.
 			if self.e.s.meta.runtime != nil {
@@ -4106,8 +4106,8 @@ impl binaryEval {
 
 	fn evalStruct(mut self): &Value {
 		match self.op.Id {
-		| token::DblEq
-		| token::NotEq:
+		| token::EQL
+		| token::NEQ:
 			if !self.checkTypeCompatibility() {
 				ret nil
 			}
@@ -4127,8 +4127,8 @@ impl binaryEval {
 		}
 
 		match self.op.Id {
-		| token::DblEq
-		| token::NotEq:
+		| token::EQL
+		| token::NEQ:
 			ret &Value{
 				untyped: true,
 				Type: primBool,
@@ -4141,8 +4141,8 @@ impl binaryEval {
 
 	fn evalAny(mut self): &Value {
 		match self.op.Id {
-		| token::DblEq
-		| token::NotEq:
+		| token::EQL
+		| token::NEQ:
 			applyImplicitCast(self.e.s, self.l.Type, self.r, self.op, self.e.getOwnerRefers())
 			ret &Value{
 				untyped: true,
@@ -4160,10 +4160,10 @@ impl binaryEval {
 		}
 
 		match self.op.Id {
-		| token::DblEq
-		| token::NotEq
-		| token::DblAmper
-		| token::DblVline:
+		| token::EQL
+		| token::NEQ
+		| token::LAND
+		| token::LOR:
 			ret self.l
 		|:
 			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
@@ -4177,14 +4177,14 @@ impl binaryEval {
 		}
 
 		match self.op.Id {
-		| token::Plus:
+		| token::ADD:
 			ret self.l
-		| token::DblEq
-		| token::NotEq
-		| token::Lt
-		| token::Gt
-		| token::GtEq
-		| token::LtEq:
+		| token::EQL
+		| token::NEQ
+		| token::LSS
+		| token::GTR
+		| token::GEQ
+		| token::LEQ:
 			ret &Value{
 				untyped: true,
 				Type: primBool,
@@ -4378,12 +4378,12 @@ impl binaryEval {
 
 		// Logicals.
 		match self.op.Id {
-		| token::DblEq
-		| token::NotEq
-		| token::Lt
-		| token::Gt
-		| token::GtEq
-		| token::LtEq:
+		| token::EQL
+		| token::NEQ
+		| token::LSS
+		| token::GTR
+		| token::GEQ
+		| token::LEQ:
 			self.setTypeToGreater()
 			ret &Value{
 				untyped: true,
@@ -4393,18 +4393,18 @@ impl binaryEval {
 
 		// Arithmetics.
 		match self.op.Id {
-		| token::Shl
-		| token::Shr:
+		| token::SHL
+		| token::SHR:
 			panic("sema: binary shifting operator handling failed")
-		| token::Plus
-		| token::Minus
-		| token::Star:
+		| token::ADD
+		| token::SUB
+		| token::MUL:
 			self.setTypeToGreater()
 			ret self.l
-		| token::Solidus:
+		| token::QUO:
 			self.setTypeToGreater()
 			ret self.l
-		| token::Percent:
+		| token::REM:
 			if !types::IsInt(self.r.Type.Prim().Kind) {
 				self.e.pushErr(self.op, log::IncompatibleTypes, self.l.Type.Str(), self.r.Type.Str())
 				ret nil
@@ -4425,12 +4425,12 @@ impl binaryEval {
 
 		// Logicals.
 		match self.op.Id {
-		| token::DblEq
-		| token::NotEq
-		| token::Lt
-		| token::Gt
-		| token::GtEq
-		| token::LtEq:
+		| token::EQL
+		| token::NEQ
+		| token::LSS
+		| token::GTR
+		| token::GEQ
+		| token::LEQ:
 			ret &Value{
 				untyped: true,
 				Type: primBool,
@@ -4439,21 +4439,21 @@ impl binaryEval {
 
 		// Arithmetics.
 		match self.op.Id {
-		| token::Shl
-		| token::Shr:
+		| token::SHL
+		| token::SHR:
 			panic("sema: binary shifting operator handling failed")
-		| token::Plus
-		| token::Minus
-		| token::Star
-		| token::Amper
-		| token::Vline
-		| token::Caret:
+		| token::ADD
+		| token::SUB
+		| token::MUL
+		| token::AND
+		| token::OR
+		| token::XOR:
 			self.setTypeToGreater()
 			ret self.l
-		| token::Solidus:
+		| token::QUO:
 			self.setTypeToGreater()
 			ret self.l
-		| token::Percent:
+		| token::REM:
 			self.mod()
 			self.setTypeToGreater()
 			ret self.l
@@ -4490,7 +4490,7 @@ impl binaryEval {
 
 	fn checkSpecialCases(mut self): (ok: bool) {
 		ok = true
-		comparing := self.op.Id == token::DblEq || self.op.Id == token::NotEq
+		comparing := self.op.Id == token::EQL || self.op.Id == token::NEQ
 		if !comparing {
 			ret
 		}
@@ -4511,7 +4511,7 @@ impl binaryEval {
 		}
 
 		// Shift operators.
-		if self.op.Id == token::Shl || self.op.Id == token::Shr {
+		if self.op.Id == token::SHL || self.op.Id == token::SHR {
 			ret self.shift()
 		}
 
@@ -4592,56 +4592,56 @@ impl binaryEval {
 		}
 
 		match self.op.Id {
-		| token::DblEq:
+		| token::EQL:
 			v.Constant = constant::Const.NewBool(self.l.Constant.Eq(*self.r.Constant))
-		| token::NotEq:
+		| token::NEQ:
 			v.Constant = constant::Const.NewBool(!self.l.Constant.Eq(*self.r.Constant))
-		| token::DblVline:
+		| token::LOR:
 			v.Constant = constant::Const.NewBool(self.l.Constant.Or(*self.r.Constant))
-		| token::DblAmper:
+		| token::LAND:
 			v.Constant = constant::Const.NewBool(self.l.Constant.And(*self.r.Constant))
-		| token::Gt:
+		| token::GTR:
 			v.Constant = constant::Const.NewBool(self.l.Constant.Gt(*self.r.Constant))
-		| token::Lt:
+		| token::LSS:
 			v.Constant = constant::Const.NewBool(self.l.Constant.Lt(*self.r.Constant))
-		| token::GtEq:
+		| token::GEQ:
 			v.Constant = constant::Const.NewBool(self.l.Constant.GtEq(*self.r.Constant))
-		| token::LtEq:
+		| token::LEQ:
 			v.Constant = constant::Const.NewBool(self.l.Constant.LtEq(*self.r.Constant))
-		| token::Plus:
+		| token::ADD:
 			_ = self.l.Constant.Add(*self.r.Constant)
 			v.Constant = self.l.Constant
-		| token::Minus:
+		| token::SUB:
 			_ = self.l.Constant.Sub(*self.r.Constant)
 			v.Constant = self.l.Constant
-		| token::Star:
+		| token::MUL:
 			_ = self.l.Constant.Mul(*self.r.Constant)
 			v.Constant = self.l.Constant
-		| token::Solidus:
+		| token::QUO:
 			ok := self.l.Constant.Div(*self.r.Constant)
 			if !ok && self.r.Constant.AsF64() == 0 {
 				self.e.pushErr(self.op, log::DivByZero)
 			}
 			v.Constant = self.l.Constant
-		| token::Percent:
+		| token::REM:
 			ok := self.l.Constant.Mod(*self.r.Constant)
 			if !ok && self.r.Constant.AsF64() == 0 {
 				self.e.pushErr(self.op, log::DivByZero)
 			}
 			v.Constant = self.l.Constant
-		| token::Vline:
+		| token::OR:
 			_ = self.l.Constant.BitwiseOr(*self.r.Constant)
 			v.Constant = self.l.Constant
-		| token::Amper:
+		| token::AND:
 			_ = self.l.Constant.BitwiseAnd(*self.r.Constant)
 			v.Constant = self.l.Constant
-		| token::Caret:
+		| token::XOR:
 			_ = self.l.Constant.Xor(*self.r.Constant)
 			v.Constant = self.l.Constant
-		| token::Shl:
+		| token::SHL:
 			_ = self.l.Constant.Lshift(*self.r.Constant)
 			v.Constant = self.l.Constant
-		| token::Shr:
+		| token::SHR:
 			_ = self.l.Constant.Rshift(*self.r.Constant)
 			v.Constant = self.l.Constant
 		}
@@ -4798,7 +4798,7 @@ impl binaryEval {
 	}
 
 	fn eval(mut self, mut &op: &ast::BinaryExpr): &Value {
-		if op.Op.Id == token::Eq {
+		if op.Op.Id == token::ASSIGN {
 			self.e.pushErr(op.Op, log::AssignInExpr)
 			self.e.pushSuggestion(log::UseImperative)
 			ret nil
@@ -5162,7 +5162,7 @@ fn makeImplicitDeref(mut &v: &Value, mut baseToken: &token::Token) {
 		Expr: new(Value, *v),
 		Op: new(token::Token, *baseToken),
 	}
-	unary.Op.Id = token::Star
+	unary.Op.Id = token::MUL
 	unary.Op.Kind = "*"
 	v.Model = unary
 }

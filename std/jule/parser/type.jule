@@ -32,7 +32,7 @@ impl typeBuilder {
 		mut token := self.tokens[*self.i]
 		mut ns := new(ast::NamespaceExpr)
 		ns.Namespace = self.tokens[*self.i]
-		if ns.Namespace.Id != token::Name && ns.Namespace.Id != token::Unsafe {
+		if ns.Namespace.Id != token::NAME && ns.Namespace.Id != token::UNSAFE {
 			self.pushErr(ns.Namespace, log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedIdentifier)
 		}
@@ -42,13 +42,13 @@ impl typeBuilder {
 			self.pushSuggestion(log::ExpectedDblColon)
 			ret nil
 		}
-		if self.tokens[*self.i].Id != token::DblColon {
+		if self.tokens[*self.i].Id != token::SEP {
 			self.pushErr(self.tokens[*self.i], log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedDblColon)
 			ret nil
 		}
 		*self.i++
-		if len(self.tokens) <= *self.i || self.tokens[*self.i].Id != token::Name {
+		if len(self.tokens) <= *self.i || self.tokens[*self.i].Id != token::NAME {
 			self.pushErr(self.tokens[*self.i-1], log::InvalidSyntax)
 			self.pushSuggestion(log::ExpectedIdentifier)
 			ret nil
@@ -60,7 +60,7 @@ impl typeBuilder {
 			Data: ns,
 		}
 		*self.i++
-		if *self.i < len(self.tokens) && self.tokens[*self.i].Id == token::LBracket {
+		if *self.i < len(self.tokens) && self.tokens[*self.i].Id == token::LBRACK {
 			ret self.buildGenericType(typ)
 		}
 		ret typ
@@ -68,7 +68,7 @@ impl typeBuilder {
 
 	unsafe fn buildIdent(mut self): &ast::Expr {
 		mut next := *self.i+1 < len(self.tokens)
-		if next && self.tokens[*self.i+1].Id == token::DblColon {
+		if next && self.tokens[*self.i+1].Id == token::SEP {
 			ret self.buildNamespace()
 		}
 		mut token := self.tokens[*self.i]
@@ -83,7 +83,7 @@ impl typeBuilder {
 			Data: name,
 		}
 		*self.i++
-		if *self.i < len(self.tokens) && self.tokens[*self.i].Id == token::LBracket {
+		if *self.i < len(self.tokens) && self.tokens[*self.i].Id == token::LBRACK {
 			ret self.buildGenericType(typ)
 		}
 		ret typ
@@ -104,11 +104,11 @@ impl typeBuilder {
 			}
 			mut token := self.tokens[*self.i]
 			match token.Id {
-			| token::Comma:
+			| token::COMMA:
 				continue
-			| token::LBracket:
+			| token::LBRACK:
 				rangeN++
-			| token::RBracket:
+			| token::RBRACK:
 				rangeN--
 				if rangeN > 0 {
 					continue
@@ -146,7 +146,7 @@ impl typeBuilder {
 	}
 
 	unsafe fn buildCppLink(mut self): &ast::Expr {
-		if *self.i+1 >= len(self.tokens) || self.tokens[*self.i+1].Id != token::Dot {
+		if *self.i+1 >= len(self.tokens) || self.tokens[*self.i+1].Id != token::PERIOD {
 			self.pushErr(self.tokens[*self.i], log::InvalidSyntax)
 			ret nil
 		}
@@ -189,7 +189,7 @@ impl typeBuilder {
 		}
 
 		*self.i++
-		if self.tokens[*self.i].Id == token::Unsafe {
+		if self.tokens[*self.i].Id == token::UNSAFE {
 			*self.i++
 			ret &ast::Expr{
 				Token: token,
@@ -256,7 +256,7 @@ impl typeBuilder {
 	}
 
 	unsafe fn buildArr(mut self): &ast::Expr {
-		mut exprTokens := range(*self.i, token::LBracket, token::RBracket, self.tokens)
+		mut exprTokens := range(*self.i, token::LBRACK, token::RBRACK, self.tokens)
 		if *self.i >= len(self.tokens) {
 			self.pushErr(self.tokens[*self.i-1], log::MissingType)
 			ret nil
@@ -272,7 +272,7 @@ impl typeBuilder {
 		}
 
 		mut token := exprTokens[0]
-		if len(exprTokens) == 1 && token.Id == token::TripleDot {
+		if len(exprTokens) == 1 && token.Id == token::ELLIPSIS {
 			// Ignore.
 		} else {
 			arrayTyp.Size = self.p.buildExpr(exprTokens)
@@ -294,7 +294,7 @@ impl typeBuilder {
 		}
 
 		// Get key type tokens without brackets.
-		mut keyTokens := range(*self.i, token::LBracket, token::RBracket, self.tokens)
+		mut keyTokens := range(*self.i, token::LBRACK, token::RBRACK, self.tokens)
 		if *self.i >= len(self.tokens) {
 			self.pushErr(self.tokens[*self.i-1], log::MissingType)
 			ret nil
@@ -333,7 +333,7 @@ impl typeBuilder {
 		}
 		*self.i++
 		token = self.tokens[*self.i]
-		if token.Id == token::RBracket {
+		if token.Id == token::RBRACK {
 			ret self.buildSlice()
 		}
 		*self.i-- // Point to left bracket.
@@ -351,7 +351,7 @@ impl typeBuilder {
 		mut recv := true
 		mut send := true
 
-		if token.Id == token::RArrow {
+		if token.Id == token::ARROW {
 			send = false
 			if *self.i+1 >= len(self.tokens) {
 				self.pushErr(token, log::InvalidSyntax)
@@ -361,14 +361,14 @@ impl typeBuilder {
 			*self.i++
 		}
 
-		if token.Id != token::Chan {
+		if token.Id != token::CHAN {
 			self.pushErr(token, log::InvalidSyntax)
 			ret nil
 		}
 
 		// Check send-only probability if channel is not recv-only.
 		// Otherwise, accept arrow for element type if exist.
-		if send && self.tokens[*self.i].Id == token::RArrow {
+		if send && self.tokens[*self.i].Id == token::ARROW {
 			recv = false
 			if *self.i+1 >= len(self.tokens) {
 				self.pushErr(self.tokens[*self.i], log::InvalidSyntax)
@@ -378,7 +378,7 @@ impl typeBuilder {
 		}
 
 		mut valueTyp := (&ast::Expr)(nil)
-		if send && recv && self.tokens[*self.i].Id == token::LParent {
+		if send && recv && self.tokens[*self.i].Id == token::LPAREN {
 			valueTyp = self.buildParenthesesRange()
 		} else {
 			valueTyp = self.step()
@@ -400,7 +400,7 @@ impl typeBuilder {
 
 	unsafe fn buildParenthesesRange(mut self): &ast::Expr {
 		token := self.tokens[*self.i] // Save token for error log.
-		mut rangeTokens := range(*self.i, token::LParent, token::RParent, self.tokens)
+		mut rangeTokens := range(*self.i, token::LPAREN, token::RPAREN, self.tokens)
 		if len(rangeTokens) == 0 {
 			// Empty range.
 			self.pushErr(token, log::MissingType)
@@ -419,16 +419,16 @@ impl typeBuilder {
 	unsafe fn step(mut self): &ast::Expr {
 		mut token := self.tokens[*self.i]
 		match token.Id {
-		| token::Name:
+		| token::NAME:
 			ret self.buildIdent()
-		| token::Cpp:
+		| token::CPP:
 			ret self.buildCppLink()
-		| token::Chan | token::RArrow:
+		| token::CHAN | token::ARROW:
 			ret self.buildChan()
-		| token::Unsafe:
+		| token::UNSAFE:
 			if len(self.tokens)-*self.i > 1 {
 				match self.tokens[*self.i+1].Id {
-				| token::Fn:
+				| token::FN:
 					// unsafe function
 					*self.i++ // point to function keyword
 					mut f := self.buildFunc()
@@ -436,18 +436,18 @@ impl typeBuilder {
 						f.Data.(&ast::Func).Unsafe = true
 					}
 					ret f
-				| token::DblColon:
+				| token::SEP:
 					// unsafe namespace
 					ret self.buildNamespace()
 				}
 			}
-		| token::Fn:
+		| token::FN:
 			ret self.buildFunc()
-		| token::Star:
+		| token::MUL:
 			ret self.buildPtr()
-		| token::Amper:
+		| token::AND:
 			ret self.buildSptr()
-		| token::DblAmper:
+		| token::LAND:
 			mut sptr := self.buildSptr()
 			ret &ast::Expr{
 				Token: token,
@@ -457,9 +457,9 @@ impl typeBuilder {
 					X: sptr,
 				},
 			}
-		| token::LBracket:
+		| token::LBRACK:
 			ret self.buildEnumerable()
-		| token::Map:
+		| token::MAP:
 			ret self.buildMap()
 		}
 		*self.i++

@@ -228,11 +228,11 @@ impl exprCoder {
 		self.oc.write(")(")
 		self.oc.write(xVar)
 		match op.Id {
-		| token::Solidus
-		| token::SolidusEq:
+		| token::QUO
+		| token::QUO_ASSIGN:
 			self.oc.write(" / ")
-		| token::Percent
-		| token::PercentEq:
+		| token::REM
+		| token::REM_ASSIGN:
 			self.oc.write(" % ")
 		}
 		self.oc.write(yVar)
@@ -281,7 +281,7 @@ impl exprCoder {
 		})
 
 		buf.WriteByte('(')!
-		if op == token::NotEq {
+		if op == token::NEQ {
 			buf.WriteByte('!')!
 		}
 		i := self.oc.pushAnyType(t)
@@ -314,7 +314,7 @@ impl exprCoder {
 			// The left operand is will be array one always.
 			arr := lk.Array()
 			mut ins := obj::FindFuncGenericInstance(meta::Program.Runtime.ArrayCmp, arr.Value)
-			if op == token::NotEq {
+			if op == token::NEQ {
 				buf.WriteByte('!')!
 			}
 			identCoder.funcIns(buf, ins)
@@ -336,9 +336,9 @@ impl exprCoder {
 
 		// guarantee integer wrap around if expressions is not a condition
 		match op {
-		| token::Gt | token::GtEq
-		| token::Lt | token::LtEq
-		| token::DblEq | token::NotEq:
+		| token::GTR | token::GEQ
+		| token::LSS | token::LEQ
+		| token::EQL | token::NEQ:
 			// No op.
 		|:
 			lp := lk.Prim()
@@ -365,7 +365,7 @@ impl exprCoder {
 	fn _unsafeBinary(mut &self, mut &buf: strings::Builder, mut l: sema::OperandExpr,
 		mut r: sema::OperandExpr, op: int, kind: str) {
 		// Special cases for comparable types.
-		if (op == token::DblEq || op == token::NotEq) && self.unsafeDynamicBinary(buf, l, r, op) {
+		if (op == token::EQL || op == token::NEQ) && self.unsafeDynamicBinary(buf, l, r, op) {
 			ret
 		}
 		ls := writeAndReadFromBuf(self.oc.Buf, fn() { self.possibleRefExpr(l.Model) })
@@ -439,15 +439,15 @@ impl exprCoder {
 
 	fn binary(mut &self, mut m: &sema::BinaryExpr) {
 		match m.Op.Id {
-		| token::Solidus | token::Percent:
+		| token::QUO | token::REM:
 			if env::Safety {
 				self.divByZeroBinary(m.Op, m.Left, m.Right)
 				ret
 			}
-		| token::Shl:
+		| token::SHL:
 			self.shl(m.Left, m.Right)
 			ret
-		| token::Shr:
+		| token::SHR:
 			self.shr(m.Left, m.Right)
 			ret
 		}
@@ -477,7 +477,7 @@ impl exprCoder {
 	fn unary(mut &self, mut m: &sema::UnaryExpr) {
 		// guarantee integer wrap around
 		match m.Op.Id {
-		| token::Plus | token::Minus | token::Caret:
+		| token::ADD | token::SUB | token::XOR:
 			lp := m.Expr.Type.Prim()
 			if lp != nil && types::IsInt(lp.Kind) {
 				self.oc.write("(")
@@ -490,12 +490,12 @@ impl exprCoder {
 		}
 
 		match m.Op.Id {
-		| token::Caret:
+		| token::XOR:
 			self.oc.write("(~(")
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write("))")
 			ret
-		| token::Star:
+		| token::MUL:
 			if env::Production || m.Expr.Type.Sptr() == nil {
 				break
 			}
@@ -2346,10 +2346,10 @@ fn utoa(mut &s: strings::Builder, x: u64) {
 
 fn structBinary(mut &buf: strings::Builder, mut &s: &sema::StructIns, &l: str,
 	&r: str, op: int, kind: str) {
-	if op != token::DblEq && op != token::NotEq {
+	if op != token::EQL && op != token::NEQ {
 		panic("cxx: unsupported token occurred for structure binary, this is an implementation mistake")
 	}
-	if op == token::NotEq {
+	if op == token::NEQ {
 		buf.WriteByte('!')!
 	}
 	identCoder.structureIns(buf, s)
