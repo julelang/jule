@@ -681,9 +681,31 @@ impl exprBuilder {
 		for !self.eof() && self.t.Id != token::RBRACK {
 			self.next()
 			if !self.eof() && self.t.Id != token::RBRACK {
-				if len(list) == 0 && self.t.Id == token::ELLIPSIS {
-					// Array type with auto-size.
-					ret self.parseArrayType(lbrack, nil)
+				if len(list) < 2 && self.t.Id == token::ELLIPSIS {
+					if len(list) == 0 {
+						// Array type with auto-size.
+						ret self.parseArrayType(lbrack, nil)
+					} else if len(list) == 1 {
+						mut t := self.t
+						// Array-fill expression.
+						self.next()
+						mut rbrack := self.t
+						self.expect(token::RBRACK, "expected ]")
+						list = append(list, &ast::Expr{
+							Token: t,
+							End: t,
+							Data: new(ast::VariadicExpr),
+						})
+						ret &ast::Expr{
+							Token: lbrack,
+							End: rbrack,
+							Data: &ast::SliceExpr{
+								Token: lbrack,
+								End: rbrack,
+								X: list,
+							},
+						}
+					}
 				}
 				list = append(list, self.parse())
 			}
