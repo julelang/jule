@@ -29,11 +29,17 @@ struct Directive {
 	Args: []&token::Token
 }
 
+// Channel directions.
+const (
+	SEND = 1 << iota
+	RECV
+)
+
 // Channel type.
 struct ChanType {
-	Recv:  bool
-	Send:  bool
-	Value: &Expr // Value type.
+	Arrow: &token::Token // Token of arrow.
+	Dir:   int           // Direction.
+	Value: &Expr         // Value type.
 }
 
 // Slice type.
@@ -78,7 +84,6 @@ enum ExprData: type {
 	&SelectorExpr,
 	&NamespaceExpr,
 	&VariadicExpr,
-	&CastExpr,
 	&CallExpr,
 	&TypedBraceLit,
 	&BraceLit,
@@ -89,7 +94,6 @@ enum ExprData: type {
 	&IndexExpr,
 	&Func,
 	&KeyValueExpr,
-	&ChanRecv,
 	&ChanSend,
 	&TypeAssertionExpr,
 	&ChanType,
@@ -103,11 +107,6 @@ struct Expr {
 	Token: &token::Token
 	End:   &token::Token
 	Data:  ExprData
-}
-
-// Channel receive expression.
-struct ChanRecv {
-	X: &Expr // Expression.
 }
 
 // Range expression represents an expression between parentheses.
@@ -170,12 +169,6 @@ impl UnaryExpr {
 struct VariadicExpr {
 	Token: &token::Token
 	X:     &Expr // Expression to variadic.
-}
-
-// Casting expression.
-struct CastExpr {
-	Type: &Expr
-	X:    &Expr // Expression to cast.
 }
 
 // Type assertion expression.
@@ -677,5 +670,16 @@ impl Impl {
 	// Reports whether implementation type is append to destination structure.
 	fn IsStructImpl(self): bool {
 		ret self.Base == nil
+	}
+}
+
+// Returns the expression with any enclosing parentheses removed.
+fn Unparen(mut e: &Expr): &Expr {
+	for {
+		mut paren, ok := e.Data.(&RangeExpr)
+		if !ok {
+			ret e
+		}
+		e = paren.X
 	}
 }

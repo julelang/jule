@@ -8,885 +8,1132 @@ use "std/jule/log"
 use "std/jule/token"
 use "std/strings"
 
+// Lowest operator precedence, no-operator.
+const lowestPrec = 0
+
 struct exprBuilder {
-	p: &parser
+	p:   &parser
+	l:   []&token::Token // token list to scan
+	i:   int             // current scanning position
+	t:   &token::Token   // current token, nil for EOF
+	lt:  &token::Token   // last token
+	err: bool            // error logging enable state
 }
 
 impl exprBuilder {
+	fn new(mut &p: &parser): exprBuilder {
+		ret exprBuilder{
+			err: true,
+			p: p,
+		}
+	}
+
 	fn pushErr(mut self, token: &token::Token, fmt: str, args: ...any) {
-		self.p.pushErr(token, fmt, args...)
+		if self.err {
+			self.p.pushErr(token, fmt, args...)
+		}
 	}
 
 	// Push suggestion to last log.
 	fn pushSuggestion(mut self, fmt: str, args: ...any) {
-		self.p.pushSuggestion(fmt, args...)
-	}
-
-	fn buildTuple(mut self, mut &parts: [][]&token::Token): &ast::TupleExpr {
-		mut tuple := &ast::TupleExpr{
-			X: make([]&ast::Expr, 0, len(parts)),
-		}
-		for (_, mut part) in parts {
-			tuple.X = append(tuple.X, self.buildFromTokens(part))
-		}
-		ret tuple
-	}
-
-	fn buildLit(self, mut token: &token::Token): &ast::LitExpr {
-		ret &ast::LitExpr{
-			Token: token,
-			Value: token.Kind,
+		if self.err {
+			self.p.pushSuggestion(fmt, args...)
 		}
 	}
 
-	fn buildSingle(mut self, mut token: &token::Token): ast::ExprData {
-		match token.Id {
-		| token::LIT:
-			ret self.buildLit(token)
-		| token::ELLIPSIS:
-			ret &ast::VariadicExpr{
-				Token: token,
-			}
-		| token::NAME
-		| token::SELF
-		| token::ERROR:
-			ret buildIdentExpr(token)
+	// Returns last token.
+	fn getLast(mut self): &token::Token {
+		if self.t == nil {
+			ret self.lt
 		}
-		self.pushErr(token, log::InvalidSyntax)
-		ret nil
+		ret self.t
 	}
 
-	fn buildBindName(mut self, mut &tokens: []&token::Token): &ast::NameExpr {
-		if tokens[0].Id != token::CPP {
-			ret nil
-		} else if tokens[1].Id != token::PERIOD {
-			self.pushErr(tokens[1], log::InvalidSyntax)
-			self.pushSuggestion(log::ExpectedDotForBind)
-			ret nil
-		}
-		mut token := tokens[2]
-
-		// Save parser mode and check whether token is identifier.
-		// Allow keywords for checking, then restore the mode immediately.
-		mode := self.p.mode
-		self.p.mode |= allowKeywordIdentifiers
-		isIdent := self.p.isIdent(token)
-		self.p.mode = mode
-
-		if !isIdent {
-			self.pushErr(tokens[2], log::InvalidSyntax)
-			self.pushSuggestion(log::ExpectedIdentifier)
-			ret nil
-		}
-
-		mut expr := buildIdentExpr(token)
-		expr.Bind = true
-		ret expr
+	// Scanning reached to EOF.
+	fn eof(self): bool {
+		ret self.t == nil
 	}
 
-	fn buildUnary(mut self, mut tokens: []&token::Token): &ast::UnaryExpr {
-		mut op := tokens[0]
-		if len(tokens) == 1 {
-			self.pushErr(op, log::MissingExprForUnary)
-			ret nil
-		} else if !token::IsUnaryOp(op.Id) {
-			self.pushErr(op, log::InvalidOpForUnary, op.Kind)
-			ret nil
-		}
-
-		// Length is 1 cause all length of operator tokens is 1.
-		// Change "1" with length of token's value
-		// if all operators length is not 1.
-		tokens = tokens[1:]
-
-		ret &ast::UnaryExpr{
-			Op: op,
-			X: self.buildFromTokens(tokens),
+	// Advance to the next token.
+	fn next(mut self) {
+		self.i++
+		if self.i < len(self.l) {
+			self.lt = self.t
+			self.t = self.l[self.i]
+		} else {
+			self.i = len(self.l)
+			self.t = nil
 		}
 	}
 
-	fn buildObjSubIdent(mut self, mut tokens: []&token::Token): &ast::SelectorExpr {
-		mut i := len(tokens) - 1
-		mut nameToken := tokens[i]
-		i--                 // Set offset to delimiter token.
-		tokens = tokens[:i] // Remove dot token and selected identifier token.
-		if len(tokens) == 0 {
-			self.pushErr(nameToken, log::InvalidSyntax)
-			ret nil
+	// Expects token, reports error if needed.
+	// Reports whether there is error.
+	// Advances to the next token.
+	fn expect(mut self, tok: int, msg: str): (err: bool) {
+		if self.eof() {
+			self.pushErr(self.lt, msg)
+			err = true
+		} else if self.t.Id != tok {
+			self.pushErr(self.t, msg)
+			err = true
 		}
-		ret &ast::SelectorExpr{
-			Name: nameToken,
-			X: self.buildFromTokens(tokens),
-		}
+		self.next()
+		ret
 	}
 
-	fn buildNamespace(mut self, mut &tokens: []&token::Token): &ast::NamespaceExpr {
+	// Caller should pass the leading namespace token, scanning must be point to the separator token.
+	fn parseNamespaceExpr(mut self, mut name: &token::Token): &ast::Expr {
 		mut ns := new(ast::NamespaceExpr)
-		if len(tokens) > 3 {
-			self.pushErr(tokens[3], log::InvalidSyntax)
-		}
-		ns.Namespace = tokens[0]
-		if ns.Namespace.Id != token::NAME && ns.Namespace.Id != token::UNSAFE {
-			self.pushErr(ns.Namespace, log::InvalidSyntax)
-			self.pushSuggestion(log::ExpectedIdentifier)
-		}
-		if len(tokens) < 2 {
-			self.pushErr(ns.Namespace, log::InvalidSyntax)
-			self.pushSuggestion(log::ExpectedDblColon)
-			ret nil
-		}
-		if tokens[1].Id != token::SEP {
-			self.pushErr(tokens[1], log::InvalidSyntax)
-			self.pushSuggestion(log::ExpectedDblColon)
-			ret nil
-		}
-		if len(tokens) < 3 {
-			self.pushErr(tokens[1], log::InvalidSyntax)
-			self.pushSuggestion(log::ExpectedIdentifier)
-			ret nil
-		}
-		ns.Name = tokens[2]
-		if ns.Name.Id != token::NAME {
-			self.pushErr(ns.Name, log::InvalidSyntax)
-			self.pushSuggestion(log::ExpectedIdentifier)
-			ret nil
-		}
-		ret ns
-	}
-
-	fn buildType(mut self, mut &tokens: []&token::Token): ast::ExprData {
-		mut i := 0
-		mut typ, ok := unsafe { self.p.buildType(tokens, &i, true) }
-		if !ok {
-			ret nil
-		}
-		if i < len(tokens) {
-			self.pushErr(tokens[i], log::InvalidSyntax)
-		}
-		ret typ.Data
-	}
-
-	fn buildSubIdent(mut self, mut &tokens: []&token::Token): ast::ExprData {
-		i := len(tokens) - 2 // Set offset to delimiter token.
-		token := tokens[i]
-		match token.Id {
-		| token::PERIOD:
-			ret self.buildObjSubIdent(tokens)
-		| token::SEP:
-			ret self.buildNamespace(tokens)
-		| token::RBRACK:
-			// Catch slice, array, and map types.
-			ret self.buildType(tokens)
-		}
-
-		// Catch anonymous functions.
-		if isAnonFuncHead(tokens) {
-			ret self.buildType(tokens)
-		}
-
-		self.pushErr(token, log::InvalidSyntax)
-		ret nil
-	}
-
-	fn buildVariadic(mut self, mut tokens: []&token::Token): &ast::VariadicExpr {
-		mut token := tokens[len(tokens)-1] // Variadic operator token.
-		tokens = tokens[:len(tokens)-1]    // Remove variadic operator token.
-		ret &ast::VariadicExpr{
-			Token: token,
-			X: self.buildFromTokens(tokens),
+		ns.Namespace = name
+		self.next() // separator is alrady checked before the calling function
+		name = self.t
+		self.expect(token::NAME, "expected identifier")
+		ns.Name = name
+		ret &ast::Expr{
+			Token: ns.Namespace,
+			End: name,
+			Data: ns,
 		}
 	}
 
-	fn buildBetweenParentheses(mut self, mut tokens: []&token::Token): &ast::RangeExpr {
-		if len(tokens) == 2 {
-			self.pushErr(tokens[0], log::MissingExpr)
-			self.pushSuggestion(log::EmptyParentNotValid)
-			ret nil
-		}
-		tokens = tokens[1 : len(tokens)-1] // Remove parentheses.
-		ret &ast::RangeExpr{
-			X: self.buildFromTokens(tokens),
-		}
-	}
-
-	fn tryBuildCast(mut self, mut &tokens: []&token::Token): &ast::CastExpr {
-		mut rangeN := 0
-		for i, token in tokens {
-			match token.Id {
-			| token::LBRACE
-			| token::LBRACK
-			| token::LPAREN:
-				rangeN++
-				continue
-			| token::RBRACE
-			| token::RBRACK
-			| token::RPAREN:
-				rangeN--
-			}
-
-			if rangeN > 0 {
-				continue
-			} else if i+1 == len(tokens) {
-				ret nil
-			}
-
-			mut typeTokens := tokens[:i+1]
-			mut exprTokens := tokens[i+1:]
-
-			if len(exprTokens) == 0 {
-				// Expression is parentheses group.
-				ret nil
-			}
-
-			tok := exprTokens[0]
-			if tok.Id != token::LPAREN {
-				ret nil
-			}
-
-			mut cast := &ast::CastExpr{}
-
-			// Expression tokens just parentheses.
-			if len(exprTokens) == 2 {
-				self.pushErr(exprTokens[0], log::MissingExpr)
-				self.pushSuggestion(log::GiveExprToCast)
-			}
-
-			// Type tokens just parentheses.
-			if len(typeTokens) == 2 {
-				self.pushErr(typeTokens[0], log::MissingType)
-				self.pushSuggestion(log::GiveTypeForCast)
-			} else {
-				typeTokens = typeTokens[1 : len(typeTokens)-1] // Remove parentheses.
-				mut typeIndex := 0
-				mut typ, ok := unsafe { self.p.buildType(typeTokens, &typeIndex, true) }
-				if ok && typeIndex < len(typeTokens) {
-					self.pushErr(typeTokens[typeIndex], log::InvalidSyntax)
-				} else if !ok {
-					ret cast
+	fn parseTypeInstance(mut self, mut typ: &ast::Expr): &ast::Expr {
+		mut lbrack := self.t
+		let mut list: []&ast::Expr
+		for !self.eof() && self.t.Id != token::RBRACK {
+			self.next()
+			if !self.eof() && self.t.Id != token::RBRACK {
+				if len(list) == 0 && self.t.Id == token::ELLIPSIS {
+					// Array type.
+					self.i-- // back to [
+					ret self.parseType()
 				}
-				cast.Type = typ
-
-				if len(exprTokens) > 2 {
-					// Remove parentheses.
-					mut j := 0
-					mut exprTokens2 := range(j, token::LPAREN, token::RPAREN, exprTokens)
-					if len(exprTokens2) == 0 || j < len(exprTokens) {
-						ret nil
-					}
-					cast.X = self.buildFromTokens(exprTokens2)
-				}
+				list = append(list, self.parse())
 			}
-			ret cast
-		}
-
-		ret nil
-	}
-
-	fn buildArgs(mut self, mut tokens: []&token::Token): []&ast::Expr {
-		// No argument.
-		if len(tokens) < 2 {
-			ret nil
-		}
-		tokens = tokens[1 : len(tokens)-1] // Remove parentheses.
-		mut parts, errs := parts(tokens, token::COMMA, true)
-		self.p.errors = append(self.p.errors, errs...)
-		mut args := make([]&ast::Expr, 0, len(parts))
-		for (_, mut part) in parts {
-			if len(part) > 0 {
-				args = append(args, self.buildFromTokens(part))
+			if self.eof() || self.t.Id != token::COMMA && self.t.Id != token::RBRACK {
+				self.pushErr(self.t, "expected , or ]")
 			}
 		}
-		ret args
+		mut rbrack := self.t
+		self.expect(token::RBRACK, "expected ]")
+		ret packIndexExpr(typ, lbrack, list, rbrack)
 	}
 
-	fn buildCall(mut self, mut &token: &token::Token, mut &expr: []&token::Token, mut &args: []&token::Token): &ast::CallExpr {
-		ret &ast::CallExpr{
-			Token: token,
-			Func: self.buildFromTokens(expr),
-			Args: self.buildArgs(args),
-		}
-	}
-
-	fn buildTypeAssertion(mut self, mut &exprTokens: []&token::Token, mut &typeTokens: []&token::Token): &ast::TypeAssertionExpr {
-		exprTokens = exprTokens[:len(exprTokens)-1] // Remove trailing dot.
-		mut x := self.buildFromTokens(exprTokens)
-		if x == nil {
-			ret nil
-		}
-		typeTokens = typeTokens[1 : len(typeTokens)-1] // Remove parentheses.
-		mut typ := self.buildType(typeTokens)
-		if typ == nil {
-			ret nil
-		}
-		ret &ast::TypeAssertionExpr{
-			X: x,
-			Type: &ast::Expr{
-				Token: typeTokens[0],
-				End: typeTokens[len(typeTokens)-1],
-				Data: typ,
+	fn parseSmartPointerType(mut self): &ast::Expr {
+		mut t := self.t
+		self.next()
+		mut base := self.parseType()
+		ret &ast::Expr{
+			Token: t,
+			End: self.getLast(),
+			Data: &ast::UnaryExpr{
+				Op: t,
+				X: base,
 			},
 		}
 	}
 
-	fn buildParenthesesRange(mut self, mut &tokens: []&token::Token): ast::ExprData {
-		mut token := tokens[0]
-		if token.Id == token::LPAREN {
-			mut expr := self.tryBuildCast(tokens)
-			if expr != nil {
-				ret expr
-			}
+	fn parsePointerType(mut self): &ast::Expr {
+		mut t := self.t
+		self.next()
+		let mut base: &ast::Expr
+		if !self.eof() && self.t.Id == token::UNSAFE {
+			// No extra operation needed for the value type.
+			// To represent unsafe pointer types, use nil expression as value type.
+			self.next()
+		} else {
+			base = self.parseType()
 		}
-		mut exprTokens, mut argsTokens := rangeLast(tokens)
-		// Expression is parentheses group if exprTokens is zero.
-		// argsTokens holds tokens of parentheses range (include parentheses).
-		if len(exprTokens) == 0 {
-			ret self.buildBetweenParentheses(argsTokens)
+		ret &ast::Expr{
+			Token: t,
+			End: self.getLast(),
+			Data: &ast::UnaryExpr{
+				Op: t,
+				X: base,
+			},
 		}
-		// Catch type assertions.
-		if exprTokens[len(exprTokens)-1].Id == token::PERIOD {
-			ret self.buildTypeAssertion(exprTokens, argsTokens)
-		}
-		ret self.buildCall(token, exprTokens, argsTokens)
 	}
 
-	fn buildUnsafeExpr(mut self, mut tokens: []&token::Token): &ast::UnsafeExpr {
-		mut token := tokens[0]
-		tokens = tokens[1:] // Remove unsafe keyword.
-		mut i := 0
-		mut rangeTokens := range(i, token::LBRACE, token::RBRACE, tokens)
-		if len(rangeTokens) == 0 {
-			self.pushErr(tokens[0], log::MissingExpr)
+	fn parseFuncType(mut self): &ast::Expr {
+		mut t := self.t
+		mut f := self.p.buildFuncPrototype(self.l, self.i, false)
+		self.i-- // back to }
+		self.next()
+		ret &ast::Expr{
+			Token: t,
+			End: self.getLast(),
+			Data: f,
+		}
+	}
+
+	fn parseArrayType(mut self, mut lbrack: &token::Token, mut len: &ast::Expr): &ast::Expr {
+		if self.eof() {
+			self.pushErr(self.t, "unexpected EOF; expecting ]")
+			ret &ast::Expr{} // bad expression
+		}
+		mut autoSized := false
+		if len == nil {
+			// Always permit ellipsis for more fault-tolerant parsing.
+			if self.t.Id == token::ELLIPSIS {
+				len = nil // size expression must be nil for auto-size
+				autoSized = true
+				self.next()
+			} else if self.t.Id != token::RBRACK {
+				len = self.parse()
+			}
+		}
+		if !self.eof() && self.t.Id == token::COMMA {
+			// Trailing commas are accepted in type parameter
+			// lists but not in array type declarations.
+			// Accept for better error handling but complain.
+			self.pushErr(self.t, "unexpected comma; expecting ]")
+			self.next()
+		}
+		self.expect(token::RBRACK, "expected ]")
+		mut valueTyp := self.parseType()
+		mut typ := &ast::Expr{
+			Token: lbrack,
+			End: self.getLast(),
+		}
+		// If it is not auto-sized and length is nil, then this is a slice type.
+		// Otherwise, this is an array.
+		if autoSized || len != nil {
+			typ.Data = &ast::ArrayType{
+				Value: valueTyp,
+				Size: len,
+			}
+		} else {
+			typ.Data = &ast::SliceType{
+				Value: valueTyp,
+			}
+		}
+		ret typ
+	}
+
+	fn parseMapType(mut self): &ast::Expr {
+		mut t := self.t
+		self.next() // skip map keyword
+		self.expect(token::LBRACK, "expected [")
+		mut key := self.parseType()
+		self.expect(token::RBRACK, "expected ]")
+		mut value := self.parseType()
+		ret &ast::Expr{
+			Token: t,
+			End: self.getLast(),
+			Data: &ast::MapType{
+				Key: key,
+				Value: value,
+			},
+		}
+	}
+
+	fn parseChanType(mut self): &ast::Expr {
+		mut t := self.t
+		mut dir := ast::SEND | ast::RECV
+		let mut arrow: &token::Token
+		if self.t.Id == token::CHAN {
+			self.next()
+			if !self.eof() && self.t.Id == token::ARROW {
+				arrow = self.t
+				self.next()
+				dir = ast::SEND
+			}
+		} else {
+			arrow = self.t
+			self.next()
+			self.expect(token::CHAN, "expected chan keyword")
+			dir = ast::RECV
+		}
+		mut valueTyp := self.parseType()
+		ret &ast::Expr{
+			Token: t,
+			End: self.getLast(),
+			Data: &ast::ChanType{
+				Arrow: arrow,
+				Dir: dir,
+				Value: valueTyp,
+			},
+		}
+	}
+
+	fn parseNameType(mut self, mut t: &token::Token, name: str): &ast::Expr {
+		if !self.eof() && self.t.Id == token::SEP {
+			// Namespace selection.
+			mut typ := self.parseNamespaceExpr(t)
+			if !self.eof() && self.t.Id == token::LBRACK {
+				typ = self.parseTypeInstance(typ)
+			}
+			ret typ
+		}
+		mut typ := &ast::Expr{
+			Token: t,
+			End: t,
+			Data: &ast::NameExpr{
+				Token: t,
+				Name: name,
+				Bind: false,
+			},
+		}
+		if !self.eof() && self.t.Id == token::LBRACK {
+			typ = self.parseTypeInstance(typ)
+		}
+		ret typ
+	}
+
+	fn tryIdentOrType(mut self): &ast::Expr {
+		if self.eof() {
+			// no type found
 			ret nil
 		}
-		ret &ast::UnsafeExpr{
-			Token: token,
-			X: self.buildFromTokens(rangeTokens),
-		}
-	}
-
-	fn buildAnonFunc(mut self, mut &tokens: []&token::Token): &ast::Func {
-		mut f := self.p.buildFunc(tokens, false, false)
-		if f != nil && !f.IsAnon() {
-			self.pushErr(f.Token, log::InvalidSyntax)
-			self.pushSuggestion(log::ExpectedAnonFunc)
-		}
-		ret f
-	}
-
-	fn buildUnsafe(mut self, mut &tokens: []&token::Token): ast::ExprData {
-		match tokens[1].Id {
-		| token::FN:
-			// Unsafe anonymous function.
-			ret self.buildAnonFunc(tokens)
-		|:
-			ret self.buildUnsafeExpr(tokens)
-		}
-	}
-
-	fn pushRangeLitPart(mut self, mut part: []&token::Token,
-		errorToken: &token::Token, mut &parts: [][]&token::Token) {
-		if len(part) == 0 {
-			self.pushErr(errorToken, log::MissingExpr)
-			self.pushSuggestion(log::ExpectedExpr)
-			ret
-		}
-		parts = append(parts, part)
-	}
-
-	// Tokens should include brace tokens.
-	fn getBraceRangeLitExprParts(mut self, mut tokens: []&token::Token): [][]&token::Token {
-		// No part.
-		if len(tokens) < 2 {
-			ret nil
-		}
-
-		let mut parts: [][]&token::Token = nil
-
-		mut last := 0
-		mut rangeN := 0
-		tokens = tokens[1 : len(tokens)-1] // Remove parentheses.
-		for i, token in tokens {
-			match token.Id {
-			| token::LBRACE
-			| token::LBRACK
-			| token::LPAREN:
-				rangeN++
-			| token::RBRACE
-			| token::RBRACK
-			| token::RPAREN:
-				rangeN--
-			}
-			if rangeN > 0 || token.Id != token::COMMA {
-				continue
-			}
-			self.pushRangeLitPart(tokens[last:i], token, parts)
-			last = i + 1
-		}
-
-		if last < len(tokens) {
-			if last == 0 {
-				if len(tokens) > 0 {
-					self.pushRangeLitPart(tokens[last:], tokens[last], parts)
+		match self.t.Id {
+		| token::CPP:
+			t := self.t
+			self.next()
+			if !self.expect(token::PERIOD, "expected period") {
+				if self.eof() {
+					self.pushErr(t, "unexpected EOF; expected identifier")
+					ret &ast::Expr{} // bad expression
 				}
-			} else {
-				self.pushRangeLitPart(tokens[last:], tokens[last-1], parts)
+				mut name := self.t
+				self.next()
+				// Special case: allow using keywords as identifier for bind defines.
+				if name.Id != token::NAME && !token::IsKeyword(name.Kind) {
+					self.pushErr(name, "expected identifier for bind namespace type")
+					ret &ast::Expr{} // bad expression
+				}
+				mut typ := self.parseNameType(name, name.Kind)
+				if typ != nil {
+					match type typ.Data {
+					| &ast::NameExpr:
+						// Plain identifier.
+						typ.Data.(&ast::NameExpr).Bind = true
+					| &ast::IndexExpr:
+						// Identifier with generics.
+						typ.Data.(&ast::IndexExpr).X.Data.(&ast::NameExpr).Bind = true
+					|:
+						self.pushErr(t, "expected identifier for bind namespace type")
+					}
+				}
+				ret typ
 			}
-		}
-
-		ret parts
-	}
-
-	fn buildTypedStructLiteral(mut self, mut tokens: []&token::Token): &ast::TypedBraceLit {
-		mut i := 0
-		mut t, ok := unsafe { self.p.buildType(tokens, &i, true) }
-		if !ok {
-			ret nil
-		} else if i >= len(tokens) {
-			self.pushErr(tokens[i], log::InvalidSyntax)
-			ret nil
-		}
-
-		tokens = tokens[i:] // Remove type tokens.
-		token := tokens[0]
-		if token.Id != token::LBRACE {
-			self.pushErr(token, log::InvalidSyntax)
-			ret nil
-		}
-		ret &ast::TypedBraceLit{
-			Type: t,
-			Lit: self.buildBraceLit(tokens),
-		}
-	}
-
-	fn buildBraceLitPart(mut self, mut &tokens: []&token::Token): &ast::Expr {
-		mut l, mut r := splitDelim(tokens, token::COLON)
-		// If left is not nil, colon token found.
-		if l != nil {
-			if len(r) == 0 {
-				self.pushErr(tokens[len(l)], log::MissingExpr)
-				self.pushSuggestion(log::ExpectedExpr)
-				ret nil
+			ret &ast::Expr{} // bad expression
+		| token::NAME:
+			mut t := self.t
+			name := self.parseIdent()
+			ret self.parseNameType(t, name)
+		| token::LAND:
+			mut p := self.parseSmartPointerType()
+			mut pp := &ast::Expr{}
+			if p != nil {
+				pp.Token = p.Token
+				pp.End = p.End
 			}
+			pp.Data = &ast::UnaryExpr{
+				Op: pp.Token,
+				X: p,
+			}
+			ret pp
+		| token::AND:
+			ret self.parseSmartPointerType()
+		| token::MUL:
+			ret self.parsePointerType()
+		| token::FN:
+			ret self.parseFuncType()
+		| token::LBRACK:
+			mut lbrack := self.t
+			self.next()
+			ret self.parseArrayType(lbrack, nil)
+		| token::MAP:
+			ret self.parseMapType()
+		| token::CHAN | token::ARROW:
+			ret self.parseChanType()
+		| token::UNSAFE:
+			mut t := self.t
+			self.next()
+			if self.eof() {
+				break
+			}
+			match self.t.Id {
+			| token::FN:
+				// Back to unsafe to handle function properly.
+				self.i--
+				self.t = self.lt
+				ret self.parseFuncType()
+			| token::SEP:
+				// Unsafe namespace.
+				ret self.parseNamespaceExpr(t)
+			}
+		| token::LPAREN:
+			mut lparen := self.t
+			self.next()
+			mut x := self.parseType()
+			self.expect(token::RPAREN, "expected )")
 			ret &ast::Expr{
-				Token: tokens[0],
-				End: tokens[len(tokens)-1],
-				Data: &ast::KeyValueExpr{
-					Colon: tokens[len(l)],
-					Key: self.buildFromTokens(l),
-					Value: self.buildFromTokens(r),
+				Token: lparen,
+				End: self.getLast(),
+				Data: &ast::RangeExpr{
+					X: x,
 				},
 			}
 		}
-		ret self.buildFromTokens(tokens)
-	}
 
-	fn buildBraceLit(mut self, mut &tokens: []&token::Token): &ast::BraceLit {
-		mut lit := &ast::BraceLit{
-			Token: tokens[0],
-			End: tokens[len(tokens)-1],
-		}
-
-		mut parts := self.getBraceRangeLitExprParts(tokens)
-		if parts == nil {
-			ret lit
-		}
-
-		lit.X = make([]&ast::Expr, 0, len(parts))
-		for (_, mut part) in parts {
-			lit.X = append(lit.X, self.buildBraceLitPart(part))
-		}
-
-		ret lit
-	}
-
-	fn buildBraceRange(mut self, mut &tokens: []&token::Token): ast::ExprData {
-		mut exprTokens, rangeN := getRangeExprTokens(tokens)
-
-		match {
-		| len(exprTokens) == 0:
-			ret self.buildBraceLit(tokens)
-		| rangeN > 0:
-			self.pushErr(tokens[0], log::InvalidSyntax)
-			ret nil
-		}
-
-		// Exceptional handling.
-		elseToken := exprTokens[len(exprTokens)-1]
-		if exprTokens[len(exprTokens)-1].Id == token::ELSE {
-			exprTokens = exprTokens[:len(exprTokens)-1] // Ignore keyword "else"
-			if len(exprTokens) == 0 {
-				self.pushErr(tokens[0], log::InvalidSyntax)
-				self.pushSuggestion(log::ExpectedConditionChainOrExceptionalCall)
-				ret nil
-			}
-			mut d := self.build(exprTokens)
-			if d == nil {
-				ret nil
-			}
-			mut model, ok := d.(&ast::CallExpr)
-			if !ok {
-				self.pushErr(exprTokens[0], log::InvalidSyntax)
-				ret nil
-			}
-			tokens = tokens[len(exprTokens)+1:] // Get range: {...}
-			mut i := 0
-			mut rangeTokens := range(i, token::LBRACE, token::RBRACE, tokens)
-			if model.Ignored() {
-				self.pushErr(elseToken, log::InvalidSyntax)
-				self.pushSuggestion(log::JustIgnoreOrHandle)
-			}
-			model.Exception = self.p.buildScope(rangeTokens, tokens[i-1])
-			ret d
-		}
-
-		match exprTokens[0].Id {
-		| token::UNSAFE:
-			ret self.buildUnsafe(tokens)
-		| token::FN:
-			ret self.buildAnonFunc(tokens)
-		| token::MAP | token::NAME | token::CPP:
-			ret self.buildTypedStructLiteral(tokens)
-		|:
-			self.pushErr(exprTokens[0], log::InvalidSyntax)
-			ret nil
-		}
-	}
-
-	// Tokens is should be store enumerable range tokens.
-	fn getEnumerableParts(mut self, mut tokens: []&token::Token): [][]&token::Token {
-		tokens = tokens[1 : len(tokens)-1] // Remove range tokens.
-		mut parts, errors := parts(tokens, token::COMMA, true)
-		self.p.errors = append(self.p.errors, errors...)
-		ret parts
-	}
-
-	fn buildSlice(mut self, mut tokens: []&token::Token): &ast::SliceExpr {
-		mut slc := &ast::SliceExpr{
-			Token: tokens[0],
-			End: tokens[len(tokens)-1],
-		}
-
-		mut parts := self.getEnumerableParts(tokens)
-		if len(parts) == 0 {
-			ret slc
-		}
-
-		slc.X = make([]&ast::Expr, 0, len(parts))
-		for (_, mut p) in parts {
-			if len(p) == 0 {
-				continue
-			}
-			slc.X = append(slc.X, self.buildFromTokens(p))
-		}
-
-		ret slc
-	}
-
-	fn buildIndex(mut self, mut exprTokens: []&token::Token,
-		mut tokens: []&token::Token, mut errorToken: &token::Token): &ast::IndexExpr {
-		mut end := tokens[len(tokens)-1]
-		tokens = tokens[1 : len(tokens)-1] // Remove brackets.
-		if len(tokens) == 0 {
-			self.pushErr(errorToken, log::MissingExpr)
-			ret nil
-		}
-		mut expr := self.buildFromTokens(exprTokens)
-		if expr == nil {
-			ret nil
-		}
-		mut index := self.buildFromTokens(tokens)
-		if index == nil {
-			ret nil
-		}
-		ret &ast::IndexExpr{
-			Token: errorToken,
-			End: end,
-			X: expr,
-			Index: index,
-		}
-	}
-
-	fn buildSlicing(mut self, mut &x: []&token::Token, mut &low: []&token::Token,
-		mut high: []&token::Token, mut &errorToken: &token::Token, mut end: &token::Token): &ast::SlicingExpr {
-		mut slc := &ast::SlicingExpr{
-			Token: errorToken,
-			End: end,
-			X: self.buildFromTokens(x),
-		}
-		if len(low) > 0 {
-			slc.Low = self.buildFromTokens(low)
-		}
-		if len(high) > 0 {
-			mut high2, mut max := splitDelim(high, token::COLON) // Catch max index.
-			if len(high2) > 0 || len(max) > 0 {
-				if len(high2) > 0 {
-					slc.High = self.buildFromTokens(high2)
-				} else {
-					panic("unreachable")
-				}
-				if len(max) > 0 {
-					slc.Max = self.buildFromTokens(max)
-				} else {
-					self.pushErr(errorToken, log::FinalIndexRequired)
-				}
-			} else {
-				slc.High = self.buildFromTokens(high)
-			}
-		}
-		ret slc
-	}
-
-	fn buildBracketRange(mut self, mut tokens: []&token::Token): ast::ExprData {
-		mut errorToken := tokens[0]
-		mut exprTokens, rangeN := getRangeExprTokens(tokens)
-
-		if len(exprTokens) == 0 {
-			ret self.buildSlice(tokens)
-		} else if rangeN > 0 {
-			self.pushErr(errorToken, log::InvalidSyntax)
-			ret nil
-		}
-
-		// Remove expression tokens.
-		// Holds only indexing tokens.
-		// Includes brackets.
-		mut bracketTokens := tokens[len(exprTokens):]
-
-		// Catch slicing expressions.
-		mut splitTokens := bracketTokens[1 : len(bracketTokens)-1] // Remove brackets.
-		mut start, mut to := splitDelim(splitTokens, token::COLON)
-		if start != nil || to != nil {
-			ret self.buildSlicing(exprTokens, start, to, errorToken, bracketTokens[len(bracketTokens)-1])
-		}
-		if bracketTokens[1].Id == token::SEP {
-			// Special case: catch x[::] and x[::index3] like expressions.
-			self.pushErr(errorToken, log::MiddleIndexRequired)
-			ret nil
-		}
-		ret self.buildIndex(exprTokens, bracketTokens, errorToken)
-	}
-
-	fn buildExclRight(mut self, mut &tokens: []&token::Token): ast::ExprData {
-		token := tokens[len(tokens)-1]
-		tokens = tokens[:len(tokens)-1] // Ignore "!" token.
-		mut d := self.build(tokens)
-		if d == nil {
-			ret nil
-		}
-		mut f, ok := d.(&ast::CallExpr)
-		if !ok {
-			self.pushErr(token, log::InvalidSyntax)
-			ret nil
-		}
-		// Catch already ignored exceptional calls.
-		// Like: foo()!!!!
-		//         the ^^^ part is unnecessary and invalid
-		if f.Ignored() {
-			self.pushErr(token, log::InvalidSyntax)
-			ret nil
-		} else {
-			f.Exception = &ast::ScopeTree{
-				Deferred: true,
-			}
-		}
-		ret d
-	}
-
-	// First token should be "<-" of the tokens.
-	fn buildChanRecv(mut self, mut &tokens: []&token::Token): &ast::ChanRecv {
-		if len(tokens) == 1 {
-			// Expression is just "<-", invalid syntax.
-			self.pushErr(tokens[0], log::InvalidSyntax)
-			ret nil
-		}
-		mut x := self.buildFromTokens(tokens[1:])
-		if x == nil {
-			ret nil
-		}
-		ret &ast::ChanRecv{
-			X: x,
-		}
-	}
-
-	fn buildData(mut self, mut &tokens: []&token::Token): ast::ExprData {
-		match len(tokens) {
-		| 0:
-			ret nil
-		| 1:
-			ret self.buildSingle(tokens[0])
-		| 3:
-			if tokens[0].Id == token::CPP {
-				ret self.buildBindName(tokens)
-			}
-		}
-
-		mut token := tokens[len(tokens)-1]
-		if token.Id == token::ELLIPSIS {
-			ret self.buildVariadic(tokens)
-		}
-
-		token = tokens[0]
-		match token.Id {
-		| token::ARROW:
-			if len(tokens) > 1 && tokens[1].Id != token::CHAN {
-				ret self.buildChanRecv(tokens)
-			}
-			fall
-		| token::CHAN:
-			// Handle channel type declaration.
-			ret self.buildType(tokens)
-		}
-
-		// Unary operators.
-		if token::IsUnaryOp(token.Id) {
-			// Handle pointer to primitive type.
-			if len(tokens) > 1 {
-				token = tokens[1]
-				if token.Id == token::UNSAFE {
-					ret self.buildType(tokens)
-				}
-			}
-			ret self.buildUnary(tokens)
-		}
-
-		if len(tokens) >= 3 {
-			token = tokens[0]
-			match token.Id {
-			| token::LPAREN
-			| token::LBRACE
-			| token::LBRACK:
-				// Catch type casting.
-				if len(tokens) > 3 {
-					t := tokens[len(tokens)-1]
-					if t.Id == token::RPAREN {
-						break
-					}
-				}
-				if tokens[1].Id == token::RBRACK {
-					ret self.buildType(tokens)
-				}
-			}
-		}
-
-		token = tokens[len(tokens)-1]
-		match token.Id {
-		| token::NAME:
-			ret self.buildSubIdent(tokens)
-		| token::NOT:
-			ret self.buildExclRight(tokens)
-		| token::RPAREN:
-			ret self.buildParenthesesRange(tokens)
-		| token::RBRACE:
-			ret self.buildBraceRange(tokens)
-		| token::RBRACK:
-			ret self.buildBracketRange(tokens)
-		}
-		self.pushErr(token, log::InvalidSyntax)
+		// no type found
 		ret nil
 	}
 
-	fn buildBinary(mut self, mut &tokens: []&token::Token, i: int): ast::ExprData {
-		mut op := tokens[i]
-		mut x := tokens[:i]
-		if isTypeOp(op.Id) && isTypeRange(x) {
-			// Catch slice and array types.
-			ret self.buildType(tokens)
-		}
-		if len(x) == 0 {
-			self.pushErr(tokens[i], log::InvalidSyntax)
-			self.pushSuggestion(log::ExpectedLeftOperand)
-			ret nil
-		}
-		mut y := tokens[i+1:]
-		if len(y) == 0 {
-			self.pushErr(tokens[i], log::InvalidSyntax)
-			self.pushSuggestion(log::ExpectedRightOperand)
-			ret nil
-		}
-		ret &ast::BinaryExpr{
-			X: self.buildFromTokens(x),
-			Y: self.buildFromTokens(y),
-			Op: op,
-		}
-	}
-
-	fn build(mut self, mut &tokens: []&token::Token): ast::ExprData {
-		i := findLowestPrecOp(tokens)
-		if i == -1 {
-			ret self.buildData(tokens)
-		}
-		ret self.buildBinary(tokens, i)
-	}
-
-	fn buildKind(mut self, mut &tokens: []&token::Token): ast::ExprData {
-		if isTupleExpr(tokens) {
-			mut parts, errors := parts(tokens, token::COMMA, true)
-			if errors != nil {
-				self.p.errors = append(self.p.errors, errors...)
-				ret nil
-			} else if len(parts) > 1 {
-				ret self.buildTuple(parts)
+	fn parseType(mut self): &ast::Expr {
+		mut typ := self.tryIdentOrType()
+		if typ == nil {
+			if self.eof() {
+				self.pushErr(self.lt, "expected type")
+			} else {
+				self.pushErr(self.t, "expected type")
 			}
 		}
-		ret self.build(tokens)
+		ret typ
 	}
 
-	fn buildFromTokens(mut self, mut tokens: []&token::Token): &ast::Expr {
-		if len(tokens) == 0 {
+	fn parseIdent(mut self): str {
+		mut name := "_"
+		if self.t.Id == token::NAME ||
+			self.t.Id == token::ERROR ||
+			self.t.Id == token::SELF ||
+			self.p.isIdent(self.t) {
+			name = self.t.Kind
+			self.next()
+		} else {
+			self.pushErr(self.t, "expected identifier")
+		}
+		ret name
+	}
+
+	fn parseSelector(mut self, mut x: &ast::Expr): &ast::Expr {
+		mut t := self.t
+		_ = self.parseIdent()
+		ret &ast::Expr{
+			Token: t,
+			End: t,
+			Data: &ast::SelectorExpr{
+				Name: t,
+				X: x,
+			},
+		}
+	}
+
+	fn parseTypeAssertion(mut self, mut x: &ast::Expr): &ast::Expr {
+		mut lparen := self.t
+		let mut typ: &ast::Expr
+		self.next()
+		if self.eof() {
+			self.pushErr(lparen, "expected )")
 			ret nil
 		}
-		mut typ := self.buildKind(tokens)
-		if typ == nil {
+		if self.t.Id == token::TYPE {
+			// type switch: typ == nil
+			self.next()
+		} else {
+			typ = self.parseType()
+		}
+		if self.expect(token::RPAREN, "expected )") {
 			ret nil
 		}
 		ret &ast::Expr{
-			Token: tokens[0],
-			End: tokens[len(tokens)-1],
-			Data: typ,
+			Token: x.Token,
+			End: self.getLast(),
+			Data: &ast::TypeAssertionExpr{
+				X: x,
+				Type: typ,
+			},
 		}
 	}
-}
 
-// Reports whether kind is potentially part of a type declaration.
-fn isTypeOp(id: int): bool {
-	ret id == token::AND ||
-		id == token::LAND ||
-		id == token::MUL ||
-		id == token::CHAN ||
-		id == token::ARROW
-}
+	fn parseIndexOrSlicingInstance(mut self, mut x: &ast::Expr): &ast::Expr {
+		mut lbrack := self.t
+		self.next()
+		if self.eof() {
+			self.pushErr(lbrack, "expected operand")
+			ret nil
+		}
+		if self.t.Id == token::RBRACK {
+			// Empty index, slicing or index expressions are not permitted; complain.
+			self.pushErr(lbrack, "expected operand")
+			self.next()
+			ret nil
+		}
+		const N = 3
+		let mut args: []&ast::Expr
+		let mut index: [N]&ast::Expr
+		let mut colons: [N - 1]&token::Token
+		if self.t.Id != token::COLON && self.t.Id != token::SEP {
+			// We can't know if we have an index expression or a type instantiation;
+			// so even if we see a (named) type we are not going to be in type context.
+			index[0] = self.parse()
+			if self.eof() {
+				self.pushErr(lbrack, "expected ]")
+			}
+		}
+		mut ncolons := 0
+		match self.t.Id {
+		| token::COLON | token::SEP:
+			// Slicing expression.
+			for (self.t.Id == token::COLON || self.t.Id == token::SEP) && ncolons < len(colons) {
+				colons[ncolons] = self.t
+				ncolons++
+				if self.t.Id == token::SEP {
+					ncolons++
+				}
+				self.next()
+				if !self.eof() && self.t.Id != token::COLON && self.t.Id != token::SEP && self.t.Id != token::RBRACK {
+					index[ncolons] = self.parse()
+				}
+			}
+		| token::COMMA:
+			// Instance expression.
+			args = append(args, index[0])
+			for !self.eof() && self.t.Id == token::COMMA {
+				self.next()
+				if !self.eof() && self.t.Id != token::RBRACK {
+					args = append(args, self.parseType())
+				}
+			}
+		}
 
-// Reports whether range is potentially part of a type declaration.
-fn isTypeRange(mut &tokens: []&token::Token): bool {
-	mut op := false
-	for i, token in tokens {
-		if token.Id == token::LBRACK {
-			if op {
-				ret true
-			}
-			mut rangeN := 0
-			mut lTokens := tokens[i:]
-			for _, lToken in lTokens {
-				match lToken.Id {
-				| token::LBRACK:
-					rangeN++
-					continue
-				| token::RBRACK:
-					rangeN--
-					continue
+		if self.expect(token::RBRACK, "expected ]") {
+			ret nil
+		}
+
+		mut rbrack := self.t
+		if ncolons > 0 {
+			// Slicing expression.
+			if ncolons == 2 {
+				// Check presence of middle and final index here than during type-checking
+				// to prevent erroneous programs from parsing through julefmt.
+				if index[1] == nil {
+					self.pushErr(colons[0], "middle index required in 3-index slice")
 				}
-				if rangeN == 0 {
-					ret isTypeOp(lToken.Id)
+				if index[2] == nil {
+					self.pushErr(colons[1], "final index required in 3-index slice")
 				}
 			}
-			ret true
+			ret &ast::Expr{
+				Token: x.Token,
+				End: rbrack,
+				Data: &ast::SlicingExpr{
+					Token: lbrack,
+					X: x,
+					Low: index[0],
+					High: index[1],
+					Max: index[2],
+				},
+			}
 		}
-		if !isTypeOp(token.Id) {
-			ret false
+
+		if len(args) == 0 {
+			// Index expression.
+			ret &ast::Expr{
+				Token: x.Token,
+				End: rbrack,
+				Data: &ast::IndexExpr{
+					Token: lbrack,
+					X: x,
+					Index: index[0],
+				},
+			}
 		}
-		op = true
+
+		// Instance expression.
+		ret packIndexExpr(x, lbrack, args, rbrack)
 	}
-	ret true
+
+	fn parseCallOrConversion(mut self, mut x: &ast::Expr): &ast::Expr {
+		mut lparen := self.t
+		let mut list: []&ast::Expr
+		for !self.eof() && self.t.Id != token::RPAREN {
+			self.next()
+			if !self.eof() && self.t.Id != token::COMMA && self.t.Id != token::RPAREN {
+				list = append(list, self.parse()) // builtins may expect a type: make(some type, ...)
+			}
+			if self.eof() || self.t.Id != token::COMMA && self.t.Id != token::RPAREN {
+				self.pushErr(self.lt, "expected , or )")
+				ret nil
+			}
+		}
+		if self.expect(token::RPAREN, "expected )") {
+			ret nil
+		}
+		ret &ast::Expr{
+			Token: x.Token,
+			End: self.getLast(),
+			Data: &ast::CallExpr{
+				Token: lparen,
+				Func: x,
+				Args: list,
+			},
+		}
+	}
+
+	fn parseValue(mut self): &ast::Expr {
+		if !self.eof() && self.t.Id == token::LBRACE {
+			ret self.parseUntypedLiteralValue()
+		}
+		ret self.parse()
+	}
+
+	fn parseElement(mut self): &ast::Expr {
+		mut x := self.parseValue()
+		if !self.eof() && self.t.Id == token::COLON {
+			self.next()
+			x = &ast::Expr{
+				Token: x.Token,
+				End: self.getLast(),
+				Data: &ast::KeyValueExpr{Key: x, Value: self.parseValue()},
+			}
+		}
+		ret x
+	}
+
+	fn parseUntypedLiteralValue(mut self): &ast::Expr {
+		mut lbrace := self.t
+		let mut list: []&ast::Expr
+		for !self.eof() && self.t.Id != token::RBRACE {
+			self.next()
+			if !self.eof() && self.t.Id != token::COMMA && self.t.Id != token::RBRACE {
+				list = append(list, self.parseElement())
+			}
+			if self.eof() || self.t.Id != token::COMMA && self.t.Id != token::RBRACE {
+				self.pushErr(self.lt, "expected , or }")
+				ret nil
+			}
+		}
+		if self.expect(token::RBRACE, "expected }") {
+			ret nil
+		}
+		ret &ast::Expr{
+			Token: lbrace,
+			End: self.getLast(),
+			Data: &ast::BraceLit{
+				Token: lbrace,
+				End: self.getLast(),
+				X: list,
+			},
+		}
+	}
+
+	fn parseLiteralValue(mut self, mut typ: &ast::Expr): &ast::Expr {
+		mut lit := self.parseUntypedLiteralValue()
+		if lit == nil {
+			ret nil
+		}
+		ret &ast::Expr{
+			Token: typ.Token,
+			End: self.getLast(),
+			Data: &ast::TypedBraceLit{
+				Type: typ,
+				Lit: lit.Data.(&ast::BraceLit),
+			},
+		}
+	}
+
+	fn trySliceOrArrayType(mut self, mut lbrack: &token::Token, mut list: []&ast::Expr): (typ: &ast::Expr, isTyp: bool) {
+		if self.eof() {
+			ret nil, false
+		}
+		err := self.err
+		self.err = true
+		n := len(self.p.errors)
+		i := self.i
+		match self.t.Id {
+		| token::LBRACK:
+			// We do not know whether if it is type or literal.
+			// We have to try for type.
+			self.err = false
+			fall
+		| token::LAND | token::AND | token::MUL | token::ARROW
+		| token::NAME | token::CHAN | token::MAP | token::FN | token::CPP | token::UNSAFE:
+			isTyp = true
+			self.i--         // Back to ]
+			self.t = self.lt // Back to ]
+			if len(list) > 0 {
+				// Array type.
+				if len(list) > 1 {
+					self.pushErr(list[1].Token, "array expression needs only single constant expression")
+				}
+				typ = self.parseArrayType(lbrack, list[0])
+			} else {
+				// Slice type.
+				typ = self.parseArrayType(lbrack, nil)
+			}
+		}
+		self.err = err
+		if isTyp && typ == nil && !err && len(self.p.errors) == n {
+			// We do not know expression is a type exactly,
+			// type builder did not log any error but returns nil.
+			// This is not a type. Recover the old state of parser.
+			isTyp = false
+			typ = nil
+			self.i = i
+		}
+		ret
+	}
+
+	fn parseSliceLiteralOrType(mut self): &ast::Expr {
+		mut lbrack := self.t
+		let mut list: []&ast::Expr
+		for !self.eof() && self.t.Id != token::RBRACK {
+			self.next()
+			if !self.eof() && self.t.Id != token::RBRACK {
+				if len(list) == 0 && self.t.Id == token::ELLIPSIS {
+					// Array type with auto-size.
+					ret self.parseArrayType(lbrack, nil)
+				}
+				list = append(list, self.parse())
+			}
+			if self.eof() || self.t.Id != token::COMMA && self.t.Id != token::RBRACK {
+				self.pushErr(self.t, "expected , or ]")
+				ret nil
+			}
+		}
+		mut rbrack := self.t
+		if self.expect(token::RBRACK, "expected ]") {
+			ret nil
+		}
+		mut typ, isTyp := self.trySliceOrArrayType(lbrack, list)
+		if isTyp {
+			ret typ
+		}
+		ret &ast::Expr{
+			Token: lbrack,
+			End: rbrack,
+			Data: &ast::SliceExpr{
+				Token: lbrack,
+				End: rbrack,
+				X: list,
+			},
+		}
+	}
+
+	fn parseFuncTypeOrLit(mut self): &ast::Expr {
+		mut t := self.t
+		mut f := self.p.buildFuncPrototype(self.l, self.i, false)
+		self.i-- // back to }
+		self.next()
+		if f == nil {
+			ret nil
+		}
+		if self.eof() || self.t.Id != token::LBRACE {
+			// Function type.
+			// No extra attention needed.
+		} else {
+			// We found LBRACE, handle scope of the function literal.
+			mut blockTokens := range(self.i, token::LBRACE, token::RBRACE, self.l)
+			self.i-- // back to }
+			self.next()
+			f.Scope = self.p.buildScope(blockTokens, self.l[self.i-1])
+		}
+		ret &ast::Expr{
+			Token: t,
+			End: self.getLast(),
+			Data: f,
+		}
+	}
+
+	fn parseUnsafeExpr(mut self): &ast::Expr {
+		mut lbrace := self.t
+		self.next()
+		mut x := self.parse()
+		if self.expect(token::RBRACE, "expected }") {
+			ret nil
+		}
+		ret &ast::Expr{
+			Token: lbrace,
+			End: self.getLast(),
+			Data: &ast::UnsafeExpr{
+				Token: lbrace,
+				X: x,
+			},
+		}
+	}
+
+	// May return an expression or a raw type (incl. array
+	// types of the form [...]T). Callers must verify the result.
+	fn parseOperand(mut self): &ast::Expr {
+		match self.t.Id {
+		| token::SELF | token::NAME | token::ERROR:
+			mut t := self.t
+			name := self.parseIdent()
+			if !self.eof() && self.t.Id == token::SEP {
+				// Namespace selection.
+				ret self.parseNamespaceExpr(t)
+			}
+			ret &ast::Expr{
+				Token: t,
+				End: t,
+				Data: &ast::NameExpr{
+					Token: t,
+					Name: name,
+					Bind: false,
+				},
+			}
+		| token::LIT:
+			mut lit := self.t
+			self.next()
+			ret &ast::Expr{
+				Token: lit,
+				End: self.getLast(),
+				Data: &ast::LitExpr{
+					Token: lit,
+					Value: lit.Kind,
+				},
+			}
+		| token::LBRACK:
+			// Slice [...] literal or type []name.
+			ret self.parseSliceLiteralOrType()
+		| token::LBRACE:
+			// Untyped brace literal.
+			ret self.parseUntypedLiteralValue()
+		| token::LPAREN:
+			// (...) expression.
+			mut lparen := self.t
+			self.next()
+			mut x := self.parse()
+			if self.expect(token::RPAREN, "expected )") {
+				ret nil
+			}
+			ret &ast::Expr{
+				Token: lparen,
+				End: self.getLast(),
+				Data: &ast::RangeExpr{
+					X: x,
+				},
+			}
+		| token::UNSAFE:
+			mut t := self.t
+			// Unsafe expression or unsafe function type declaration.
+			self.next()
+			if self.eof() {
+				self.pushErr(t, "expected unsafe scope expression or unsafe function type/literal")
+				ret nil
+			}
+			match self.t.Id {
+			| token::LBRACE:
+				// Unsafe scope expression.
+				ret self.parseUnsafeExpr()
+			| token::SEP:
+				// Namespace.
+				ret self.parseNamespaceExpr(t)
+			| token::FN:
+				// Function type.
+				mut f := self.parseFuncTypeOrLit()
+				if f != nil {
+					mut fnc := f.Data.(&ast::Func)
+					fnc.Unsafe = true
+					if fnc.Scope != nil {
+						fnc.Scope.Unsafe = fnc.Unsafe
+					}
+				}
+				ret f
+			|:
+				self.pushErr(t, "expected unsafe scope expression or unsafe function type/literal")
+			}
+		| token::FN:
+			ret self.parseFuncTypeOrLit()
+		}
+
+		// The self and other identifiers will be handled above.
+		// But here is another case, cpp.name, or namespaces.
+		// Catch such identifiers too. Also checks for types.
+		mut typ := self.tryIdentOrType()
+		if typ != nil {
+			ret typ
+		}
+
+		self.pushErr(self.t, "expected operand")
+		self.next()
+		ret nil
+	}
+
+	fn parsePrimaryExpr(mut self, mut x: &ast::Expr): &ast::Expr {
+		if x == nil {
+			x = self.parseOperand()
+			if x == nil {
+				ret nil
+			}
+		}
+		for {
+			if self.eof() || x == nil {
+				ret x
+			}
+			match self.t.Id {
+			| token::ELLIPSIS:
+				// Variadic expression.
+				mut t := self.t
+				self.next()
+				x = &ast::Expr{
+					Token: x.Token,
+					End: t,
+					Data: &ast::VariadicExpr{
+						Token: t,
+						X: x,
+					},
+				}
+			| token::NOT:
+				t := self.t
+				self.next()
+				// Trailing not operator.
+				// It should be call expression to an exceptional function.
+				mut f, isFunc := ast::Unparen(x).Data.(&ast::CallExpr)
+				if !isFunc {
+					self.pushErr(t, "trailing not operator expects a function call")
+					break
+				}
+				f.Exception = &ast::ScopeTree{
+					Deferred: true,
+				}
+			| token::ELSE:
+				t := self.t
+				self.next()
+				// Trailing else keyword.
+				// It should be call expression to an exceptional function.
+				mut f, isFunc := ast::Unparen(x).Data.(&ast::CallExpr)
+				if !isFunc {
+					self.pushErr(t, "else keyword expects a function call")
+					break
+				}
+				if f.Exception != nil {
+					self.pushErr(t, "exceptional is already handled for this call")
+				}
+				if self.eof() || self.t.Id != token::LBRACE {
+					self.pushErr(t, "expected {")
+					ret nil
+				}
+				mut blockTokens := range(self.i, token::LBRACE, token::RBRACE, self.l)
+				self.i-- // back to }, to advance properly
+				self.next()
+				f.Exception = self.p.buildScope(blockTokens, self.l[self.i-1])
+			| token::PERIOD:
+				self.next()
+				if self.eof() {
+					break
+				}
+				match self.t.Id {
+				| token::NAME:
+					x = self.parseSelector(x)
+				| token::LPAREN:
+					x = self.parseTypeAssertion(x)
+				|:
+					self.pushErr(self.t, "expected selector or type assertion")
+					ret nil
+				}
+			| token::LBRACK:
+				x = self.parseIndexOrSlicingInstance(x)
+			| token::LPAREN:
+				x = self.parseCallOrConversion(x)
+			| token::LBRACE:
+				// Operand may have returned a parenthesized complit
+				// type; accept it but complain if we have a complit.
+				mut t := ast::Unparen(x)
+				// Determine if '{' belongs to a composite literal or a block statement.
+				match type t.Data {
+				| &ast::NameExpr | &ast::SelectorExpr | &ast::NamespaceExpr:
+					// x is possibly a composite literal type.
+				| &ast::IndexExpr:
+					// x is possibly a composite literal type.
+				| &ast::MapType:
+					// x is a composite literal type..
+				|:
+					ret x
+				}
+				if t != x {
+					self.pushErr(t.Token, "cannot parenthesize type in composite literal")
+					// Already progressed, no need to advance.
+				}
+				x = self.parseLiteralValue(x)
+			|:
+				ret x
+			}
+		}
+	}
+
+	fn parseUnaryExpr(mut self): &ast::Expr {
+		if self.eof() {
+			self.pushErr(self.lt, "expected operand")
+			ret nil
+		}
+		match self.t.Id {
+		| token::ADD | token::SUB | token::NOT | token::XOR | token::AND:
+			mut t := self.t
+			self.next()
+			mut x := self.parseUnaryExpr()
+			if x == nil {
+				ret nil
+			}
+			ret &ast::Expr{
+				Token: t,
+				End: self.getLast(),
+				Data: &ast::UnaryExpr{
+					Op: t,
+					X: x,
+				},
+			}
+		| token::ARROW:
+			// Channel type or receive expression.
+			mut arrow := self.t
+			self.next()
+
+			// If the next token is token::CHAN we still don't know if it
+			// is a channel type or a receive operation - we only know
+			// once we have found the end of the unary expression. There
+			// are two cases:
+			//
+			//   <- type  => (<-type) must be channel type
+			//   <- expr  => <-(expr) is a receive from an expression
+			//
+			// In the first case, the arrow must be re-associated with
+			// the channel type parsed already:
+			//
+			//   <- (chan type)    =>  (<-chan type)
+			//   <- (chan<- type)  =>  (<-chan (<-type))
+
+			mut x := self.parseUnaryExpr()
+			if x == nil {
+				ret nil
+			}
+
+			// Determine which case we have.
+			mut typ, mut ok := x.Data.(&ast::ChanType)
+			if ok {
+				// (<-type)
+
+				// Re-associate position info and <- token.
+				mut dir := ast::SEND
+				for ok && dir == ast::SEND {
+					if typ.Dir == ast::RECV {
+						// error: (<-type) is (<-(<-chan T))
+						self.pushErr(typ.Arrow, "expected chan <-")
+					}
+					arrow, typ.Arrow = typ.Arrow, arrow
+					dir, typ.Dir = typ.Dir, ast::RECV
+					typ, ok = typ.Value.Data.(&ast::ChanType)
+				}
+				if dir == ast::SEND {
+					self.pushErr(arrow, "expected channel type")
+				}
+			}
+
+			// <-(expr)
+			ret &ast::Expr{
+				Token: arrow,
+				End: self.getLast(),
+				Data: &ast::UnaryExpr{
+					Op: arrow,
+					X: x,
+				},
+			}
+		| token::MUL:
+			// Pointer type or unary "*" expression.
+			mut t := self.t
+			self.next()
+			// Check for the unsafe pointer type.
+			if !self.eof() && self.t.Id == token::UNSAFE {
+				self.next()
+				ret &ast::Expr{
+					Token: t,
+					End: self.getLast(),
+					Data: &ast::UnaryExpr{
+						Op: t,
+						X: nil, // Set Expr as nil for unsafe pointer (*unsafe) type.
+					},
+				}
+			}
+			mut x := self.parseUnaryExpr()
+			if x == nil {
+				ret nil
+			}
+			ret &ast::Expr{
+				Token: t,
+				End: self.getLast(),
+				Data: &ast::UnaryExpr{
+					Op: t,
+					X: x,
+				},
+			}
+		}
+
+		ret self.parsePrimaryExpr(nil)
+	}
+
+	// Parses a (possibly) binary expression.
+	// If x is non-nil, it is used as the left operand.
+	fn parseBinaryExpr(mut self, mut x: &ast::Expr, prec1: int): &ast::Expr {
+		if x == nil {
+			x = self.parseUnaryExpr()
+		}
+		for {
+			if self.eof() {
+				ret x
+			}
+			mut op := self.t
+			oprec := op.Precedence()
+			if oprec < prec1 {
+				ret x
+			}
+			self.next()
+			mut y := self.parseBinaryExpr(nil, oprec+1)
+			x = &ast::Expr{
+				Token: x.Token,
+				End: self.getLast(),
+				Data: &ast::BinaryExpr{
+					X: x,
+					Y: y,
+					Op: op,
+				},
+			}
+		}
+	}
+
+	fn parse(mut self): &ast::Expr {
+		ret self.parseBinaryExpr(nil, lowestPrec+1)
+	}
+
+	// Parses (possibly) expression list.
+	fn parseExprList(mut self): &ast::Expr {
+		mut t := self.t
+		let mut list: []&ast::Expr
+		list = append(list, self.parse())
+		for !self.eof() && self.t.Id == token::COMMA {
+			self.next()
+			list = append(list, self.parse())
+		}
+		if len(list) == 1 {
+			ret list[0]
+		}
+		ret &ast::Expr{
+			Token: t,
+			End: self.getLast(),
+			Data: &ast::TupleExpr{
+				X: list,
+			},
+		}
+	}
+
+	fn setForNewTokens(mut self, mut tokens: []&token::Token) {
+		self.i = -1
+		self.t = nil
+		self.l = tokens
+		self.next()
+	}
+
+	fn parseFromTokens(mut self, mut tokens: []&token::Token): &ast::Expr {
+		if len(tokens) == 0 {
+			ret nil
+		}
+		self.setForNewTokens(tokens)
+		mut expr := self.parseExprList()
+		if !self.eof() {
+			// All tokens must be consumed.
+			self.pushErr(self.t, "invalid syntax")
+		}
+		ret expr
+	}
 }
 
 // Returns expression tokens comes before block if exist, nil if not.
@@ -920,206 +1167,42 @@ fn getBlockExpr(mut &tokens: []&token::Token): []&token::Token {
 	ret nil
 }
 
-// Returns delimiter index, left range and right range tokens.
-// Returns nil slice and -1 if not found.
-fn splitDelim(mut &tokens: []&token::Token, delim: int): ([]&token::Token, []&token::Token) {
-	mut func := -1
-	mut rangeN := 0
-	mut i := 0
-	for i < len(tokens); i++ {
-		token := tokens[i]
-		match token.Id {
-		| token::FN:
-			func = rangeN
-		| token::LBRACE
-		| token::LBRACK
-		| token::LPAREN:
-			rangeN++
-			continue
-		| token::RPAREN:
-			rangeN--
-			if func == rangeN {
-				func = -1
-				// Skip colon token if function built.
-				if len(tokens)-i > 1 && tokens[i+1].Id == token::COLON {
-					i++
-					continue
-				}
-			}
-		| token::RBRACE
-		| token::RBRACK:
-			rangeN--
+fn packIndexExpr(mut x: &ast::Expr, mut lbrack: &token::Token, mut exprs: []&ast::Expr, mut rbrack: &token::Token): &ast::Expr {
+	match len(exprs) {
+	| 0:
+		panic("internal error: packIndexExpr with empty expr slice")
+	| 1:
+		ret &ast::Expr{
+			Token: lbrack,
+			End: rbrack,
+			Data: &ast::IndexExpr{
+				Token: rbrack,
+				X: x,
+				Index: exprs[0],
+			},
 		}
-		if token.Id == delim && rangeN == 0 {
-			mut l := tokens[:i]
-			mut r := tokens[i+1:]
-			ret l, r
+	|:
+		ret &ast::Expr{
+			Token: lbrack,
+			End: rbrack,
+			Data: &ast::IndexExpr{
+				Token: rbrack,
+				X: x,
+				Index: &ast::Expr{
+					Token: avoidNilExpr(exprs[0]),
+					End: avoidNilExpr(exprs[len(exprs)-1]),
+					Data: &ast::TupleExpr{
+						X: exprs,
+					},
+				},
+			},
 		}
-	}
-	ret nil, nil
-}
-
-// Finds index of priority operator and returns index of operator
-// if found, returns -1 if not.
-fn findLowestPrecOp(tokens: []&token::Token): int {
-	// Set to max byte value, there is nothing for precedence it.
-	// It's provides optimization, avoid prec != -1 (if not set) checking.
-	// Always greater than actual precedences.
-	// So, It's will initialized by first precedence without any checking that if not set.
-	const MaxPrec = byte(255)
-	mut prec := MaxPrec
-	mut precPos := -1
-	mut op := true // Ready to read operator.
-
-	mut braceN := 0
-	mut mapType := 0
-
-	// Skips all unary operators of tokens by i and increases the i for each token.
-	// At the end, i will point to last skipped unary operator, if any.
-	// Reports whether any token skipped.
-	skipunary := fn(mut &i: int): bool {
-		mut inc := false
-		for i < len(tokens) {
-			if token::IsUnaryOp(tokens[i].Id) {
-				i++
-				inc = true
-			} else {
-				if inc {
-					i--
-				}
-				break
-			}
-		}
-		ret inc
-	}
-
-	mut i := 0
-	// Skip the unary operators of the beginning.
-	// If skipped any operator, point to correct start token.
-	if skipunary(i) {
-		i++
-	}
-	for i < len(tokens); i++ {
-		token := tokens[i]
-		match token.Id {
-		| token::MAP:
-			mapType++
-		| token::LBRACE
-		| token::LPAREN
-		| token::LBRACK:
-			op = true
-			braceN++
-			skipunary(i) // Skip the unary expressions of the range's beginning.
-			continue
-		| token::RPAREN:
-			// For the closing parentheses range, it might be a function call.
-			// Therefore, we need to handle ! operators.
-			// Allow multiple EXCL operator here,
-			// error logging should be handled by expression parser.
-			i++ // Skip the range closer token.
-			for i < len(tokens); i++ {
-				if tokens[i].Id != token::NOT {
-					break
-				}
-			}
-			i-- // Fallback to the range closer token or last skipped unary operator.
-			fall // Fallback to ordinary range closing algorithm.
-		| token::RBRACK:
-			op = mapType == 0
-			if mapType > 0 {
-				mapType--
-			}
-			braceN--
-			continue
-		| token::RBRACE:
-			op = true
-			braceN--
-			continue
-		}
-		match {
-		| i == 0:
-			continue
-		| braceN > 0:
-			continue
-		| !token::IsBinOp(token.Id):
-			op = true
-			continue
-		| !op:
-			continue
-		}
-
-		// Skip type annotations.
-		left := tokens[i-1]
-		if left.Id == token::COLON {
-			continue
-		}
-		if i > 1 && left.Id == token::RBRACK {
-			lleft := tokens[i-2]
-			if lleft.Id == token::LBRACK {
-				// Skip potential type annotations.
-				if token.Id == token::AND || token.Id == token::MUL {
-					continue
-				}
-			}
-		}
-
-		op = false
-		p := token.Prec()
-		if p != 0 && p <= prec {
-			prec = p
-			precPos = i
-		}
-
-		// After binary expression, skip the unary operators of the following operand.
-		skipunary(i)
-	}
-	ret precPos
-}
-
-fn buildIdentExpr(mut &token: &token::Token): &ast::NameExpr {
-	ret &ast::NameExpr{
-		Token: token,
-		Name: token.Kind,
-		Bind: false,
 	}
 }
 
-fn getRangeExprTokens(mut &tokens: []&token::Token): ([]&token::Token, int) {
-	mut rangeN := 0
-	mut i := len(tokens) - 1
-	for i >= 0; i-- {
-		tok := tokens[i]
-		match tok.Id {
-		| token::RBRACE
-		| token::RBRACK
-		| token::RPAREN:
-			rangeN++
-		| token::LBRACE
-		| token::LBRACK
-		| token::LPAREN:
-			rangeN--
-		}
-
-		if rangeN == 0 {
-			ret tokens[:i], rangeN
-		}
+fn avoidNilExpr(mut e: &ast::Expr): &token::Token {
+	if e == nil {
+		ret nil
 	}
-	ret nil, rangeN
-}
-
-fn isAnonFuncHead(&tokens: []&token::Token): bool {
-	match tokens[0].Id {
-	| token::UNSAFE:
-		if len(tokens) == 1 || tokens[1].Id != token::FN {
-			break
-		}
-		fall
-	| token::FN:
-		if tokens[len(tokens)-1].Id == token::RBRACE {
-			// Not function type declaration, anonymous function expression.
-			break
-		}
-		ret true
-	}
-	ret false
+	ret e.Token
 }

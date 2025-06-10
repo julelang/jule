@@ -3089,29 +3089,6 @@ impl eval {
 		ret bs.eval(op)
 	}
 
-	fn evalChanRecv(mut &self, mut expr: &ast::ChanRecv): &Value {
-		mut v := self.evalExpr(expr.X, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
-		if v == nil {
-			ret nil
-		}
-		mut ch := v.Type.Chan()
-		if ch == nil {
-			// Expression type is not channel.
-			self.s.pushErr(expr.X.Token, log::ExprNotChan)
-			self.s.pushSuggestion(log::RArrowOpExpectsChan)
-			ret nil
-		}
-		if !ch.Recv {
-			self.s.pushErr(expr.X.Token, log::RecvFromSendOnlyChan)
-		}
-		v.Model = &ChanRecv{
-			Token: expr.X.Token,
-			Expr: new(Value, *v),
-		}
-		v.Type = ch.Value
-		ret v
-	}
-
 	fn evalChanSend(mut &self, mut chs: &ast::ChanSend): &Value {
 		mut l := self.evalExpr(chs.Chan, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if l == nil {
@@ -3231,13 +3208,11 @@ impl eval {
 		match type kind {
 		| &ast::RangeExpr:
 			mut e := kind.(&ast::RangeExpr)
-			ret self.evalExprData(e.X.Data)
+			ret self.evalExprPlain(e.X)
 		| &ast::LitExpr:
 			ret self.evalLit(kind.(&ast::LitExpr))
 		| &ast::NameExpr:
 			ret self.evalName(kind.(&ast::NameExpr))
-		| &ast::UnaryExpr:
-			ret self.evalUnary(kind.(&ast::UnaryExpr))
 		| &ast::VariadicExpr:
 			ret self.evalVariadic(kind.(&ast::VariadicExpr))
 		| &ast::UnsafeExpr:
@@ -3266,8 +3241,6 @@ impl eval {
 			ret self.evalAnonFunc(kind.(&ast::Func))
 		| &ast::BinaryExpr:
 			ret self.evalBinary(kind.(&ast::BinaryExpr))
-		| &ast::ChanRecv:
-			ret self.evalChanRecv(kind.(&ast::ChanRecv))
 		| &ast::ChanSend:
 			ret self.evalChanSend(kind.(&ast::ChanSend))
 		| &ast::TypeAssertionExpr:
@@ -3285,6 +3258,13 @@ impl eval {
 		| &ast::ChanType
 		| &ast::MapType:
 			ret self.evalType(expr)
+		| &ast::UnaryExpr:
+			mut u := expr.Data.(&ast::UnaryExpr)
+			// Catch unsafe pointer types.
+			if u.IsUnsafePtr() {
+				ret self.evalType(expr)
+			}
+			ret self.evalUnary(u)
 		|:
 			ret self.evalExprData(expr.Data)
 		}
@@ -3748,6 +3728,29 @@ impl unaryEval {
 		self.v.Mutable = true
 	}
 
+	fn chanRecv(mut self): &Value {
+		mut v := self.e.evalExpr(self.u.X, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+		if v == nil {
+			ret nil
+		}
+		mut ch := v.Type.Chan()
+		if ch == nil {
+			// Expression type is not channel.
+			self.e.pushErr(self.u.X.Token, log::ExprNotChan)
+			self.e.pushSuggestion(log::RArrowOpExpectsChan)
+			ret nil
+		}
+		if !ch.Recv {
+			self.e.pushErr(self.u.X.Token, log::RecvFromSendOnlyChan)
+		}
+		v.Model = &ChanRecv{
+			Token: self.u.X.Token,
+			Expr: new(Value, *v),
+		}
+		v.Type = ch.Value
+		ret v
+	}
+
 	fn typeDecl(mut self) {
 		mut tc := self.e.typeChecker()
 		match self.u.Op.Id {
@@ -3780,6 +3783,10 @@ impl unaryEval {
 
 	fn eval(mut self, mut u: &ast::UnaryExpr): &Value {
 		self.u = u
+		// Special case: channel receive expression.
+		if self.u.Op.Id == token::ARROW {
+			ret self.chanRecv()
+		}
 		self.evalData()
 		if self.v == nil {
 			ret nil

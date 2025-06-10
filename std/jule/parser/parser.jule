@@ -187,8 +187,6 @@ struct parser {
 	ast:        &ast::AST
 	directives: []&ast::Directive
 	errors:     []log::Log
-
-	ep: &exprBuilder
 }
 
 impl parser {
@@ -212,8 +210,12 @@ impl parser {
 			self.mode&allowKeywordIdentifiers == allowKeywordIdentifiers && token::IsKeyword(tok.Kind)
 	}
 
+	fn getExprBuilder(mut &self): exprBuilder {
+		ret exprBuilder.new(self)
+	}
+
 	fn buildExpr(mut &self, mut &tokens: []&token::Token): &ast::Expr {
-		ret self.ep.buildFromTokens(tokens)
+		ret self.getExprBuilder().parseFromTokens(tokens)
 	}
 
 	fn buildDirective(mut self, mut tokens: []&token::Token): &ast::Directive {
@@ -255,21 +257,18 @@ impl parser {
 		ret s
 	}
 
-	unsafe fn _buildType(mut &self, mut &tokens: []&token::Token,
-		mut i: *int, err: bool): (&ast::Expr, bool) {
-		mut tb := typeBuilder{
-			p: self,
-			tokens: tokens,
-			i: i,
-			err: err,
-		}
-		ret tb.build()
-	}
-
 	// Builds AST model of data-type.
-	unsafe fn buildType(mut &self, mut &tokens: []&token::Token,
-		mut i: *int, err: bool): (&ast::Expr, bool) {
-		ret self._buildType(tokens, i, err)
+	fn buildType(mut &self, mut &tokens: []&token::Token, mut &i: int, err: bool): (typ: &ast::Expr, ok: bool) {
+		mut eb := self.getExprBuilder()
+		eb.setForNewTokens(tokens[i:])
+		if err {
+			typ = eb.parseType()
+		} else {
+			typ = eb.tryIdentOrType()
+		}
+		i += eb.i
+		ok = typ != nil
+		ret
 	}
 
 	fn buildTypeAliasDecl(mut &self, mut &tokens: []&token::Token): &ast::TypeAlias {
@@ -309,7 +308,7 @@ impl parser {
 			self.pushErr(tokens[i-1], log::MissingType)
 			ret tad
 		}
-		mut t, ok := unsafe { self.buildType(tokens, &i, true) }
+		mut t, ok := self.buildType(tokens, i, true)
 		tad.Type = t
 		if ok && i < len(tokens) {
 			self.pushErr(tokens[i], log::InvalidSyntax)
@@ -355,7 +354,7 @@ impl parser {
 				self.pushErr(tok, log::MissingType)
 				ret
 			}
-			mut t, ok := unsafe { self.buildType(tokens, &i, true) }
+			mut t, ok := self.buildType(tokens, i, true)
 			if ok {
 				v.Type = t
 				if i >= len(tokens) {
@@ -480,7 +479,7 @@ impl parser {
 			g.Constraint = &ast::Constraint{Mask: make([]&ast::Expr, 0, len(parts))}
 			for (_, mut part) in parts {
 				mut i := 0
-				mut kind, _ := unsafe { self.buildType(part, &i, true) }
+				mut kind, _ := self.buildType(part, i, true)
 				g.Constraint.Mask = append(g.Constraint.Mask, kind)
 				if i < len(part) {
 					self.pushErr(part[i], log::InvalidSyntax)
@@ -573,7 +572,7 @@ impl parser {
 			ret
 		}
 
-		param.Type, _ = unsafe { self.buildType(tokens, &i, true) }
+		param.Type, _ = self.buildType(tokens, i, true)
 		if i < len(tokens) {
 			self.pushErr(tokens[i], log::InvalidSyntax)
 		}
@@ -697,7 +696,7 @@ impl parser {
 		i++
 		if i >= len(tokens) {
 			i--
-			t.Type, ok = unsafe { self.buildType(tokens, &i, false) }
+			t.Type, ok = self.buildType(tokens, i, false)
 			ret
 		}
 
@@ -740,7 +739,7 @@ impl parser {
 				t.Names = append(t.Names, token)
 			}
 
-			mut tk, _ := unsafe { self.buildType(part, &offset, true) }
+			mut tk, _ := self.buildType(part, offset, true)
 			if offset < len(part) {
 				self.pushErr(part[offset], log::InvalidSyntax)
 			}
@@ -767,14 +766,20 @@ impl parser {
 	fn buildRetType(mut &self, mut &tokens: []&token::Token, mut &i: int): (t: &ast::RetType, ok: bool) {
 		t = new(ast::RetType)
 		if i >= len(tokens) {
+			// EOF, void return type.
+			ok = true
 			ret
 		}
 
 		mut token := tokens[i]
 		match token.Id {
 		| token::LBRACE:
+			// Body started, void return type.
+			ok = true
 			ret
 		| token::ASSIGN:
+			// Assignment started, void return type.
+			ok = true
 			ret
 		| token::COLON:
 			if i+1 >= len(tokens) {
@@ -792,11 +797,7 @@ impl parser {
 				self.pushErr(token, log::MissingType)
 				ret
 			}
-			t.Type, ok = unsafe { self.buildType(tokens, &i, true) }
-			// If result type analysis failed, set i to -1 for error mark.
-			if !ok {
-				i = -1
-			}
+			t.Type, ok = self.buildType(tokens, i, true)
 			ret
 		}
 		i++
@@ -867,26 +868,26 @@ impl parser {
 		}
 
 		f.Public = mod::IsPub(f.Name)
-		f.Result, _ = self.buildRetType(tokens, i)
+		f.Result, ok := self.buildRetType(tokens, i)
+		if !ok {
+			ret nil
+		}
 		ret f
 	}
 
 	// Parses function define.
 	// Prototype and body.
-	fn buildFunc(mut &self, mut &tokens: []&token::Token, method: bool, prototype: bool): &ast::Func {
-		mut i := 0
+	// If prototype is true, it only parses declaration, body and following tokens considired illegal.
+	// It advances i by token, it will be point to the last handled legal token.
+	fn buildFunc(mut &self, mut &i: int, mut &tokens: []&token::Token, method: bool, prototype: bool): &ast::Func {
 		mut f := self.buildFuncPrototype(tokens, i, method)
-		// If i == -1, there is critical error for analysis.
-		// Return nil immediately.
-		if i == -1 {
-			ret nil
+		if f == nil {
+			ret f
 		}
 		if prototype {
 			if i < len(tokens) {
 				self.pushErr(tokens[i], log::InvalidSyntax)
 			}
-			ret f
-		} else if f == nil {
 			ret f
 		}
 
@@ -1001,7 +1002,7 @@ impl parser {
 					kindTokens = tokens[exprStart:]
 				}
 				mut j := 0
-				mut kind, _ := unsafe { self.buildType(kindTokens, &j, true) }
+				mut kind, _ := self.buildType(kindTokens, j, true)
 				if j < len(kindTokens) {
 					self.pushErr(kindTokens[j], log::InvalidSyntax)
 				}
@@ -1149,7 +1150,7 @@ impl parser {
 				self.pushErr(tokens[i-1], log::InvalidSyntax)
 				ret e
 			}
-			e.Type, _ = unsafe { self.buildType(tokens, &i, true) }
+			e.Type, _ = self.buildType(tokens, i, true)
 			if i >= len(tokens) {
 				self.stop()
 				self.pushErr(e.Token, log::BodyNotExist)
@@ -1213,7 +1214,7 @@ impl parser {
 
 		tokens = tokens[2:] // Remove identifier and colon tokens.
 		mut i := 0
-		f.Type, _ = unsafe { self.buildType(tokens, &i, true) }
+		f.Type, _ = self.buildType(tokens, i, true)
 		if i < len(tokens) {
 			mut token := tokens[i]
 			if token.Id == token::LIT {
@@ -1315,7 +1316,8 @@ impl parser {
 			}
 			match tokens[0].Id {
 			| token::FN:
-				mut f := self.buildFunc(tokens, true, true)
+				mut i := 0
+				mut f := self.buildFunc(i, tokens, true, true)
 				if f == nil {
 					break
 				}
@@ -1326,7 +1328,7 @@ impl parser {
 				t.Methods = append(t.Methods, f)
 			|:
 				mut i := 0
-				mut ti, ok := unsafe { self.buildType(tokens, &i, true) }
+				mut ti, ok := self.buildType(tokens, i, true)
 				if !ok {
 					break
 				}
@@ -1369,8 +1371,8 @@ impl parser {
 	}
 
 	fn buildBindFunc(mut &self, mut tokens: []&token::Token): &ast::Func {
-		tokens = tokens[1:] // Remove "cpp" keyword.
-		mut f := self.buildFunc(tokens, false, true)
+		mut i := 1 // Skip "cpp" keyword.
+		mut f := self.buildFunc(i, tokens, false, true)
 		if f != nil {
 			f.Public = false
 			f.Bind = true
@@ -1478,7 +1480,8 @@ impl parser {
 			ret nil
 		}
 
-		ret self.buildFunc(tokens, true, false)
+		i = 0
+		ret self.buildFunc(i, tokens, true, false)
 	}
 
 	fn parseImplBody(mut &self, mut &ipl: &ast::Impl, mut &tokens: []&token::Token) {
@@ -1517,7 +1520,7 @@ impl parser {
 
 		mut i := 1
 
-		mut base, mut ok := unsafe { self.buildType(tokens, &i, true) }
+		mut base, mut ok := self.buildType(tokens, i, true)
 		if !ok {
 			ret nil
 		}
@@ -1552,7 +1555,7 @@ impl parser {
 			ret nil
 		}
 
-		ipl.Dest, ok = unsafe { self.buildType(tokens, &i, true) }
+		ipl.Dest, ok = self.buildType(tokens, i, true)
 		if !ok {
 			ret nil
 		}
@@ -1584,7 +1587,8 @@ impl parser {
 		match token.Id {
 		| token::FN
 		| token::UNSAFE:
-			mut f := self.buildFunc(tokens, false, false)
+			mut i := 0
+			mut f := self.buildFunc(i, tokens, false, false)
 			if f != nil {
 				f.Global = true
 			}
@@ -1784,9 +1788,6 @@ impl parser {
 	fn parse(mut &self, mut &f: &token::FileSet) {
 		self.ast = &ast::AST{
 			File: f,
-		}
-		self.ep = &exprBuilder{
-			p: self,
 		}
 
 		self.checkRanges(f.Tokens)

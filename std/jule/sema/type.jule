@@ -1472,8 +1472,8 @@ impl typeChecker {
 			self.pushTA(taMutable)
 		}
 		ret &Chan{
-			Recv: decl.Recv,
-			Send: decl.Send,
+			Recv: decl.Dir&ast::RECV == ast::RECV,
+			Send: decl.Dir&ast::SEND == ast::SEND,
 			Value: valueTyp,
 		}
 	}
@@ -1771,6 +1771,9 @@ impl typeChecker {
 	fn build(mut self, mut declKind: ast::ExprData): &Type {
 		let mut kind: Kind = nil
 		match type declKind {
+		| &ast::RangeExpr:
+			mut r := declKind.(&ast::RangeExpr)
+			ret self.build(r.X.Data)
 		| &ast::NameExpr:
 			mut name := declKind.(&ast::NameExpr)
 			mut t := self.buildName(name.Token, name.Bind)
