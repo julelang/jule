@@ -320,18 +320,22 @@ impl exprBuilder {
 			name := self.parseIdent()
 			ret self.parseNameType(t, name)
 		| token::LAND:
-			mut p := self.parseSmartPointerType()
-			mut pp := &ast::Expr{}
-			if p != nil {
-				pp.Token = p.Token
-				pp.End = p.End
-			}
-			pp.Data = &ast::UnaryExpr{
-				Op: pp.Token,
-				X: p,
-			}
+			// First, make the logical and `&&` operator the and `&` operator.
+			mut t := new(token::Token, *self.t)
+			t.ID = token::AND
+			t.Kind = "&"
+			self.t = t
 
-			ret pp
+			mut valueTyp := self.parseSmartPointerType()
+			mut p := &ast::Expr{
+				Token: t,
+				End: avoidNilExpr2(valueTyp),
+				Data: &ast::UnaryExpr{
+					Op: t,
+					X: valueTyp,
+				},
+			}
+			ret p
 		| token::AND:
 			ret self.parseSmartPointerType()
 		| token::MUL:
