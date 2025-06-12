@@ -21,6 +21,7 @@ const identSelf = "_self_"
 
 struct identCoder{}
 
+// Identifier coder.
 impl identCoder {
 	// Write identifiers to buf. If identifier contains unicode runes,
 	// handle as ASCII characters. Some backend compilers are not supports
@@ -149,17 +150,21 @@ impl identCoder {
 
 	fn field(mut &buf: strings::Builder, &f: &sema::Field) {
 		if f.Owner.Bind {
-			buf.WriteStr(f.Name)!
-			ret
-		}
-		if jule::IsBlank(f.Name) {
-			// If the identifier is blank, there may be other fields like that.
-			// So handle them with unique identifier, avoid duplication.
-			buf.WriteStr("_field_")!
-			buf.WriteStr(conv::FormatUint(u64(uintptr(f)), 0xF))!
+			export, ok := f.Tags["#export"]
+			if ok {
+				buf.WriteStr(export)!
+			} else {
+				buf.WriteStr(f.Name)!
+			}
 			ret
 		}
 		buf.WriteStr("_field_")!
+		if jule::IsBlank(f.Name) {
+			// If the identifier is blank, there may be other fields like that.
+			// So handle them with unique identifier, avoid duplication.
+			buf.WriteStr(conv::FormatUint(u64(uintptr(f)), 0xF))!
+			ret
+		}
 		identCoder.writeIdentTo(buf, f.Name)
 	}
 
