@@ -181,7 +181,7 @@ impl eval {
 
 	fn litStr(mut self, &l: &ast::LitExpr): &Value {
 		mut s := ""
-		if token::IsRawStr(l.Value) {
+		if l.Value[0] == '`' {
 			s = lit::ToRawStr(l.Value)
 		} else {
 			mut errors := []lit::Error(nil)
@@ -301,25 +301,18 @@ impl eval {
 		ret v
 	}
 
-	fn litNum(mut self, &l: &ast::LitExpr): &Value {
-		match {
-		| token::IsFloat(l.Value):
-			ret self.litFloat(l)
-		|:
-			ret self.litInt(l)
-		}
-	}
-
 	fn evalLit(mut self, lit: &ast::LitExpr): &Value {
-		match {
-		| token::IsStr(lit.Value):
+		match lit.Token.ID {
+		| token::STR:
 			ret self.litStr(lit)
-		| token::IsRune(lit.Value):
+		| token::RUNE:
 			ret self.litRune(lit)
-		| token::IsNum(lit.Value):
-			ret self.litNum(lit)
+		| token::FLOAT:
+			ret self.litFloat(lit)
+		| token::INT:
+			ret self.litInt(lit)
 		|:
-			ret nil
+			panic("unreachable")
 		}
 	}
 
@@ -2254,7 +2247,7 @@ impl eval {
 		if isName {
 			// Use fc.expr.Token.Kind instead of casting.
 			// Same thing, but more efficient and performant.
-			if fc.Func.Token.Id == token::ERROR {
+			if fc.Func.Token.ID == token::ERROR {
 				ret builtinCallerError(self, fc)
 			}
 		}
@@ -3743,7 +3736,7 @@ impl unaryEval {
 
 	fn typeDecl(mut self) {
 		mut tc := self.e.typeChecker()
-		match self.u.Op.Id {
+		match self.u.Op.ID {
 		| token::MUL:
 			self.v.Type = &Type{Kind: tc.buildPtrFromType(self.v.Type)}
 			self.v.Model = self.v.Type
@@ -3759,7 +3752,7 @@ impl unaryEval {
 	}
 
 	fn evalData(mut self) {
-		match self.u.Op.Id {
+		match self.u.Op.ID {
 		| token::MUL
 		| token::AND:
 			mut prefix := self.e.prefix
@@ -3774,7 +3767,7 @@ impl unaryEval {
 	fn eval(mut self, mut u: &ast::UnaryExpr): &Value {
 		self.u = u
 		// Special case: channel receive expression.
-		if self.u.Op.Id == token::ARROW {
+		if self.u.Op.ID == token::ARROW {
 			ret self.chanRecv()
 		}
 		self.evalData()
@@ -3792,7 +3785,7 @@ impl unaryEval {
 		// For this cases, following algorithm will not log error and
 		// returns nil.
 		kind := self.v.Type
-		match self.u.Op.Id {
+		match self.u.Op.ID {
 		| token::SUB:
 			self.minus()
 		| token::ADD:
@@ -3871,7 +3864,7 @@ impl binaryEval {
 			ret nil
 		}
 		mut l := self.l.Type.comptimeTypeInfo()
-		match self.op.Id {
+		match self.op.ID {
 		| token::EQL:
 			mut constant := constant::Const.NewBool(l.base.Equal(r.base))
 			ret &Value{
@@ -3900,7 +3893,7 @@ impl binaryEval {
 			ret nil
 		}
 
-		match self.op.Id {
+		match self.op.ID {
 		| token::EQL
 		| token::NEQ:
 			ret &Value{
@@ -3914,7 +3907,7 @@ impl binaryEval {
 	}
 
 	fn evalEnum(mut self): &Value {
-		match self.op.Id {
+		match self.op.ID {
 		| token::EQL
 		| token::NEQ:
 			mut rkind := self.r.Type
@@ -3935,7 +3928,7 @@ impl binaryEval {
 			ret nil
 		}
 
-		match self.op.Id {
+		match self.op.ID {
 		| token::GTR
 		| token::LSS
 		| token::GEQ
@@ -3988,7 +3981,7 @@ impl binaryEval {
 			ret nil
 		}
 
-		match self.op.Id {
+		match self.op.ID {
 		| token::EQL
 		| token::NEQ:
 			ret &Value{
@@ -4006,7 +3999,7 @@ impl binaryEval {
 			ret nil
 		}
 
-		match self.op.Id {
+		match self.op.ID {
 		| token::EQL
 		| token::NEQ:
 			ret &Value{
@@ -4024,7 +4017,7 @@ impl binaryEval {
 			ret nil
 		}
 
-		match self.op.Id {
+		match self.op.ID {
 		| token::EQL
 		| token::NEQ:
 			ret &Value{
@@ -4038,7 +4031,7 @@ impl binaryEval {
 	}
 
 	fn evalPtr(mut self): &Value {
-		match self.op.Id {
+		match self.op.ID {
 		| token::EQL
 		| token::NEQ
 		| token::LSS
@@ -4076,7 +4069,7 @@ impl binaryEval {
 			ret nil
 		}
 
-		match self.op.Id {
+		match self.op.ID {
 		| token::EQL
 		| token::NEQ:
 			// We will not have to check whether array type is comparable.
@@ -4102,7 +4095,7 @@ impl binaryEval {
 	}
 
 	fn evalStruct(mut self): &Value {
-		match self.op.Id {
+		match self.op.ID {
 		| token::EQL
 		| token::NEQ:
 			if !self.checkTypeCompatibility() {
@@ -4123,7 +4116,7 @@ impl binaryEval {
 			ret nil
 		}
 
-		match self.op.Id {
+		match self.op.ID {
 		| token::EQL
 		| token::NEQ:
 			ret &Value{
@@ -4137,7 +4130,7 @@ impl binaryEval {
 	}
 
 	fn evalAny(mut self): &Value {
-		match self.op.Id {
+		match self.op.ID {
 		| token::EQL
 		| token::NEQ:
 			applyImplicitCast(self.e.s, self.l.Type, self.r, self.op, self.e.getOwnerRefers())
@@ -4156,7 +4149,7 @@ impl binaryEval {
 			ret nil
 		}
 
-		match self.op.Id {
+		match self.op.ID {
 		| token::EQL
 		| token::NEQ
 		| token::LAND
@@ -4173,7 +4166,7 @@ impl binaryEval {
 			ret nil
 		}
 
-		match self.op.Id {
+		match self.op.ID {
 		| token::ADD:
 			ret self.l
 		| token::EQL
@@ -4374,7 +4367,7 @@ impl binaryEval {
 		}
 
 		// Logicals.
-		match self.op.Id {
+		match self.op.ID {
 		| token::EQL
 		| token::NEQ
 		| token::LSS
@@ -4389,7 +4382,7 @@ impl binaryEval {
 		}
 
 		// Arithmetics.
-		match self.op.Id {
+		match self.op.ID {
 		| token::SHL
 		| token::SHR:
 			panic("sema: binary shifting operator handling failed")
@@ -4421,7 +4414,7 @@ impl binaryEval {
 		}
 
 		// Logicals.
-		match self.op.Id {
+		match self.op.ID {
 		| token::EQL
 		| token::NEQ
 		| token::LSS
@@ -4435,7 +4428,7 @@ impl binaryEval {
 		}
 
 		// Arithmetics.
-		match self.op.Id {
+		match self.op.ID {
 		| token::SHL
 		| token::SHR:
 			panic("sema: binary shifting operator handling failed")
@@ -4487,7 +4480,7 @@ impl binaryEval {
 
 	fn checkSpecialCases(mut self): (ok: bool) {
 		ok = true
-		comparing := self.op.Id == token::EQL || self.op.Id == token::NEQ
+		comparing := self.op.ID == token::EQL || self.op.ID == token::NEQ
 		if !comparing {
 			ret
 		}
@@ -4508,7 +4501,7 @@ impl binaryEval {
 		}
 
 		// Shift operators.
-		if self.op.Id == token::SHL || self.op.Id == token::SHR {
+		if self.op.ID == token::SHL || self.op.ID == token::SHR {
 			ret self.shift()
 		}
 
@@ -4588,7 +4581,7 @@ impl binaryEval {
 			ret
 		}
 
-		match self.op.Id {
+		match self.op.ID {
 		| token::EQL:
 			v.Constant = constant::Const.NewBool(self.l.Constant.Eq(*self.r.Constant))
 		| token::NEQ:
@@ -4795,7 +4788,7 @@ impl binaryEval {
 	}
 
 	fn eval(mut self, mut &op: &ast::BinaryExpr): &Value {
-		if op.Op.Id == token::ASSIGN {
+		if op.Op.ID == token::ASSIGN {
 			self.e.pushErr(op.Op, log::AssignInExpr)
 			self.e.pushSuggestion(log::UseImperative)
 			ret nil
@@ -5159,7 +5152,7 @@ fn makeImplicitDeref(mut &v: &Value, mut baseToken: &token::Token) {
 		Expr: new(Value, *v),
 		Op: new(token::Token, *baseToken),
 	}
-	unary.Op.Id = token::MUL
+	unary.Op.ID = token::MUL
 	unary.Op.Kind = "*"
 	v.Model = unary
 }

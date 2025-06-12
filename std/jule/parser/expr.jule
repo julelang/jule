@@ -67,7 +67,7 @@ impl exprBuilder {
 		if self.eof() {
 			self.pushErr(self.lt, msg)
 			err = true
-		} else if self.t.Id != tok {
+		} else if self.t.ID != tok {
 			self.pushErr(self.t, msg)
 			err = true
 		}
@@ -93,17 +93,17 @@ impl exprBuilder {
 	fn parseTypeInstance(mut self, mut typ: &ast::Expr): &ast::Expr {
 		mut lbrack := self.t
 		let mut list: []&ast::Expr
-		for !self.eof() && self.t.Id != token::RBRACK {
+		for !self.eof() && self.t.ID != token::RBRACK {
 			self.next()
-			if !self.eof() && self.t.Id != token::RBRACK {
-				if len(list) == 0 && self.t.Id == token::ELLIPSIS {
+			if !self.eof() && self.t.ID != token::RBRACK {
+				if len(list) == 0 && self.t.ID == token::ELLIPSIS {
 					// Array type.
 					self.i-- // back to [
 					ret self.parseType()
 				}
 				list = append(list, self.parse())
 			}
-			if self.eof() || self.t.Id != token::COMMA && self.t.Id != token::RBRACK {
+			if self.eof() || self.t.ID != token::COMMA && self.t.ID != token::RBRACK {
 				self.pushErr(self.t, "expected , or ]")
 			}
 		}
@@ -131,7 +131,7 @@ impl exprBuilder {
 		self.next()
 		let mut end: &token::Token
 		let mut base: &ast::Expr
-		if !self.eof() && self.t.Id == token::UNSAFE {
+		if !self.eof() && self.t.ID == token::UNSAFE {
 			end = self.t
 			// No extra operation needed for the value type.
 			// To represent unsafe pointer types, use nil expression as value type.
@@ -170,15 +170,15 @@ impl exprBuilder {
 		mut autoSized := false
 		if len == nil {
 			// Always permit ellipsis for more fault-tolerant parsing.
-			if self.t.Id == token::ELLIPSIS {
+			if self.t.ID == token::ELLIPSIS {
 				len = nil // size expression must be nil for auto-size
 				autoSized = true
 				self.next()
-			} else if self.t.Id != token::RBRACK {
+			} else if self.t.ID != token::RBRACK {
 				len = self.parse()
 			}
 		}
-		if !self.eof() && self.t.Id == token::COMMA {
+		if !self.eof() && self.t.ID == token::COMMA {
 			// Trailing commas are accepted in type parameter
 			// lists but not in array type declarations.
 			// Accept for better error handling but complain.
@@ -228,9 +228,9 @@ impl exprBuilder {
 		mut t := self.t
 		mut dir := ast::SEND | ast::RECV
 		let mut arrow: &token::Token
-		if self.t.Id == token::CHAN {
+		if self.t.ID == token::CHAN {
 			self.next()
-			if !self.eof() && self.t.Id == token::ARROW {
+			if !self.eof() && self.t.ID == token::ARROW {
 				arrow = self.t
 				self.next()
 				dir = ast::SEND
@@ -254,10 +254,10 @@ impl exprBuilder {
 	}
 
 	fn parseNameType(mut self, mut t: &token::Token, name: str): &ast::Expr {
-		if !self.eof() && self.t.Id == token::SEP {
+		if !self.eof() && self.t.ID == token::SEP {
 			// Namespace selection.
 			mut typ := self.parseNamespaceExpr(t)
-			if !self.eof() && self.t.Id == token::LBRACK {
+			if !self.eof() && self.t.ID == token::LBRACK {
 				typ = self.parseTypeInstance(typ)
 			}
 			ret typ
@@ -272,7 +272,7 @@ impl exprBuilder {
 			},
 		}
 
-		if !self.eof() && self.t.Id == token::LBRACK {
+		if !self.eof() && self.t.ID == token::LBRACK {
 			typ = self.parseTypeInstance(typ)
 		}
 		ret typ
@@ -283,8 +283,8 @@ impl exprBuilder {
 			// no type found
 			ret nil
 		}
-		match self.t.Id {
-		| token::CPP:
+		match self.t.ID {
+		| token::BIND:
 			t := self.t
 			self.next()
 			if !self.expect(token::PERIOD, "expected period") {
@@ -295,7 +295,7 @@ impl exprBuilder {
 				mut name := self.t
 				self.next()
 				// Special case: allow using keywords as identifier for bind defines.
-				if name.Id != token::NAME && !token::IsKeyword(name.Kind) {
+				if name.ID != token::NAME && !token::IsKeyword(name.Kind) {
 					self.pushErr(name, "expected identifier for bind namespace type")
 					ret &ast::Expr{} // bad expression
 				}
@@ -352,7 +352,7 @@ impl exprBuilder {
 			if self.eof() {
 				break
 			}
-			match self.t.Id {
+			match self.t.ID {
 			| token::FN:
 				// Back to unsafe to handle function properly.
 				self.i--
@@ -395,9 +395,9 @@ impl exprBuilder {
 
 	fn parseIdent(mut self): str {
 		mut name := "_"
-		if self.t.Id == token::NAME ||
-			self.t.Id == token::ERROR ||
-			self.t.Id == token::SELF ||
+		if self.t.ID == token::NAME ||
+			self.t.ID == token::ERROR ||
+			self.t.ID == token::SELF ||
 			self.p.isIdent(self.t) {
 			name = self.t.Kind
 			self.next()
@@ -428,7 +428,7 @@ impl exprBuilder {
 			self.pushErr(lparen, "expected )")
 			ret nil
 		}
-		if self.t.Id == token::TYPE {
+		if self.t.ID == token::TYPE {
 			// type switch: typ == nil
 			self.next()
 		} else {
@@ -455,7 +455,7 @@ impl exprBuilder {
 			self.pushErr(lbrack, "expected operand")
 			ret nil
 		}
-		if self.t.Id == token::RBRACK {
+		if self.t.ID == token::RBRACK {
 			// Empty index, slicing or index expressions are not permitted; complain.
 			self.pushErr(lbrack, "expected operand")
 			self.next()
@@ -465,7 +465,7 @@ impl exprBuilder {
 		let mut args: []&ast::Expr
 		let mut index: [N]&ast::Expr
 		let mut colons: [N - 1]&token::Token
-		if self.t.Id != token::COLON && self.t.Id != token::SEP {
+		if self.t.ID != token::COLON && self.t.ID != token::SEP {
 			// We can't know if we have an index expression or a type instantiation;
 			// so even if we see a (named) type we are not going to be in type context.
 			index[0] = self.parse()
@@ -474,26 +474,26 @@ impl exprBuilder {
 			}
 		}
 		mut ncolons := 0
-		match self.t.Id {
+		match self.t.ID {
 		| token::COLON | token::SEP:
 			// Slicing expression.
-			for (self.t.Id == token::COLON || self.t.Id == token::SEP) && ncolons < len(colons) {
+			for (self.t.ID == token::COLON || self.t.ID == token::SEP) && ncolons < len(colons) {
 				colons[ncolons] = self.t
 				ncolons++
-				if self.t.Id == token::SEP {
+				if self.t.ID == token::SEP {
 					ncolons++
 				}
 				self.next()
-				if !self.eof() && self.t.Id != token::COLON && self.t.Id != token::SEP && self.t.Id != token::RBRACK {
+				if !self.eof() && self.t.ID != token::COLON && self.t.ID != token::SEP && self.t.ID != token::RBRACK {
 					index[ncolons] = self.parse()
 				}
 			}
 		| token::COMMA:
 			// Instance expression.
 			args = append(args, index[0])
-			for !self.eof() && self.t.Id == token::COMMA {
+			for !self.eof() && self.t.ID == token::COMMA {
 				self.next()
-				if !self.eof() && self.t.Id != token::RBRACK {
+				if !self.eof() && self.t.ID != token::RBRACK {
 					args = append(args, self.parseType())
 				}
 			}
@@ -549,12 +549,12 @@ impl exprBuilder {
 	fn parseCallOrConversion(mut self, mut x: &ast::Expr): &ast::Expr {
 		mut lparen := self.t
 		let mut list: []&ast::Expr
-		for !self.eof() && self.t.Id != token::RPAREN {
+		for !self.eof() && self.t.ID != token::RPAREN {
 			self.next()
-			if !self.eof() && self.t.Id != token::COMMA && self.t.Id != token::RPAREN {
+			if !self.eof() && self.t.ID != token::COMMA && self.t.ID != token::RPAREN {
 				list = append(list, self.parse()) // builtins may expect a type: make(some type, ...)
 			}
-			if self.eof() || self.t.Id != token::COMMA && self.t.Id != token::RPAREN {
+			if self.eof() || self.t.ID != token::COMMA && self.t.ID != token::RPAREN {
 				self.pushErr(self.lt, "expected , or )")
 				ret nil
 			}
@@ -575,7 +575,7 @@ impl exprBuilder {
 	}
 
 	fn parseValue(mut self): &ast::Expr {
-		if !self.eof() && self.t.Id == token::LBRACE {
+		if !self.eof() && self.t.ID == token::LBRACE {
 			ret self.parseUntypedLiteralValue()
 		}
 		ret self.parse()
@@ -583,7 +583,7 @@ impl exprBuilder {
 
 	fn parseElement(mut self): &ast::Expr {
 		mut x := self.parseValue()
-		if !self.eof() && self.t.Id == token::COLON {
+		if !self.eof() && self.t.ID == token::COLON {
 			self.next()
 			mut value := self.parseValue()
 			x = &ast::Expr{
@@ -598,12 +598,12 @@ impl exprBuilder {
 	fn parseUntypedLiteralValue(mut self): &ast::Expr {
 		mut lbrace := self.t
 		let mut list: []&ast::Expr
-		for !self.eof() && self.t.Id != token::RBRACE {
+		for !self.eof() && self.t.ID != token::RBRACE {
 			self.next()
-			if !self.eof() && self.t.Id != token::COMMA && self.t.Id != token::RBRACE {
+			if !self.eof() && self.t.ID != token::COMMA && self.t.ID != token::RBRACE {
 				list = append(list, self.parseElement())
 			}
-			if self.eof() || self.t.Id != token::COMMA && self.t.Id != token::RBRACE {
+			if self.eof() || self.t.ID != token::COMMA && self.t.ID != token::RBRACE {
 				self.pushErr(self.lt, "expected , or }")
 				ret nil
 			}
@@ -646,14 +646,14 @@ impl exprBuilder {
 		self.err = true
 		n := len(self.p.errors)
 		i := self.i
-		match self.t.Id {
+		match self.t.ID {
 		| token::LBRACK:
 			// We do not know whether if it is type or literal.
 			// We have to try for type.
 			self.err = false
 			fall
 		| token::LAND | token::AND | token::MUL | token::ARROW
-		| token::NAME | token::CHAN | token::MAP | token::FN | token::CPP | token::UNSAFE:
+		| token::NAME | token::CHAN | token::MAP | token::FN | token::BIND | token::UNSAFE:
 			isTyp = true
 			self.i--         // Back to ]
 			self.t = self.lt // Back to ]
@@ -683,10 +683,10 @@ impl exprBuilder {
 	fn parseSliceLiteralOrType(mut self): &ast::Expr {
 		mut lbrack := self.t
 		let mut list: []&ast::Expr
-		for !self.eof() && self.t.Id != token::RBRACK {
+		for !self.eof() && self.t.ID != token::RBRACK {
 			self.next()
-			if !self.eof() && self.t.Id != token::RBRACK {
-				if len(list) < 2 && self.t.Id == token::ELLIPSIS {
+			if !self.eof() && self.t.ID != token::RBRACK {
+				if len(list) < 2 && self.t.ID == token::ELLIPSIS {
 					if len(list) == 0 {
 						// Array type with auto-size.
 						ret self.parseArrayType(lbrack, nil)
@@ -714,7 +714,7 @@ impl exprBuilder {
 				}
 				list = append(list, self.parse())
 			}
-			if self.eof() || self.t.Id != token::COMMA && self.t.Id != token::RBRACK {
+			if self.eof() || self.t.ID != token::COMMA && self.t.ID != token::RBRACK {
 				self.pushErr(self.t, "expected , or ]")
 				ret nil
 			}
@@ -746,7 +746,7 @@ impl exprBuilder {
 		if f == nil {
 			ret nil
 		}
-		if self.eof() || self.t.Id != token::LBRACE {
+		if self.eof() || self.t.ID != token::LBRACE {
 			// Function type.
 			// No extra attention needed.
 		} else {
@@ -784,11 +784,11 @@ impl exprBuilder {
 	// May return an expression or a raw type (incl. array
 	// types of the form [...]T). Callers must verify the result.
 	fn parseOperand(mut self): &ast::Expr {
-		match self.t.Id {
+		match self.t.ID {
 		| token::SELF | token::NAME | token::ERROR:
 			mut t := self.t
 			name := self.parseIdent()
-			if !self.eof() && self.t.Id == token::SEP {
+			if !self.eof() && self.t.ID == token::SEP {
 				// Namespace selection.
 				ret self.parseNamespaceExpr(t)
 			}
@@ -801,7 +801,7 @@ impl exprBuilder {
 					Bind: false,
 				},
 			}
-		| token::LIT:
+		| token::STR | token::INT | token::FLOAT | token::RUNE:
 			mut lit := self.t
 			self.next()
 			ret &ast::Expr{
@@ -842,7 +842,7 @@ impl exprBuilder {
 				self.pushErr(t, "expected unsafe scope expression or unsafe function type/literal")
 				ret nil
 			}
-			match self.t.Id {
+			match self.t.ID {
 			| token::LBRACE:
 				// Unsafe scope expression.
 				ret self.parseUnsafeExpr()
@@ -891,7 +891,7 @@ impl exprBuilder {
 			if self.eof() || x == nil {
 				ret x
 			}
-			match self.t.Id {
+			match self.t.ID {
 			| token::ELLIPSIS:
 				// Variadic expression.
 				mut t := self.t
@@ -930,7 +930,7 @@ impl exprBuilder {
 				if f.Exception != nil {
 					self.pushErr(t, "exceptional is already handled for this call")
 				}
-				if self.eof() || self.t.Id != token::LBRACE {
+				if self.eof() || self.t.ID != token::LBRACE {
 					self.pushErr(t, "expected {")
 					ret nil
 				}
@@ -945,7 +945,7 @@ impl exprBuilder {
 				if self.eof() {
 					break
 				}
-				match self.t.Id {
+				match self.t.ID {
 				| token::NAME:
 					x = self.parseSelector(x)
 				| token::LPAREN:
@@ -989,7 +989,7 @@ impl exprBuilder {
 			self.pushErr(self.lt, "expected operand")
 			ret nil
 		}
-		match self.t.Id {
+		match self.t.ID {
 		| token::ADD | token::SUB | token::NOT | token::XOR | token::AND:
 			mut t := self.t
 			self.next()
@@ -1066,7 +1066,7 @@ impl exprBuilder {
 			mut t := self.t
 			self.next()
 			// Check for the unsafe pointer type.
-			if !self.eof() && self.t.Id == token::UNSAFE {
+			if !self.eof() && self.t.ID == token::UNSAFE {
 				mut _unsafe := self.t
 				self.next()
 				ret &ast::Expr{
@@ -1133,7 +1133,7 @@ impl exprBuilder {
 		mut t := self.t
 		let mut list: []&ast::Expr
 		list = append(list, self.parse())
-		for !self.eof() && self.t.Id == token::COMMA {
+		for !self.eof() && self.t.ID == token::COMMA {
 			self.next()
 			list = append(list, self.parse())
 		}
@@ -1175,9 +1175,9 @@ fn getBlockExpr(mut &tokens: []&token::Token): []&token::Token {
 	mut braceN := 0
 	mut skipToNextBraceClose := 0
 	for i, tok in tokens {
-		match tok.Id {
+		match tok.ID {
 		| token::UNSAFE:
-			if len(tokens)-i > 1 && tokens[i+1].Id == token::LBRACE {
+			if len(tokens)-i > 1 && tokens[i+1].ID == token::LBRACE {
 				skipToNextBraceClose++
 			}
 		| token::LBRACE:

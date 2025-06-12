@@ -1240,7 +1240,7 @@ impl scopeChecker {
 			if r.Type.Void() {
 				self.s.pushErr(a.Y.Token, log::InvalidExpr)
 			}
-			if a.Op.Id != token::ASSIGN {
+			if a.Op.ID != token::ASSIGN {
 				self.s.pushErr(a.Op, log::InvalidSyntax)
 			}
 			self.scope.Stmts = append(self.scope.Stmts, r)
@@ -1266,7 +1266,7 @@ impl scopeChecker {
 		}
 		self.scope.Stmts = append(self.scope.Stmts, &Assign{Left: lm, Right: rm, Op: a.Op})
 
-		if a.Op.Id == token::ASSIGN {
+		if a.Op.ID == token::ASSIGN {
 			mut checker := assignTypeChecker{
 				s: self.s,
 				dest: l.Type,
@@ -1280,12 +1280,12 @@ impl scopeChecker {
 			}
 			ret
 		}
-		id := a.Op.Id
-		a.Op.Id = removeEqFromOp(a.Op.Id)
+		id := a.Op.ID
+		a.Op.ID = removeEqFromOp(a.Op.ID)
 		mut solver := binaryEval.new(eval, a.Op, a.Op, a.Y.Token)
 		solver.l, solver.r = l, r
 		_ = solver.evalOp()
-		a.Op.Id = id
+		a.Op.ID = id
 	}
 
 	fn processEndPartOfMultiAssign(mut &self, mut &st: &MultiAssign, mut &a: &ast::Assign,
@@ -1446,7 +1446,7 @@ impl scopeChecker {
 	}
 
 	fn checkMultiAssign(mut &self, mut &a: &ast::Assign) {
-		if a.Op.Id != token::ASSIGN && a.Op.Id != token::DEFINE {
+		if a.Op.ID != token::ASSIGN && a.Op.ID != token::DEFINE {
 			self.s.pushErr(a.Op, log::InvalidSyntax)
 			ret
 		}
@@ -1561,7 +1561,7 @@ impl scopeChecker {
 
 	fn checkAssign(mut &self, mut a: &ast::Assign, flags: int) {
 		match {
-		| token::IsPostfixOp(a.Op.Id):
+		| token::IsPostfix(a.Op.ID):
 			self.checkPostfix(a)
 		| len(a.X) == 1:
 			self.checkSingleAssign(a, flags)

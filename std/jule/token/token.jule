@@ -6,146 +6,140 @@ use "std/strings"
 
 // Token identities.
 const (
-	ILLEGAL    = iota // illegal token
-	NAME              // identifier
-	RET               // ret
-	SEMICOLON         // ;
-	LIT               // integer, floating-point, string, rune
-	COMMA             // ,
-	CONST             // const
-	TYPE              // type
-	COLON             // :
-	FOR               // for
-	BREAK             // break
-	CONTINUE          // continue
-	IN                // int
-	IF                // if
-	ELSE              // else
-	COMMENT           // /*..*/ or //...
-	USE               // use
-	PERIOD            // .
-	GOTO              // goto
-	SEP               // ::
-	ENUM              // enum
-	STRUCT            // struct
-	CO                // co
-	MATCH             // match
-	SELF              // self
-	TRAIT             // trait
-	IMPL              // impl
-	CHAN              // chan
-	CPP               // cpp
-	FALL              // fall
-	FN                // fn
-	LET               // let
-	UNSAFE            // unsafe
-	MUT               // mut
-	DEFER             // defer
-	HASH              // #
-	ERROR             // error
-	MAP               // map
-	SELECT            // select
-	DEFINE            // :=
-	ELLIPSIS          // ...
-	ADD_ASSIGN        // +=
-	SUB_ASSIGN        // -=
-	MUL_ASSIGN        // *=
-	QUO_ASSIGN        // /=
-	REM_ASSIGN        // %=
-	SHL_ASSIGN        // <<=
-	SHR_ASSIGN        // >>=
-	XOR_ASSIGN        // ^=
-	AND_ASSIGN        // &=
-	OR_ASSIGN         // |=
-	EQL               // ==
-	NEQ               // !=
-	GEQ               // >=
-	LEQ               // <=
-	LAND              // &&
-	LOR               // ||
-	SHL               // <<
-	SHR               // >>
-	INC               // ++
-	DEC               // --
-	ADD               // +
-	SUB               // -
-	MUL               // *
-	QUO               // /
-	REM               // %
-	AND               // &
-	OR                // |
-	XOR               // ^
-	NOT               // !
-	LSS               // <
-	GTR               // >
-	ASSIGN            // =
-	ARROW             // <-
-	LPAREN            // (
-	LBRACK            // [
-	LBRACE            // {
-	RPAREN            // )
-	RBRACK            // ]
-	RBRACE            // }
+	ILLEGAL = iota // illegal token
+
+	SEMICOLON // ;
+	COMMA     // ,
+	COLON     // :
+	PERIOD    // .
+	SEP       // ::
+	HASH      // #
+	ELLIPSIS  // ...
+
+	COMMENT // /*..*/ or //...
+	NAME    // identifier
+
+	FLOAT // floating-point literal
+	INT   // integer literal
+	STR   // string literal
+	RUNE  // rune literal
+
+	RET      // ret
+	CONST    // const
+	TYPE     // type
+	FOR      // for
+	BREAK    // break
+	CONTINUE // continue
+	IN       // int
+	IF       // if
+	ELSE     // else
+	USE      // use
+	GOTO     // goto
+	ENUM     // enum
+	STRUCT   // struct
+	CO       // co
+	MATCH    // match
+	SELF     // self
+	TRAIT    // trait
+	IMPL     // impl
+	CHAN     // chan
+	BIND     // cpp
+	FALL     // fall
+	FN       // fn
+	LET      // let
+	UNSAFE   // unsafe
+	MUT      // mut
+	DEFER    // defer
+	ERROR    // error
+	MAP      // map
+	SELECT   // select
+
+	EQL  // ==
+	NEQ  // !=
+	GEQ  // >=
+	LEQ  // <=
+	LAND // &&
+	LOR  // ||
+
+	SHL   // <<
+	SHR   // >>
+	INC   // ++
+	DEC   // --
+	ADD   // +
+	SUB   // -
+	MUL   // *
+	QUO   // /
+	REM   // %
+	AND   // &
+	OR    // |
+	XOR   // ^
+	NOT   // !
+	LSS   // <
+	GTR   // >
+	ARROW // <-
+
+	ASSIGN     // =
+	DEFINE     // :=
+	ADD_ASSIGN // +=
+	SUB_ASSIGN // -=
+	MUL_ASSIGN // *=
+	QUO_ASSIGN // /=
+	REM_ASSIGN // %=
+	SHL_ASSIGN // <<=
+	SHR_ASSIGN // >>=
+	XOR_ASSIGN // ^=
+	AND_ASSIGN // &=
+	OR_ASSIGN  // |=
+
+	LPAREN // (
+	LBRACK // [
+	LBRACE // {
+	RPAREN // )
+	RBRACK // ]
+	RBRACE // }
 )
 
 // Token.
 struct Token {
-	Id:     int      // Identity of token.
+	ID:     int      // Identity of token.
 	File:   &FileSet // Associated FileSet where token appear.
 	Row:    int      // Row position of token.
 	Column: int      // Column position of token.
 	Kind:   str      // Token kind as string.
 }
 
+// A set of constants for precedence-based expression parsing.
+// Non-operators have lowest precedence, followed by operators
+// starting with precedence 1 up to unary operators. The highest
+// precedence serves as "catch-all" precedence for selector,
+// indexing, and other operator and delimiter tokens.
+const (
+	LowestPrec  = 0 // non-operators
+	UnaryPrec   = 6
+	HighestPrec = 7
+)
+
 impl Token {
 	// Returns operator precedence of token.
 	// Returns 0 if token is not operator or
 	// invalid operator for operator precedence.
-	//
-	// Accepts assignment tokens (like equals [=]) as precedenced operator
-	// to handle expression assignments.
+	// It only reports for the binary operators, otherwise returns LowestPrec.
 	fn Precedence(self): int {
-		ret precedence(self.Id)
+		match self.ID {
+		| MUL | REM | QUO | SHR | SHL | AND:
+			ret 5
+		| ADD | SUB | OR | XOR:
+			ret 4
+		| EQL | NEQ | LSS | LEQ | GTR | GEQ:
+			ret 3
+		| LAND:
+			ret 2
+		| LOR:
+			ret 1
+		|:
+			ret LowestPrec
+		}
 	}
-}
-
-// Reports whether kind is string literal.
-fn IsStr(k: str): bool { ret k != "" && (k[0] == '"' || IsRawStr(k)) }
-
-// Reports whether kind is raw string literal.
-fn IsRawStr(k: str): bool { ret k != "" && k[0] == '`' }
-
-// Reports whether kind is rune literal.
-// Literal value can be byte or rune.
-fn IsRune(k: str): bool { ret k != "" && k[0] == '\'' }
-
-// Reports whether kind is nil literal.
-fn IsNil(k: str): bool { ret k == "nil" }
-
-// Reports whether kind is boolean literal.
-fn IsBool(k: str): bool { ret k == "true" || k == "false" }
-
-// Reports whether kind is float.
-fn IsFloat(k: str): bool {
-	if strings::HasPrefix(k, "0x") {
-		ret strings::ContainsAny(k, ".pP")
-	}
-	ret strings::ContainsAny(k, ".eE")
-}
-
-// Reports whether kind is numeric.
-fn IsNum(k: str): bool {
-	if k == "" {
-		ret false
-	}
-
-	b := k[0]
-	ret b == '.' || ('0' <= b && b <= '9')
-}
-
-// Reports whether kind is literal.
-fn IsLit(k: str): bool {
-	ret IsNum(k) || IsStr(k) || IsRune(k) || IsNil(k) || IsBool(k)
 }
 
 // Reports whether s is keyword.
@@ -155,26 +149,13 @@ fn IsKeyword(s: str): bool {
 }
 
 // Reports whether operator kind is postfix operator.
-fn IsPostfixOp(id: int): bool {
+fn IsPostfix(id: int): bool {
 	ret id == INC || id == DEC
 }
 
-// Reports given token id is allow for
-// assignment left-expression or not.
-fn IsAssign(id: int): bool {
-	ret id == NAME ||
-		id == CPP ||
-		id == LET ||
-		id == MUT ||
-		id == SELF ||
-		id == LPAREN ||
-		id == MUL ||
-		id == AND
-}
-
 // Reports whether operator kind is assignment operator.
-fn IsAssignOp(id: int): bool {
-	if IsPostfixOp(id) {
+fn IsAssign(id: int): bool {
+	if IsPostfix(id) {
 		ret true
 	}
 	ret id == ASSIGN ||
@@ -188,37 +169,4 @@ fn IsAssignOp(id: int): bool {
 		id == OR_ASSIGN ||
 		id == AND_ASSIGN ||
 		id == XOR_ASSIGN
-}
-
-// Reports whether kind is unary operator.
-fn IsUnaryOp(id: int): bool {
-	ret id == SUB ||
-		id == ADD ||
-		id == XOR ||
-		id == NOT ||
-		id == MUL ||
-		id == AND
-}
-
-// Reports whether kind is binary operator.
-fn IsBinOp(id: int): bool {
-	ret precedence(id) > 0
-}
-
-// Implementation of the Token.Prec.
-fn precedence(id: int): int {
-	match id {
-	| MUL | REM | QUO | SHR | SHL | AND:
-		ret 5
-	| ADD | SUB | OR | XOR:
-		ret 4
-	| EQL | NEQ | LSS | LEQ | GTR | GEQ:
-		ret 3
-	| LAND:
-		ret 2
-	| LOR:
-		ret 1
-	|:
-		ret 0
-	}
 }

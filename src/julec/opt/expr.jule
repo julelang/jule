@@ -84,7 +84,7 @@ impl exprOptimizer {
 					// Because the first node is the root binary expression.
 					// And by the CAST production, the || operator cames first than && operator.
 					// So it breaks if binary expression is not uses only the && operator.
-					*_check = binary.Op.Id != token::LOR
+					*_check = binary.Op.ID != token::LOR
 					if *_check {
 						exop.checkBinaryForBoundary(binary)
 						exop.checkBinaryForNil(binary)
@@ -104,7 +104,7 @@ impl exprOptimizer {
 		if !obj::EqualModels(m.Left.Model, m.Right.Model) {
 			ret false
 		}
-		match m.Op.Id {
+		match m.Op.ID {
 		| token::EQL
 		| token::LEQ
 		| token::GEQ:
@@ -143,7 +143,7 @@ impl exprOptimizer {
 			}
 		}
 		mut c := m.Right.Model.(&constant::Const)
-		match m.Op.Id {
+		match m.Op.ID {
 		| token::LAND:
 			if c.ReadBool() {
 				// Use left operand as model directly.
@@ -222,7 +222,7 @@ impl exprOptimizer {
 		if lp == nil || !lp.IsStr() {
 			ret false
 		}
-		if m.Op.Id != token::EQL && m.Op.Id != token::NEQ {
+		if m.Op.ID != token::EQL && m.Op.ID != token::NEQ {
 			ret false
 		}
 		match type m.Left.Model {
@@ -239,7 +239,7 @@ impl exprOptimizer {
 			}
 		}
 		mut c := m.Right.Model.(&constant::Const)
-		match m.Op.Id {
+		match m.Op.ID {
 		| token::EQL:
 			if c.ReadStr() == "" {
 				mut model := any(&EmptyCompareExpr{
@@ -280,7 +280,7 @@ impl exprOptimizer {
 		if lp == nil || !lp.IsStr() {
 			ret false
 		}
-		if m.Op.Id != token::ADD {
+		if m.Op.ID != token::ADD {
 			ret false
 		}
 
@@ -345,7 +345,7 @@ impl exprOptimizer {
 			if !Str {
 				ret false
 			}
-			if c.ReadStr() == "" && m.Op.Id == token::ADD {
+			if c.ReadStr() == "" && m.Op.ID == token::ADD {
 				// Concatenation with empty string, use the non-constant operand's model.
 				*self.model = nc.Model
 				ret true
@@ -358,7 +358,7 @@ impl exprOptimizer {
 		if !Math || c.AsF64() != 0 {
 			ret false
 		}
-		match m.Op.Id {
+		match m.Op.ID {
 		| token::SHL
 		| token::SHR:
 			// If the constant expression is shifter, use the right operand's model.
@@ -412,12 +412,12 @@ impl exprOptimizer {
 			if !isBoundaryValidType(blc.Expr.Type) {
 				ret
 			}
-			if m.Op.Id != token::GTR && m.Op.Id != token::EQL {
+			if m.Op.ID != token::GTR && m.Op.ID != token::EQL {
 				ret
 			}
 			// len(x) > y, len(x) == y (constant)
 			// Max guaranteed size of x is y.
-			if m.Op.Id == token::EQL {
+			if m.Op.ID == token::EQL {
 				mut rc, constant := m.Right.Model.(&constant::Const)
 				if constant {
 					mut c := new(constant::Const, *rc) // Do not mutate binary operand.
@@ -434,12 +434,12 @@ impl exprOptimizer {
 			if !isBoundaryValidType(blc.Expr.Type) {
 				ret
 			}
-			if m.Op.Id != token::LSS && m.Op.Id != token::EQL {
+			if m.Op.ID != token::LSS && m.Op.ID != token::EQL {
 				ret
 			}
 			// y < len(x), y (constant) == len(x)
 			// Max guaranteed size of x is y.
-			if m.Op.Id == token::EQL {
+			if m.Op.ID == token::EQL {
 				mut lc, constant := m.Left.Model.(&constant::Const)
 				if constant {
 					mut c := new(constant::Const, *lc) // Do not mutate binary operand.
@@ -466,7 +466,7 @@ impl exprOptimizer {
 			if constant {
 				// No need to check whether constant variable is nil.
 				// It only can be nil.
-				self.data.nils.pushVar(var, m.Op.Id == token::NEQ)
+				self.data.nils.pushVar(var, m.Op.ID == token::NEQ)
 			}
 			ret
 		}
@@ -479,7 +479,7 @@ impl exprOptimizer {
 			if constant {
 				// No need to check whether constant variable is nil.
 				// It only can be nil.
-				self.data.nils.pushVar(var, m.Op.Id == token::NEQ)
+				self.data.nils.pushVar(var, m.Op.ID == token::NEQ)
 			}
 			ret
 		}
@@ -520,7 +520,7 @@ impl exprOptimizer {
 			ret false
 		}
 
-		match m.Op.Id {
+		match m.Op.ID {
 		| token::ADD:
 			// If type is integer and expressions is like "x+x", then we can simplify to "x<<1" which is faster.
 			// Floating-point types is exceptional because we cannot predict the result because of NaN or similar values.
@@ -529,7 +529,7 @@ impl exprOptimizer {
 				break
 			}
 			m.Op = new(token::Token, *m.Op)
-			m.Op.Id = token::SHL
+			m.Op.ID = token::SHL
 			m.Op.Kind = "<<"
 			m.Right.Model = constant::Const.NewU64(1)
 			// Set model to unsafe expression model. Because it is safe.
@@ -600,13 +600,13 @@ impl exprOptimizer {
 			ret false
 		}
 
-		match m.Op.Id {
+		match m.Op.ID {
 		| token::MUL:
 			if types::IsInt(lp.Kind) && types::IsUnsigInt(rp.Kind) {
 				ok, x := checkForBitShiftOpt(m.Left, m.Right)
 				if ok {
 					m.Op = new(token::Token, *m.Op)
-					m.Op.Id = token::SHL
+					m.Op.ID = token::SHL
 					m.Op.Kind = "<<"
 					mut c := m.Right.Model.(&constant::Const)
 					c.SetU64(x)
@@ -619,7 +619,7 @@ impl exprOptimizer {
 				mut c := m.Right.Model.(&constant::Const)
 				if c.AsF64() == 0b10 {
 					m.Op = new(token::Token, *m.Op)
-					m.Op.Id = token::AND
+					m.Op.ID = token::AND
 					m.Op.Kind = "&"
 					c.SetI64(1)
 					// No need to set model as UnsafeBinaryExpr,
@@ -675,7 +675,7 @@ impl exprOptimizer {
 		}
 
 	end:
-		if m.Op.Id == token::LOR {
+		if m.Op.ID == token::LOR {
 			// Binary expression uses the || operator.
 			// We should ignore optimization information updates.
 			// Because we can't whether they are really informative.
@@ -729,11 +729,11 @@ impl exprOptimizer {
 		if !Ptr {
 			ret
 		}
-		match m.Op.Id {
+		match m.Op.ID {
 		| token::MUL:
 			mut um, unary := m.Expr.Model.(&sema::UnaryExpr)
 			if unary {
-				if um.Op.Id == token::AND {
+				if um.Op.ID == token::AND {
 					// Remove pointer overhead.
 					// Expression is: *(&x)
 					// Simplify to: x
@@ -964,7 +964,7 @@ impl exprOptimizer {
 			if isPowerOfTwo(u64(array.N)) {
 				mask := u64(array.N - 1)
 				bin, mut ok := m.Index.Model.(&sema::BinaryExpr)
-				if ok && bin.Op.Id == token::AND {
+				if ok && bin.Op.ID == token::AND {
 					{
 						c, (ok) := bin.Left.Model.(&constant::Const)
 						if ok && c.AsU64() == mask {
@@ -1097,7 +1097,7 @@ fn areSameLvalueExpr(&l: sema::Expr, &r: sema::Expr): bool {
 		if ur != nil {
 			// Unary operators should have the same operator.
 			// The operator does not matter.
-			if ul.Op.Id != ur.Op.Id || ul.Op.Kind != ur.Op.Kind {
+			if ul.Op.ID != ur.Op.ID || ul.Op.Kind != ur.Op.Kind {
 				ret false
 			}
 			// Check expressions used for unary.

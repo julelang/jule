@@ -403,7 +403,7 @@ impl scopeOptimizer {
 	}
 
 	fn substr(mut &self, mut a: &sema::Assign): bool {
-		if a.Op.Id != token::ASSIGN {
+		if a.Op.ID != token::ASSIGN {
 			ret false
 		}
 		mut sem, ok := a.Right.Model.(&sema::SlicingExpr)
@@ -447,7 +447,7 @@ impl scopeOptimizer {
 	}
 
 	fn cmplxAssign(mut &self, mut &assign: &sema::Assign): bool {
-		if !StdMathCmplx || assign.Op.Id != token::ASSIGN || meta::Program.MathCmplx == nil {
+		if !StdMathCmplx || assign.Op.ID != token::ASSIGN || meta::Program.MathCmplx == nil {
 			ret false
 		}
 		mut s := assign.Left.Type.Struct()
@@ -489,7 +489,7 @@ impl scopeOptimizer {
 	}
 
 	fn optimizeAssign(mut &self, mut assign: &sema::Assign) {
-		if assign.Op.Id == token::ASSIGN &&
+		if assign.Op.ID == token::ASSIGN &&
 			obj::EqualModels(assign.Left.Model, assign.Right.Model) {
 			self.removeCurrent()
 			self.i-- // In next iteration, point to correct statement.
@@ -533,35 +533,35 @@ impl scopeOptimizer {
 		exprOptimizer.optimizeValue(assign.Left.Model, self.data, self)
 		exprOptimizer.optimizeValue(assign.Right.Model, self.data, self)
 
-		match assign.Op.Id {
+		match assign.Op.ID {
 		| token::XOR_ASSIGN | token::QUO_ASSIGN | token::REM_ASSIGN
 		| token::SHL_ASSIGN | token::SHR_ASSIGN | token::ADD_ASSIGN | token::SUB_ASSIGN:
 			// Do not check structures.
 			if !Math && !Str || assign.Left.Type.Struct() != nil {
 				break
 			}
-			oldId, oldKind := assign.Op.Id, assign.Op.Kind
-			match assign.Op.Id {
+			oldId, oldKind := assign.Op.ID, assign.Op.Kind
+			match assign.Op.ID {
 			| token::ADD_ASSIGN:
-				assign.Op.Id = token::ADD
+				assign.Op.ID = token::ADD
 				assign.Op.Kind = "+"
 			| token::SUB_ASSIGN:
-				assign.Op.Id = token::SUB
+				assign.Op.ID = token::SUB
 				assign.Op.Kind = "-"
 			| token::QUO_ASSIGN:
-				assign.Op.Id = token::QUO
+				assign.Op.ID = token::QUO
 				assign.Op.Kind = "/"
 			| token::REM_ASSIGN:
-				assign.Op.Id = token::REM
+				assign.Op.ID = token::REM
 				assign.Op.Kind = "%"
 			| token::SHL_ASSIGN:
-				assign.Op.Id = token::SHL
+				assign.Op.ID = token::SHL
 				assign.Op.Kind = "<<"
 			| token::SHR_ASSIGN:
-				assign.Op.Id = token::SHR
+				assign.Op.ID = token::SHR
 				assign.Op.Kind = ">>"
 			| token::XOR_ASSIGN:
-				assign.Op.Id = token::XOR
+				assign.Op.ID = token::XOR
 				assign.Op.Kind = "^"
 			|:
 				panic("opt: implementation mistake, this panic call should be unreachable")
@@ -576,7 +576,7 @@ impl scopeOptimizer {
 			if model != b || b.Op != assign.Op {
 				// Binary model optimized.
 				// Use optimized model directly.
-				if assign.Op.Id == token::XOR {
+				if assign.Op.ID == token::XOR {
 					// If caret operator optimized, it is equal to self assignment.
 					// Remove this unnecessary statement.
 					self.removeCurrent()
@@ -584,12 +584,12 @@ impl scopeOptimizer {
 				}
 				assign.Right = new(sema::OperandExpr, *assign.Right)
 				b.Op = new(token::Token, *b.Op) // Unsafe model wraps original model. Save token.
-				assign.Op.Id = token::ASSIGN
+				assign.Op.ID = token::ASSIGN
 				assign.Op.Kind = "="
 				assign.Right.Model = model
 				ret
 			}
-			assign.Op.Id = oldId
+			assign.Op.ID = oldId
 			assign.Op.Kind = oldKind
 			ret
 		}
@@ -1069,7 +1069,7 @@ fn isUnreachableExpr(&expr: sema::Expr): bool {
 		ret c.IsBool() && !c.ReadBool()
 	| &sema::BinaryExpr:
 		m := expr.(&sema::BinaryExpr)
-		if m.Op.Id == token::LAND {
+		if m.Op.ID == token::LAND {
 			ret isUnreachableExpr(m.Left.Model) ||
 				isUnreachableExpr(m.Right.Model)
 		}
