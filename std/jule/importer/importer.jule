@@ -35,32 +35,14 @@ fn flatCompilerErr(text: str): log::Log {
 }
 
 // Default importer for the reference Jule compiler.
-struct Importer {
+struct importer {
 	mods: []str
 	mod:  str
 	pkgs: []&sema::ImportInfo
 	vars: []str
 }
 
-impl Importer {
-	// Returns new importer instance by compile information.
-	fn New(info: CompileInfo): &Importer {
-		mut imp := &Importer{
-			mods: [build::PathStdlib()],
-		}
-		initVars(imp.vars, info)
-		ret imp
-	}
-
-	// Returns all imported packages.
-	// The return value is mutable reference to internal buffer.
-	// You should be care about using that copy.
-	fn AllPackages(mut self): []&sema::ImportInfo {
-		ret self.pkgs
-	}
-}
-
-impl sema::Importer for Importer {
+impl sema::Importer for importer {
 	fn SetModPath(mut self, path: str) {
 		self.mod = path
 	}
@@ -163,9 +145,16 @@ impl sema::Importer for Importer {
 
 		self.pkgs = append(self.pkgs, imp)
 	}
+
+	// Implements the [sema::Importer.AllPackages] function.
+	// The return value is mutable reference to the internal buffer.
+	// You should be care about using that copy.
+	fn AllPackages(mut self): []&sema::ImportInfo {
+		ret self.pkgs
+	}
 }
 
-impl Importer {
+impl importer {
 	// Reports whether file passes build directives.
 	fn isPassBuildDirectives(mut self, mut &file: &ast::AST): (bool, []log::Log) {
 		for (_, mut td) in file.TopDirectives {
@@ -186,4 +175,12 @@ impl Importer {
 		}
 		ret true, nil
 	}
+}
+
+// Returns new default Jule package importer by the compile information.
+fn New(info: CompileInfo): sema::Importer {
+	mut imp := new(importer)
+	imp.mods = [build::PathStdlib()]
+	initVars(imp.vars, info)
+	ret imp
 }

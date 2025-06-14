@@ -4,19 +4,17 @@
 
 use "env"
 use "std/jule/ast"
-use "std/jule/build"
 use "std/jule/importer"
 use "std/jule/log"
 use "std/jule/sema"
 use "std/jule/token"
 
-// Intermediate representation of code for compiler.
+// Intermediate representation of the code for compiler.
 struct IR {
-	// Directory of root package.
-	Root:    str
-	Passes:  []str
-	Runtime: &sema::ImportInfo // "std/runtime"
-	Ordered: OrderedDefines
+	Root:    str               // Directory of the root package.
+	Passes:  []str             // All unique pass directives.
+	Runtime: &sema::ImportInfo // ImportInfo instance of the "std/runtime" package.
+	Ordered: OrderedDefines    //  Ordered defines, nil by default. Initialized by the Order method.
 
 	// The main package. Not including in the Used.
 	// The Last dependency of the program, root package of the program.
@@ -36,8 +34,8 @@ impl IR {
 	// - Returns (nil, logs) if exist any log.
 	// - Returns IR and nil logs if everything is fine.
 	fn Build(path: str, flags: int): (&IR, []log::Log) {
-		mut importer := importer::Importer.New(buildCompileInfo())
-		const UpdateMod = true // Use root module for project if exist.
+		mut importer := importer::New(buildCompileInfo())
+		const UpdateMod = true // Detect and use the root module for the main package if exist.
 		mut files, mut logs := importer.ImportPackage(path, UpdateMod)
 		if len(logs) > 0 {
 			ret nil, logs
@@ -220,7 +218,10 @@ fn buildCompileInfo(): importer::CompileInfo {
 fn pushRuntimeToAST(mut &f: &ast::AST) {
 	mut decl := &ast::Use{
 		Token: nil, // Nil token is a flag for implicit declaration.
-		Path: &token::Token{ID: token::STR, Kind: `"std/runtime"`},
+		Path: &token::Token{
+			ID: token::STR,
+			Kind: `"std/runtime"`,
+		},
 		Alias: nil,
 		Bind: false,
 	}
