@@ -603,11 +603,9 @@ impl dynamicTypeAnnotation {
 	}
 
 	fn annotateConstraint(mut self, mut &k: &Type): bool {
-		match type self.c.Data {
-		| &ast::NameExpr:
+		_, isName := self.c.Data.(&ast::NameExpr)
+		if isName {
 			ret self.annotateConstraintName(k)
-		|:
-			// no-op
 		}
 		match {
 		| k.Array() != nil:
@@ -647,7 +645,20 @@ impl dynamicTypeAnnotation {
 	}
 
 	unsafe fn annotatePrim(mut self, mut &k: &Type): (ok: bool) {
-		ret self.annotateAny(k)
+		// Try to annotate by primitive type the any.
+		// If self.k type in generics, handle it.
+		// If result is not successful and self.k is not generic,
+		// check for the primitive type compatibility.
+		// If types are same, report true. There is no need to infer type.
+		ok, generic := self.annotateAny(k)
+		if !ok && !generic {
+			kprim := k.Prim()
+			skprim := (*self.k).Prim()
+			if kprim != nil && skprim != nil && k.Equal(*self.k) {
+				ok = true
+			}
+		}
+		ret
 	}
 
 	unsafe fn annotateArray(mut self, mut &k: &Type): (ok: bool) {
@@ -709,8 +720,20 @@ impl dynamicTypeAnnotation {
 		}
 
 		if !pf.Decl.IsVoid() {
-			self.k = &pf.Result
-			ok = self.annotateKind(f.Result) && ok
+			mut tup := pf.Result.Tuple()
+			if tup == nil {
+				// Single type for result.
+				self.k = &pf.Result
+				ok = self.annotateKind(f.Result) && ok
+			} else {
+				// Tuple type, iterate one-by-one.
+				mut ftup := f.Result.Tuple()
+				for i in tup.Types {
+					self.k = &tup.Types[i]
+					mut t := ftup.Types[i]
+					ok = self.annotateKind(t) && ok
+				}
+			}
 		}
 
 		self.k = old
@@ -773,7 +796,10 @@ impl dynamicTypeAnnotation {
 		ret self.annotateKind(c2.Value)
 	}
 
-	unsafe fn annotateAny(mut self, mut &k: &Type): (ok: bool) {
+	// Checks for self.k whether in the generics.
+	// If type is generic, checks for the source type k and tries to infer.
+	// Reports successful state and self.k is generic.
+	unsafe fn annotateAny(mut self, mut &k: &Type): (ok: bool, generic: bool) {
 		kind := (*self.k).Str()
 		for i, g in self.f.Decl.Generics {
 			if kind != g.Name {
@@ -786,21 +812,23 @@ impl dynamicTypeAnnotation {
 			| !t.Type.Equal(k):
 				// Generic already pushed but generic type and current kind
 				// is different, so incompatible.
-				ret false
+				ret false, true
 			}
 			(*self.k).Kind = k.Kind
-			ret true
+			ret true, true
 		}
-		ret false
+		ret false, false
 	}
 
 	unsafe fn annotateKind(mut self, mut &k: &Type): (ok: bool) {
 		if self.k == nil || *self.k == nil {
 			ret
 		}
+		ok, _ = self.annotateAny(k)
+		if ok {
+			ret
+		}
 		match {
-		| self.annotateAny(k):
-			ret true
 		| k.Prim() != nil:
 			ret self.annotatePrim(k)
 		| k.Array() != nil:
