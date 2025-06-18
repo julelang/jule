@@ -646,17 +646,14 @@ impl dynamicTypeAnnotation {
 
 	unsafe fn annotatePrim(mut self, mut &k: &Type): (ok: bool) {
 		// Try to annotate by primitive type the any.
-		// If self.k type in generics, handle it.
-		// If result is not successful and self.k is not generic,
-		// check for the primitive type compatibility.
-		// If types are same, report true. There is no need to infer type.
+		// If self.k type in generics, annotateAny will handle it.
 		ok, generic := self.annotateAny(k)
 		if !ok && !generic {
-			kprim := k.Prim()
-			skprim := (*self.k).Prim()
-			if kprim != nil && skprim != nil && k.Equal(*self.k) {
-				ok = true
-			}
+			// The self.k type is not generic. So there is no need to infer type.
+			// Types may be different, it is ok for now, no relevance with inference.
+			// Report true to avoid log error about type inference.
+			// Type compatibility analysis will log error about incompatibility, if any.
+			ok = true
 		}
 		ret
 	}
@@ -811,8 +808,10 @@ impl dynamicTypeAnnotation {
 				self.pushGeneric(k, i)
 			| !t.Type.Equal(k):
 				// Generic already pushed but generic type and current kind
-				// is different, so incompatible.
-				ret false, true
+				// is different, so incompatible. There is no need to infer type.
+				// Report true to avoid log error about type inference.
+				// Type compatibility analysis will log error about incompatibility.
+				ret true, true
 			}
 			(*self.k).Kind = k.Kind
 			ret true, true
