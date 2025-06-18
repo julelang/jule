@@ -1481,7 +1481,6 @@ struct retTypeChecker {
 	exprs:      []&Value // Return expressions.
 	exprDecls:  []&ast::Expr
 	errorToken: &token::Token
-	model:      Expr
 	mutable:    bool // Whether the return expression should be mutable.
 }
 
@@ -1555,13 +1554,6 @@ impl retTypeChecker {
 			}
 			ac.check()
 		}
-
-		// Set Model.
-		if len(self.exprs) > 1 { // Tuple
-			self.model = &TupleExpr{Values: self.exprs}
-		} else if len(self.exprs) == 1 {
-			self.model = self.exprs[0].Model
-		}
 	}
 
 	// Assumes the len(self.exprs) == 1 and self.exprs[0].Type.Tuple() != nil.
@@ -1570,7 +1562,6 @@ impl retTypeChecker {
 		if len(tup.Types) != len(self.types) {
 			goto err
 		}
-		self.model = self.exprs[0].Model
 		for i in self.types {
 			mut t1 := self.types[i]
 			mut t2 := tup.Types[i]
