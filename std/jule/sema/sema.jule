@@ -881,12 +881,13 @@ impl sema {
 	//	- For non-generic type parsed string type kinds.
 	//	- For checking non-generic types.
 	fn buildNonGenericType(mut &self, mut &ast: &ast::Expr,
-		mut &generics: []&ast::Generic, mut &ignored: []&Type, mut &recheckNeed: []recheckableType): &Type {
+		mut useGenerics: []&TypeAlias, mut &ignoreGenerics: []&ast::Generic, mut &ignored: []&Type, mut &recheckNeed: []recheckableType): &Type {
 		mut tc := &typeChecker{
 			s: self,
 			rootLookup: self,
 			lookup: self,
-			ignoreGenerics: generics,
+			useGenerics: useGenerics,
+			ignoreGenerics: ignoreGenerics,
 			ignoredGenerics: &ignored,
 			recheckNeed: &recheckNeed,
 		}
@@ -894,22 +895,19 @@ impl sema {
 	}
 
 	fn buildFuncNonGenericTypes(mut &self, mut f: &FuncIns, mut &ignored: []&Type, mut &recheckNeed: []recheckableType): (ok: bool) {
-		let mut generics: []&ast::Generic = nil
-		if f.Decl.IsMethod() {
-			generics = append(f.Decl.Generics, f.Decl.Owner.Generics...)
-		} else {
-			generics = f.Decl.Generics
-		}
-		ret self.basicFuncEnvironment(f, fn(mut &sema: &sema): (ok: bool) {
+		// Check with funcEnvironment, we need to generics of owner, if any.
+		// If owner generics are ignored, we cannot resolve them with type inference.
+		// Resolve owner generics in time, only ignore generics of the function.
+		ret self.funcEnvironment(f, fn(mut &sema: &sema, mut &generics: []&TypeAlias): (ok: bool) {
 			ok = true
 			for (_, mut p) in f.Params {
 				if !p.Decl.IsSelf() {
-					p.Type = sema.buildNonGenericType(p.Decl.TypeSym.Decl, generics, unsafe { ignored }, unsafe { recheckNeed })
+					p.Type = sema.buildNonGenericType(p.Decl.TypeSym.Decl, generics, f.Decl.Generics, unsafe { ignored }, unsafe { recheckNeed })
 					ok = ok && p.Type != nil
 				}
 			}
 			if !f.Decl.IsVoid() {
-				f.Result = sema.buildNonGenericType(f.Decl.Result.TypeSym.Decl, generics, unsafe { ignored }, unsafe { recheckNeed })
+				f.Result = sema.buildNonGenericType(f.Decl.Result.TypeSym.Decl, generics, f.Decl.Generics, unsafe { ignored }, unsafe { recheckNeed })
 				ok = ok && f.Result != nil
 			}
 			ret
