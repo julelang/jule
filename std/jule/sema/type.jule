@@ -1107,7 +1107,7 @@ impl typeChecker {
 		// Otherwise type issues may occur. For example:
 		//
 		//	struct Bar[T]{}
-		//	struct Baz[t]{}
+		//	struct Baz[T]{}
 		//
 		//	struct Foo[T] {
 		//		br: Bar[T]
@@ -1126,7 +1126,7 @@ impl typeChecker {
 		// The deferred analysis is mandatory for this kind of generic defines,
 		// because this package analysis will not check them, so we have to collect
 		// them for deferred check analysis.
-		gstructs := self.s.meta.flags & semametaGstruct
+		gstructs := self.s.meta.flags&semametaGstruct == semametaGstruct
 		if self.s != ins.Decl.sema && len(ins.Decl.Generics) > 0 {
 			self.s.meta.flags |= semametaGstruct
 		}
@@ -1136,7 +1136,7 @@ impl typeChecker {
 			// just push this instance into the collection.
 			// Otherwise, this semantic analysis process is the root gstruct collector.
 			// Check collected generic structures waiting for deferred analysis.
-			if gstructs == semametaGstruct {
+			if gstructs {
 				self.s.meta.gstructs = append(self.s.meta.gstructs, ins)
 			} else if self.s != ins.Decl.sema { // Avoid checking generic defines of this sema.
 				// We can check structures using this sema.
@@ -1905,6 +1905,21 @@ impl typeChecker {
 		| &StructIns:
 			mut s := t.(&StructIns)
 			s.checked = false
+
+			// We need to hard-check methods, if it have any method.
+			// Because method types will not be rechecked with the recheck strategy.
+			// So if any method refers to generic type, it may use unresolved type.
+			// Reload (resolve) types from scratch.
+			for (_, mut m) in s.Methods {
+				// If method have parameters (except receiver) or have result type,
+				// then reload types. Otherwise, it is not needed.
+				if len(m.Params) > 1 || !m.IsVoid() {
+					for (_, mut mm) in m.Instances {
+						self.s.reloadFuncInsTypes(mm)
+					}
+				}
+			}
+
 			ok = self._fromStructIns(s, errorToken)
 		}
 		ret
