@@ -3010,12 +3010,55 @@ impl eval {
 		ret nil
 	}
 
+	fn evalAnonFuncIns(mut &self, mut decl: &ast::Func): (ins: &FuncIns) {
+		if decl.IsShort() {
+			if self.prefix == nil {
+				self.s.pushErr(decl.Token, "type of the inferred anonymous function is unknown")
+				ret nil
+			}
+			mut f := self.prefix.Func()
+			if f == nil {
+				self.s.pushErr(decl.Token, "type @ is invalid for the inferred anonymous function", self.prefix.Str())
+				ret nil
+			}
+			if len(f.Params) != len(decl.Params) {
+				self.s.pushErr(decl.Token, "unexpected parameter count for inferred anonymous function, expected @, found @", len(f.Params), len(decl.Params))
+				ret nil
+			}
+			ins = f.Decl.instanceForce()
+			ins.Decl = buildFunc(decl)
+			ins.Decl.Result = f.Decl.Result
+			ins.Decl.Exceptional = f.Decl.Exceptional
+			ins.Decl.sema = self.s
+			ins.Result = f.Result
+			for (i, mut param) in ins.Params {
+				param.Type = f.Params[i].Type
+				param.Decl = ins.Decl.Params[i]
+				param.Decl.TypeSym = f.Params[i].Decl.TypeSym
+				param.Decl.Reference = f.Params[i].Decl.Reference
+				param.Decl.Variadic = f.Params[i].Decl.Variadic
+			}
+			// Function body is one-line.
+			if ins.Decl.Scope.Deferred {
+				ins.Decl.Scope.Deferred = false // Remove mark of the one-line block.
+				ins.oneliner = true
+			}
+		} else {
+			ins = self.typeChecker().buildFunc(decl)
+		}
+		if ins != nil {
+			ins.Anon = true
+			ins.AsAnon = true
+			ins.reloaded = true
+		}
+		ret
+	}
+
 	fn evalAnonFunc(mut &self, mut decl: &ast::Func): &Value {
-		mut ins := self.typeChecker().buildFunc(decl)
+		mut ins := self.evalAnonFuncIns(decl)
 		if ins == nil {
 			ret nil
 		}
-		ins.AsAnon = true
 		// Function is type declaration.
 		if decl.IsDecl() {
 			ret &Value{

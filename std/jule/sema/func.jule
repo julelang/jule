@@ -191,7 +191,6 @@ impl ParamIns {
 	// Returns ParamIns's type kind as string.
 	fn Str(self): str {
 		mut s := strings::Builder{}
-		s.Grow(1 << 5)
 		if self.Decl.Mutable {
 			s.WriteStr("mut ")!
 		}
@@ -223,16 +222,17 @@ struct FuncIns {
 	Decl:     &Func
 	Generics: []&InsGeneric
 	Params:   []&ParamIns
-	Result:   &Type
+	Result:   &Type // Result type of the instance, nil for void.
 	Scope:    &Scope
 	Refers:   &ReferenceStack
-	Anon:     bool
+	Anon:     bool // Whether this function instance is anonymous function literal.
 	AsAnon:   bool // Whether this function instance used as anonymous function.
 	CalledCo: bool // Whether this function instance used for concurrent call.
 
 	caller:   builtinCaller
 	reloaded: bool
 	checked:  bool
+	oneliner: bool // Whether this function body is one-line expression.
 	env:      &environ
 }
 
@@ -437,6 +437,15 @@ impl FuncIns {
 			updateRetVars(self.env.vars, self, n)
 		}
 	}
+}
+
+fn funcParametersUseGenerics(mut &params: []&ParamIns, &generics: []&ast::Generic): bool {
+	for (_, mut p) in params {
+		if parameterUsesGenerics(p, generics) {
+			ret true
+		}
+	}
+	ret false
 }
 
 fn parameterUsesGenerics(mut &p: &ParamIns, &generics: []&ast::Generic): bool {

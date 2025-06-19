@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/jule"
 use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/log"
@@ -742,8 +743,105 @@ impl exprBuilder {
 		}
 	}
 
+	fn parseShortFuncLit(mut self): &ast::Expr {
+		mut f := new(ast::Func)
+		f.Token = self.lt
+		f.Name = jule::Anon
+		f.Result = new(ast::RetType)
+		f.Short = true
+		// We have content between |...| range.
+		// Build parameters.
+		if self.t.ID == token::OR {
+			for {
+				self.next()
+				if self.eof() {
+					self.pushErr(self.lt, "unexpected EOF; expected identifier or |")
+					ret nil
+				}
+				mut param := new(ast::Param)
+				if self.t.ID == token::MUT {
+					param.Mutable = true
+					self.next()
+				}
+				if self.eof() {
+					self.pushErr(self.lt, "expected identifier for the function parameter")
+					ret nil
+				}
+				if self.t.ID != token::NAME {
+					self.pushErr(self.lt, "expected identifier for the function parameter")
+					ret nil
+				}
+				param.Token = self.t
+				param.Name = self.t.Kind
+				self.next()
+				if self.eof() {
+					self.pushErr(self.lt, "unexpected EOF; expected , or |")
+					ret nil
+				}
+				f.Params = append(f.Params, param)
+				if self.t.ID == token::COMMA {
+					continue
+				}
+				if self.t.ID == token::OR {
+					break
+				}
+				self.pushErr(self.t, "unexpected token; expected , or |")
+				ret nil
+			}
+		}
+
+		// We point to closer | token.
+		// There is two case; inline or block body.
+		// Advance to the next token see what we have.
+		self.next()
+		if self.eof() {
+			self.pushErr(self.t, "unexpected EOF; expected function body")
+			ret nil
+		}
+		inliner := self.t.ID != token::LBRACE
+		if inliner {
+			// We have one-line body.
+			// Accept rest of the tokens as body.
+			f.Scope = newScope()
+			f.Scope.Deferred = true // Mark as one-line body.
+			mut e := self.parseExprList()
+			f.Scope.End = avoidNilExpr2(e)
+			f.Scope.Stmts = append(f.Scope.Stmts, ast::Stmt{
+				Token: avoidNilExpr(e),
+				End: f.Scope.End,
+				Data: e,
+			})
+		} else {
+			// We have explicit block body.
+			mut bodyTokens := range(self.i, token::LBRACE, token::RBRACE, self.l)
+			self.i-- // back to }
+			self.next()
+			f.Scope = self.p.buildScope(bodyTokens, self.l[self.i-1])
+		}
+		ret &ast::Expr{
+			Token: f.Token,
+			End: self.lt,
+			Data: f,
+		}
+	}
+
 	fn parseFuncTypeOrLit(mut self): &ast::Expr {
 		mut t := self.t
+		self.next()
+		if self.eof() {
+			self.pushErr(t, "unexpected EOF; expected function type or literal")
+			ret nil
+		}
+		if self.t.ID == token::OR || self.t.ID == token::LOR {
+			ret self.parseShortFuncLit()
+		}
+		if self.t.ID != token::LPAREN {
+			self.pushErr(t, "unexpected token; expected ( or |")
+			ret nil
+		}
+		self.i -= 2 // back to previous token of the function keyword to advance properly
+		self.next() // advance to the function keyword
+
 		mut f := self.p.buildFuncPrototype(self.l, self.i, false)
 		self.i-- // back to }
 		self.next()

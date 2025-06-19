@@ -959,10 +959,29 @@ impl fnCallArgChecker {
 		oldMut := self.e.target.mutable
 
 		self.e.target.mutable = p.Decl.Mutable
-		if !self.dynamicAnnotation && !p.Decl.Variadic {
+		if !p.Decl.Variadic && (!self.dynamicAnnotation || !parameterUsesGenerics(p, self.f.Decl.Generics)) {
 			self.e.prefix = p.Type
 		} else {
 			self.e.prefix = nil
+			// If the parameter type is function and the argument type is
+			// one-line short function literal, check for the generics.
+			// If the parameter function type uses generics only in result type,
+			// then infer type from the result type of the short function literal.
+			// To to that, use type of the return value by default.
+			if self.dynamicAnnotation {
+				mut dest := p.Type.Func()
+				if dest != nil && !funcParametersUseGenerics(dest.Params, self.f.Decl.Generics) {
+					mut src, isFunc := arg.Data.(&ast::Func)
+					if isFunc && src.IsShort() && src.Scope.Deferred {
+						// Set the prefix type.
+						self.e.prefix = p.Type
+						// Set the generics from the owner function to detect generics.
+						// It will be cleaned after eval.
+						// Refer to retTypeChecker documentation.
+						src.Generics = self.f.Decl.Generics
+					}
+				}
+			}
 		}
 		// Do not unwrap untyped literals, type analysis will check overflows.
 		mut v := self.e.evalExpr(arg, evalDefault)
@@ -1500,6 +1519,13 @@ impl rangeChecker {
 }
 
 // Return type checker for return statements.
+// For short function literals, works in the same way.
+// Special case: one-line short function literals with type inference.
+// Type inference applied only for result types.
+// If a one-line short function declaration have generics, it is impossible syntactically.
+// In this case, return analysis will enable the type result type inference,
+// and clean generics types of the declaration.
+// When type inference enabled, result type of the function will be return value type.
 struct retTypeChecker {
 	sc:         &scopeChecker
 	f:          &FuncIns
@@ -1509,12 +1535,24 @@ struct retTypeChecker {
 	exprDecls:  []&ast::Expr
 	errorToken: &token::Token
 	mutable:    bool // Whether the return expression should be mutable.
+	inference:  bool // Type-inference mode.
 }
 
 impl retTypeChecker {
 	fn prepareTypes(mut self) {
+		// Check if the function is not nil.
+		// But analysis requires types, actually.
+		// Types may be provided by the external source.
 		if self.f != nil {
-			self.types = self.f.Types()
+			if self.f.oneliner && len(self.f.Decl.Generics) > 0 {
+				// If the function is one-line short literal and have generics,
+				// we will use type inference.
+				self.types = nil
+				self.inference = true
+				self.f.Decl.Generics = nil // Clean generics.
+			} else {
+				self.types = self.f.Types()
+			}
 		}
 	}
 
@@ -1536,6 +1574,12 @@ impl retTypeChecker {
 		mut flags := evalDefault
 		if len(self.exprDecls) == 1 {
 			flags |= evalExceptional
+		}
+		if self.inference {
+			// Types will be inferred.
+			// Do not eval expressions separately.
+			self.expr = eval.evalExpr(e, flags)
+			ret self.expr != nil
 		}
 		for (i, mut expr) in self.exprDecls {
 			if i < len(self.types) {
@@ -1625,11 +1669,23 @@ impl retTypeChecker {
 		}
 	}
 
+	fn inferTypes(mut self) {
+		if self.expr.Type.Void() {
+			self.f.Result = nil
+		} else {
+			self.f.Result = self.expr.Type
+		}
+	}
+
 	fn check(mut self, mut &e: &ast::Expr): bool {
 		self.prepareTypes()
 		mut ok := self.prepareExprs(e)
 		if !ok {
 			ret false
+		}
+		if self.inference {
+			self.inferTypes()
+			ret true
 		}
 
 		// Check whether we have enough variables for return.

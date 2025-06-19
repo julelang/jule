@@ -2151,11 +2151,7 @@ impl scopeChecker {
 		self.scope.Stmts = append(self.scope.Stmts, brk)
 	}
 
-	fn checkRet(mut &self, mut r: &ast::Ret) {
-		if self.isDeferred() {
-			self.s.pushErr(r.Token, log::RetInDeferred)
-		}
-
+	fn checkRet2(mut &self, mut token: &token::Token, mut x: &ast::Expr) {
 		mut rt := &Ret{
 			Func: self.getRoot().owner,
 		}
@@ -2164,17 +2160,24 @@ impl scopeChecker {
 		mut rtc := &retTypeChecker{
 			sc: self,
 			f: rt.Func,
-			errorToken: r.Token,
+			errorToken: token,
 			mutable: true,
 		}
-		ok := rtc.check(r.X)
+		ok := rtc.check(x)
 		if !ok {
 			ret
 		}
 
-		if r.X != nil {
+		if x != nil {
 			rt.Expr = rtc.expr.Model
 		}
+	}
+
+	fn checkRet(mut &self, mut r: &ast::Ret) {
+		if self.isDeferred() {
+			self.s.pushErr(r.Token, log::RetInDeferred)
+		}
+		self.checkRet2(r.Token, r.X)
 	}
 
 	fn checkUseExpr(mut &self, ue: &ast::UseExpr) {
@@ -2475,8 +2478,18 @@ impl scopeChecker {
 		self.tree = tree
 		self.scope = s
 
+		// Catch one-line return statement expressions without keyword.
+		if self.owner != nil && self.owner.oneliner && !self.owner.Decl.IsVoid() {
+			mut expr, isExpr := self.tree.Stmts[0].Data.(&ast::Expr)
+			if isExpr {
+				self.checkRet2(expr.Token, expr)
+				goto FinalStage
+			}
+		}
+
 		self.checkTree()
 
+	FinalStage:
 		// If we have new errors, don't check unused declarations.
 		if errors == len(self.s.errors) {
 			self.checkVars()

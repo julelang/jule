@@ -392,13 +392,15 @@ impl Param {
 }
 
 // Function declaration.
-// Also represents anonymous function expression and function type declarations.
+// Also represents anonymous function expression and function type declarations..
+// For short function literals, Scope will be deferred to represent one-line body.
 struct Func {
 	Token:       &token::Token
 	Global:      bool
 	Unsafe:      bool
 	Public:      bool
 	Bind:        bool
+	Short:       bool // Whether this function is an anonymous function, defined by short literal.
 	Static:      bool
 	Exceptional: bool
 	Name:        str
@@ -410,12 +412,17 @@ struct Func {
 }
 
 impl Func {
-	// Reports whether function is anonymous.
+	// Reports whether the function is anonymous.
 	fn IsAnon(self): bool {
 		ret self.Name == jule::Anon
 	}
 
-	// Reports whether function is type declaration.
+	// Reports whether the function is anonymous and defined in short way.
+	fn IsShort(self): bool {
+		ret self.Short && self.IsAnon()
+	}
+
+	// Reports whether the function is type declaration.
 	fn IsDecl(self): bool {
 		ret self.Scope == nil
 	}
