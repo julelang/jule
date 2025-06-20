@@ -2185,6 +2185,15 @@ impl eval {
 				v = nil
 				ret
 			}
+			// Clear generic type cache to catch inferred types.
+			// Cache of functions will be nil already, because of dynamimc annotation.
+			// But methods (functions associated with a structure) may have generics in cache.
+			// When the owner struct have generic types, method's cache may not be empty.
+			// In such case, generics of the method will not be cached.
+			// Because algorithm will not re-cache if cache is not empty.
+			// As a result, generic type aliases may be missing during analysis.
+			// To avoid this, clear the cache of generic type aliases.
+			f.env.generics = nil
 			ok, _ = self.checkGenericFunc(f, fc.Token, v.Model, recheckNeed)
 			if !ok {
 				v = nil
