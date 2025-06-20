@@ -1,0 +1,119 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/slices"
+
+struct Query[T] {
+	mut s: []T
+}
+
+fn NewQuery[S: []T, T](mut s: S): Query[T] {
+	ret Query[T]{
+		s: s,
+	}
+}
+
+impl Query {
+	fn Where(self, f: fn(x: T): bool): Query[T] {
+		mut i := 0
+		mut n := len(self.s)
+		for i < n {
+			if !f(self.s[i]) {
+				copy(self.s[i:], self.s[i+1:])
+				n--
+				continue
+			}
+			i++
+		}
+		self.s = self.s[:i]
+		ret self
+	}
+
+	fn Map(self, f: fn(x: T): T): Query[T] {
+		for i in self.s {
+			self.s[i] = f(self.s[i])
+		}
+		ret self
+	}
+
+	fn Reverse(self): Query[T] {
+		slices::Reverse(self.s)
+		ret self
+	}
+
+	fn OrderBy[E: ordered](self, f: fn(x: T): E): Query[T] {
+		slices::SortFunc(self.s, fn|x, y| {
+			r0, r1 := f(x), f(y)
+			if r0 == r1 {
+				ret 0
+			} else if r0 > r1 {
+				ret +1
+			}
+			ret -1
+		})
+		ret self
+	}
+
+	fn OrderByAsc[E: ordered](self, f: fn(x: T): E): Query[T] {
+		slices::SortFunc(self.s, fn|x, y| {
+			r0, r1 := f(x), f(y)
+			if r0 == r1 {
+				ret 0
+			} else if r0 > r1 {
+				ret -1
+			}
+			ret +1
+		})
+		ret self
+	}
+
+	fn Max[E: ordered](self, f: fn(x: T): E): E {
+		mut m := f(self.s[0])
+		for _, x in self.s[1:] {
+			mut z := f(x)
+			if z > m {
+				m = z
+			}
+		}
+		ret m
+	}
+
+	fn Min[E: ordered](self, f: fn(x: T): E): E {
+		mut m := f(self.s[0])
+		for _, x in self.s[1:] {
+			mut z := f(x)
+			if z < m {
+				m = z
+			}
+		}
+		ret m
+	}
+
+	fn Count(self, f: fn(x: T): bool): (n: int) {
+		for _, x in self.s {
+			if f(x) {
+				n++
+			}
+		}
+		ret
+	}
+
+	fn Unwrap(self): []T {
+		ret self.s
+	}
+}
+
+fn init() {
+	mut x := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+	NewQuery(x).
+		Where(fn|x| x%2 == 0).
+		Map(fn|x| x * 10).
+		OrderBy(fn|x| x).
+		OrderByAsc(fn|x| x).
+		Reverse().
+		Unwrap()
+	NewQuery(x).Max(fn|x| x)
+	NewQuery(x).Min(fn|x| x)
+	NewQuery(x).Count(fn|x| x%2 == 0)
+}
