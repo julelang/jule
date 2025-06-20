@@ -711,10 +711,6 @@ struct referencer {
 	next:  &referencer // Next referencer.
 }
 
-enum recheckableType: type {
-	&StructIns,
-}
-
 // Cycle state flags.
 const (
 	cycleErrDisable = 1 << iota // Disable error logging for cycle analysis.
@@ -764,7 +760,7 @@ struct typeChecker {
 	ignoredGenerics: *[]&Type
 
 	// See developer reference (15).
-	recheckNeed: *[]recheckableType
+	recheckNeed: *[]&Type
 
 	// This generics used as type alias for real kind.
 	useGenerics: []&TypeAlias
@@ -1187,7 +1183,7 @@ impl typeChecker {
 
 	// Builds generic types and associates with struct s.
 	// Returns struct s if no error occurred, otherwise returns nil.
-	fn getStructInsWithGenerics(mut self, mut s: &StructIns, mut indx: &ast::IndexExpr): &StructIns {
+	fn getStructInsWithGenerics(mut self, mut s: &StructIns, mut indx: &ast::IndexExpr): (&StructIns, recheckNeeded: bool) {
 		inscatch, letGenerics := self.inscatchNeeded(s.Decl)
 
 		// Save configuration.
@@ -1207,8 +1203,7 @@ impl typeChecker {
 		defer { self.lookup = lookup }
 
 		// Whether the instance pushed to recheck stack.
-		mut recheck := false
-		mut &_recheck := recheck // For closure.
+		mut &_recheck := recheckNeeded // For closure.
 
 		pushGenericToIns := fn(mut typDecl: &ast::Expr): bool {
 			mut typ := unsafe { self.checkDecl(typDecl) }
@@ -1242,7 +1237,6 @@ impl typeChecker {
 				prim := typ.Prim()
 				if prim != nil && unsafe { self.isIgnoredGeneric(prim.Kind) } {
 					unsafe { _recheck = true }
-					unsafe { *self.recheckNeed = append(*self.recheckNeed, s) }
 				}
 			}
 			s.Generics = append(s.Generics, &InsGeneric{Type: typ})
@@ -1257,28 +1251,54 @@ impl typeChecker {
 			for (_, mut typDecl) in tup.X {
 				ok := pushGenericToIns(typDecl)
 				if !ok {
-					ret nil
+					ret nil, false
 				}
 			}
 		|:
 			ok := pushGenericToIns(indx.Index)
 			if !ok {
-				ret nil
+				ret nil, false
 			}
 		}
-		ret s
+		ret s, recheckNeeded
 	}
 
-	fn buildStructInsWithGenerics(mut self, mut s: &StructIns, mut indx: &ast::IndexExpr): &StructIns {
-		s = self.getStructInsWithGenerics(s, indx)
+	fn buildStructInsWithGenerics(mut self, mut s: &StructIns, mut indx: &ast::IndexExpr): (&StructIns, recheckNeeded: bool) {
+		s, recheckNeeded = self.getStructInsWithGenerics(s, indx)
 		if s == nil {
-			ret nil
+			ret nil, false
 		}
 		mut ok := self.s.checkGenericQuantity(len(s.Decl.Generics), len(s.Generics), indx.X.Token)
 		if !ok {
-			ret nil
+			ret nil, false
 		}
-		ret self.buildStructIns(s, indx.X.Token)
+		// If recheck needed for the structure, do not build instance.
+		// Avoid appending to collection, otherwise we may have duplicate instances.
+		// For example:
+		//
+		//	consider this function:
+		//		fn Foo(): Bar[T]
+		//
+		//	consider this code:
+		//		x := int(10)
+		//		Foo(x)
+		//		Foo(x)
+		//
+		//	In this case, Foo called with type inferred generics.
+		//	We build for the non-generic types first.
+		//	If we append instance for Bar[T], we will have duplicate instances.
+		//	Because Bar[T] will resolved as Bar[int] in the first call.
+		//	The second will append Bar[T] to collection again, because there is no Bar[T].
+		//	Then the new Bar[T] will resolved as Bar[int], as a result we have two Bar[int].
+		//	This may also cause some conflicts, since lookup returns the first match.
+		//
+		// As explained above, we should not append instances into collection here.
+		// Return with s directly, and report recheck needed.
+		// Append instance into collection when analysis sent type to recheck.
+		if recheckNeeded {
+			ret s, recheckNeeded
+		}
+		ret self.buildStructIns(s, indx.X.Token), false
 	}
 
 	fn buildStructIns(mut self, mut s: &StructIns, mut errToken: &token::Token): &StructIns {
@@ -1751,25 +1771,26 @@ impl typeChecker {
 		ret kind
 	}
 
-	fn buildIndex(mut self, mut indx: &ast::IndexExpr): Kind {
+	fn buildIndex(mut self, mut indx: &ast::IndexExpr): (Kind, recheckNeeded: bool) {
 		mut typ := self.build(indx.X.Data)
 		if typ == nil {
-			ret nil
+			ret nil, false
 		}
 		mut s := typ.SoftStruct()
 		if self.selection {
 			self.pushErr(indx.X.Token, log::GenericsNotAllowed)
-			ret nil
+			ret nil, false
 		}
 		if s == nil || s.Source != nil || len(s.Generics) > 0 {
 			self.pushErr(indx.X.Token, log::TypeNotSupportsGenerics, typ.Str())
-			ret nil
+			ret nil, false
 		}
 		ret self.buildStructInsWithGenerics(s, indx)
 	}
 
 	fn build(mut self, mut declKind: ast::ExprData): &Type {
 		let mut kind: Kind = nil
+		let mut recheckNeeded: bool = false
 		match type declKind {
 		| &ast::RangeExpr:
 			mut r := declKind.(&ast::RangeExpr)
@@ -1833,7 +1854,7 @@ impl typeChecker {
 				kind = t
 			}
 		| &ast::IndexExpr:
-			mut t := self.buildIndex(declKind.(&ast::IndexExpr))
+			mut t, (recheckNeeded) := self.buildIndex(declKind.(&ast::IndexExpr))
 			if t != nil {
 				kind = t
 			}
@@ -1844,19 +1865,24 @@ impl typeChecker {
 		if kind == nil {
 			ret nil
 		}
+		mut typ := (&Type)(nil)
 		match type kind {
 		| &Type:
-			ret kind.(&Type)
+			typ = kind.(&Type)
 		|:
-			mut tk := &Type{Kind: kind}
+			typ = &Type{Kind: kind}
 			if self.ignoredGenerics != nil {
 				_, prim := kind.(&Prim)
 				if prim {
-					unsafe { *self.ignoredGenerics = append(*self.ignoredGenerics, tk) }
+					unsafe { *self.ignoredGenerics = append(*self.ignoredGenerics, typ) }
 				}
 			}
-			ret tk
 		}
+		// Recheck needed, append type into collection.
+		if recheckNeeded {
+			unsafe { *self.recheckNeed = append(*self.recheckNeed, typ) }
+		}
+		ret typ
 	}
 
 	fn checkDecl(mut self, mut &decl: &ast::Expr): &Type {
@@ -1900,10 +1926,10 @@ impl typeChecker {
 
 	// Rechecks the recheckable type.
 	// See developer reference (15).
-	fn recheck(mut self, mut &t: recheckableType, mut &errorToken: &token::Token): (ok: bool) {
-		match type t {
-		| &StructIns:
-			mut s := t.(&StructIns)
+	fn recheck(mut self, mut &t: &Type, mut &errorToken: &token::Token): (ok: bool) {
+		match {
+		| t.SoftStruct() != nil:
+			mut s := t.SoftStruct()
 			s.checked = false
 
 			// We need to hard-check methods, if it have any method.
@@ -1920,7 +1946,22 @@ impl typeChecker {
 				}
 			}
 
-			ok = self._fromStructIns(s, errorToken)
+			// Recheck needed types will not be appended.
+			// So append instance to the collection. The buildStructIns will do it.
+			// Now, the instance s have resolved types completely.
+			// There is no risk for duplicated instances. Time to append.
+			//
+			// The buildStructIns returns common instance to avoid using duplicated instances.
+			// So the returned instance may be already existing or the same instance we pass.
+			// In both cases, use the result to make sure we have common instance.
+			s = self.buildStructIns(s, errorToken)
+			// The result instance is not nil, so analysis were successful.
+			// Update t.Kind with the instance s to make sure using common instance.
+			// Because all types must be point to the same common instance.
+			if s != nil {
+				ok = true
+				t.Kind = s
+			}
 		}
 		ret
 	}

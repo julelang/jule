@@ -1100,7 +1100,7 @@ impl eval {
 			v = nil
 			ret
 		}
-		s = self.typeChecker().buildStructInsWithGenerics(s, i)
+		s, _ = self.typeChecker().buildStructInsWithGenerics(s, i)
 		if s == nil {
 			v = nil
 			ret
@@ -1112,7 +1112,7 @@ impl eval {
 	// If instance is already exist, f will point to exist instantantiation.
 	// If recheckNeed is not nil, function will checked with recheck strategy.
 	fn checkGenericFunc(mut &self, mut &f: &FuncIns, mut &et: &token::Token,
-		mut &model: Expr, mut recheckNeed: []recheckableType): (ok: bool, exist: bool) {
+		mut &model: Expr, mut recheckNeed: []&Type): (ok: bool, exist: bool) {
 		mut old := f
 		if recheckNeed == nil {
 			ok, exist = self.s.checkGenericFunc(f, et)
@@ -2144,7 +2144,7 @@ impl eval {
 
 		// This will be used to collect recheck-needed types if dynamic annotation enabled.
 		// See developer reference (15).
-		let mut recheckNeed: []recheckableType
+		let mut recheckNeed: []&Type
 
 		if !dynamicAnnotation {
 			if !f.reloaded {
@@ -2162,7 +2162,7 @@ impl eval {
 		} else {
 			// Use non-nil slice for dynamic type annotation.
 			// Thus we can use recheck strategy even for zero recheck-need cases.
-			recheckNeed = make([]recheckableType, 0, len(f.Params)/2)
+			recheckNeed = make([]&Type, 0, len(f.Params)/2)
 			if !self.s.buildFuncNonGenericTypes(f, fcac.ignored, recheckNeed) {
 				v = nil
 				ret
