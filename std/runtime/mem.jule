@@ -3,24 +3,13 @@
 // license that can be found in the LICENSE file.
 
 use "std/comptime"
-
-const sptrSize = ptrSize << 1
-
-struct sptrBase[T] {
-	data: *T
-	ref:  *uint
-}
+use "std/internal/runtime"
+use "std/unsafe"
 
 // Reports whether pointer allocations are points to same address.
 #export "__jule_ptrEqual"
 fn ptrEqual(a: *unsafe, b: *unsafe): bool {
 	ret a == b
-}
-
-struct strBase {
-	buffer: &byte
-	slice:  *byte
-	len:    int
 }
 
 // Returns string based on b, the parameter b means first byte of string.
@@ -29,10 +18,11 @@ struct strBase {
 #export "__jule_strBytePtr"
 unsafe fn strBytePtr(b: *byte, n: int): str {
 	mut s := ""
-	mut sb := (*strBase)(&s)
-	sb.buffer = (&byte)(*(&b))
-	sb.slice = (*byte)(sb.buffer)
-	sb.len = n
+	mut sb := (*runtime::Str)(&s)
+	sb.Buffer.Data = *(&b)
+	sb.Buffer.Ref = nil
+	sb.Slice = sb.Buffer.Data
+	sb.Len = n
 	ret s
 }
 
@@ -43,33 +33,14 @@ fn strAsSlice(s: str): []byte {
 	if len(s) == 0 {
 		ret nil
 	}
-	ret unsafe { slice(&s[0], len(s), len(s)) }
-}
-
-struct sliceBase[Elem] {
-	data:  &Elem
-	slice: *Elem
-	len:   int
-	cap:   int
-}
-
-// Returns slice based on e, the parameter e means first element of slice.
-// Will not perform garbage collection.
-unsafe fn slice[Elem](mut e: *Elem, len: int, cap: int): []Elem {
-	mut buf := []Elem(nil)
-	mut sb := (*sliceBase[Elem])(&buf)
-	sb.data = (&Elem)(e)
-	sb.slice = (*Elem)(sb.data)
-	sb.len = len
-	sb.cap = cap
-	ret buf
+	ret unsafe::Slice(&s[0], len(s), len(s))
 }
 
 // Returns slice based on b, the parameter b means first element of slice.
 // Will not perform garbage collection.
 #export "__jule_sliceBytePtr"
-unsafe fn sliceBytePtr(mut b: *byte, len: int, cap: int): []byte {
-	ret slice(b, len, cap)
+fn sliceBytePtr(mut b: *byte, len: int, cap: int): []byte {
+	ret unsafe::Slice(b, len, cap)
 }
 
 // Returns byte slice as str.
@@ -135,8 +106,8 @@ fn memcopy[Dest, Src](mut dest: Dest, mut src: Src): (n: int) {
 		// slice memory model can represent a string memory model.
 		// And this implementation does not need to slice-specific data.
 		comptime::TypeAlias(E, comptime::TypeOf(Dest).Value())
-		mut d := (*sliceBase[E])(&dest).slice
-		mut s := (*sliceBase[E])(&src).slice
+		mut d := (*runtime::Slice[E])(&dest).Slice
+		mut s := (*runtime::Slice[E])(&src).Slice
 		if d > s && u64(d-s) < u64(n) {
 			// to overlaps with from
 			// <from...>

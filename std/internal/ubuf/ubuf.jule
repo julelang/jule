@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use "std/runtime"
+use "std/internal/runtime"
 use "std/unsafe"
 
 // Unsafe buffer for bytes.
@@ -10,13 +10,13 @@ use "std/unsafe"
 // and removes boundary checking for fast memory access and performance gain.
 // Intended for buffer handling of performance critical implementations.
 struct Ubuf {
-	mut data: runtime::sliceBase[byte]
+	mut data: runtime::Slice[byte]
 }
 
 impl Ubuf {
 	// self.data == nil
 	fn IsNil(self): bool {
-		ret self.data.slice == nil
+		ret self.data.Slice == nil
 	}
 
 	// Returns the mutable data of the buffer.
@@ -26,72 +26,69 @@ impl Ubuf {
 
 	// Sets the data of the buffer.
 	fn SetData(self, data: []byte) {
-		if len(data) == 0 {
-			self.data.data, self.data.slice = nil, nil
-			self.data.len, self.data.cap = 0, 0
-			ret
+		unsafe {
+			*(*[]byte)(&self.data) = *(&data)
 		}
-		self.data = unsafe { *(*runtime::sliceBase[byte])(&data) }
 	}
 
 	// self.data[i]
 	fn Get(self, i: int): byte {
-		ret unsafe { *(self.data.slice + i) }
+		ret unsafe { *(self.data.Slice + i) }
 	}
 
 	// self.data[s:]
 	// Returned slice will have no GC.
 	fn Slice1(self, s: int): []byte {
-		l := self.data.len - s
-		c := self.data.cap - s
-		ret unsafe { unsafe::Slice(self.data.slice+s, l, c) }
+		l := self.data.Len - s
+		c := self.data.Cap - s
+		ret unsafe { unsafe::Slice(self.data.Slice+s, l, c) }
 	}
 
 	// self.data[s:n]
 	// Returned slice will have no GC.
 	fn Slice2(self, s: int, n: int): []byte {
 		l := n - s
-		c := self.data.cap - s
-		ret unsafe { unsafe::Slice(self.data.slice+s, l, c) }
+		c := self.data.Cap - s
+		ret unsafe { unsafe::Slice(self.data.Slice+s, l, c) }
 	}
 
 	// self.data[:n]
 	// Returned slice will have no GC.
 	fn Slice3(self, n: int): []byte {
-		ret unsafe { unsafe::Slice(self.data.slice, n, self.data.cap) }
+		ret unsafe { unsafe::Slice(self.data.Slice, n, self.data.Cap) }
 	}
 
 	// self.data[i] = b
 	fn Set(self, i: int, b: byte) {
-		unsafe { *(self.data.slice + i) = b }
+		unsafe { *(self.data.Slice + i) = b }
 	}
 
 	// self.data = self.data[:n]
 	fn SetLen(self, n: int) {
-		self.data.len = n
+		self.data.Len = n
 	}
 
 	// self.data = self.data[s:n]
 	fn SetLen2(self, s: int, n: int) {
-		self.data.slice += s
-		self.data.len = n - s
-		self.data.cap -= s
+		self.data.Slice += s
+		self.data.Len = n - s
+		self.data.Cap -= s
 	}
 
 	// self.data = self.data[s:]
 	fn SetLen3(self, s: int) {
-		self.data.len -= s
-		self.data.cap -= s
-		self.data.slice += s
+		self.data.Len -= s
+		self.data.Cap -= s
+		self.data.Slice += s
 	}
 
 	// len(self.data)
 	fn Len(self): int {
-		ret self.data.len
+		ret self.data.Len
 	}
 
 	// cap(self.data)
 	fn Cap(self): int {
-		ret self.data.cap
+		ret self.data.Cap
 	}
 }

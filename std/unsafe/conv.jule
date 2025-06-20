@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use integ "std/jule/integrated"
+use "std/internal/runtime"
 
 // Returns string based on b, the parameter b means first byte of string.
 // The returned string uses n as length.
@@ -10,28 +10,30 @@ use integ "std/jule/integrated"
 fn Str(b: *byte, n: int): str {
 	mut s := ""
 	unsafe {
-		integ::Emit("{}.buffer = {}::make({}, {})", s, &byte, b, nil)
-		integ::Emit("{}._len = {}", s, n)
-		integ::Emit("{}._slice = {}", s, b)
+		mut sp := (*runtime::Str)(&s)
+		sp.Buffer.Data = *(&b)
+		sp.Slice = sp.Buffer.Data
+		sp.Len = n
 	}
 	ret s
 }
 
 // Returns slice based on e, the parameter e means first element of slice.
 // Will not perform garbage collection.
-fn Slice[Elem](e: *Elem, len: int, cap: int): []Elem {
+fn Slice[Elem](mut e: *Elem, len: int, cap: int): []Elem {
 	mut buf := []Elem(nil)
 	unsafe {
-		integ::Emit("{}.data = {}::make({}, {})", buf, &Elem, e, nil)
-		integ::Emit("{}._len = {}", buf, len)
-		integ::Emit("{}._cap = {}", buf, cap)
-		integ::Emit("{}._slice = {}", buf, e)
+		mut sp := (*runtime::Slice[Elem])(&buf)
+		sp.Data.Data = e
+		sp.Data.Ref = nil
+		sp.Slice = sp.Data.Data
+		sp.Len, sp.Cap = len, cap
 	}
 	ret buf
 }
 
 // Alias for Slice(b, n, n).
-fn Bytes(b: *byte, n: int): []byte {
+fn Bytes(mut b: *byte, n: int): []byte {
 	ret Slice(b, n, n)
 }
 
@@ -58,12 +60,11 @@ fn StrFromBytes(b: []byte): str { ret unsafe { *(*str)(&b) } }
 
 // Same as [StrBytes] but keeps garbage collection.
 fn BytesFromStr(s: str): []byte {
-	mut b := StrBytes(s)
+	let mut b: []byte
 	unsafe {
-		if integ::Emit[bool]("{}.buffer.ref != {}", s, nil) {
-			integ::Emit("{}.data.ref = {}.buffer.ref", b, s)
-			integ::Emit("__jule_RCAdd({}.data.ref)", b)
-		}
+		*(*str)(&b) = s
+		mut sp := (*runtime::Slice[byte])(&b)
+		sp.Cap = sp.Len
 	}
 	ret b
 }
