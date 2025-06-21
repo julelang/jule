@@ -743,6 +743,34 @@ impl exprBuilder {
 		}
 	}
 
+	// Parses (...) range.
+	// If list is true, evaluates list expressions.
+	// Since list expressions cannot be in range, returns list expression directly.
+	fn parseParenRange(mut self, list: bool): &ast::Expr {
+		mut lparen := self.t
+		self.next()
+		let mut x: &ast::Expr
+		if list {
+			x = self.parseExprList()
+		} else {
+			x = self.parse()
+		}
+		mut rparen := self.t
+		if self.expect(token::RPAREN, "expected )") {
+			ret nil
+		}
+		if list {
+			ret x
+		}
+		ret &ast::Expr{
+			Token: lparen,
+			End: rparen,
+			Data: &ast::RangeExpr{
+				X: x,
+			},
+		}
+	}
+
 	fn parseShortFuncLit(mut self): &ast::Expr {
 		mut f := new(ast::Func)
 		f.Token = self.lt
@@ -804,7 +832,13 @@ impl exprBuilder {
 			// Accept rest of the tokens as body.
 			f.Scope = newScope()
 			f.Scope.Deferred = true // Mark as one-line body.
-			mut e := self.parseExprList()
+			let mut e: &ast::Expr
+			if self.t.ID == token::LPAREN {
+				// Special case: allow list expressions for inliner short funtions in (...) range.
+				e = self.parseParenRange(true)
+			} else {
+				e = self.parse()
+			}
 			f.Scope.End = avoidNilExpr2(e)
 			f.Scope.Stmts = append(f.Scope.Stmts, ast::Stmt{
 				Token: avoidNilExpr(e),
@@ -922,20 +956,7 @@ impl exprBuilder {
 			ret self.parseUntypedLiteralValue()
 		| token::LPAREN:
 			// (...) expression.
-			mut lparen := self.t
-			self.next()
-			mut x := self.parse()
-			mut rparen := self.t
-			if self.expect(token::RPAREN, "expected )") {
-				ret nil
-			}
-			ret &ast::Expr{
-				Token: lparen,
-				End: rparen,
-				Data: &ast::RangeExpr{
-					X: x,
-				},
-			}
+			ret self.parseParenRange(false)
 		| token::UNSAFE:
 			mut t := self.t
 			// Unsafe expression or unsafe function type declaration.
