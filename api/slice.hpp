@@ -132,12 +132,14 @@ namespace jule
             {
                 this->data.ref = nullptr;
                 this->data.alloc = nullptr;
+                this->_slice = nullptr;
                 return;
             }
             if (__jule_RCDrop(this->data.ref))
             {
                 this->data.ref = nullptr;
                 this->data.alloc = nullptr;
+                this->_slice = nullptr;
                 return;
             }
             this->__free();
