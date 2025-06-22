@@ -2275,7 +2275,7 @@ fn decomposeCommonEsq(b: byte): str {
 
 fn sbtoa(b: byte): str {
 	if b == 0 {
-		ret "\\x00"
+		ret "\\000"
 	}
 	if b < utf8::RuneSelf { // ASCII, fast way.
 		seq := decomposeCommonEsq(b)
@@ -2287,10 +2287,14 @@ fn sbtoa(b: byte): str {
 		}
 	}
 	seq := conv::FormatUint(u64(b), 8)
-	if len(seq) == 2 {
+	match len(seq) {
+	| 1:
+		ret "\\00" + seq
+	| 2:
 		ret "\\0" + seq
+	|:
+		ret "\\" + seq
 	}
-	ret "\\" + seq
 }
 
 fn cstrBytes(mut &s: strings::Builder, ctx: str) {
