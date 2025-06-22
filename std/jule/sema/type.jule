@@ -711,6 +711,11 @@ struct referencer {
 	next:  &referencer // Next referencer.
 }
 
+enum recheckableType: type {
+	&Type,
+	&StructIns,
+}
+
 // Cycle state flags.
 const (
 	cycleErrDisable = 1 << iota // Disable error logging for cycle analysis.
@@ -760,7 +765,7 @@ struct typeChecker {
 	ignoredGenerics: *[]&Type
 
 	// See developer reference (15).
-	recheckNeed: *[]&Type
+	recheckNeed: *[]recheckableType
 
 	// This generics used as type alias for real kind.
 	useGenerics: []&TypeAlias
@@ -873,6 +878,19 @@ impl typeChecker {
 		for (i, mut t) in types {
 			ins.Generics[i] = &InsGeneric{Type: t}
 		}
+
+		// If the type depends to an ignored generic, add it to recheckNeed.
+		// We have to check it with recheck strategy, like user defined structs.
+		if len(self.ignoreGenerics) > 0 {
+			for (_, mut typ) in types {
+				prim := typ.Prim()
+				if prim != nil && self.isIgnoredGeneric(prim.Kind) {
+					unsafe { *self.recheckNeed = append(*self.recheckNeed, ins) }
+					ret
+				}
+			}
+		}
+
 		ins = self.fromStructIns(ins, token)
 		self.pushReference[&StructIns](ins)
 	}
@@ -1933,44 +1951,61 @@ impl typeChecker {
 		t.Type = kind
 	}
 
-	// Rechecks the recheckable type.
-	// See developer reference (15).
-	fn recheck(mut self, mut &t: &Type, mut &errorToken: &token::Token): (ok: bool) {
-		match {
-		| t.SoftStruct() != nil:
-			mut s := t.SoftStruct()
-			s.checked = false
+	// Rechecks structure instance.
+	// Updates s to common instance before return.
+	fn recheckStructIns(mut self, mut &s: &StructIns, mut &errorToken: &token::Token): (ok: bool) {
+		s.checked = false
 
-			// We need to hard-check methods, if it have any method.
-			// Because method types will not be rechecked with the recheck strategy.
-			// So if any method refers to generic type, it may use unresolved type.
-			// Reload (resolve) types from scratch.
-			for (_, mut m) in s.Methods {
-				// If method have parameters (except receiver) or have result type,
-				// then reload types. Otherwise, it is not needed.
-				if len(m.Params) > 1 || !m.IsVoid() {
-					for (_, mut mm) in m.Instances {
-						self.s.reloadFuncInsTypes(mm)
-					}
+		// We need to hard-check methods, if it have any method.
+		// Because method types will not be rechecked with the recheck strategy.
+		// So if any method refers to generic type, it may use unresolved type.
+		// Reload (resolve) types from scratch.
+		for (_, mut m) in s.Methods {
+			// If method have parameters (except receiver) or have result type,
+			// then reload types. Otherwise, it is not needed.
+			if len(m.Params) > 1 || !m.IsVoid() {
+				for (_, mut mm) in m.Instances {
+					self.s.reloadFuncInsTypes(mm)
 				}
 			}
+		}
 
-			// Recheck needed types will not be appended.
-			// So append instance to the collection. The buildStructIns will do it.
-			// Now, the instance s have resolved types completely.
-			// There is no risk for duplicated instances. Time to append.
-			//
-			// The buildStructIns returns common instance to avoid using duplicated instances.
-			// So the returned instance may be already existing or the same instance we pass.
-			// In both cases, use the result to make sure we have common instance.
-			s = self.buildStructIns(s, errorToken)
-			// The result instance is not nil, so analysis were successful.
-			// Update t.Kind with the instance s to make sure using common instance.
-			// Because all types must be point to the same common instance.
-			if s != nil {
-				ok = true
-				t.Kind = s
+		// Recheck needed types will not be appended.
+		// So append instance to the collection. The buildStructIns will do it.
+		// Now, the instance s have resolved types completely.
+		// There is no risk for duplicated instances. Time to append.
+		//
+		// The buildStructIns returns common instance to avoid using duplicated instances.
+		// So the returned instance may be already existing or the same instance we pass.
+		// In both cases, use the result to make sure we have common instance.
+		s = self.buildStructIns(s, errorToken)
+		// The result instance is not nil, so analysis were successful.
+		ok = s != nil
+		ret
+	}
+
+	// Rechecks the recheckable type.
+	// See developer reference (15).
+	fn recheck(mut self, mut &t: recheckableType, mut &errorToken: &token::Token): (ok: bool) {
+		match type t {
+		| &Type:
+			mut typ := t.(&Type)
+			match {
+			| typ.Struct() != nil:
+				mut s := typ.Struct()
+				ok = self.recheckStructIns(s, errorToken)
+				// Analysis returned successfully.
+				// Update typ.Kind with the instance s to make sure using common instance.
+				// Because all types must be point to the same common instance.
+				if ok {
+					typ.Kind = s
+				}
+			|:
+				panic("unreachable")
 			}
+		| &StructIns:
+			mut s := t.(&StructIns)
+			ret self.recheckStructIns(s, errorToken)
 		}
 		ret
 	}
