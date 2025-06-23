@@ -298,8 +298,9 @@ impl Lookup for scopeChecker {
 	//	- Parent scopes.
 	//	- Sema.
 	fn FindVar(mut self, name: str, _bind: bool): &Var {
+		const Closure = true // allow capturing variables from parent scope
 		if !_bind { // Local variables cannot be bind.
-			mut v := self.findVar(name)
+			mut v := self.findVar(name, Closure)
 			if v != nil {
 				ret v
 			}
@@ -484,16 +485,17 @@ impl scopeChecker {
 	}
 
 	// Like [Lookup.FindVar] but designed for local variables only.
-	fn findVar(mut self, name: str): &Var {
+	fn findVar(mut self, name: str, closure: bool): &Var {
 		const Reverse = true // Search reverse for correct shadowing.
 		const Bind = false   // Local variables cannot be bind.
-		mut v := self.table.findVar(name, Bind, Reverse)
-		if v != nil {
-			ret v
-		}
-		mut parent := self.parent
+		mut parent := unsafe { (&scopeChecker)(&self) }
 		for parent != nil {
-			v = parent.table.findVar(name, Bind, Reverse)
+			// Closure mode is disable and we have a owner.
+			// Do not capture variables from the parent scopes.
+			if !closure && parent.owner != nil {
+				ret nil
+			}
+			mut v := parent.table.findVar(name, Bind, Reverse)
 			if v != nil {
 				ret v
 			}
@@ -542,7 +544,8 @@ impl scopeChecker {
 	// The "self" parameter represents address of exception identifier.
 	// If founded identifier address equals to self, will be skipped.
 	fn isDuplicatedName(mut self, itself: uintptr, &name: str): bool {
-		v := self.FindVar(name, false)
+		const Closure = false
+		v := self.findVar(name, Closure)
 		if v != nil && uintptr(v) != itself {
 			if v.Scope == nil { // Ignore globals.
 				ret false
