@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/unsafe"
+
 // Seek whence values.
 const (
 	SeekStart   = 0 // seek relative to the origin of the file
@@ -311,10 +313,16 @@ fn copyBuffer(mut dst: Writer, mut src: Reader, mut buf: []byte)!: (written: i64
 	ret written
 }
 
-// Writes the contents of the string s to w, which accepts a slice of bytes.
-// The [Writer.write] is invoked directly.
+// Writes the contents of the string s to w efficiently.
+// Guarantees a slice will not be allocated.
 fn WriteStr(mut w: Writer, s: str)!: (n: int) {
-	ret w.Write([]byte(s)) else { error(error) }
+	ret w.Write(unsafe::StrBytes(s)) else { error(error) }
+}
+
+// Writes a single byte to w efficiently.
+// Guarantees a slice will not be allocated.
+fn WriteByte(mut w: Writer, b: byte)!: (n: int) {
+	ret w.Write(unsafe::Slice(&b, 1, 1)) else { error(error) }
 }
 
 // Reads from r until an error or EOF and returns the data it read.
