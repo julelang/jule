@@ -284,7 +284,7 @@ impl jsonEncoder {
 			error(&UnsupportedTypeError{Type: tt.Str()})
 		}
 		if t == nil {
-			self.encodeNil()
+			self.buf.writeStr("{}")
 			ret
 		}
 		const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeIndent)
@@ -359,7 +359,7 @@ impl jsonEncoder {
 	// Non-nil slices and arrays should have same outputs.
 	fn encodeSlice[T, Flag](mut self, &t: T)! {
 		if t == nil {
-			self.encodeNil()
+			self.writeStr("[]")
 			ret
 		}
 		const match comptime::TypeOf(T).Value().Kind() {
@@ -512,12 +512,12 @@ fn encoder(): jsonEncoder {
 //
 //	Slices:
 //		Encode as JSON array.
-//		If slice is nil, encode as null JSON value.
+//		If slice is nil, encode as empty array [] JSON value.
 //		For the []byte type, encodes as a base64-encoded string.
 //
 //	Maps:
 //		Encode as JSON object.
-//		If map is nil, encode as null JSON value.
+//		If map is nil, encode as empty object {} JSON value.
 //		The keys of the map always will be quoted.
 //		Also map's key type only can be: signed integer, unsigned integer and string.
 //		Other types will cause exceptional with [UnsupportedTypeError].
