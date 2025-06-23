@@ -8,6 +8,7 @@ use "obj/meta"
 use "opt"
 use "std/conv"
 use "std/jule/constant"
+use "std/jule/directive"
 use "std/jule/sema"
 use "std/jule/token"
 use "std/strings"
@@ -1696,6 +1697,19 @@ impl scopeCoder {
 		if f.Scope == nil {
 			ret
 		}
+
+		// Save the mode and restore before return.
+		mut mode := self.oc.mode
+		defer { self.oc.mode = mode }
+
+		// Update modes according to function.
+		disable := obj::FindDirective(f.Decl.Directives, directive::Disable)
+		if disable == nil {
+			self.oc.mode &= ^_OBJ_DISABLE
+		} else {
+			self.oc.mode = obj::HasDirectiveArg(disable, "boundary", self.oc.mode, _OBJC_DISABLE_BOUNDARY)
+		}
+
 		self.oc.write("{\n")
 		self.oc.addIndent()
 		self.commonFuncScope(f)

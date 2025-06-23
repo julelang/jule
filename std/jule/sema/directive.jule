@@ -149,6 +149,36 @@ impl directiveChecker {
 		d.Args[0].Kind = arg.Kind[1 : len(arg.Kind)-1]
 	}
 
+	fn checkDisable(mut self, mut &d: &ast::Directive) {
+		match type self.o {
+		| &Func:
+			f := self.o.(&Func)
+			if f.Bind {
+				self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
+				ret
+			}
+		|:
+			self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
+			ret
+		}
+		if len(d.Args) == 0 {
+			self.s.pushErr(d.Tag, "the #disable directive requires at least one argument")
+			ret
+		}
+		mut args := map[str]bool{
+			"boundary": false,
+		}
+		for _, arg in d.Args {
+			r, ok := args[arg.Kind]
+			if r {
+				self.s.pushErr(arg, "argument is already passed for the #disable directive: "+arg.Kind)
+			} else if !ok {
+				self.s.pushErr(arg, "invalid argument for the #disable directive: "+arg.Kind)
+			}
+			args[arg.Kind] = true
+		}
+	}
+
 	fn checkDirective(mut self, mut &d: &ast::Directive) {
 		match d.Tag.Kind {
 		| directive::Cdef:
@@ -164,6 +194,8 @@ impl directiveChecker {
 		| directive::Build
 		| directive::Pass:
 			self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
+		| directive::Disable:
+			self.checkDisable(d)
 		|:
 			self.s.pushErr(d.Tag, log::InvalidLabel, d.Tag.Kind)
 		}

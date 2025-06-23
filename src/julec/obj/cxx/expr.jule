@@ -1247,6 +1247,42 @@ impl exprCoder {
 		self.oc.write("; })")
 	}
 
+	fn indexingWithSafety(mut &self, mut m: &sema::IndexingExpr, safe: bool) {
+		match {
+		| m.Expr.Type.Map() != nil:
+			mut _map := m.Expr.Type.Map()
+			mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Value)
+			const Static = false
+			mut f := ins.FindMethod("get", Static).Instances[0]
+			identCoder.funcIns(self.oc.Buf, f)
+			self.oc.write("(")
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write(", ")
+			self.possibleRefExpr(m.Index.Model)
+			self.oc.write(")")
+		| env::Production && safe
+		| m.Expr.Type.Ptr() != nil
+		| obj::IsExprComesFromBind(m.Expr):
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write("[")
+			self.possibleRefExpr(m.Index.Model)
+			self.oc.write("]")
+		|:
+			self.possibleRefExpr(m.Expr.Model)
+			if safe {
+				self.oc.write(".at(\"")
+				self.oc.locInfo(m.Token)
+				self.oc.write("\", ")
+				self.possibleRefExpr(m.Index.Model)
+				self.oc.write(")")
+			} else {
+				self.oc.write(".__at(")
+				self.possibleRefExpr(m.Index.Model)
+				self.oc.write(")")
+			}
+		}
+	}
+
 	fn indexing(mut &self, mut m: &sema::IndexingExpr) {
 		match type m.Expr.Model {
 		| &constant::Const:
@@ -1265,56 +1301,14 @@ impl exprCoder {
 			self.oc.write(", ")
 			self.possibleRefExpr(m.Index.Model)
 			self.oc.write(")")
-			ret
 		|:
-			// no-op
-		}
-
-		// Index access with safety measures.
-		match {
-		| m.Expr.Type.Map() != nil:
-			mut _map := m.Expr.Type.Map()
-			mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Value)
-			const Static = false
-			mut f := ins.FindMethod("get", Static).Instances[0]
-			identCoder.funcIns(self.oc.Buf, f)
-			self.oc.write("(")
-			self.possibleRefExpr(m.Expr.Model)
-			self.oc.write(", ")
-			self.possibleRefExpr(m.Index.Model)
-			self.oc.write(")")
-		| env::Production
-		| m.Expr.Type.Ptr() != nil
-		| obj::IsExprComesFromBind(m.Expr):
-			self.possibleRefExpr(m.Expr.Model)
-			self.oc.write("[")
-			self.possibleRefExpr(m.Index.Model)
-			self.oc.write("]")
-		|:
-			self.possibleRefExpr(m.Expr.Model)
-			self.oc.write(".at(\"")
-			self.oc.locInfo(m.Token)
-			self.oc.write("\", ")
-			self.possibleRefExpr(m.Index.Model)
-			self.oc.write(")")
+			// Index access with safety measures, by configuration.
+			self.indexingWithSafety(m, self.oc.mode&_OBJC_DISABLE_BOUNDARY != _OBJC_DISABLE_BOUNDARY)
 		}
 	}
 
 	fn unsafeIndexing(mut &self, mut m: &opt::UnsafeIndexingExpr) {
-		self.possibleRefExpr(m.Node.Expr.Model)
-		// Index access with safety measures.
-		match {
-		| env::Production
-		| m.Node.Expr.Type.Ptr() != nil
-		| m.Node.Expr.Type.Map() != nil:
-			self.oc.write("[")
-			self.possibleRefExpr(m.Node.Index.Model)
-			self.oc.write("]")
-		|:
-			self.oc.write(".__at(")
-			self.possibleRefExpr(m.Node.Index.Model)
-			self.oc.write(")")
-		}
+		self.indexingWithSafety(m.Node, false)
 	}
 
 	fn anonFunc(mut &self, mut m: &sema::AnonFuncExpr) {

@@ -75,6 +75,7 @@ struct traitCast {
 struct anonHash {
 	expr: &sema::AnonFuncExpr
 	name: str
+	mode: int // ObjectCoder mode when this anonymous function appears.
 }
 
 struct traitHash {
@@ -86,7 +87,18 @@ struct metadata {
 	concurrent: bool // Whether built-in concurrency used.
 }
 
+// Internal ObjectCoder modes.
+const (
+	_OBJC_DEFAULT          = iota            // Default configuration.
+	_OBJC_DISABLE_BOUNDARY = 1 << (iota - 1) // Disable boundary checking.
+
+	// All disable flags.
+	_OBJ_DISABLE = _OBJC_DISABLE_BOUNDARY
+)
+
 struct ObjectCoder {
+	mode: int
+
 	// Internal buffer which is commonly used.
 	Buf: strings::Builder
 
@@ -130,6 +142,7 @@ struct ObjectCoder {
 impl ObjectCoder {
 	fn New(mut &ir: &obj::IR, info: SerializationInfo): &ObjectCoder {
 		mut oc := &ObjectCoder{
+			mode: _OBJC_DEFAULT,
 			ir: ir,
 			info: info,
 			resultMap: {},
@@ -360,7 +373,7 @@ impl ObjectCoder {
 		}
 
 		// Anonymous function.
-		self.anons = append(self.anons, &anonHash{expr: m, name: name})
+		self.anons = append(self.anons, &anonHash{expr: m, name: name, mode: self.mode})
 		self.anonFuncInsDecl(m, name)
 		self.anonObj.WriteByte('\n')!
 		ret
@@ -1584,6 +1597,10 @@ impl ObjectCoder {
 	}
 
 	fn anonHashes(mut &self) {
+		// Save the current mode and restore before return.
+		mode := self.mode
+		defer { self.mode = mode }
+
 		// Use recursive algorithm, because anonymous function may have
 		// anonymous functions, so [self.anons] may grow.
 		// Make sure whether all anonymous functions are handled.
@@ -1591,6 +1608,7 @@ impl ObjectCoder {
 		mut anons := self.anons
 		self.anons = nil
 		for (_, mut h) in anons {
+			self.mode = h.mode
 			self.anonFuncIns(h.expr, h.name)
 		}
 		if len(self.anons) > 0 {
