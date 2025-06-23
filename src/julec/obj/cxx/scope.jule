@@ -100,7 +100,7 @@ impl scopeCoder {
 			expr.Expr = new(sema::Value)
 			expr.Expr.Type = it.Expr.Type
 			expr.Expr.Model = unsafe { *(*sema::Expr)(&model) }
-			self.oc.ec.chanRecv(expr, fn() { self.oc.write("&__ok") }, false)
+			self.oc.ec.chanRecv(expr, fn|| self.oc.write("&__ok"), false)
 		}
 		if it.KeyA != nil {
 			self.oc.varInitExpr(it.KeyA, writeExpr)
@@ -194,7 +194,7 @@ impl scopeCoder {
 		mut ref := false
 		self.iterHead(it, ref, begin)
 		if it.KeyA != nil {
-			self.oc.varInitExpr(it.KeyA, fn() {
+			self.oc.varInitExpr(it.KeyA, fn|| {
 				if ref {
 					self.oc.write("it - expr->begin()")
 				} else {
@@ -206,7 +206,7 @@ impl scopeCoder {
 		}
 		if it.KeyB != nil {
 			it.KeyB.Reference = opt::Copy && isIterCopyOptimizable(it.Expr, it.KeyB)
-			self.oc.varInitExpr(it.KeyB, fn() {
+			self.oc.varInitExpr(it.KeyB, fn|| {
 				unsafe {
 					if it.KeyB.Reference {
 						self.oc.write("it")
@@ -300,12 +300,12 @@ impl scopeCoder {
 		self.oc.addIndent()
 		self.oc.indent()
 		if it.KeyA != nil {
-			self.oc.varInitExpr(it.KeyA, fn() { self.oc.write("*" + resultKey) })
+			self.oc.varInitExpr(it.KeyA, fn|| self.oc.write("*"+resultKey))
 			self.oc.write("\n")
 			self.oc.indent()
 		}
 		if it.KeyB != nil {
-			self.oc.varInitExpr(it.KeyB, fn() { self.oc.write("*" + resultVal) })
+			self.oc.varInitExpr(it.KeyB, fn|| self.oc.write("*"+resultVal))
 			self.oc.write("\n")
 			self.oc.indent()
 		}
@@ -391,7 +391,7 @@ impl scopeCoder {
 
 		// Variables.
 		if it.Base.KeyA != nil {
-			self.oc.varInitExpr(it.Base.KeyA, fn() { self.oc.write("0") })
+			self.oc.varInitExpr(it.Base.KeyA, fn|| self.oc.write("0"))
 			self.oc.write("\n")
 			self.oc.indent()
 		}
@@ -875,7 +875,7 @@ impl scopeCoder {
 		if a.Left[1] != nil {
 			// The |ok| parameter found.
 			// Pass the memory of the lvalue to the receiver function.
-			ok = fn() {
+			ok = fn|| {
 				self.oc.write("&(")
 				self.oc.ec.possibleRefExpr(a.Left[1].Model)
 				self.oc.write(")")
@@ -1033,9 +1033,8 @@ impl scopeCoder {
 		if !m.Comptime {
 			l.Type = m.Expr.Type
 			if m.Expr.IsConst() {
-				matchExprS := writeAndReadFromBuf(self.oc.Buf, fn() {
-					self.oc.ec.possibleRefExpr(m.Expr.Model)
-				})
+				matchExprS := writeAndReadFromBuf(self.oc.Buf,
+					fn|| self.oc.ec.possibleRefExpr(m.Expr.Model))
 				mut matchExpr := compExpr(matchExprS)
 				l.Model = unsafe { *(*sema::Expr)(&matchExpr) }
 			} else {
@@ -1123,7 +1122,7 @@ impl scopeCoder {
 		// So chans[i] always the matched case, if exist.
 		mut chans := make([]chanCase, 0, len(slct.Cases))
 		mut &_chans := chans // Used by closure, unsafely.
-		obj::IterCaseExprs(slct.Cases, fn(mut &c: &sema::Case, mut &val: &sema::Value) {
+		obj::IterCaseExprs(slct.Cases, fn|mut c, mut val| {
 			mut cr, _ := val.Model.(&sema::ChanRecv)
 			if cr != nil {
 				unsafe { _chans = append(_chans, chanCase{c, val}) }
@@ -1134,7 +1133,7 @@ impl scopeCoder {
 			}
 		})
 		recvChans := len(chans) // Total count of chan-recv cases.
-		obj::IterCaseExprs(slct.Cases, fn(mut &c: &sema::Case, mut &val: &sema::Value) {
+		obj::IterCaseExprs(slct.Cases, fn|mut c, mut val| {
 			mut cs, _ := val.Model.(&sema::ChanSend)
 			if cs != nil {
 				unsafe { _chans = append(_chans, chanCase{c, val}) }
@@ -1666,9 +1665,8 @@ impl scopeCoder {
 		}
 		closure := obj::IsClosure(m)
 		if closure {
-			self.oc.ec.varPrefixes = append(self.oc.ec.varPrefixes, fn(mut v: &sema::Var): bool {
-				ret captureVarHandling(self.oc, m, v)
-			})
+			self.oc.ec.varPrefixes = append(self.oc.ec.varPrefixes,
+				fn|mut v| captureVarHandling(self.oc, m, v))
 		}
 		self.oc.write("{\n")
 		self.oc.addIndent()

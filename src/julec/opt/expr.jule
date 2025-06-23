@@ -68,7 +68,7 @@ impl exprOptimizer {
 		mut check := true
 		mut _check := unsafe { (&bool)(&check) } // reference for the check variable used from closure
 
-		exop.inspector.Inspect(*exop.model, fn(mut &m: sema::Expr) {
+		exop.inspector.Inspect(*exop.model, fn|mut m| {
 			if *_check {
 				mut binary, _ := m.(&sema::BinaryExpr)
 				if binary != nil {
@@ -304,7 +304,7 @@ impl exprOptimizer {
 		// Point to the step variable in the closure. Otherwise it will be copied,
 		// so the step function remains as nil, which is causes nil dereferencing.
 		&_step := step
-		step = fn(mut m: sema::Expr) {
+		step = fn|mut m| {
 			match type m {
 			| &sema::BinaryExpr:
 				// First, handle the left operand.
@@ -1032,9 +1032,8 @@ impl exprOptimizer {
 	}
 
 	fn do(self) {
-		self.inspector.Inspect(*self.model, fn(mut &m: sema::Expr) {
-			unsafe { self.inspectStep(m) }
-		})
+		self.inspector.Inspect(*self.model,
+			fn|mut m| unsafe { self.inspectStep(m) })
 	}
 }
 

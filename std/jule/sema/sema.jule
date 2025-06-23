@@ -898,7 +898,7 @@ impl sema {
 		// Check with funcEnvironment, we need to generics of owner, if any.
 		// If owner generics are ignored, we cannot resolve them with type inference.
 		// Resolve owner generics in time, only ignore generics of the function.
-		ret self.funcEnvironment(f, fn(mut &sema: &sema, mut &generics: []&TypeAlias): (ok: bool) {
+		ret self.funcEnvironment(f, fn|mut sema, mut generics| {
 			ok = true
 			for (_, mut p) in f.Params {
 				if !p.Decl.IsSelf() {
@@ -910,7 +910,7 @@ impl sema {
 				f.Result = sema.buildNonGenericType(f.Decl.Result.TypeSym.Decl, generics, f.Decl.Generics, unsafe { ignored }, unsafe { recheckNeed })
 				ok = ok && f.Result != nil
 			}
-			ret
+			ret ok
 		})
 	}
 
@@ -996,9 +996,7 @@ impl sema {
 	// Calls basicFuncEnvironment internally but handles generics.
 	fn funcEnvironment(mut &self, mut f: &FuncIns, algo: fn(mut &sema: &sema, mut &generics: []&TypeAlias): bool): bool {
 		// Needs to f.environ(), but the basicFuncEnviron will handle it.
-		ret self.basicFuncEnvironment(f, fn(mut &sema: &sema): bool {
-			ret algo(f.env.sema, f.env.generics)
-		})
+		ret self.basicFuncEnvironment(f, fn|mut sema| algo(f.env.sema, f.env.generics))
 	}
 
 	fn checkFuncParamKind(mut &self, mut &p: &ParamIns) {
@@ -1037,7 +1035,7 @@ impl sema {
 		if f.IsBuiltin() || f.IsAnon() {
 			ret true
 		}
-		ret self.funcEnvironment(f, fn(mut &sema: &sema, mut &generics: []&TypeAlias): bool {
+		ret self.funcEnvironment(f, fn|mut sema, mut generics| {
 			self.reloadSelf(f)
 			mut ok := true
 			for (_, mut p) in f.Params {
@@ -2741,7 +2739,7 @@ impl sema {
 				cached = cached[:0]
 				let mut refCheck: fn(mut &cached: []&ReferenceStack, mut r: &ReferenceStack, owner: str): (cycle: bool)
 				&_refCheck := refCheck // For closure.
-				refCheck = fn(mut &cached: []&ReferenceStack, mut r: &ReferenceStack, owner: str): (cycle: bool) {
+				refCheck = fn|mut cached, mut r, owner| {
 					// We already checked/checking this reference stack.
 					if slices::Contains(cached, r) {
 						ret false
@@ -3452,7 +3450,7 @@ fn checkTypeEnumRefCycle(mut s: &sema, mut e: &TypeEnum, mut item: &TypeEnumItem
 	}
 	mut checkCycles := (fn(mut e2: &TypeEnum): bool)(nil)
 	&_checkCycles := checkCycles // For closure.
-	checkCycles = fn(mut e2: &TypeEnum): bool {
+	checkCycles = fn|mut e2| {
 		n := message.Len()
 		for (_, mut item2) in e2.Items {
 			if item2.TypeSym.Type == nil {

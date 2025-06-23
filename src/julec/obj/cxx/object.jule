@@ -1055,8 +1055,8 @@ impl ObjectCoder {
 	}
 
 	fn funcDecls(mut &self) {
-		obj::IterPackages(self.ir, fn(mut &pkg: &sema::Package) {
-			obj::IterFiles(pkg, fn(mut &file: &sema::SymTab) {
+		obj::IterPackages(self.ir, fn|mut pkg| {
+			obj::IterFiles(pkg, fn|mut file| {
 				for (_, mut f) in file.Funcs {
 					if !f.Bind && f.Token != nil {
 						self.pushResult(f)
@@ -1180,7 +1180,7 @@ impl ObjectCoder {
 		if v.ValueSym != nil && v.ValueSym.Expr != nil {
 			if v.ValueSym.Value.Model != nil {
 				if v.Reference {
-					self.varInitExpr(v, fn() {
+					self.varInitExpr(v, fn|| {
 						// If value is variable, check whether it is a reference.
 						// Because references implemented as raw pointers.
 						// So, do not take address of them, use directly them.
@@ -1195,7 +1195,7 @@ impl ObjectCoder {
 					})
 				} else {
 					if v.Static {
-						self.varInitExpr(v, fn() { self.ec.possibleRefExpr(v.ValueSym.Value.Model) })
+						self.varInitExpr(v, fn|| self.ec.possibleRefExpr(v.ValueSym.Value.Model))
 					} else {
 						self.varInitExpr(v, nil)
 						self.write(" ")
@@ -1208,11 +1208,11 @@ impl ObjectCoder {
 			ret
 		}
 		if v.Reference {
-			self.varInitExpr(v, fn() { self.write("nullptr") })
+			self.varInitExpr(v, fn|| self.write("nullptr"))
 			ret
 		}
 		if shouldInitialized(v.TypeSym.Type) {
-			self.varInitExpr(v, fn() { self.ec.initExpr(v.TypeSym.Type) })
+			self.varInitExpr(v, fn|| self.ec.initExpr(v.TypeSym.Type))
 			ret
 		}
 		self.varInitExpr(v, nil)
@@ -1549,8 +1549,8 @@ impl ObjectCoder {
 	}
 
 	fn funcs(mut &self) {
-		obj::IterPackages(self.ir, fn(mut &pkg: &sema::Package) {
-			obj::IterFiles(pkg, fn(mut &file: &sema::SymTab) {
+		obj::IterPackages(self.ir, fn|mut pkg| {
+			obj::IterFiles(pkg, fn|mut file| {
 				for (_, mut f) in file.Funcs {
 					if !env::Test && obj::HasDirective(f.Directives, directive::Test) {
 						continue
@@ -1572,7 +1572,7 @@ impl ObjectCoder {
 	}
 
 	fn pushInit(mut &self, mut &pkg: &sema::Package) {
-		obj::IterFiles(pkg, fn(mut &file: &sema::SymTab) {
+		obj::IterFiles(pkg, fn|mut file| {
 			for (_, mut f) in file.Funcs {
 				if f.Name == jule::InitFunc {
 					self.indent()
@@ -1623,9 +1623,7 @@ impl ObjectCoder {
 	fn initCaller(mut &self) {
 		self.write("void " + initCallerIdent + "(void) {\n")
 		self.addIndent()
-		obj::IterPackages(self.ir, fn(mut &pkg: &sema::Package) {
-			self.pushInit(pkg)
-		})
+		obj::IterPackages(self.ir, fn|mut pkg| self.pushInit(pkg))
 		self.doneIndent()
 		self.write("\n}")
 	}
@@ -1694,7 +1692,7 @@ impl ObjectCoder {
 			traitDecl: t,
 			methods: make([]&sema::Func, 0, len(t.Methods)),
 		}
-		obj::IterTraitMethods(t, fn(mut &m: &sema::Func) {
+		obj::IterTraitMethods(t, fn|mut m| {
 			// lookup and do not add already exist methods
 			for _, em in hash.methods {
 				if em == m {
@@ -1708,8 +1706,8 @@ impl ObjectCoder {
 	}
 
 	fn buildTraitHashes(mut &self) {
-		obj::IterPackages(self.ir, fn(mut &pkg: &sema::Package) {
-			obj::IterFiles(pkg, fn(mut &file: &sema::SymTab) {
+		obj::IterPackages(self.ir, fn|mut pkg| {
+			obj::IterFiles(pkg, fn|mut file| {
 				for (_, mut t) in file.Traits {
 					if t.Token != nil {
 						self.buildTraitHash(t)

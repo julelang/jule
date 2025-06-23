@@ -210,7 +210,7 @@ impl exprCoder {
 			self.oc.write(" > 0 ? 1 : -1)); ")
 		} else {
 			self.oc.write(`__jule_panicStr(`)
-			strLitF(self.oc.Buf, fn(): int {
+			strLitF(self.oc.Buf, fn|| {
 				self.oc.write("\"runtime: divide by zero")
 				mut len := 23 // runtime: divide by zero
 				if !env::Production {
@@ -269,16 +269,14 @@ impl exprCoder {
 			dynT = r.Type
 		}
 
-		ls := writeAndReadFromBuf(self.oc.Buf, fn() {
+		ls := writeAndReadFromBuf(self.oc.Buf, fn|| {
 			if leftIsStrict {
 				self.possibleRefExpr(l.Model)
 			} else {
 				self.possibleRefExpr(r.Model)
 			}
 		})
-		rs := writeAndReadFromBuf(self.oc.Buf, fn() {
-			self.possibleRefExpr(e)
-		})
+		rs := writeAndReadFromBuf(self.oc.Buf, fn|| self.possibleRefExpr(e))
 
 		buf.WriteByte('(')!
 		if op == token::NEQ {
@@ -368,8 +366,8 @@ impl exprCoder {
 		if (op == token::EQL || op == token::NEQ) && self.unsafeDynamicBinary(buf, l, r, op) {
 			ret
 		}
-		ls := writeAndReadFromBuf(self.oc.Buf, fn() { self.possibleRefExpr(l.Model) })
-		rs := writeAndReadFromBuf(self.oc.Buf, fn() { self.possibleRefExpr(r.Model) })
+		ls := writeAndReadFromBuf(self.oc.Buf, fn|| self.possibleRefExpr(l.Model))
+		rs := writeAndReadFromBuf(self.oc.Buf, fn|| self.possibleRefExpr(r.Model))
 		self._unsafeBinaryNoDynamic(buf, ls, rs, l.Type, r.Type, op, kind)
 	}
 
@@ -1175,7 +1173,7 @@ impl exprCoder {
 			self.oc.write(`if (!except.ok()) __jule_panicStr(`)
 			strLit(self.oc.Buf, "unhandled exceptional: ", "23")
 			self.oc.write(" + except.error.type->to_str(except.error.data) + ")
-			strLitF(self.oc.Buf, fn(): int {
+			strLitF(self.oc.Buf, fn|| {
 				self.oc.write("\"\\nlocation: ")
 				mut len := 11 // \nlocation:
 				len += self.oc.locInfo(m.Token)
@@ -1547,7 +1545,7 @@ impl exprCoder {
 		self.oc.write(" + ")
 		strLit(self.oc.Buf, "\nlocation: ", "12")
 		self.oc.write(" + ")
-		strLitF(self.oc.Buf, fn(): int {
+		strLitF(self.oc.Buf, fn|| {
 			self.oc.write("\"")
 			len := self.oc.locInfo(m.Token)
 			self.oc.write("\"")
