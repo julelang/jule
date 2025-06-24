@@ -1045,13 +1045,26 @@ impl exprBuilder {
 					self.pushErr(t, "trailing not operator expects a function call")
 					break
 				}
-				if f.Ignored() {
+				if f.Exception == ast::Ignored {
 					self.pushErr(t, "function call already ignores the exceptional")
 					break
 				}
-				f.Exception = &ast::ScopeTree{
-					Unsafe: true,
+				f.Exception = ast::Ignored
+			| token::QMARK:
+				t := self.t
+				self.next()
+				// Trailing question-mark operator.
+				// It should be call expression to an exceptional function.
+				mut f, isFunc := ast::Unparen(x).Data.(&ast::CallExpr)
+				if !isFunc {
+					self.pushErr(t, "trailing question-mark operator expects a function call")
+					break
 				}
+				if f.Exception == ast::Forwarded {
+					self.pushErr(t, "function call already forwards the exceptional")
+					break
+				}
+				f.Exception = ast::Forwarded
 			| token::ELSE:
 				t := self.t
 				self.next()

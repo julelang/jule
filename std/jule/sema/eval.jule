@@ -2229,9 +2229,31 @@ impl eval {
 			| fc.Unhandled():
 				self.pushErr(fc.Token, log::UnhandledExceptional)
 				self.pushSuggestion(log::HandleExceptional)
-			| fc.Ignored():
-				// Ok.
-				break
+			| fc.Exception == ast::Ignored:
+				model.Except = nil
+			| fc.Exception == ast::Forwarded:
+				mut s, (ok) := self.lookup.(&scopeChecker)
+				if ok {
+					if s.isDeferred() {
+						self.s.pushErr(fc.Token, "function call forwards exception in a deferred scope")
+					} else {
+						mut root := s.getRoot()
+						if root.owner.Decl.Exceptional {
+							model.Except = s.getChild()
+							mut ec := buildVoidValue()
+							ec.Model = &BuiltinErrorCallExpr{
+								Func: root.owner,
+								Err: &Value{
+									Model: self.evalVar(buildErrorVar(model.Except, fc), fc.Token).Model,
+								},
+							}
+							model.Except.Stmts = append(model.Except.Stmts, ec)
+							break
+						}
+					}
+				}
+				self.s.pushErr(fc.Token, "function call forwards exceptional in non-exceptional scope")
+				self.s.pushSuggestion("make the function exceptional to forward")
 			|:
 				// Handled with scope.
 				self.processExceptionalHandler(f, fc, v)
