@@ -763,7 +763,8 @@ impl parser {
 	}
 
 	// Builds function return type from tokens.
-	fn buildRetType(mut &self, mut &tokens: []&token::Token, mut &i: int): (t: &ast::RetType, ok: bool) {
+	// If expression mode enabled, it will not complain about trailing invalid tokens.
+	fn buildRetType(mut &self, mut &tokens: []&token::Token, mut expr: bool, mut &i: int): (t: &ast::RetType, ok: bool) {
 		t = new(ast::RetType)
 		if i >= len(tokens) {
 			// EOF, void return type.
@@ -800,15 +801,17 @@ impl parser {
 			t.Type, ok = self.buildType(tokens, i, true)
 			ret
 		}
-		i++
-		self.pushErr(token, log::InvalidSyntax)
+		if !expr {
+			i++
+			self.pushErr(token, log::InvalidSyntax)
+		}
 		ret
 	}
 
 	// Build function prototype.
-	// Body is not necessary for successful parsing.
-	// Just declaration.
-	fn buildFuncPrototype(mut &self, mut &tokens: []&token::Token, mut &i: int, method: bool): &ast::Func {
+	// Body is not necessary for successful parsing, just declaration.
+	// If expression mode enabled, it will not complain about trailing invalid tokens.
+	fn buildFuncPrototype(mut &self, mut &tokens: []&token::Token, mut &i: int, expr: bool, method: bool): &ast::Func {
 		mut f := &ast::Func{
 			Token: tokens[i],
 		}
@@ -868,7 +871,7 @@ impl parser {
 		}
 
 		f.Public = mod::IsPub(f.Name)
-		f.Result, ok := self.buildRetType(tokens, i)
+		f.Result, ok := self.buildRetType(tokens, expr, i)
 		if !ok {
 			ret nil
 		}
@@ -880,7 +883,8 @@ impl parser {
 	// If prototype is true, it only parses declaration, body and following tokens considired illegal.
 	// It advances i by token, it will be point to the last handled legal token.
 	fn buildFunc(mut &self, mut &i: int, mut &tokens: []&token::Token, method: bool, prototype: bool): &ast::Func {
-		mut f := self.buildFuncPrototype(tokens, i, method)
+		const ExprMode = false
+		mut f := self.buildFuncPrototype(tokens, i, ExprMode, method)
 		if f == nil {
 			ret f
 		}
