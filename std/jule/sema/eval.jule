@@ -535,7 +535,10 @@ impl eval {
 	}
 
 	fn evalVar(mut self, mut v: &Var, errorToken: &token::Token): &Value {
-		if !self.s.isAccessibleDefine(v.Public, v.Token) {
+		// Do not check accessibility if variable is scope-based.
+		// If this variable is available, it should be defined in the scope.
+		// Then, it is accessible.
+		if v.Scope == nil && !self.s.isAccessibleDefine(v.Public, v.Token) {
 			self.pushErr(errorToken, log::IdentIsNotAccessible, v.Name)
 			self.pushSuggestion(log::MakePubToAccess)
 			ret nil
@@ -2243,9 +2246,7 @@ impl eval {
 							mut ec := buildVoidValue()
 							ec.Model = &BuiltinErrorCallExpr{
 								Func: root.owner,
-								Err: &Value{
-									Model: self.evalVar(buildErrorVar(model.Except, fc), fc.Token).Model,
-								},
+								Err: self.evalVar(buildErrorVar(model.Except, fc), fc.Token),
 							}
 							model.Except.Stmts = append(model.Except.Stmts, ec)
 							break
