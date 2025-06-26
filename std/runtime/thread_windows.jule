@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use integ "std/jule/integrated"
 use "std/sys"
 
-cpp unsafe fn CreateThread(*unsafe, int, *unsafe, *unsafe, int, *unsafe): *unsafe
-cpp fn GetCurrentThreadId(): _DWORD
-cpp fn SwitchToThread(): bool
+cpp let CreateThread: *unsafe
+cpp let GetCurrentThreadId: *unsafe
+cpp let SwitchToThread: *unsafe
 
 // Wrapper for operating system thread.
 struct osthread {
@@ -40,13 +39,8 @@ struct threadData {
 unsafe fn coSpawn(func: *unsafe, mut args: *unsafe): bool {
 	mut t := pushNewThread()
 	(*threadData)(args).handle = &t.os.handle
-	t.os.handle = cpp.CreateThread(
-		nil,
-		0,
-		integ::Emit[*unsafe]("(unsigned long(*)(void*))({})", func),
-		args,
-		0,
-		integ::Emit[*unsafe]("(LPDWORD)({})", &t.os.id))
+	t.os.handle = sys::Addrcall[*unsafe](uintptr(cpp.CreateThread),
+		(*unsafe)(nil), int(0), func, args, _DWORD(0), &t.os.id)
 	if t.os.handle == nil {
 		ret false
 	}
@@ -56,11 +50,11 @@ unsafe fn coSpawn(func: *unsafe, mut args: *unsafe): bool {
 }
 
 fn currentThreadID(): _DWORD {
-	ret cpp.GetCurrentThreadId()
+	ret sys::Addrcall[_DWORD](uintptr(cpp.GetCurrentThreadId))
 }
 
 fn osyield() {
-	cpp.SwitchToThread()
+	sys::Addrcall(uintptr(cpp.SwitchToThread))
 }
 
 fn threadinit() {

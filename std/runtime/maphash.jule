@@ -4,7 +4,7 @@
 
 use "std/comptime"
 use "std/internal/runtime"
-use integ "std/jule/integrated"
+use "std/sys"
 
 const (
 	// Size of a pointer in bytes - mem::SizeOf(uintptr(0)) but as an ideal constant.
@@ -117,10 +117,13 @@ fn maphash[K](k: K, seed: uintptr): uintptr {
 		ret f64hash(f64(k), seed)
 	| comptime::Trait | comptime::Any | comptime::TypeEnum:
 		// If hash function pointer equals to nil, underlying type is not hashable.
-		if unsafe { integ::Emit[*unsafe]("{}.type->hash", k) } == nil {
-			panic("runtime: dynamic type used as map key with not-hashable/not-comparable underlying type")
+		unsafe {
+			dt := (*runtime::DynamicType)(&k)
+			if dt.Type.Hash == nil {
+				panic("runtime: dynamic type used as map key with not-hashable/not-comparable underlying type")
+			}
+			ret sys::Addrcall[uintptr](uintptr(dt.Type.Hash), &dt.Data, seed)
 		}
-		ret unsafe { integ::Emit[uintptr]("{}.type->hash(&{}.data, {})", k, k, seed) }
 	| comptime::Str:
 		ret strhash(str(k), seed)
 	| comptime::Uintptr | comptime::Ptr | comptime::SmartPtr:

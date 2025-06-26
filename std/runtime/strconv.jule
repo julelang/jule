@@ -3,7 +3,8 @@
 // license that can be found in the LICENSE file.
 
 use "std/comptime"
-use integ "std/jule/integrated"
+use "std/internal/runtime"
+use "std/sys"
 use "std/unsafe"
 
 // Returns pointer in string form.
@@ -277,9 +278,12 @@ fn toStr[T](x: T): str {
 	| comptime::Bool:
 		ret boolToStr(bool(x))
 	| comptime::Any | comptime::TypeEnum | comptime::Trait:
-		ret unsafe { integ::Emit[str]("{}.type->to_str({}.data.alloc)", x, x) }
+		unsafe {
+			dt := (*runtime::DynamicType)(&x)
+			ret sys::Addrcall[str](uintptr(dt.Type.ToStr), dt.Data.Data)
+		}
 	| comptime::Func:
-		ret unsafe { ptrToStr(integ::Emit[*unsafe]("({}){}.f", *unsafe, x)) }
+		ret unsafe { ptrToStr((*runtime::Func)(&x).Addr) }
 	| comptime::Slice | comptime::Array:
 		ret arrToStr(x)
 	| comptime::Map:

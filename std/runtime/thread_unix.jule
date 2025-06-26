@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use integ "std/jule/integrated"
 use "std/sys"
 
 cpp use "<pthread.h>"
 
-cpp unsafe fn pthread_create(*cpp.pthread_t, *unsafe, *unsafe, *unsafe): int
-cpp fn pthread_equal(cpp.pthread_t, cpp.pthread_t): bool
-cpp fn pthread_detach(cpp.pthread_t): int
-cpp fn pthread_self(): cpp.pthread_t
+cpp let pthread_create: *unsafe
+cpp let pthread_equal: *unsafe
+cpp let pthread_detach: *unsafe
+cpp let pthread_self: *unsafe
 
 #typedef
 cpp struct pthread_t{}
@@ -23,7 +22,7 @@ struct osthread {
 impl osthread {
 	// Reports whether the threads are equal.
 	fn equal(self, other: cpp.pthread_t): bool {
-		ret cpp.pthread_equal(self.handle, other)
+		ret sys::Addrcall[i32](uintptr(cpp.pthread_equal), self.handle, other) != 0
 	}
 }
 
@@ -45,16 +44,16 @@ struct threadData {
 unsafe fn coSpawn(func: *unsafe, mut args: *unsafe): bool {
 	mut t := pushNewThread()
 	(*threadData)(args).handle = &t.os.handle
-	if cpp.pthread_create(&t.os.handle, nil, integ::Emit[*unsafe]("(void*(*)(void*))({})", func), args) != 0 {
+	if sys::Addrcall[i32](uintptr(cpp.pthread_create), &t.os.handle, (*unsafe)(nil), func, args) != 0 {
 		ret false
 	}
 	threadMutex.unlock()
-	cpp.pthread_detach(t.os.handle)
+	sys::Addrcall(uintptr(cpp.pthread_detach), t.os.handle)
 	ret true
 }
 
 fn currentThreadID(): cpp.pthread_t {
-	ret cpp.pthread_self()
+	ret sys::Addrcall[cpp.pthread_t](uintptr(cpp.pthread_self))
 }
 
 fn osyield() {
