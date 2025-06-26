@@ -191,6 +191,25 @@ fn findBuiltinDefStdJuleIntegrated(&name: str): any {
 	}
 }
 
+// Initialized by the init function.
+let mut builtinFuncsStdSys = map[str]&FuncIns{}
+
+fn findBuiltinDefStdSys(&name: str): any {
+	match name {
+	| "Addrcall":
+		mut funcAddrcall := builtinFuncsStdSys[name]
+		// Reset generics for every reference because of common instance.
+		funcAddrcall.Generics = nil
+		ret funcAddrcall
+	|:
+		mut r, ok := builtinFuncsStdSys[name]
+		if ok {
+			ret r
+		}
+		ret nil
+	}
+}
+
 fn findPackageBuiltinDef(&linkPath: str, &name: str): any {
 	match linkPath {
 	| "std/comptime":
@@ -199,6 +218,8 @@ fn findPackageBuiltinDef(&linkPath: str, &name: str): any {
 		ret findBuiltinDefStdMem(name)
 	| "std/jule/integrated":
 		ret findBuiltinDefStdJuleIntegrated(name)
+	| "std/sys":
+		ret findBuiltinDefStdSys(name)
 	|:
 		ret nil
 	}
@@ -1166,6 +1187,49 @@ fn builtinCallerStdJuleIntegratedEmit(mut &e: &eval, mut &fc: &ast::CallExpr, mu
 	ret r
 }
 
+fn builtinCallerStdSysAddrcall(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Value {
+	if len(fc.Args) < 1 {
+		e.pushErr(fc.Token, log::MissingExprFor, "func")
+		ret nil
+	}
+
+	mut argVal := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+	if argVal == nil {
+		ret nil
+	}
+
+	if argVal.Type.Prim() == nil || !argVal.Type.Prim().IsUintptr() {
+		e.pushErr(fc.Args[0].Token, log::IncompatibleTypes, argVal.Type.Str(), primUintptr.Str())
+		ret nil
+	}
+
+	mut r := buildVoidValue()
+
+	mut model := &AddrcallExpr{
+		Addr: argVal,
+	}
+
+	mut f := v.Type.Func()
+	if len(f.Generics) > 0 {
+		r.Type = f.Generics[0].Type
+		model.Result = r.Type
+	}
+
+	if len(fc.Args) > 1 {
+		model.Args = make([]&Value, 0, len(fc.Args)-1)
+		for (_, mut arg) in fc.Args[1:] {
+			argVal = e.evalExpr(arg, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+			if argVal == nil {
+				ret nil
+			}
+			model.Args = append(model.Args, argVal)
+		}
+	}
+
+	r.Model = model
+	ret r
+}
+
 // Builds and returns the built-in iota variable representation.
 fn buildIota(i: i64): &Var {
 	ret &Var{
@@ -1216,5 +1280,13 @@ fn init() {
 			Generics: make([]&ast::Generic, 1),
 		},
 		caller: builtinCallerStdJuleIntegratedEmit,
+	}
+
+	// Initialize built-in functions of the "std/sys" package.
+	builtinFuncsStdSys["Addrcall"] = &FuncIns{
+		Decl: &Func{
+			Generics: make([]&ast::Generic, 1),
+		},
+		caller: builtinCallerStdSysAddrcall,
 	}
 }

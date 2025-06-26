@@ -1871,6 +1871,36 @@ impl exprCoder {
 		self.oc.write("))")
 	}
 
+	fn addrcallExpr(mut &self, mut m: &sema::AddrcallExpr) {
+		self.oc.write("((")
+		if m.Result == nil {
+			self.oc.write("void")
+		} else {
+			self.oc.tc.kind(self.oc.Buf, m.Result)
+		}
+		self.oc.write("(*)(")
+		if len(m.Args) == 0 {
+			self.oc.write("void")
+		} else {
+			for (i, mut arg) in m.Args {
+				if i > 0 {
+					self.oc.write(", ")
+				}
+				self.oc.tc.kind(self.oc.Buf, arg.Type)
+			}
+		}
+		self.oc.write("))(")
+		self.possibleRefExpr(m.Addr.Model)
+		self.oc.write("))(")
+		for (i, mut arg) in m.Args {
+			if i > 0 {
+				self.oc.write(", ")
+			}
+			self.possibleRefExpr(arg.Model)
+		}
+		self.oc.write(")")
+	}
+
 	fn strComp(mut &self, mut m: &opt::StrCompExpr) {
 		if m.NotEq {
 			self.oc.write("(!")
@@ -2068,6 +2098,8 @@ impl exprCoder {
 			self.closeCall(m.(&sema::BuiltinCloseCallExpr))
 		| &sema::TypeAssertionExpr:
 			self.typeAssertion(m.(&sema::TypeAssertionExpr))
+		| &sema::AddrcallExpr:
+			self.addrcallExpr(m.(&sema::AddrcallExpr))
 		| &opt::UnsafeBinaryExpr:
 			self.unsafeBinary(m.(&opt::UnsafeBinaryExpr).Node)
 		| &opt::StrCompExpr:
