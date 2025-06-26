@@ -35,6 +35,11 @@ cpp struct FILETIME{}
 // It is a C enum in the Windows API.
 cpp type GET_FILEEX_INFO_LEVELS: int
 
+cpp let LoadLibraryW: *unsafe
+cpp let LoadLibraryExW: *unsafe
+cpp let GetProcAddress: *unsafe
+cpp let FreeLibrary: *unsafe
+
 cpp fn ExitProcess(exitcode: u32)
 cpp fn GetStdHandle(stdh: uintptr): *unsafe
 cpp unsafe fn CloseHandle(stdh: *unsafe): bool
@@ -481,4 +486,38 @@ fn QueryPerformanceCounter()!: i64 {
 
 fn GetSystemTimeAsFileTime(mut &ft: Filetime) {
 	unsafe { cpp.GetSystemTimeAsFileTime((*cpp.FILETIME)(&ft)) }
+}
+
+fn LoadLibrary(libname: str)!: Handle {
+	utf16libname := integ::UTF16FromStr(libname)
+	phandle := Addrcall[*unsafe](uintptr(cpp.LoadLibraryW), &utf16libname[0])
+	if phandle == nil {
+		error(GetLastErrno())
+	}
+	ret Handle(phandle)
+}
+
+fn LoadLibraryEx(libname: str, zero: Handle, flags: uintptr)!: Handle {
+	utf16libname := integ::UTF16FromStr(libname)
+	phandle := Addrcall[*unsafe](uintptr(cpp.LoadLibraryExW), &utf16libname[0], unsafe { (*unsafe)(zero) }, flags)
+	if phandle == nil {
+		error(GetLastErrno())
+	}
+	ret Handle(phandle)
+}
+
+fn GetProcAddress(module: Handle, procname: str)!: (proc: uintptr) {
+	_procname := integ::StrToBytes(procname)
+	procp := Addrcall[*unsafe](uintptr(cpp.GetProcAddress), unsafe { (*unsafe)(module) }, &_procname[0])
+	if procp == nil {
+		error(GetLastErrno())
+	}
+	ret uintptr(procp)
+}
+
+fn FreeLibrary(handle: Handle)! {
+	r := Addrcall[i32](uintptr(cpp.FreeLibrary), unsafe { (*unsafe)(handle) })
+	if r == 0 {
+		error(GetLastErrno())
+	}
 }
