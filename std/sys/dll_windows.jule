@@ -1,0 +1,62 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// A DLL implements access to a single DLL.
+struct DLL {
+	Name:   str
+	Handle: Handle
+}
+
+impl DLL {
+	// Searches DLL for procedure named name and returns &Proc if found.
+	fn FindProc(&self, name: str)!: (proc: &Proc) {
+		addr := GetProcAddress(self.Handle, name)?
+		ret &Proc{
+			Name: name,
+			addr: addr,
+		}
+	}
+
+	// Like FindProc but panics if search fails.
+	fn MustFindProc(&self, name: str): &Proc {
+		ret self.FindProc(name)!
+	}
+
+	// Unloads DLL from memory.
+	fn Release(mut &self)! {
+		FreeLibrary(self.Handle)?
+	}
+}
+
+// Implements access to a procedure inside a DLL.
+struct Proc {
+	Name: str
+	addr: uintptr
+}
+
+impl Proc {
+	// Returns the address of the represented procedure.
+	// The return value can be passed to Addrcall to run the procedure.
+	fn Addr(self): uintptr {
+		ret self.addr
+	}
+}
+
+// Loads DLL file into memory.
+// Wraps the Windows LoadLibraryEx function.
+//
+// See https://msdn.microsoft.com/en-us/library/windows/desktop/ms684179(v=vs.85).aspx
+//
+// If name is not an absolute path, LoadLibraryEx searches for the DLL
+// in a variety of automatic locations unless constrained by flags.
+// See: https://msdn.microsoft.com/en-us/library/ff919712%28VS.85%29.aspx
+fn LoadDLL(name: str)!: &DLL {
+	h := LoadLibraryEx(name, 0, 0)?
+	ret &DLL{Name: name, Handle: h}
+}
+
+// Like LoadDLL but panics if load operation fails.
+fn MustLoadDLL(name: str): &DLL {
+	ret LoadDLL(name)!
+}
