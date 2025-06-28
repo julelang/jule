@@ -1,0 +1,132 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/conv"
+use "std/fmt"
+use "std/runtime"
+use "std/strings"
+use "std/testing"
+
+enum formatEnumPtr: uintptr {
+	foo: 98,
+	bar: 23,
+	baz: 38,
+}
+
+enum formatEnum: uint {
+	foo: 98,
+	bar: 23,
+	baz: 38,
+}
+
+struct formatTest {
+	fmt:  str
+	args: []any
+	out:  str
+}
+
+struct formatStruct {
+	foo: str
+	bar: int
+	baz: uintptr
+}
+
+let fmtChan = make(chan int)
+let fmtPtr = &fmtChan
+
+let formatTests: []formatTest = [
+	{"{{}} {{{}}} {} {} {}", [10, 20], "{} {{{}}} 10 20 {}"},
+	{"{{}} {{{}}} {} {{foo}} {foo}", [10, 20], "{} {{{}}} 10 {{foo}} {foo}"},
+	{"{} {}", [10, 20], "10 20"},
+	{"{} {}", ["hello", "world"], "hello world"},
+	{"{}", [fmtChan], runtime::toStr(fmtChan)},
+	{"{}", [fmtPtr], "0x" + conv::FormatUint(u64(uintptr(fmtPtr)), 16)},
+	{"{}", [uintptr(fmtPtr)], "0x" + conv::FormatUint(u64(uintptr(fmtPtr)), 16)},
+	{"{}", [[1, 2, 3, 4, 5]], "[1, 2, 3, 4, 5]"},
+	{"{}", [[1.12, 2.34, 3.45, 4.983, 5e98]], "[+1.120000e+000, +2.340000e+000, +3.450000e+000, +4.983000e+000, +5.000000e+098]"},
+	{"{}", [formatStruct{"foo", 10, 98}], "{foo, 10, 0x62}"},
+	{"{} {} {}", [formatEnumPtr.foo, formatEnumPtr.bar, formatEnumPtr.baz], "0x62 0x17 0x26"},
+	{"{} {} {}", [formatEnum.foo, formatEnum.bar, formatEnum.baz], "98 23 38"},
+]
+
+#test
+fn testSprintf(t: &testing::T) {
+	for _, test in formatTests {
+		out := fmt::Sprintf(test.fmt, test.args...)
+		if out != test.out {
+			t.Errorf("Sprintf({}, {}) = {}, want {}", test.fmt, test.args, out, test.out)
+		}
+	}
+}
+
+#test
+fn testFprintf(t: &testing::T) {
+	for _, test in formatTests {
+		mut sb := new(strings::Builder)
+		fmt::Fprintf(sb, test.fmt, test.args...)!
+		out := sb.Str()
+		if out != test.out {
+			t.Errorf("Fprintf({}, {}) = {}, want {}", test.fmt, test.args, out, test.out)
+		}
+	}
+}
+
+#test
+fn testSprintg(t: &testing::T) {
+	mut out := fmt::Sprintg(fmtChan)
+	mut testOut := runtime::toStr(fmtChan)
+	if out != testOut {
+		t.Errorf("Sprintg({}) = {}, want {}", fmtChan, out, testOut)
+	}
+	out = fmt::Sprintg(fmtPtr)
+	testOut = "0x" + conv::FormatUint(u64(uintptr(fmtPtr)), 16)
+	if out != testOut {
+		t.Errorf("Sprintg({}) = {}, want {}", fmtChan, out, testOut)
+	}
+	out = fmt::Sprintg(uintptr(fmtPtr))
+	testOut = "0x" + conv::FormatUint(u64(uintptr(fmtPtr)), 16)
+	if out != testOut {
+		t.Errorf("Sprintg({}) = {}, want {}", fmtChan, out, testOut)
+	}
+	out = fmt::Sprintg([1, 2, 3, 4, 5])
+	testOut = "[1, 2, 3, 4, 5]"
+	if out != testOut {
+		t.Errorf("Sprintg({}) = {}, want {}", fmtChan, out, testOut)
+	}
+	out = fmt::Sprintg([1.12, 2.34, 3.45, 4.983, 5e98])
+	testOut = "[1.12, 2.34, 3.45, 4.983, 5e+98]"
+	if out != testOut {
+		t.Errorf("Sprintg({}) = {}, want {}", fmtChan, out, testOut)
+	}
+	out = fmt::Sprintg(formatStruct{"foo", 10, 98})
+	testOut = "{foo, 10, 0x62}"
+	if out != testOut {
+		t.Errorf("Sprintg({}) = {}, want {}", fmtChan, out, testOut)
+	}
+	out = fmt::Sprintg(uintptr(0))
+	testOut = "<nil>"
+	if out != testOut {
+		t.Errorf("Sprintg({}) = {}, want {}", fmtChan, out, testOut)
+	}
+	out = fmt::Sprintg(any(fmtPtr))
+	testOut = "0x" + conv::FormatUint(u64(uintptr(fmtPtr)), 16)
+	if out != testOut {
+		t.Errorf("Sprintg({}) = {}, want {}", fmtChan, out, testOut)
+	}
+	out = fmt::Sprintg(any(uintptr(fmtPtr)))
+	testOut = "0x" + conv::FormatUint(u64(uintptr(fmtPtr)), 16)
+	if out != testOut {
+		t.Errorf("Sprintg({}) = {}, want {}", fmtChan, out, testOut)
+	}
+	out = fmt::Sprintg([formatEnumPtr.foo, formatEnumPtr.bar, formatEnumPtr.baz])
+	testOut = "[0x62, 0x17, 0x26]"
+	if out != testOut {
+		t.Errorf("Sprintg({}) = {}, want {}", fmtChan, out, testOut)
+	}
+	out = fmt::Sprintg([formatEnum.foo, formatEnum.bar, formatEnum.baz])
+	testOut = "[98, 23, 38]"
+	if out != testOut {
+		t.Errorf("Sprintg({}) = {}, want {}", fmtChan, out, testOut)
+	}
+}

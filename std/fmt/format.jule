@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/comptime"
 use "std/conv"
 use "std/runtime"
 use "std/strings"
@@ -54,6 +55,8 @@ fn formatByDefault(mut &buf: strings::Builder, &arg: any) {
 		buf.WriteStr(conv::FormatFloat(f64(arg.(f32)), 'g', -1, 32))!
 	| f64:
 		buf.WriteStr(conv::FormatFloat(arg.(f64), 'g', -1, 64))!
+	| int:
+		buf.WriteStr(conv::FormatInt(i64(arg.(int)), 10))!
 	| i8:
 		buf.WriteStr(conv::FormatInt(i64(arg.(i8)), 10))!
 	| i16:
@@ -62,6 +65,8 @@ fn formatByDefault(mut &buf: strings::Builder, &arg: any) {
 		buf.WriteStr(conv::FormatInt(i64(arg.(i32)), 10))!
 	| i64:
 		buf.WriteStr(conv::FormatInt(arg.(i64), 10))!
+	| uint:
+		buf.WriteStr(conv::FormatUint(u64(arg.(uint)), 10))!
 	| u8:
 		buf.WriteStr(conv::FormatUint(u64(arg.(u8)), 10))!
 	| u16:
@@ -70,6 +75,9 @@ fn formatByDefault(mut &buf: strings::Builder, &arg: any) {
 		buf.WriteStr(conv::FormatUint(u64(arg.(u32)), 10))!
 	| u64:
 		buf.WriteStr(conv::FormatUint(arg.(u64), 10))!
+	| uintptr:
+		buf.WriteStr("0x")!
+		buf.WriteStr(conv::FormatUint(u64(arg.(uintptr)), 16))!
 	| str:
 		buf.WriteStr(arg.(str))!
 	| bool:
@@ -109,10 +117,10 @@ fn applyFormat(mut &fmt: []byte, mut &buf: strings::Builder, mut &j: int, args: 
 	buf.Write(fmt)!
 }
 
-// See the [Format] function for main documentation. This is a low level internal API.
+// See the [Sprintf] function for main documentation. This is a low level internal API.
 // For this function, returned []byte is might be string literal actually.
 // Be careful about mutating it.
-fn format(fmt: str, args: ...any): []byte {
+fn bprintf(fmt: str, args: ...any): []byte {
 	mut fmtBytes := unsafe::StrBytes(fmt)
 	if len(args) == 0 {
 		ret fmtBytes
@@ -146,29 +154,138 @@ fn format(fmt: str, args: ...any): []byte {
 	ret unsafe { buf.Buf() }
 }
 
-// It places the passes arguments in the string relative to the corresponding
-// format string. Returns format string if len(args) == 0. If the arguments
-// have ended, the remaining part of format string is not processed and
-// is returned as is. For supported types it uses custom functions for conversion,
-// but for unusupported types it uses default runtime string conversion function of type.
-//
-// Formatting:
-//	Arguments are processed sequentially. That is, when an argument
-//	encounters a format string parameter, it will be processed according
-//	to how many parameters it is. The 5th parameter uses the 5th argument
-//	as the value.
-//
-//	Each format parameter is represented as "{}" in the format string.
-//	These parameters will then be deleted according to the processing
-//	algorithm and replaced with arguments.
-//
-//	The parameter "{{}}" is formatted as "{}" actually,
-//	And does not increase argument list offset.
-//
-// Examples:
-//	Format("{} {}!", "Hello", "World") = "Hello World!"
-//	Format("{} {}") = "{} {}"
-//	Format("{} is the {}", "Pi Number") = "Pi Number is the {}"
-fn Format(fmt: str, args: ...any): str {
-	ret unsafe::StrFromBytes(format(fmt, args...))
+// Tries to call reserved Str method for type.
+fn tryToCallStr[T](mut &sb: strings::Builder, t: T): (ok: bool) {
+	const tt = comptime::TypeOf(T)
+	const for _, method in tt.Decl().Methods() {
+		const match method.Name() {
+		| "Str":
+			const v = comptime::ValueOf(t)
+			const methodv = v.Method(method.Name())
+			const match {
+			| !methodv.Type().Decl().Exceptional() &&
+				methodv.Type().Result().Kind() == comptime::Str:
+				const params = method.Params()
+				const match {
+				| len(params) == 1 && !params[0].Mutable():
+					sb.WriteStr(methodv.Unwrap()())!
+					ret true
+				}
+			}
+		}
+	}
+	ret false
+}
+
+fn bprintgw[T](mut &sb: strings::Builder, t: T) {
+	const tt = comptime::TypeOf(T)
+	const match {
+	| tt.Bind():
+		sb.WriteStr(tt.Str())!
+	|:
+		const match {
+		| tt.CanNil():
+			if t == nil {
+				sb.WriteStr("<nil>")!
+				ret
+			}
+		| tt.Strict():
+			ok := tryToCallStr(sb, t)
+			if ok {
+				ret
+			}
+		}
+		const match tt.Kind() {
+		| comptime::F32:
+			sb.WriteStr(conv::FormatFloat(f64(t), 'g', -1, 32))!
+		| comptime::F64:
+			sb.WriteStr(conv::FormatFloat(f64(t), 'g', -1, 64))!
+		| comptime::Int | comptime::I8 | comptime::I16 | comptime::I32 | comptime::I64:
+			sb.WriteStr(conv::FormatInt(i64(t), 10))!
+		| comptime::Uint | comptime::U8 | comptime::U16 | comptime::U32 | comptime::U64:
+			sb.WriteStr(conv::FormatUint(u64(t), 10))!
+		| comptime::Str:
+			sb.WriteStr(t)!
+		| comptime::Bool:
+			if t {
+				sb.WriteStr("true")!
+			} else {
+				sb.WriteStr("false")!
+			}
+		| comptime::Slice | comptime::Array:
+			sb.WriteByte('[')!
+			for i, z in t {
+				if i > 0 {
+					sb.WriteStr(", ")!
+				}
+				bprintgw(sb, z)
+			}
+			sb.WriteByte(']')!
+		| comptime::Map:
+			sb.WriteByte('{')!
+			mut written := false
+			for key, val in x {
+				if written {
+					sb.WriteStr(", ")!
+				} else {
+					written = true
+				}
+				bprintgw(sb, key)
+				sb.WriteByte(':')!
+				bprintgw(sb, val)
+			}
+			sb.WriteByte('}')!
+		| comptime::Struct:
+			ok := tryToCallStr(sb, t)
+			if ok {
+				ret
+			}
+			const v = comptime::ValueOf(t)
+			sb.WriteByte('{')!
+			const for i, field in tt.Fields() {
+				const match {
+				| i > 0:
+					sb.WriteStr(", ")!
+				}
+				const match {
+				| field.Type().Bind():
+					sb.WriteStr(field.Type().Str())!
+				|:
+					bprintgw(sb, v.FieldByIndex(i).Unwrap())
+				}
+			}
+			sb.WriteByte('}')!
+		| comptime::SmartPtr:
+			// Handle element type of smart pointer.
+			const elem = tt.Elem()
+			const match {
+			| elem.Strict() | elem.Kind() == comptime::Struct:
+				ok := tryToCallStr(sb, *t)
+				if ok {
+					ret
+				}
+			}
+			sb.WriteStr(conv::FormatUint(u64(uintptr(t)), 16))!
+		| comptime::Uintptr | comptime::Ptr | comptime::UnsafePtr:
+			p := uintptr(t)
+			if p == 0 { // Check for nil, because uintptr will not be checked above.
+				sb.WriteStr("<nil>")!
+			} else {
+				sb.WriteStr("0x")!
+				sb.WriteStr(conv::FormatUint(u64(p), 16))!
+			}
+		| comptime::Enum:
+			comptime::TypeAlias(elemType, tt.Value())
+			bprintgw(sb, elemType(t))
+		|:
+			// Channel, dynamic type, function.
+			sb.WriteStr(runtime::toStr(t))!
+		}
+	}
+}
+
+fn bprintg[T](t: T): []byte {
+	mut sb := strings::Builder{}
+	bprintgw(sb, t)
+	ret unsafe { sb.Buf() }
 }

@@ -7,62 +7,99 @@ use "std/os"
 use "std/strings"
 use "std/unsafe"
 
-// Prints arguments to w by default formatting.
-// See documentation of format function for formatting.
-fn Fprint(mut w: io::Writer, args: ...any) {
+// Prints arguments to w with default formatting.
+// See documentation of the [Sprint] function for formatting.
+// Forwards exceptions, if any.
+fn Fprint(mut w: io::Writer, args: ...any)! {
 	mut sb := strings::Builder{}
-	sb.Grow(20)
-	for _, arg in args {
-		formatByDefault(sb, arg)
-		w.Write(unsafe { sb.Buf() }) else {
-			panic("fmt: Fprint: error occurs when printing")
-		}
-		// Do not use the [Clear] method to avoid making new allocations.
-		// The buffer used temporarily, so just clear the length, not capacity.
-		unsafe { sb.SetBuf(sb.Buf()[:0]) }
-	}
+	sprint(sb, args...)
+	w.Write(unsafe { sb.Buf() }) else { error(error) }
 }
 
-// Prints arguments to w by default formatting.
+// Prints arguments to w with default formatting.
 // Prints new-line after arguments.
-// See documentation of format function for formatting.
-fn Fprintln(mut w: io::Writer, args: ...any) {
-	Fprint(w, args...)
-	Fprintf(w, "\n")
+// See documentation of the [Sprint] function for formatting.
+// Forwards exceptions, if any.
+fn Fprintln(mut w: io::Writer, args: ...any)! {
+	mut sb := strings::Builder{}
+	sprint(sb, args...)
+	sb.WriteByte('\n')!
+	w.Write(unsafe { sb.Buf() }) else { error(error) }
 }
 
 // Prints result of formatting to w.
-// See documentation of format function for formatting.
-fn Fprintf(mut w: io::Writer, fmt: str, args: ...any) {
-	format := format(fmt, args...)
-	w.Write(format) else {
-		panic("fmt: Fprintf: error occurs when printing")
-	}
+// See documentation of the [Sprint] function for formatting.
+// Forwards exceptions, if any.
+fn Fprintf(mut w: io::Writer, fmt: str, args: ...any)! {
+	format := bprintf(fmt, args...)
+	w.Write(format) else { error(error) }
 }
 
 // Prints result of formatting to stdout.
-// See documentation of format function for formatting.
+// See documentation of the [Sprint] function for formatting.
+// Panics if any exception appears.
 fn Printf(fmt: str, args: ...any) {
-	Fprintf(os::Stdout(), fmt, args...)
+	Fprintf(os::Stdout(), fmt, args...)!
 }
 
-// Prints arguments by default formatting to stdout.
+// Prints arguments with default formatting to stdout.
+// Panics if any exception appears.
 fn Print(args: ...any) {
-	Fprint(os::Stdout(), args...)
+	Fprint(os::Stdout(), args...)!
 }
 
-// Prints arguments by default formatting to stdout.
+// Prints arguments with default formatting to stdout.
 // Prints new-line after arguments.
+// Panics if any exception appears.
 fn Println(args: ...any) {
-	Fprintln(os::Stdout(), args...)
+	Fprintln(os::Stdout(), args...)!
 }
 
-// Returns string result of arguments by default formatting.
-fn Sprint(args: ...any): str {
-	mut buf := strings::Builder{}
-	buf.Grow(100)
+// Implements [Sprint], writes result to sb.
+fn sprint(mut &sb: strings::Builder, args: ...any) {
 	for _, arg in args {
-		formatByDefault(buf, arg)
+		formatByDefault(sb, arg)
 	}
-	ret buf.Str()
+}
+
+// Returns string result of arguments with default formatting.
+// Arguments will be concatenated without any spaces.
+fn Sprint(args: ...any): str {
+	mut sb := strings::Builder{}
+	sprint(sb, args...)
+	ret sb.Str()
+}
+
+// Returns string result of argument with default formatting.
+// It uses comptime to analysis type T. If type T is a dynamic or unsupported type,
+// it jumps back to the [Sprint] algorithm.
+fn Sprintg[T](t: T): str {
+	ret unsafe::StrFromBytes(bprintg(t))
+}
+
+// It places the passes arguments in the string relative to the corresponding
+// format string. Returns format string if len(args) == 0. If the arguments
+// have ended, the remaining part of format string is not processed and
+// is returned as is. For supported types it uses custom functions for conversion,
+// but for unusupported types it uses default runtime string conversion function of type.
+//
+// Formatting:
+//	Arguments are processed sequentially. That is, when an argument
+//	encounters a format string parameter, it will be processed according
+//	to how many parameters it is. The 5th parameter uses the 5th argument
+//	as the value.
+//
+//	Each format parameter is represented as "{}" in the format string.
+//	These parameters will then be deleted according to the processing
+//	algorithm and replaced with arguments.
+//
+//	The parameter "{{}}" is formatted as "{}" actually,
+//	And does not increase argument list offset.
+//
+// Examples:
+//	Sprintf("{} {}!", "Hello", "World") = "Hello World!"
+//	Sprintf("{} {}") = "{} {}"
+//	Sprintf("{} is the {}", "Pi Number") = "Pi Number is the {}"
+fn Sprintf(fmt: str, args: ...any): str {
+	ret unsafe::StrFromBytes(bprintf(fmt, args...))
 }
