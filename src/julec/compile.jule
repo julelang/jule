@@ -66,8 +66,8 @@ fn clearObjects() {
 }
 
 // Compie generated IR.
-fn compileIr(compiler: str, compilerCmd: str) {
-	mut cmd := os::Cmd.New(compiler, strings::Split(compilerCmd, " ")...)
+fn compileIr(compiler: str, mut compilerArgs: []str) {
+	mut cmd := os::Cmd.New(compiler, compilerArgs...)
 	cmd.Stdout(os::Stdout())!
 	cmd.Stderr(os::Stderr())!
 	cmd.Start() else {
@@ -95,22 +95,21 @@ fn isCppSourceFile(path: str): bool {
 	ret build::IsValidCppExt(path[offset:])
 }
 
-fn pushCompCmdClang(mut &cmd: strings::Builder) {
+fn pushCompCmdClang(mut args: []str): []str {
 	// Disable all warnings.
-	cmd.WriteStr("-Wno-everything ")!
+	args = append(args, "-Wno-everything")
 
 	// Set C++ standard.
-	cmd.WriteStr("--std=")!
 	match env::CppStd {
 	| "cpp14":
-		cmd.WriteStr("c++14")!
+		args = append(args, "--std=c++14")
 	| "cpp17":
-		cmd.WriteStr("c++17")!
+		args = append(args, "--std=c++17")
 	| "cpp20":
-		cmd.WriteStr("c++20")!
+		args = append(args, "--std=c++20")
 	}
 	// Enable wrap around behavior.
-	cmd.WriteStr(" -fwrapv ")!
+	args = append(args, "-fwrapv")
 	// The ffloat-store flag is used to prevent excess precision issues in
 	// floating-point arithmetic on certain architectures, particularly x86.
 	// By default, the x87 floating-point unit (FPU) uses extended precision
@@ -122,11 +121,11 @@ fn pushCompCmdClang(mut &cmd: strings::Builder) {
 	// different compiler optimizations and hardware, it may also introduce a slight
 	// performance overhead due to additional memory operations. But it is a
 	// good tradeoff for consistency.
-	cmd.WriteStr("-ffloat-store ")!
+	args = append(args, "-ffloat-store")
 
 	if env::Production {
-		cmd.WriteStr("-O3 ")!        // Enable all optimizations.
-		cmd.WriteStr("-flto=thin ")! // Enable LTO.
+		args = append(args, "-O3")        // Enable all optimizations.
+		args = append(args, "-flto=thin") // Enable LTO.
 		if build::OS == dist::Windows {
 			// For Windows, we have to do extra work to use LTO.
 			// If the Clang is not MinGW, it is probably the “Clang Compiler for Windows”
@@ -134,37 +133,38 @@ fn pushCompCmdClang(mut &cmd: strings::Builder) {
 			// may cause compile errors due to using linker with not LTO support.
 			// To avoid this issue, tell the compiler to use LLD.
 			// As far as tested, the same command works for both versions of Clang.
-			cmd.WriteStr("-fuse-ld=lld ")!
+			args = append(args, "-fuse-ld=lld")
 		}
-		cmd.WriteStr("-DNDEBUG ")!             // Define NDEBUG, turn off assertions.
-		cmd.WriteStr("-fomit-frame-pointer ")! // Do not use frame pointer.
+		args = append(args, "-DNDEBUG")             // Define NDEBUG, turn off assertions.
+		args = append(args, "-fomit-frame-pointer") // Do not use frame pointer.
 	} else {
-		cmd.WriteStr("-O0 ")! // No optimization.
+		args = append(args, "-O0") // No optimization.
 	}
 
 	// Disable strict aliasing optimizations.
 	// Unsafe Jule allows casting between different pointer types for the same address.
 	// The back-end compiler may optimize this kind of code and it can lead several
 	// issues on runtime such as crash, segfault, or undefined behavior.
-	cmd.WriteStr("-fno-strict-aliasing ")!
+	args = append(args, "-fno-strict-aliasing")
+
+	ret args
 }
 
-fn pushCompCmdGcc(mut &cmd: strings::Builder) {
+fn pushCompCmdGcc(mut args: []str): []str {
 	// Disable all warnings.
-	cmd.WriteStr("-w ")!
+	args = append(args, "-w")
 
 	// Set C++ standard.
-	cmd.WriteStr("--std=")!
 	match env::CppStd {
 	| "cpp14":
-		cmd.WriteStr("c++14")!
+		args = append(args, "--std=c++14")
 	| "cpp17":
-		cmd.WriteStr("c++17")!
+		args = append(args, "--std=c++17")
 	| "cpp20":
-		cmd.WriteStr("c++20")!
+		args = append(args, "--std=c++20")
 	}
 	// Enable wrap around behavior.
-	cmd.WriteStr(" -fwrapv ")!
+	args = append(args, "-fwrapv")
 	// The ffloat-store flag is used to prevent excess precision issues in
 	// floating-point arithmetic on certain architectures, particularly x86.
 	// By default, the x87 floating-point unit (FPU) uses extended precision
@@ -176,67 +176,63 @@ fn pushCompCmdGcc(mut &cmd: strings::Builder) {
 	// different compiler optimizations and hardware, it may also introduce a slight
 	// performance overhead due to additional memory operations. But it is a
 	// good tradeoff for consistency.
-	cmd.WriteStr("-ffloat-store ")!
+	args = append(args, "-ffloat-store")
 
 	if env::Production {
-		cmd.WriteStr("-O3 ")!                  // Enable all optimizations.
-		cmd.WriteStr("-DNDEBUG ")!             // Define NDEBUG, turn off assertions.
-		cmd.WriteStr("-fomit-frame-pointer ")! // Do not use frame pointer.
+		args = append(args, "-O3")                  // Enable all optimizations.
+		args = append(args, "-DNDEBUG")             // Define NDEBUG, turn off assertions.
+		args = append(args, "-fomit-frame-pointer") // Do not use frame pointer.
 	} else {
-		cmd.WriteStr("-O0 ")! // No optimization.
+		args = append(args, "-O0") // No optimization.
 	}
 
 	// Disable strict aliasing optimizations.
 	// Unsafe Jule allows casting between different pointer types for the same address.
 	// The back-end compiler may optimize this kind of code and it can lead several
 	// issues on runtime such as crash, segfault, or undefined behavior.
-	cmd.WriteStr("-fno-strict-aliasing ")!
+	args = append(args, "-fno-strict-aliasing")
+
+	ret args
 }
 
 // Generate compile command for backend-compiler.
-fn genCompileCmd(sourcePath: str, &ir: &obj::IR): (str, str) {
-	&compiler := env::CompilerPath
-	mut cmd := strings::Builder{}
-	cmd.Grow(1 << 6)
+fn genCompileCmd(sourcePath: str, &ir: &obj::IR): (compiler: str, args: []str) {
+	compiler = env::CompilerPath
 
 	match env::Compiler {
 	| "gcc":
-		pushCompCmdGcc(cmd)
+		args = pushCompCmdGcc(args)
 	| "clang":
-		pushCompCmdClang(cmd)
+		args = pushCompCmdClang(args)
 	}
 
 	// Push bind source files.
 	for _, u in ir.Used {
 		if u.Bind && isCppSourceFile(u.Path) {
-			cmd.WriteStr(u.Path)!
-			cmd.WriteByte(' ')!
+			args = append(args, u.Path)
 		}
 	}
 
 	if Out != "" {
-		cmd.WriteStr("-o ")!
-		cmd.WriteStr(Out)!
+		args = append(args, "-o")
+		mut out := Out
 		// If compiling for Windows and Out path is not have `.exe` extension, then add it.
 		if build::OS == dist::Windows && filepath::Ext(Out) != ".exe" {
-			cmd.WriteStr(".exe")!
+			out += ".exe"
 		}
-		cmd.WriteByte(' ')!
+		args = append(args, out)
 	}
-	cmd.WriteStr(sourcePath)!
+	args = append(args, sourcePath)
 
 	// Push passes.
-	for _, pass in ir.Passes {
-		cmd.WriteByte(' ')!
-		cmd.WriteStr(pass)!
-	}
+	args = append(args, ir.Passes...)
 
 	// Link necessary libraries for Windows.
 	if build::OS == dist::Windows {
-		cmd.WriteStr(" -lshell32")!
+		args = append(args, "-lshell32")
 	}
 
-	ret compiler, cmd.Str()
+	ret
 }
 
 fn getCompilePath(): str {
@@ -468,11 +464,11 @@ fn compileCommand(mut &args: []str) {
 	ir.Order()
 
 	compPath := getCompilePath()
-	compiler, compilerCmd := genCompileCmd(compPath, ir)
+	compiler, mut compilerArgs := genCompileCmd(compPath, ir)
 
 	mut oc := cxx::ObjectCoder.New(ir, cxx::SerializationInfo{
 		Compiler: compiler,
-		CompilerCommand: compilerCmd,
+		CompilerArgs: compilerArgs,
 	})
 	if env::Test {
 		mut tc := cxx::TestCoder.New(oc)
@@ -488,6 +484,6 @@ fn compileCommand(mut &args: []str) {
 	file.Close()!
 
 	if !env::Transpilation {
-		compileIr(compiler, compilerCmd)
+		compileIr(compiler, compilerArgs)
 	}
 }
