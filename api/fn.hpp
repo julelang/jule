@@ -22,7 +22,7 @@ namespace jule
     struct Fn
     {
     public:
-        Ret (*f)(jule::Ptr<jule::Uintptr>, Args...) = nullptr;
+        Ret (*f)(void*, Args...) = nullptr;
         jule::Ptr<jule::Uintptr> ctx; // Closure ctx.
         void (*ctxHandler)(jule::Ptr<jule::Uintptr> &alloc) = nullptr;
 
@@ -30,7 +30,7 @@ namespace jule
         Fn(const Fn<Ret, Args...> &) = default;
         Fn(std::nullptr_t) noexcept : Fn() {}
 
-        Fn(Ret (*f)(jule::Ptr<jule::Uintptr>, Args...)) noexcept
+        Fn(Ret (*f)(void*, Args...)) noexcept
         {
             this->f = f;
         }
@@ -67,7 +67,7 @@ namespace jule
                 __jule_panicStr(__JULE_ERROR__INVALID_MEMORY);
 #endif // PRODUCTION
 #endif // SAFETY
-            return this->f(this->ctx, args...);
+            return this->f((void*)(this->ctx.alloc), args...);
         }
 
         inline auto operator()(Args... args)
@@ -148,7 +148,7 @@ namespace jule
     template <typename Ret, typename... Args>
     jule::Fn<Ret, Args...> __new_closure(void *fn, jule::Ptr<jule::Uintptr> ctx, void (*ctxHandler)(jule::Ptr<jule::Uintptr> &)) noexcept
     {
-        jule::Fn<Ret, Args...> fn2((Ret(*)(jule::Ptr<jule::Uintptr>, Args...))fn);
+        jule::Fn<Ret, Args...> fn2((Ret(*)(void*, Args...))fn);
         fn2.ctx = std::move(ctx);
         fn2.ctxHandler = ctxHandler;
         return fn2;
