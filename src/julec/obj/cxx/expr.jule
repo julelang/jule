@@ -34,7 +34,6 @@ enum compExpr: type {
 	&opt::UnsafeBinaryExpr,
 	&opt::UnsafeIndexingExpr,
 	&opt::StrCompExpr,
-	&opt::RefExpr,
 	&opt::EmptyCompareExpr,
 	&opt::UnsafeDerefExpr,
 	&opt::UnsafeTypeAssertionExpr,
@@ -494,6 +493,13 @@ impl exprCoder {
 			self.oc.write("))")
 			ret
 		| token::MUL:
+			mut v, _ := m.Expr.Model.(&sema::Var)
+			if v != nil && v.Reference {
+				self.oc.write("(*")
+				self.checkNilRef(v)
+				self.oc.write(")")
+				ret
+			}
 			if env::Production || m.Expr.Type.Sptr() == nil {
 				break
 			}
@@ -562,14 +568,17 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
+	fn checkNilRef(mut &self, mut v: &sema::Var) {
+		self.oc.write("((")
+		self.oc.tc.kind(self.oc.Buf, v.TypeSym.Type)
+		self.oc.write(")(")
+		identCoder.funcIns(self.oc.Buf, meta::Program.Runtime.CheckNilRef)
+		self.oc.write("((void*)(")
+		self.model(v)
+		self.oc.write("))))")
+	}
+
 	fn possibleRefExpr(mut &self, mut expr: compExpr) {
-		v, _ := expr.(&sema::Var)
-		if v != nil && v.Reference {
-			self.oc.write("(*(")
-			self.model(expr)
-			self.oc.write("))")
-			ret
-		}
 		self.model(expr)
 	}
 
@@ -816,19 +825,7 @@ impl exprCoder {
 			j++ // Skip receiver parameter.
 		}
 		for (i, mut arg) in m.Args {
-			p := m.Func.Params[j]
-			if p.Decl != nil && p.Decl.Reference {
-				v, _ := arg.(&sema::Var)
-				if v != nil && v.Reference {
-					self.model(arg)
-				} else {
-					self.oc.write("&(")
-					self.model(arg)
-					self.oc.write(")")
-				}
-			} else {
-				self.possibleRefExpr(arg)
-			}
+			self.possibleRefExpr(arg)
 			if len(m.Args)-i > 1 {
 				self.oc.write(", ")
 			}
@@ -2104,8 +2101,6 @@ impl exprCoder {
 			self.unsafeBinary(m.(&opt::UnsafeBinaryExpr).Node)
 		| &opt::StrCompExpr:
 			self.strComp(m.(&opt::StrCompExpr))
-		| &opt::RefExpr:
-			self.var(m.(&opt::RefExpr).Var)
 		| &opt::EmptyCompareExpr:
 			self.emptyCompare(m.(&opt::EmptyCompareExpr))
 		| &opt::UnsafeDerefExpr:

@@ -942,6 +942,12 @@ impl eval {
 		self.checkIntegerIndexByData(index, i.Token)
 		v.Lvalue = true
 
+		if isRef(v) != nil {
+			self.pushErr(i.Token, "index is not supported by reference type @", v.Type.Str())
+			self.pushSuggestion("try deference the reference pointer like: *x")
+			ret
+		}
+
 		mut ptr := v.Type.Ptr()
 		match {
 		| ptr.IsUnsafe():
@@ -2897,7 +2903,7 @@ impl eval {
 			if ptr.IsUnsafe() {
 				break
 			}
-			if !self.isUnsafe() {
+			if isRef(v) == nil && !self.isUnsafe() {
 				self.pushErr(si.Name, log::UnsafeBehaviorAtOutOfUnsafeScope)
 				self.pushSuggestion(log::WriteYourCodeInUnsafeJule)
 			}
@@ -3728,6 +3734,7 @@ impl unaryEval {
 	}
 
 	fn star(mut self) {
+		isRef := isRef(self.v) != nil
 		self.v.Model = &UnaryExpr{
 			Expr: new(Value, *self.v),
 			Op: self.u.Op,
@@ -3735,7 +3742,7 @@ impl unaryEval {
 
 		match {
 		| self.v.Type.Ptr() != nil:
-			if !self.e.isUnsafe() {
+			if !isRef && !self.e.isUnsafe() {
 				self.e.pushErr(self.u.Op, log::UnsafeBehaviorAtOutOfUnsafeScope)
 				self.e.pushSuggestion(log::WriteYourCodeInUnsafeJule)
 			}
@@ -3760,6 +3767,9 @@ impl unaryEval {
 	}
 
 	fn amper(mut self) {
+		// Gettin raw-pointer returns mutable pointer by default.
+		mut mutable := true
+
 		match type self.v.Model {
 		| &StructLitExpr:
 			mut lit := self.v.Model.(&StructLitExpr)
@@ -3767,6 +3777,11 @@ impl unaryEval {
 		|:
 			match {
 			| canGetPtr(self.v):
+				// If expression is based on a reference variable,
+				// use the mutability of the variable.
+				ref := deepIsRef(self.v)
+				mutable = mutable && (ref == nil || ref.Mutable)
+
 				self.v.Type = &Type{
 					Kind: &Ptr{Value: self.v.Type},
 				}
@@ -3783,7 +3798,7 @@ impl unaryEval {
 		self.v.Constant = nil
 		self.v.untyped = false
 		self.v.Lvalue = false
-		self.v.Mutable = true
+		self.v.Mutable = mutable
 	}
 
 	fn chanRecv(mut self): &Value {
@@ -3928,8 +3943,8 @@ impl binaryEval {
 		if self.l.IsConst() && self.l.untyped {
 			self.l, self.r = self.r, self.l
 		}
-		const Ref = false
-		ret self.e.s.checkAssignType(Ref, self.l.Type, self.r, self.op, nil)
+		const Reference = false
+		ret self.e.s.checkAssignType(Reference, self.l.Type, self.r, self.op, nil)
 	}
 
 	fn evalComptimeTypeInfo(mut self): &Value {
@@ -4106,6 +4121,18 @@ impl binaryEval {
 	}
 
 	fn evalPtr(mut self): &Value {
+		if isRef(self.l) != nil {
+			match self.op.ID {
+			| token::EQL | token::NEQ:
+				// nil data handled in a separate function, this is incompatibility.
+				self.e.pushErr(self.op, "reference type @ supports comparison only for nil literals", self.l.Type.Str())
+			|:
+				self.e.pushErr(self.op, "operator @ is not defined for reference type @", self.op.Kind, self.l.Type.Str())
+				self.e.pushSuggestion("try deference the reference pointer like: *x")
+				ret nil
+			}
+		}
+
 		match self.op.ID {
 		| token::EQL
 		| token::NEQ
@@ -5334,4 +5361,29 @@ fn getUntypedCmpScore(k: str): int {
 		ret 3
 	}
 	ret -1
+}
+
+// Reports whether the value is reference based.
+// Returns variable if it is reference, otherwise nil.
+fn isRef(mut v: &Value): &Var {
+	mut variable, _ := v.Model.(&Var)
+	if variable != nil && variable.Reference {
+		ret variable
+	}
+	ret nil
+}
+
+// Reports whether the value is reference based.
+// Returns variable if it is reference, otherwise nil.
+// Works like isRef, but checks deeply.
+fn deepIsRef(mut v: &Value): &Var {
+	mut ref := isRef(v)
+	if ref != nil {
+		ret ref
+	}
+	mut unary, _ := v.Model.(&UnaryExpr)
+	if unary == nil || unary.Op.ID != token::MUL {
+		ret nil
+	}
+	ret deepIsRef(unary.Expr)
 }

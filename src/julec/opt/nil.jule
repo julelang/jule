@@ -104,6 +104,12 @@ fn getNilVar(m: sema::Expr): uintptr {
 		ret getNilVar(v.ValueSym.Value.Model)
 	| &sema::StructSubIdentExpr:
 		ret uintptr(m.(&sema::StructSubIdentExpr).Field)
+	| &sema::UnaryExpr:
+		uem := m.(&sema::UnaryExpr)
+		if uem.Op.ID == token::MUL { // Dereferencing.
+			ret getNilVar(uem.Expr.Model)
+		}
+		ret invalidBoundary
 	|:
 		ret invalidBoundary
 	}

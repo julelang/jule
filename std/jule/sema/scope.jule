@@ -1155,10 +1155,15 @@ impl scopeChecker {
 		_ = checkAssign(self.s, v, nil, a.Op)
 
 		if v.Type.Ptr() != nil {
-			mut ptr := v.Type.Ptr()
-			if ptr.IsUnsafe() {
-				self.s.pushErr(a.Op, log::OperatorNotForJuleType, a.Op.Kind, v.Type.Str())
+			if isRef(v) != nil {
+				self.s.pushErr(a.Op, "postfix operator are not supported by the reference pointer type @", v.Type.Str())
 				ret
+			} else {
+				mut ptr := v.Type.Ptr()
+				if ptr.IsUnsafe() {
+					self.s.pushErr(a.Op, log::OperatorNotForJuleType, a.Op.Kind, v.Type.Str())
+					ret
+				}
 			}
 		} else {
 			if v.Type.Prim() == nil || !types::IsNum(v.Type.Prim().Kind) {
@@ -1540,6 +1545,7 @@ impl scopeChecker {
 				if !a.Decl {
 					goto eval
 				}
+				// If variable is reference and mutable, this is exactly a new identifier.
 				if lexpr.Mutable && lexpr.Reference {
 					goto end
 				}

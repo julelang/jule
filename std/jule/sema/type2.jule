@@ -15,6 +15,15 @@ use "std/math"
 use "std/math/big"
 use "std/strings"
 
+fn checkTypeForRef(mut s: &sema, mut t: &Type, errorToken: &token::Token) {
+	ptr := t.Ptr()
+	if ptr == nil {
+		s.pushErr(errorToken, "reference variable must be have raw-pointer type")
+	} else if ptr.IsUnsafe() {
+		s.pushErr(errorToken, "reference variable cannot be have unsafe pointer type")
+	}
+}
+
 fn traitHasReferenceReceiver(&t: &Trait): bool {
 	for _, f in t.Methods {
 		// Skip static functions.
@@ -946,9 +955,9 @@ impl fnCallArgChecker {
 			}
 		}
 
+		// Check type if validity is good.
+		// Helps to reduce error logs and duplicated logs.
 		if self.e.s.checkValidityForInitExpr(p.Decl.Mutable, p.Decl.Reference, p.Type, arg, errorToken) {
-			// Check type if validity is good.
-			// Helps to reduce error logs and duplicated logs.
 			ret self.e.s.checkAssignType(p.Decl.Reference, p.Type, arg, errorToken, self.e.getOwnerRefers())
 		}
 		ret false
@@ -1183,10 +1192,10 @@ impl structLitChecker {
 		// Do not accept as risky if structure is not have any method.
 		// Because if there is no method, no risk for interior mutability.
 		mutable := self.e.target.mutable || (f.Decl.Mutable && len(self.s.Methods) > 0)
+		// Check type if validity is good.
+		// Helps to reduce error logs and duplicated logs.
 		if self.e.s.checkValidityForInitExpr(mutable, Reference, f.Type, v, errorToken) {
-			// Check type if validity is good.
-			// Helps to reduce error logs and duplicated logs.
-			_ = self.e.s.checkAssignType(false, f.Type, v, errorToken, self.e.getOwnerRefers())
+			_ = self.e.s.checkAssignType(Reference, f.Type, v, errorToken, self.e.getOwnerRefers())
 		}
 		self.args = append(self.args, &StructArgExpr{
 			Token: errorToken,
@@ -1611,11 +1620,12 @@ impl retTypeChecker {
 			ret
 		}
 		for (i, mut v) in self.exprs {
+			// Save the mutability state of the value type.
+			// Because assignTypeChecker may implicitly cast it.
+			// To perform right mutability analysis, we have to use old type.
+			mut typMutable := v.Type.Mutable()
+
 			mut expr := self.exprDecls[i]
-			if self.mutable && !v.Mutable && v.Type.Mutable() {
-				self.sc.s.pushErr(expr.Token, log::RetWithMutTypedNonMut)
-				ret
-			}
 			mut ac := assignTypeChecker{
 				s: self.sc.s,
 				dest: self.types[i],
@@ -1623,7 +1633,16 @@ impl retTypeChecker {
 				errorToken: expr.Token,
 				refers: self.sc.getHardRoot().owner.Refers,
 			}
-			ac.check()
+			// Check type if assign is good.
+			// Helps to reduce error logs and duplicated logs.
+			// Also if we have compatibility issues, logs it.
+			// Otherwise we may will log mutability error instead of type,
+			// which is might be confusing.
+			if ac.check() {
+				if self.mutable && !v.Mutable && typMutable {
+					self.sc.s.pushErr(expr.Token, log::RetWithMutTypedNonMut)
+				}
+			}
 		}
 	}
 

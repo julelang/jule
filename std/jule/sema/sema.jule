@@ -147,11 +147,16 @@ fn updateParamVars(mut &dest: []&Var, mut &f: &FuncIns): (n: int) {
 				Variadic: false,
 				Kind: f.Owner,
 			}
-			v.Reference = !p.Decl.IsRef()
-
 			if p.Decl.IsRef() {
 				v.Name = v.Name[1:] // Remove reference sign.
 				v.TypeSym.Type.Kind = &Sptr{
+					Value: &Type{
+						Kind: f.Owner,
+					},
+				}
+			} else {
+				v.Reference = true
+				v.TypeSym.Type.Kind = &Ptr{
 					Value: &Type{
 						Kind: f.Owner,
 					},
@@ -779,14 +784,15 @@ impl sema {
 	}
 
 	// Do not checks mutability.
-	fn checkAssignType(mut &self, destIsRef: bool, mut &dest: &Type,
-		mut &v: &Value, mut errorToken: &token::Token, mut refers: &ReferenceStack): bool {
+	fn checkAssignType(mut &self, destIsRef: bool, mut &dest: &Type, mut &v: &Value,
+		mut errorToken: &token::Token, mut refers: &ReferenceStack): bool {
 		if v.Decl {
 			self.pushErr(errorToken, log::InvalidExpr)
 			ret false
 		}
+
 		if destIsRef {
-			if !dest.Equal(v.Type) {
+			if !v.IsNil() && !dest.Equal(v.Type) {
 				self.pushErr(errorToken, log::IncompatibleTypes, dest.Str(), v.Type.Str())
 				ret false
 			}
@@ -1001,6 +1007,9 @@ impl sema {
 
 	fn checkFuncParamKind(mut &self, mut &p: &ParamIns) {
 		p.Type.Variadic = p.Decl.Variadic
+		if p.Decl.Reference {
+			checkTypeForRef(self, p.Type, p.Decl.Token)
+		}
 	}
 
 	// Reload type of function's self (receiver) parameter.
@@ -1058,14 +1067,28 @@ impl sema {
 	}
 
 	fn checkRefValidityForInitExpr(mut &self, leftMut: bool, mut &v: &Value, mut &errorToken: &token::Token): bool {
-		if !isValidModelForRef(v.Model) {
-			self.pushErr(errorToken, log::RefAssignNonVar)
-			ret false
+		// If value is nil-literal, there is nothing to do.
+		// Report true, passed nil pointer to the reference.
+		if v.IsNil() {
+			ret true
 		}
+
+		_v, _ := v.Model.(&Var)
+		if _v != nil && v.Reference {
+			// no-op
+		} else {
+			mut unary, _ := v.Model.(&UnaryExpr)
+			if unary == nil || !isValidModelForRef(unary.Expr.Model) {
+				self.pushErr(errorToken, log::RefAssignNonVar)
+				ret false
+			}
+		}
+
 		if leftMut && !v.Mutable {
 			self.pushErr(errorToken, log::MutRefPointsImmut)
 			ret false
 		}
+
 		ret true
 	}
 
@@ -2131,6 +2154,10 @@ impl sema {
 			// Build new TypeSym because auto-type symbols are nil.
 			v.TypeSym = &TypeSym{Type: v.ValueSym.Value.Type}
 
+			if v.Reference {
+				checkTypeForRef(self, v.TypeSym.Type, v.Token)
+			}
+
 			// Check value for unwrap and physical memory constraint.
 			if !v.Constant && v.ValueSym.Value.untyped {
 				_ = checkValue(v.ValueSym.Value, self, v.ValueSym.Expr.Token, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
@@ -2144,6 +2171,10 @@ impl sema {
 				v.ValueSym.Value,
 				v.ValueSym.Expr.Token)
 		} else {
+			if v.Reference {
+				checkTypeForRef(self, v.TypeSym.Type, v.Token)
+			}
+
 			// Set the size of the array if it is auto-sized.
 			mut arr := v.TypeSym.Type.Array()
 			if arr != nil {
@@ -2352,6 +2383,10 @@ impl sema {
 		}
 		// We still need to check self parameter.
 		self.reloadSelf(f)
+		// Check parameter types.
+		for (_, mut p) in f.Params {
+			self.checkFuncParamKind(p)
+		}
 		if !self.checkConstraintsFunc(f, et, existInstance) {
 			ret false, false
 		}

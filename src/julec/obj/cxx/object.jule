@@ -353,9 +353,6 @@ impl ObjectCoder {
 				self.anonObj.WriteByte(indentKind)! // 1x indent
 				self.tc.kind(self.anonObj, v.TypeSym.Type)
 				self.anonObj.WriteByte(' ')!
-				if v.Reference {
-					self.anonObj.WriteByte('*')!
-				}
 				identCoder.anonFuncVar(self.anonObj, v)
 				self.anonObj.WriteStr(";\n")!
 			}
@@ -454,9 +451,9 @@ impl ObjectCoder {
 			// comparison function.
 			self.anyObj.WriteStr(typeBool + " " + anyTypeIdent)!
 			self.anyObj.WriteStr(si)!
-			self.anyObj.WriteStr("_compare(const " + typeAny + " &any, const void *type, const ")!
+			self.anyObj.WriteStr("_compare(" + typeAny + " &any, void *type, ")!
 			self.tc.kind(self.anyObj, t)
-			self.anyObj.WriteStr(" &other) { return any.type == type && __jule_ptrEqual(any.data.alloc, other.alloc); }\n")!
+			self.anyObj.WriteStr(" other) { return any.type == type && __jule_ptrEqual(any.data.alloc, other.alloc); }\n")!
 		| t.Map() != nil:
 			// Consider map as a smart pointer.
 			// But it supports content-based string conversion unlike channels.
@@ -521,9 +518,9 @@ impl ObjectCoder {
 			// comparison function.
 			self.anyObj.WriteStr(typeBool + " " + anyTypeIdent)!
 			self.anyObj.WriteStr(si)!
-			self.anyObj.WriteStr("_compare(const " + typeAny + " &any, const void *type, const ")!
+			self.anyObj.WriteStr("_compare(" + typeAny + " &any, void *type, ")!
 			self.tc.kind(self.anyObj, t)
-			self.anyObj.WriteStr(" &other) { return any.type == type && __jule_ptrEqual(any.data.alloc, other.alloc); }\n")!
+			self.anyObj.WriteStr(" other) { return any.type == type && __jule_ptrEqual(any.data.alloc, other.alloc); }\n")!
 		|:
 			mut kindB := strings::Builder{}
 			kindB.Grow(40)
@@ -625,9 +622,9 @@ impl ObjectCoder {
 			// comparison function.
 			self.anyObj.WriteStr(typeBool + " " + anyTypeIdent)!
 			self.anyObj.WriteStr(si)!
-			self.anyObj.WriteStr("_compare(const " + typeAny + " &any, const void *type, const ")!
+			self.anyObj.WriteStr("_compare(" + typeAny + " &any, void *type, ")!
 			self.tc.kind(self.anyObj, t)
-			self.anyObj.WriteStr(" &other) { return any.type == type && any.type->eq(any.data.alloc, (void*)&other); }\n")!
+			self.anyObj.WriteStr(" other) { return any.type == type && any.type->eq(any.data.alloc, (void*)&other); }\n")!
 		}
 		ret i
 	}
@@ -1159,9 +1156,6 @@ impl ObjectCoder {
 
 		self.tc.kind(self.Buf, v.TypeSym.Type)
 		self.write(" ")
-		if v.Reference {
-			self.write("*")
-		}
 		identCoder.var(self.Buf, v)
 		if init != nil {
 			self.write(" = ")
@@ -1194,36 +1188,16 @@ impl ObjectCoder {
 		}
 		if v.ValueSym != nil && v.ValueSym.Expr != nil {
 			if v.ValueSym.Value.Model != nil {
-				if v.Reference {
-					self.varInitExpr(v, fn|| {
-						// If value is variable, check whether it is a reference.
-						// Because references implemented as raw pointers.
-						// So, do not take address of them, use directly them.
-						vv, var := v.ValueSym.Value.Model.(&sema::Var)
-						if var && vv.Reference {
-							self.ec.model(v.ValueSym.Value.Model)
-						} else {
-							self.write("&(")
-							self.ec.model(v.ValueSym.Value.Model)
-							self.write(")")
-						}
-					})
+				if v.Static {
+					self.varInitExpr(v, fn|| self.ec.possibleRefExpr(v.ValueSym.Value.Model))
 				} else {
-					if v.Static {
-						self.varInitExpr(v, fn|| self.ec.possibleRefExpr(v.ValueSym.Value.Model))
-					} else {
-						self.varInitExpr(v, nil)
-						self.write(" ")
-						self.commonVarInit(v)
-					}
+					self.varInitExpr(v, nil)
+					self.write(" ")
+					self.commonVarInit(v)
 				}
 				ret
 			}
 			self.varInitExpr(v, nil)
-			ret
-		}
-		if v.Reference {
-			self.varInitExpr(v, fn|| self.write("nullptr"))
 			ret
 		}
 		if shouldInitialized(v.TypeSym.Type) {
