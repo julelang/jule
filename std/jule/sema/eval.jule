@@ -4124,8 +4124,13 @@ impl binaryEval {
 		if isRef(self.l) != nil {
 			match self.op.ID {
 			| token::EQL | token::NEQ:
-				// nil data handled in a separate function, this is incompatibility.
-				self.e.pushErr(self.op, "reference type @ supports comparison only for nil literals", self.l.Type.Str())
+				if !self.checkTypeCompatibility() {
+					ret nil
+				}
+				ret &Value{
+					untyped: true,
+					Type: primBool,
+				}
 			|:
 				self.e.pushErr(self.op, "operator @ is not defined for reference type @", self.op.Kind, self.l.Type.Str())
 				self.e.pushSuggestion("try deference the reference pointer like: *x")
