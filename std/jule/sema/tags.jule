@@ -16,12 +16,12 @@ struct tagChecker {
 }
 
 impl tagChecker {
-	fn getKey(mut self, tag: str, mut &i: int): str {
-		j := i
-		for k, r in tag[i:] {
+	fn getKey(mut self, tag: str, mut &i: *int): str {
+		j := *i
+		for k, r in tag[*i:] {
 			if unicode::IsSpace(r) {
 				self.s.pushErrorFromLitError(self.f.Tag, lit::Error{
-					Offset: self.off + i,
+					Offset: self.off + *i,
 					Text: "space cannot be part of key",
 				})
 				ret ""
@@ -29,49 +29,49 @@ impl tagChecker {
 			if r == ':' {
 				ret tag[j : j+k]
 			}
-			i += utf8::RuneLen(r)
+			*i += utf8::RuneLen(r)
 		}
 		ret tag[j:]
 	}
 
-	fn getValue(mut self, tag: str, mut &i: int): str {
+	fn getValue(mut self, tag: str, mut &i: *int): str {
 		{
-			r, _ := utf8::DecodeRuneStr(tag[i:])
+			r, _ := utf8::DecodeRuneStr(tag[*i:])
 			if r != '"' {
 				self.s.pushErrorFromLitError(self.f.Tag, lit::Error{
-					Offset: self.off + i,
+					Offset: self.off + *i,
 					Text: "invalid value sequence, expected '\"', found '" + str(r) + "'",
 				})
 				ret ""
 			}
 		}
-		i++
-		if i >= len(tag) {
+		*i++
+		if *i >= len(tag) {
 			self.s.pushErrorFromLitError(self.f.Tag, lit::Error{
-				Offset: self.off + i,
+				Offset: self.off + *i,
 				Text: "missing closing quote of value, expected '\"', found EOF",
 			})
 			ret ""
 		}
 		mut value := strings::Builder{}
 		for {
-			mut r, _ := utf8::DecodeRuneStr(tag[i:])
+			mut r, _ := utf8::DecodeRuneStr(tag[*i:])
 			if r == '"' {
 				ret value.Str()
 			}
-			r, n, mut errors := lit::GetRune(tag[i:])
+			r, n, mut errors := lit::GetRune(tag[*i:])
 			if len(errors) > 0 {
 				for j in errors {
-					errors[j].Offset += self.off + i
+					errors[j].Offset += self.off + *i
 				}
 				self.s.pushErrorsFromLitErrors(self.f.Tag, errors)
 				ret ""
 			}
-			i += n
+			*i += n
 			value.WriteRune(r)!
 		}
 		self.s.pushErrorFromLitError(self.f.Tag, lit::Error{
-			Offset: self.off + i,
+			Offset: self.off + *i,
 			Text: "missing closing quote of value, expected '\"', found EOF",
 		})
 		ret ""
@@ -81,7 +81,7 @@ impl tagChecker {
 		mut i := 0
 		for i < len(tag); i++ {
 			keyPos := i
-			key := self.getKey(tag, i)
+			key := self.getKey(tag, &i)
 			if key == "" {
 				ret false
 			}
@@ -108,7 +108,7 @@ impl tagChecker {
 				})
 				ret false
 			}
-			value := self.getValue(tag, i)
+			value := self.getValue(tag, &i)
 			if value == "" {
 				ret false
 			}

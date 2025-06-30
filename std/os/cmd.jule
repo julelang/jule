@@ -106,7 +106,7 @@ impl Cmd {
 		if self.stdin != nil {
 			error(errors::New("std/os: Cmd.Stdin used when stdin already assigned"))
 		}
-		if atomic::Load(self.started, atomic::Acquire) == 1 {
+		if atomic::Load(&self.started, atomic::Acquire) == 1 {
 			error(errors::New("std/os: Cmd.Stdin after process started"))
 		}
 		self.stdin = r
@@ -119,7 +119,7 @@ impl Cmd {
 		if self.stdout != nil {
 			error(errors::New("std/os: Cmd.Stdout used when stdout already assigned"))
 		}
-		if atomic::Load(self.started, atomic::Acquire) == 1 {
+		if atomic::Load(&self.started, atomic::Acquire) == 1 {
 			error(errors::New("std/os: Cmd.Stdout after process started"))
 		}
 		self.stdout = w
@@ -132,7 +132,7 @@ impl Cmd {
 		if self.stderr != nil {
 			error(errors::New("std/os: Cmd.Stderr used when stderr already assigned"))
 		}
-		if atomic::Load(self.started, atomic::Acquire) == 1 {
+		if atomic::Load(&self.started, atomic::Acquire) == 1 {
 			error(errors::New("std/os: Cmd.Stderr after process started"))
 		}
 		self.stderr = w
@@ -148,7 +148,7 @@ impl Cmd {
 		if self.stdin != nil {
 			error(errors::New("std/os: Cmd.StdinPipe used when stdin already assigned"))
 		}
-		if atomic::Load(self.started, atomic::Acquire) == 1 {
+		if atomic::Load(&self.started, atomic::Acquire) == 1 {
 			error(errors::New("std/os: Cmd.StdinPipe after process started"))
 		}
 		mut r, mut w := Pipe() else { error(error) }
@@ -169,7 +169,7 @@ impl Cmd {
 		if self.stdout != nil {
 			error(errors::New("std/os: Cmd.StdoutPipe used when stdout already assigned"))
 		}
-		if atomic::Load(self.started, atomic::Acquire) == 1 {
+		if atomic::Load(&self.started, atomic::Acquire) == 1 {
 			error(errors::New("std/os: Cmd.StdoutPipe after process started"))
 		}
 		mut r, mut w := Pipe() else { error(error) }
@@ -190,7 +190,7 @@ impl Cmd {
 		if self.stderr != nil {
 			error(errors::New("std/os: Cmd.StderrPipe used when stderr already assigned"))
 		}
-		if atomic::Load(self.started, atomic::Acquire) == 1 {
+		if atomic::Load(&self.started, atomic::Acquire) == 1 {
 			error(errors::New("std/os: Cmd.StderrPipe after process started"))
 		}
 		mut r, mut w := Pipe() else { error(error) }
@@ -235,17 +235,17 @@ impl Cmd {
 	fn Start(self)! {
 		// Check for doubled Start calls before we defer failure cleanup. If the prior
 		// call to Start succeeded, we don't want to spuriously close its pipes.
-		if atomic::Load(self.started, atomic::Acquire) == 1 {
+		if atomic::Load(&self.started, atomic::Acquire) == 1 {
 			panic("std/os: Cmd.Spawn: command is already started")
 		}
 		mut started := false
-		&_started := started // For deferred scope, use reference.
+		&_started := &started // For deferred scope, use reference.
 		defer {
 			for (_, mut f) in self.childIOFiles {
 				f.Close() else {}
 			}
 			self.childIOFiles = nil
-			if !_started {
+			if !*_started {
 				for (_, mut f) in self.parentIOFiles {
 					f.Close() else {}
 				}
@@ -273,7 +273,7 @@ impl Cmd {
 		stdout := self.childStdout() else { error(error) }
 		stderr := self.childStderr() else { error(error) }
 		self.spawn(path, stdin, stdout, stderr) else { error(error) }
-		atomic::Store(self.started, 1, atomic::Relaxed)
+		atomic::Store(&self.started, 1, atomic::Relaxed)
 		started = true
 	}
 
@@ -291,7 +291,7 @@ impl Cmd {
 		}
 		self.parentIOFiles = nil
 		self.stdin, self.stdout, self.stderr = nil, nil, nil
-		atomic::Store(self.started, 0, atomic::Relaxed)
+		atomic::Store(&self.started, 0, atomic::Relaxed)
 	}
 
 	// Waits for the command to exit.
@@ -299,7 +299,7 @@ impl Cmd {
 	// It releases any resources associated with the [Cmd].
 	// After calling it, Cmd will be ready to reuse.
 	fn Wait(self)!: int {
-		if atomic::Load(self.started, atomic::Acquire) == 0 {
+		if atomic::Load(&self.started, atomic::Acquire) == 0 {
 			panic("std/os: Cmd.Wait: command is not started")
 		}
 		c := self.wait() else { error(error) }

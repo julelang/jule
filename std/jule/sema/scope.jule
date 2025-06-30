@@ -34,7 +34,7 @@ enum Stmt: type {
 	&Use,
 }
 
-fn newScopeCheckerBase(mut &s: &sema, mut owner: &FuncIns): &scopeChecker {
+fn newScopeCheckerBase(mut s: &sema, mut owner: &FuncIns): &scopeChecker {
 	ret &scopeChecker{
 		s: s,
 		owner: owner,
@@ -42,7 +42,7 @@ fn newScopeCheckerBase(mut &s: &sema, mut owner: &FuncIns): &scopeChecker {
 	}
 }
 
-fn newScopeChecker(mut &s: &sema, mut owner: &FuncIns): &scopeChecker {
+fn newScopeChecker(mut s: &sema, mut owner: &FuncIns): &scopeChecker {
 	mut base := newScopeCheckerBase(s, owner)
 	base.labels = new([]&scopeLabel, nil)
 	base.gotos = new([]&Goto, nil)
@@ -207,11 +207,11 @@ impl caseOwner {
 	// Returns data in uintptr.
 	// Assumes self is not nil.
 	fn asUintptr(self): uintptr {
-		match type self {
+		match type *self {
 		| &Match:
-			ret uintptr(self.(&Match))
+			ret uintptr((*self).(&Match))
 		| &Select:
-			ret uintptr(self.(&Select))
+			ret uintptr((*self).(&Select))
 		|:
 			panic("unreachable")
 		}
@@ -438,7 +438,7 @@ impl scopeChecker {
 	// parent-scopes must be capture this variable too.
 	// Starts pushing from self to all parents.
 	// If any parent scope is not captures variable v, iteration will be break.
-	fn pushCaptured(mut &self, mut &v: &Var) {
+	fn pushCaptured(mut &self, mut v: &Var) {
 		mut sc := self
 		for {
 			if sc.captured != nil {
@@ -488,7 +488,7 @@ impl scopeChecker {
 	fn findVar(mut self, name: str, closure: bool): &Var {
 		const Reverse = true // Search reverse for correct shadowing.
 		const Bind = false   // Local variables cannot be bind.
-		mut parent := unsafe { (&scopeChecker)(&self) }
+		mut parent := unsafe { (&scopeChecker)(self) }
 		for parent != nil {
 			// Closure mode is disable and we have a owner.
 			// Do not capture variables from the parent scopes.
@@ -507,7 +507,7 @@ impl scopeChecker {
 	// Returns label by identifier.
 	// Returns nil if not exist any label in this identifier.
 	// Just lookups current scope.
-	fn findLabel(mut self, &name: str): &Label {
+	fn findLabel(mut self, name: str): &Label {
 		for (_, mut st) in self.scope.Stmts {
 			mut label, ok := st.(&Label)
 			if ok && label.Name == name {
@@ -520,7 +520,7 @@ impl scopeChecker {
 	// Returns label by identifier.
 	// Returns nil if not exist any label in this identifier.
 	// Just lookups current scope.
-	fn findLabelScope(mut &self, &name: str): &scopeLabel {
+	fn findLabelScope(mut &self, name: str): &scopeLabel {
 		mut label := self.findLabelAll(name)
 		if label != nil && label.node.Scope == self.scope {
 			ret label
@@ -531,7 +531,7 @@ impl scopeChecker {
 	// Returns label by identifier.
 	// Returns nil if not exist any label in this identifier.
 	// Lookups all labels.
-	fn findLabelAll(mut self, &name: str): &scopeLabel {
+	fn findLabelAll(mut self, name: str): &scopeLabel {
 		for (_, mut lbl) in *self.labels {
 			if lbl.node.Name == name {
 				ret lbl
@@ -543,7 +543,7 @@ impl scopeChecker {
 	// Reports this identifier duplicated in scope.
 	// The "self" parameter represents address of exception identifier.
 	// If founded identifier address equals to self, will be skipped.
-	fn isDuplicatedName(mut self, itself: uintptr, &name: str): bool {
+	fn isDuplicatedName(mut self, itself: uintptr, name: str): bool {
 		const Closure = false
 		v := self.findVar(name, Closure)
 		if v != nil && uintptr(v) != itself {
@@ -564,7 +564,7 @@ impl scopeChecker {
 		ret false
 	}
 
-	fn checkVarDecl1(mut &self, mut &v: &Var) {
+	fn checkVarDecl1(mut &self, mut v: &Var) {
 		defer {
 			self.table.Vars = append(self.table.Vars, v)
 			self.scope.Stmts = append(self.scope.Stmts, v)
@@ -619,7 +619,7 @@ impl scopeChecker {
 		}
 	}
 
-	fn checkTypeAlias(mut &self, mut &ta: &TypeAlias) {
+	fn checkTypeAlias(mut &self, mut ta: &TypeAlias) {
 		if self.isDuplicatedName(uintptr(ta), ta.Name) {
 			self.s.pushErr(ta.Token, log::DuplicatedIdent, ta.Name)
 			self.s.pushSuggestion(log::RenameForAvoidDuplication)
@@ -646,20 +646,20 @@ impl scopeChecker {
 		}
 	}
 
-	fn checkChildSsc(mut &self, mut &tree: &ast::ScopeTree, mut &s: &Scope, mut &ssc: &scopeChecker) {
+	fn checkChildSsc(mut &self, mut tree: &ast::ScopeTree, mut s: &Scope, mut ssc: &scopeChecker) {
 		s.StmtIndex = self.i
 		s.ChildIndex = ssc.childIndex
 		ssc.parent = self
 		ssc.check(tree, s)
 	}
 
-	fn checkChildSc(mut &self, mut &tree: &ast::ScopeTree, mut &ssc: &scopeChecker): &Scope {
+	fn checkChildSc(mut &self, mut tree: &ast::ScopeTree, mut ssc: &scopeChecker): &Scope {
 		mut s := self.getChild()
 		self.checkChildSsc(tree, s, ssc)
 		ret s
 	}
 
-	fn checkChild(mut &self, mut &tree: &ast::ScopeTree): &Scope {
+	fn checkChild(mut &self, mut tree: &ast::ScopeTree): &Scope {
 		mut ssc := self.newChildChecker()
 		ret self.checkChildSc(tree, ssc)
 	}
@@ -683,7 +683,7 @@ impl scopeChecker {
 		self.scope.Stmts = append(self.scope.Stmts, s)
 	}
 
-	fn processErrorCall(mut &self, mut &m: &BuiltinErrorCallExpr, err: &token::Token) {
+	fn processErrorCall(mut &self, mut m: &BuiltinErrorCallExpr, err: &token::Token) {
 		if self.isDeferred() {
 			self.s.pushErr(err, log::ErrorInDeferred)
 		}
@@ -774,7 +774,7 @@ impl scopeChecker {
 		}
 	}
 
-	fn checkIterScopeSsc(mut &self, it: uintptr, mut tree: &ast::ScopeTree, mut &s: &Scope, mut ssc: &scopeChecker) {
+	fn checkIterScopeSsc(mut &self, it: uintptr, mut tree: &ast::ScopeTree, mut s: &Scope, mut ssc: &scopeChecker) {
 		ssc.it = it
 		self.checkChildSsc(tree, s, ssc)
 	}
@@ -785,18 +785,18 @@ impl scopeChecker {
 		ret scope
 	}
 
-	fn checkIterScope(mut &self, it: uintptr, mut &tree: &ast::ScopeTree): &Scope {
+	fn checkIterScope(mut &self, it: uintptr, mut tree: &ast::ScopeTree): &Scope {
 		mut ssc := self.newChildChecker()
 		ret self.checkIterScopeSc(it, tree, ssc)
 	}
 
-	fn checkInfIter(mut &self, mut &it: &ast::Iter) {
+	fn checkInfIter(mut &self, mut it: &ast::Iter) {
 		mut kind := new(InfIter)
 		self.scope.Stmts = append(self.scope.Stmts, kind)
 		kind.Scope = self.checkIterScope(uintptr(kind), it.Scope)
 	}
 
-	fn checkWhileIter(mut &self, mut &it: &ast::Iter) {
+	fn checkWhileIter(mut &self, mut it: &ast::Iter) {
 		mut wh := it.Kind.(&ast::WhileKind)
 		if wh.X == nil && wh.Next == nil {
 			self.checkInfIter(it)
@@ -846,7 +846,7 @@ impl scopeChecker {
 		}
 	}
 
-	fn checkComptimeRangeIter(mut &self, mut &it: &ast::Iter, mut &kind: &RangeIter, mut &v: &Value) {
+	fn checkComptimeRangeIter(mut &self, mut it: &ast::Iter, mut kind: &RangeIter, mut v: &Value) {
 		if kind.KeyA != nil {
 			if !self.s.isFlag(Shadowing) && self.isDuplicatedName(0, kind.KeyA.Name) {
 				self.s.pushErr(kind.KeyA.Token, log::DuplicatedIdent, kind.KeyA.Name)
@@ -903,7 +903,7 @@ impl scopeChecker {
 		}
 	}
 
-	fn checkRangeIter(mut &self, mut &it: &ast::Iter) {
+	fn checkRangeIter(mut &self, mut it: &ast::Iter) {
 		mut rang := it.Kind.(&ast::RangeKind)
 
 		// Evaluate expression as mutable. Because we can't know type of the expression,
@@ -1191,7 +1191,7 @@ impl scopeChecker {
 	// Otherwise assign analysis will complain and copy operation will not be allowed.
 	//
 	// See also documentation of the [sema.isMutRiskyStruct] method.
-	fn removeInteriorMutRisk(mut &self, mut &v: &Value) {
+	fn removeInteriorMutRisk(mut &self, mut v: &Value) {
 		s := v.Type.Struct()
 		if s == nil {
 			ret
@@ -1208,7 +1208,7 @@ impl scopeChecker {
 		v.Mutable = true
 	}
 
-	fn checkSingleAssign(mut &self, mut &a: &ast::Assign, flags: int) {
+	fn checkSingleAssign(mut &self, mut a: &ast::Assign, flags: int) {
 		let mut l: &Value = nil
 
 		if !jule::IsBlank(a.X[0].Name) {
@@ -1297,8 +1297,8 @@ impl scopeChecker {
 		a.Op.ID = id
 	}
 
-	fn processEndPartOfMultiAssign(mut &self, mut &st: &MultiAssign, mut &a: &ast::Assign,
-		mut &lexpr: &ast::AssignLeft, mut &l: &Value, mut &r: exprPart, strict: bool) {
+	fn processEndPartOfMultiAssign(mut &self, mut st: &MultiAssign, mut a: &ast::Assign,
+		mut lexpr: &ast::AssignLeft, mut l: &Value, mut r: exprPart, strict: bool) {
 		if !lexpr.Reference && jule::IsBlank(lexpr.Name) {
 			if r.data.Type.Void() {
 				self.s.pushErr(a.Y.Token, log::InvalidExpr)
@@ -1454,7 +1454,7 @@ impl scopeChecker {
 		ret
 	}
 
-	fn checkMultiAssign(mut &self, mut &a: &ast::Assign) {
+	fn checkMultiAssign(mut &self, mut a: &ast::Assign) {
 		if a.Op.ID != token::ASSIGN && a.Op.ID != token::DEFINE {
 			self.s.pushErr(a.Op, log::InvalidSyntax)
 			ret
@@ -1500,7 +1500,7 @@ impl scopeChecker {
 						mut f := decl.instanceForce()
 						f.Generics = append(f.Generics, &InsGeneric{Type: ce.Expr.Type}, &InsGeneric{Type: ce.Type})
 						mut token := right[0].expr.Token
-						ok, _ = self.s.checkGenericFunc(f, token)
+						ok, _ = self.s.checkGenericFunc(&f, token)
 						if !ok {
 							panic("sema: dynAssertAssign evaluation failed, this is an implementation mistake")
 						}
@@ -1580,7 +1580,7 @@ impl scopeChecker {
 		}
 	}
 
-	fn checkCaseScope(mut &self, &c: &Case, mut &tree: &ast::ScopeTree): &Scope {
+	fn checkCaseScope(mut &self, c: &Case, mut tree: &ast::ScopeTree): &Scope {
 		mut ssc := self.newChildChecker()
 		ssc.cse = uintptr(c)
 		ret self.checkChildSc(tree, ssc)
@@ -1679,7 +1679,7 @@ impl scopeChecker {
 		ret case
 	}
 
-	fn checkCases(mut &self, mut &m: &ast::Match, mut rm: &Match, mut expr: &Value) {
+	fn checkCases(mut &self, mut m: &ast::Match, mut rm: &Match, mut expr: &Value) {
 		rm.Cases = make([]&Case, 0, len(m.Cases))
 		for i in m.Cases {
 			mut case := &Case{
@@ -1708,7 +1708,7 @@ impl scopeChecker {
 		ret def
 	}
 
-	fn checkComptimePanic(mut &self, mut callToken: &token::Token, mut &s: &Scope) {
+	fn checkComptimePanic(mut &self, mut callToken: &token::Token, mut s: &Scope) {
 		if len(s.Stmts) != 1 {
 			ret
 		}
@@ -1737,7 +1737,7 @@ impl scopeChecker {
 		self.stop()
 	}
 
-	fn processConstMatch(mut &self, mut &tm: &Match, mut &m: &ast::Match) {
+	fn processConstMatch(mut &self, mut tm: &Match, mut m: &ast::Match) {
 		for (i, mut c) in tm.Cases {
 			if c.Scope != nil {
 				let mut token: &token::Token = nil
@@ -1768,9 +1768,9 @@ impl scopeChecker {
 
 	// Checks and reports whether the all possible types of enum handled in the match statement.
 	// Writes all missing types as a list to sb.
-	fn checkAllTypeEnumCasesHandled(mut &self, mut m: &Match, mut te: &TypeEnum, mut &sb: strings::Builder): (ok: bool) {
+	fn checkAllTypeEnumCasesHandled(mut &self, mut m: &Match, mut te: &TypeEnum, mut &sb: *strings::Builder): (ok: bool) {
 		let mut isPushedAlready: fn(mut t: &TypeEnum, mut item: &TypeEnumItem): bool
-		&_isPushedAlready := isPushedAlready
+		&_isPushedAlready := &isPushedAlready
 		isPushedAlready = fn|mut t, mut item| {
 			for (_, mut titem) in t.Items {
 				if titem == item {
@@ -1788,7 +1788,7 @@ impl scopeChecker {
 				// If item is not strict type alias, check inherited types if it is type-enum.
 				if titem.TypeSym.Type.SoftStruct() == nil {
 					if ke != nil {
-						pushed := unsafe { _isPushedAlready(ke, item) }
+						pushed := unsafe { (*_isPushedAlready)(ke, item) }
 						if pushed {
 							ret true
 						}
@@ -1824,7 +1824,7 @@ impl scopeChecker {
 		ret
 	}
 
-	fn checkTypeMatch(mut &self, mut &m: &ast::Match) {
+	fn checkTypeMatch(mut &self, mut m: &ast::Match) {
 		mut v := self.s.eval(self).eval1(m.X, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if v == nil {
 			ret
@@ -1870,7 +1870,7 @@ impl scopeChecker {
 		// If match statement have a default case, avoid evaluation cost, handled all cases.
 		if tm.Default == nil && te != nil {
 			mut sb := strings::Builder{}
-			ok := self.checkAllTypeEnumCasesHandled(tm, te, sb)
+			ok := self.checkAllTypeEnumCasesHandled(tm, te, &sb)
 			if !ok {
 				self.s.pushErr(m.Token, log::MatchTypeStmtDoesNotHandleAllCases, sb.Str())
 				self.s.pushSuggestion(log::HandleMissingCasesOrAddDefault)
@@ -1896,7 +1896,7 @@ impl scopeChecker {
 		}
 	}
 
-	fn checkCommonMatch(mut &self, mut &m: &ast::Match) {
+	fn checkCommonMatch(mut &self, mut m: &ast::Match) {
 		let mut v: &Value = nil
 		if m.X == nil {
 			v = &Value{
@@ -1988,7 +1988,7 @@ impl scopeChecker {
 		ret case
 	}
 
-	fn checkSelectCases(mut &self, mut &sc: &ast::Select, mut slct: &Select) {
+	fn checkSelectCases(mut &self, mut sc: &ast::Select, mut slct: &Select) {
 		slct.Cases = make([]&Case, 0, len(sc.Cases))
 		for i in sc.Cases {
 			mut case := &Case{
@@ -2206,7 +2206,7 @@ impl scopeChecker {
 		// Validated at end of scope's analysis.
 	}
 
-	fn checkNode(mut &self, mut &node: ast::StmtData, flags: int) {
+	fn checkNode(mut &self, mut node: ast::StmtData, flags: int) {
 		match type node {
 		| &ast::ScopeTree:
 			self.checkAnonScope(node.(&ast::ScopeTree))
@@ -2354,7 +2354,7 @@ impl scopeChecker {
 		}
 	}
 
-	fn checkGoto(mut self, mut &gt: &Goto, mut &label: &scopeLabel) {
+	fn checkGoto(mut self, mut gt: &Goto, mut label: &scopeLabel) {
 		mut n := 0
 		if gt.Scope == label.node.Scope {
 			// Scopes are same and label at above, so it is safe.
@@ -2479,7 +2479,7 @@ impl scopeChecker {
 	}
 
 	// Checks scope tree.
-	fn check(mut &self, mut &tree: &ast::ScopeTree, mut &s: &Scope) {
+	fn check(mut &self, mut tree: &ast::ScopeTree, mut s: &Scope) {
 		s.Deferred = tree.Deferred
 		s.Unsafe = tree.Unsafe
 
@@ -2552,7 +2552,7 @@ fn removeEqFromOp(op: int): int {
 // Makes data d as comptimeRange.
 // If type is not supported, d.Decl will be true.
 // If onlyComptime is true, only handles comptime types.
-fn makeComptimeRange(mut &v: &Value, onlyComptime: bool) {
+fn makeComptimeRange(mut v: &Value, onlyComptime: bool) {
 	match {
 	| v.Type.comptimeStructFields() != nil:
 		v.Type = &Type{Kind: &comptimeRange{v.Type.comptimeStructFields()}}
@@ -2596,7 +2596,7 @@ Fail:
 }
 
 // Reports whether v can match at comptime.
-fn canComptimeMatch(mut &v: &Value): bool {
+fn canComptimeMatch(mut v: &Value): bool {
 	// Do not allow value if has unsupported type for type infer.
 	if !isGoodValueToInfer(v) {
 		ret false
@@ -2604,7 +2604,7 @@ fn canComptimeMatch(mut &v: &Value): bool {
 	ret v.IsConst() || v.Type.comptimeTypeInfo() != nil
 }
 
-fn stmtIsDef(&stmt: Stmt): bool {
+fn stmtIsDef(stmt: Stmt): bool {
 	match type stmt {
 	| &Var:
 		ret true
@@ -2618,7 +2618,7 @@ fn stmtIsDef(&stmt: Stmt): bool {
 
 // Counts matched fields with name and returns the result.
 // If limit=0, counts all fields, otherwise the count is limited by the limit.
-fn countMatchEnum(&m: &ast::Match, name: str, limit: int): int {
+fn countMatchEnum(m: &ast::Match, name: str, limit: int): int {
 	mut n := 0
 loop:
 	for _, c in m.Cases {
@@ -2637,7 +2637,7 @@ loop:
 
 // Counts matched types with t and returns the result.
 // If limit=0, counts all types, otherwise the count is limited by the limit.
-fn countMatchType(&m: &Match, &t: &Type, limit: int): int {
+fn countMatchType(m: &Match, t: &Type, limit: int): int {
 	mut n := 0
 loop:
 	for _, c in m.Cases {
@@ -2664,7 +2664,7 @@ loop:
 // Returns label by identifier.
 // Returns nil if not exist any label in this identifier.
 // Lookups given scope and parent scopes.
-fn findLabelParent(&name: str, mut scope: &scopeChecker): &scopeLabel {
+fn findLabelParent(name: str, mut scope: &scopeChecker): &scopeLabel {
 	mut label := scope.findLabelScope(name)
 	for label == nil {
 		if scope.parent == nil || scope.owner != nil {
@@ -2676,7 +2676,7 @@ fn findLabelParent(&name: str, mut scope: &scopeChecker): &scopeLabel {
 	ret label
 }
 
-fn getExprs(mut &m: ast::ExprData): []ast::ExprData {
+fn getExprs(mut m: ast::ExprData): []ast::ExprData {
 	match type m {
 	| &ast::TupleExpr:
 		mut tup := m.(&ast::TupleExpr)
@@ -2690,7 +2690,7 @@ fn getExprs(mut &m: ast::ExprData): []ast::ExprData {
 	}
 }
 
-fn checkAssignMut(mut &s: &sema, &left: &Value, mut right: &Value, op: &token::Token): (ok: bool) {
+fn checkAssignMut(mut s: &sema, left: &Value, mut right: &Value, op: &token::Token): (ok: bool) {
 	match {
 	| !left.Mutable:
 		s.pushErr(op, log::AssignToNonMut)
@@ -2703,7 +2703,7 @@ fn checkAssignMut(mut &s: &sema, &left: &Value, mut right: &Value, op: &token::T
 	}
 }
 
-fn checkAssign(mut &s: &sema, mut &left: &Value, mut right: &Value, op: &token::Token): (ok: bool) {
+fn checkAssign(mut s: &sema, mut left: &Value, mut right: &Value, op: &token::Token): (ok: bool) {
 	f := left.Type.Func()
 	if f != nil && f.Decl != nil && f.Decl.Global {
 		s.pushErr(op, log::AssignTypeNotSupportValue)
@@ -2740,7 +2740,7 @@ fn checkAssign(mut &s: &sema, mut &left: &Value, mut right: &Value, op: &token::
 	ret checkAssignMut(s, left, right, op)
 }
 
-fn isValidStmtForNext(mut &n: ast::StmtData): bool {
+fn isValidStmtForNext(mut n: ast::StmtData): bool {
 	match type n {
 	| &ast::Assign:
 		ret !n.(&ast::Assign).Decl
@@ -2751,7 +2751,7 @@ fn isValidStmtForNext(mut &n: ast::StmtData): bool {
 	}
 }
 
-fn isValidStmtForNext2(&st: Stmt): bool {
+fn isValidStmtForNext2(st: Stmt): bool {
 	match type st {
 	| &Postfix
 	| &Assign

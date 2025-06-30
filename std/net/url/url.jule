@@ -76,7 +76,7 @@ type EscapeError: str
 
 impl EscapeError {
 	fn Str(self): str {
-		ret "invalid URL escape " + conv::Quote(str(self))
+		ret "invalid URL escape " + conv::Quote(str(*self))
 	}
 }
 
@@ -84,7 +84,7 @@ type InvalidHostError: str
 
 impl InvalidHostError {
 	fn Str(self): str {
-		ret "invalid character " + conv::Quote(str(self)) + " in host name"
+		ret "invalid character " + conv::Quote(str(*self)) + " in host name"
 	}
 }
 
@@ -471,7 +471,7 @@ impl UserInfo {
 // Separates host and port. If the port is not valid, it returns
 // the entire input as host, and it doesn't check the validity of the host.
 // Unlike net::SplitHostPort, but per RFC 3986, it requires ports to be numeric.
-fn splitHostPort(&hostPort: str): (host: str, port: str) {
+fn splitHostPort(hostPort: str): (host: str, port: str) {
 	host = hostPort
 	colon := strings::LastIndexByte(host, ':')
 	if colon != -1 && validOptionalPort(host[colon:]) {
@@ -682,7 +682,7 @@ impl URL {
 		if strings::HasSuffix(elem[len(elem)-1], "/") && !strings::HasSuffix(p, "/") {
 			p += "/"
 		}
-		mut url := self
+		mut url := *self
 		url.setPath(p)!
 		ret new(URL, url)
 	}
@@ -787,7 +787,7 @@ impl URL {
 		if self.User != nil {
 			_, has := self.User.Password()
 			if has {
-				mut url := unsafe { *(&self) } // Break immutability, no risk for reflective mutation.
+				mut &url := unsafe { &(*(*(&self))) } // Break immutability, no risk for reflective mutation.
 				url.User = UserPassword(self.User.Username(), "xxxxx")
 				ret url.Str()
 			}
@@ -1112,7 +1112,7 @@ impl Values {
 	// the empty string. To access multiple values, use the map
 	// directly.
 	fn Get(self, key: str): str {
-		vs := self[key]
+		vs := (*self)[key]
 		if len(vs) == 0 {
 			ret ""
 		}
@@ -1121,39 +1121,39 @@ impl Values {
 
 	// Sets the key to value. It replaces any existing values.
 	fn Set(mut self, key: str, value: str) {
-		self[key] = [value]
+		(*self)[key] = [value]
 	}
 
 	// Adds the value to key. It appends to any existing values associated with key.
 	fn Add(mut self, key: str, value: str) {
-		self[key] = append(self[key], value)
+		(*self)[key] = append((*self)[key], value)
 	}
 
 	// Deletes the values associated with key.
 	fn Del(mut self, key: str) {
-		delete(self, key)
+		delete(*self, key)
 	}
 
 	// Reports whether a given key is set.
 	fn Has(self, key: str): bool {
-		_, ok := self[key]
+		_, ok := (*self)[key]
 		ret ok
 	}
 
 	// Encodes the values into “URL encoded” form
 	// ("bar=baz&foo=quux") sorted by key.
 	fn Encode(self): str {
-		if len(self) == 0 {
+		if len(*self) == 0 {
 			ret ""
 		}
-		mut keys := make([]str, 0, len(self))
-		for k in self {
+		mut keys := make([]str, 0, len(*self))
+		for k in *self {
 			keys = append(keys, k)
 		}
 		slices::Sort(keys)
 		mut buf := strings::Builder{}
 		for _, k in keys {
-			vs := self[k]
+			vs := (*self)[k]
 			keyEscaped := QueryEscape(k)
 			for _, v in vs {
 				if buf.Len() > 0 {
@@ -1168,7 +1168,7 @@ impl Values {
 	}
 }
 
-fn parseQuery(mut &m: Values, mut query: str)! {
+fn parseQuery(mut m: Values, mut query: str)! {
 	for query != "" {
 		mut key := ""
 		key, query, _ = strings::Cut(query, "&")

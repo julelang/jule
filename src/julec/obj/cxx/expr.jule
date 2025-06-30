@@ -53,20 +53,20 @@ struct exprCoder {
 }
 
 impl exprCoder {
-	fn new(mut &oc: &ObjectCoder): &exprCoder {
+	fn new(mut oc: &ObjectCoder): &exprCoder {
 		ret &exprCoder{
 			oc: oc,
 		}
 	}
 
-	fn string(mut &self, &c: &constant::Const) {
+	fn string(mut &self, c: &constant::Const) {
 		content := c.ReadStr()
 		if len(content) == 0 { // Empty.
 			self.oc.write(typeStr + "()")
 			ret
 		}
 		len := conv::FormatInt(i64(len(content)), 10)
-		strLit(self.oc.Buf, content, len)
+		strLit(&self.oc.Buf, content, len)
 	}
 
 	fn boolean(mut &self, b: bool) {
@@ -81,7 +81,7 @@ impl exprCoder {
 		self.oc.write("nullptr")
 	}
 
-	fn ftoaSpecialCases(mut &self, &x: f64): bool {
+	fn ftoaSpecialCases(mut &self, x: f64): bool {
 		match {
 		| math::IsNaN(x):
 			self.oc.write("__jule_NaN()")
@@ -95,7 +95,7 @@ impl exprCoder {
 		ret true
 	}
 
-	fn float32(mut &self, &c: &constant::Const) {
+	fn float32(mut &self, c: &constant::Const) {
 		x := c.AsF64()
 
 		self.oc.write("jule::F32(")
@@ -113,13 +113,13 @@ impl exprCoder {
 			//| x == types::MinF32:
 			//	self.oc.write("-3.402823466e+38f")
 
-			ftoa(self.oc.Buf, x, 32)
+			ftoa(&self.oc.Buf, x, 32)
 			self.oc.write("f")
 		}
 		self.oc.write(")")
 	}
 
-	fn float64(mut &self, &c: &constant::Const) {
+	fn float64(mut &self, c: &constant::Const) {
 		x := c.AsF64()
 
 		self.oc.write("jule::F64(")
@@ -136,7 +136,7 @@ impl exprCoder {
 		| x == types::MinF64:
 			self.oc.write("-1.797693134862315708e+308")
 		|:
-			ftoa(self.oc.Buf, x, 64)
+			ftoa(&self.oc.Buf, x, 64)
 		}
 		self.oc.write(")")
 	}
@@ -157,13 +157,13 @@ impl exprCoder {
 		| c.IsInt():
 			i := c.ReadInt()
 			if c.Kind != "" {
-				self.oc.tc.toType(self.oc.Buf, c.Kind)
+				self.oc.tc.toType(&self.oc.Buf, c.Kind)
 				self.oc.write("(")
 			}
 			if i.IsI64() {
-				itoa(self.oc.Buf, i.I64())
+				itoa(&self.oc.Buf, i.I64())
 			} else {
-				utoa(self.oc.Buf, i.U64())
+				utoa(&self.oc.Buf, i.U64())
 			}
 			if c.Kind != "" {
 				self.oc.write(")")
@@ -175,19 +175,19 @@ impl exprCoder {
 		}
 	}
 
-	fn divByZeroBinary(mut &self, &op: &token::Token, mut &l: &sema::OperandExpr, mut &r: &sema::OperandExpr) {
+	fn divByZeroBinary(mut &self, op: &token::Token, mut l: &sema::OperandExpr, mut r: &sema::OperandExpr) {
 		const (
 			xVar = "__jule_x"
 			yVar = "__jule_y"
 		)
 		self.oc.write("({ ")
-		self.oc.tc.kind(self.oc.Buf, l.Type)
+		self.oc.tc.kind(&self.oc.Buf, l.Type)
 		self.oc.write(" ")
 		self.oc.write(xVar)
 		self.oc.write(" = ")
 		self.possibleRefExpr(l.Model)
 		self.oc.write("; ")
-		self.oc.tc.kind(self.oc.Buf, r.Type)
+		self.oc.tc.kind(&self.oc.Buf, r.Type)
 		self.oc.write(" ")
 		self.oc.write(yVar)
 		self.oc.write(" = ")
@@ -198,9 +198,9 @@ impl exprCoder {
 		lp, rp := l.Type.Prim(), r.Type.Prim()
 		if types::IsFloat(lp.Kind) || types::IsFloat(rp.Kind) {
 			if types::IsFloat(lp.Kind) {
-				self.oc.tc.kind(self.oc.Buf, l.Type)
+				self.oc.tc.kind(&self.oc.Buf, l.Type)
 			} else {
-				self.oc.tc.kind(self.oc.Buf, r.Type)
+				self.oc.tc.kind(&self.oc.Buf, r.Type)
 			}
 			self.oc.write("(__jule_Inf(")
 			self.oc.write(xVar)
@@ -209,7 +209,7 @@ impl exprCoder {
 			self.oc.write(" > 0 ? 1 : -1)); ")
 		} else {
 			self.oc.write(`__jule_panicStr(`)
-			strLitF(self.oc.Buf, fn|| {
+			strLitF(&self.oc.Buf, fn|| {
 				self.oc.write("\"runtime: divide by zero")
 				mut len := 23 // runtime: divide by zero
 				if !env::Production {
@@ -223,7 +223,7 @@ impl exprCoder {
 			self.oc.write("); ")
 		}
 		self.oc.write("((")
-		self.oc.tc.kind(self.oc.Buf, l.Type)
+		self.oc.tc.kind(&self.oc.Buf, l.Type)
 		self.oc.write(")(")
 		self.oc.write(xVar)
 		match op.ID {
@@ -240,7 +240,7 @@ impl exprCoder {
 
 	// Tries to handle binary expressions with dynamic types and reports whether
 	// it successful. Should support all dynamic types.
-	fn unsafeDynamicBinary(mut &self, mut &buf: strings::Builder,
+	fn unsafeDynamicBinary(mut &self, mut &buf: *strings::Builder,
 		mut l: sema::OperandExpr, mut r: sema::OperandExpr, op: int): bool {
 		// Return immediately if binary expression is not contain dynamic type.
 		// Handle traits separately, see documentation of obj::IsAny.
@@ -268,14 +268,14 @@ impl exprCoder {
 			dynT = r.Type
 		}
 
-		ls := writeAndReadFromBuf(self.oc.Buf, fn|| {
+		ls := writeAndReadFromBuf(&self.oc.Buf, fn|| {
 			if leftIsStrict {
 				self.possibleRefExpr(l.Model)
 			} else {
 				self.possibleRefExpr(r.Model)
 			}
 		})
-		rs := writeAndReadFromBuf(self.oc.Buf, fn|| self.possibleRefExpr(e))
+		rs := writeAndReadFromBuf(&self.oc.Buf, fn|| self.possibleRefExpr(e))
 
 		buf.WriteByte('(')!
 		if op == token::NEQ {
@@ -303,8 +303,8 @@ impl exprCoder {
 		ret true
 	}
 
-	fn _unsafeBinaryNoDynamic(mut &self, mut &buf: strings::Builder, &l: str,
-		&r: str, mut &lk: &sema::Type, mut &rk: &sema::Type, op: int, kind: str) {
+	fn _unsafeBinaryNoDynamic(mut &self, mut &buf: *strings::Builder, l: str,
+		r: str, mut lk: &sema::Type, mut rk: &sema::Type, op: int, kind: str) {
 		match {
 		| lk.Array() != nil:
 			// If this binary operator comparing array type.
@@ -359,40 +359,40 @@ impl exprCoder {
 		buf.WriteByte(')')!
 	}
 
-	fn _unsafeBinary(mut &self, mut &buf: strings::Builder, mut l: sema::OperandExpr,
+	fn _unsafeBinary(mut &self, mut &buf: *strings::Builder, mut l: sema::OperandExpr,
 		mut r: sema::OperandExpr, op: int, kind: str) {
 		// Special cases for comparable types.
 		if (op == token::EQL || op == token::NEQ) && self.unsafeDynamicBinary(buf, l, r, op) {
 			ret
 		}
-		ls := writeAndReadFromBuf(self.oc.Buf, fn|| self.possibleRefExpr(l.Model))
-		rs := writeAndReadFromBuf(self.oc.Buf, fn|| self.possibleRefExpr(r.Model))
+		ls := writeAndReadFromBuf(&self.oc.Buf, fn|| self.possibleRefExpr(l.Model))
+		rs := writeAndReadFromBuf(&self.oc.Buf, fn|| self.possibleRefExpr(r.Model))
 		self._unsafeBinaryNoDynamic(buf, ls, rs, l.Type, r.Type, op, kind)
 	}
 
 	fn unsafeBinary(mut &self, mut m: &sema::BinaryExpr) {
-		self._unsafeBinary(self.oc.Buf, *m.Left, *m.Right, m.Op.ID, m.Op.Kind)
+		self._unsafeBinary(&self.oc.Buf, *m.Left, *m.Right, m.Op.ID, m.Op.Kind)
 	}
 
-	fn shl(mut &self, mut &l: &sema::OperandExpr, mut &r: &sema::OperandExpr) {
+	fn shl(mut &self, mut l: &sema::OperandExpr, mut r: &sema::OperandExpr) {
 		const (
 			xVar = "__jule_x"
 			yVar = "__jule_y"
 		)
 		self.oc.write("({ ")
-		self.oc.tc.kind(self.oc.Buf, l.Type)
+		self.oc.tc.kind(&self.oc.Buf, l.Type)
 		self.oc.write(" ")
 		self.oc.write(xVar)
 		self.oc.write(" = ")
 		self.possibleRefExpr(l.Model)
 		self.oc.write("; ")
-		self.oc.tc.kind(self.oc.Buf, r.Type)
+		self.oc.tc.kind(&self.oc.Buf, r.Type)
 		self.oc.write(" ")
 		self.oc.write(yVar)
 		self.oc.write(" = ")
 		self.possibleRefExpr(r.Model)
 		self.oc.write("; ((")
-		self.oc.tc.kind(self.oc.Buf, l.Type)
+		self.oc.tc.kind(&self.oc.Buf, l.Type)
 		self.oc.write(")(")
 		self.oc.write(yVar)
 		self.oc.write(" >= ")
@@ -404,25 +404,25 @@ impl exprCoder {
 		self.oc.write(")); })")
 	}
 
-	fn shr(mut &self, mut &l: &sema::OperandExpr, mut &r: &sema::OperandExpr) {
+	fn shr(mut &self, mut l: &sema::OperandExpr, mut r: &sema::OperandExpr) {
 		const (
 			xVar = "__jule_x"
 			yVar = "__jule_y"
 		)
 		self.oc.write("({ ")
-		self.oc.tc.kind(self.oc.Buf, l.Type)
+		self.oc.tc.kind(&self.oc.Buf, l.Type)
 		self.oc.write(" ")
 		self.oc.write(xVar)
 		self.oc.write(" = ")
 		self.possibleRefExpr(l.Model)
 		self.oc.write("; ")
-		self.oc.tc.kind(self.oc.Buf, r.Type)
+		self.oc.tc.kind(&self.oc.Buf, r.Type)
 		self.oc.write(" ")
 		self.oc.write(yVar)
 		self.oc.write(" = ")
 		self.possibleRefExpr(r.Model)
 		self.oc.write("; ((")
-		self.oc.tc.kind(self.oc.Buf, l.Type)
+		self.oc.tc.kind(&self.oc.Buf, l.Type)
 		self.oc.write(")(")
 		self.oc.write(yVar)
 		self.oc.write(" >= ")
@@ -464,11 +464,11 @@ impl exprCoder {
 				self.oc.write("::")
 			}
 		}
-		identCoder.var(self.oc.Buf, m)
+		identCoder.var(&self.oc.Buf, m)
 	}
 
 	fn structureIns(mut &self, mut m: &sema::StructIns) {
-		self.oc.tc.structureIns(self.oc.Buf, m)
+		self.oc.tc.structureIns(&self.oc.Buf, m)
 	}
 
 	fn unary(mut &self, mut m: &sema::UnaryExpr) {
@@ -478,7 +478,7 @@ impl exprCoder {
 			lp := m.Expr.Type.Prim()
 			if lp != nil && types::IsInt(lp.Kind) {
 				self.oc.write("(")
-				self.oc.tc.prim(self.oc.Buf, lp)
+				self.oc.tc.prim(&self.oc.Buf, lp)
 				self.oc.write(")(")
 				defer {
 					self.oc.write(")")
@@ -538,7 +538,7 @@ impl exprCoder {
 						self.oc.write(", ")
 					}
 					self.oc.write(".")
-					identCoder.field(self.oc.Buf, f.Decl)
+					identCoder.field(&self.oc.Buf, f.Decl)
 					self.oc.write("=")
 					self.possibleRefExpr(arg.Expr.Model)
 					inited = true
@@ -570,9 +570,9 @@ impl exprCoder {
 
 	fn checkNilRef(mut &self, mut v: &sema::Var) {
 		self.oc.write("((")
-		self.oc.tc.kind(self.oc.Buf, v.TypeSym.Type)
+		self.oc.tc.kind(&self.oc.Buf, v.TypeSym.Type)
 		self.oc.write(")(")
-		identCoder.funcIns(self.oc.Buf, meta::Program.Runtime.CheckNilRef)
+		identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.CheckNilRef)
 		self.oc.write("((void*)(")
 		self.model(v)
 		self.oc.write("))))")
@@ -582,7 +582,7 @@ impl exprCoder {
 		self.model(expr)
 	}
 
-	fn castTraitFromTrait(mut &self, mut &m: &sema::CastingExpr, mut t1: &sema::Trait, mut t2: &sema::Trait) {
+	fn castTraitFromTrait(mut &self, mut m: &sema::CastingExpr, mut t1: &sema::Trait, mut t2: &sema::Trait) {
 		self.possibleRefExpr(m.Expr.Model)
 		self.oc.write(".map(")
 		self.oc.pushAndWriteMaskMapper(t1, t2)
@@ -599,20 +599,20 @@ impl exprCoder {
 			match {
 			| m.Type.Sptr() != nil:
 				self.oc.write("cast_ptr<")
-				self.oc.tc.kind(self.oc.Buf, m.Type.Sptr().Value)
+				self.oc.tc.kind(&self.oc.Buf, m.Type.Sptr().Value)
 			| m.Type.Map() != nil:
 				self.oc.write("cast_ptr<")
 				mp := m.Type.Map()
 				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Value)
-				self.oc.tc.structureIns(self.oc.Buf, mps)
+				self.oc.tc.structureIns(&self.oc.Buf, mps)
 			| m.Type.Chan() != nil:
 				self.oc.write("cast_ptr<")
 				ch := m.Type.Chan()
 				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
-				self.oc.tc.structureIns(self.oc.Buf, chs)
+				self.oc.tc.structureIns(&self.oc.Buf, chs)
 			|:
 				self.oc.write("cast<")
-				self.oc.tc.kind(self.oc.Buf, m.Type)
+				self.oc.tc.kind(&self.oc.Buf, m.Type)
 			}
 			self.oc.write(">(")
 			if !env::Production {
@@ -634,20 +634,20 @@ impl exprCoder {
 			match {
 			| m.Type.Sptr() != nil:
 				self.oc.write("cast_ptr<")
-				self.oc.tc.kind(self.oc.Buf, m.Type.Sptr().Value)
+				self.oc.tc.kind(&self.oc.Buf, m.Type.Sptr().Value)
 			| m.Type.Map() != nil:
 				self.oc.write("cast_ptr<")
 				mp := m.Type.Map()
 				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Value)
-				self.oc.tc.structureIns(self.oc.Buf, mps)
+				self.oc.tc.structureIns(&self.oc.Buf, mps)
 			| m.Type.Chan() != nil:
 				self.oc.write("cast_ptr<")
 				ch := m.Type.Chan()
 				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
-				self.oc.tc.structureIns(self.oc.Buf, chs)
+				self.oc.tc.structureIns(&self.oc.Buf, chs)
 			|:
 				self.oc.write("cast<")
-				self.oc.tc.kind(self.oc.Buf, m.Type)
+				self.oc.tc.kind(&self.oc.Buf, m.Type)
 			}
 			self.oc.write(">(")
 			if !env::Production {
@@ -656,7 +656,7 @@ impl exprCoder {
 				self.oc.write("\", ")
 			}
 			self.oc.write("(" + typeTrait + "::Type*)&")
-			identCoder.traitDecl(self.oc.Buf, m.Expr.Type.Trait())
+			identCoder.traitDecl(&self.oc.Buf, m.Expr.Type.Trait())
 			self.oc.write("_mptr_data")
 			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Expr.Type.Trait(), m.Type)))
 			self.oc.write(")")
@@ -689,7 +689,7 @@ impl exprCoder {
 				prim := m.Expr.Type.Prim()
 				if prim != nil && types::IsInt(prim.Kind) {
 					self.oc.write("static_cast<")
-					self.oc.tc.prim(self.oc.Buf, prim)
+					self.oc.tc.prim(&self.oc.Buf, prim)
 					self.oc.write(">(")
 					self.possibleRefExpr(m.Expr.Model)
 					self.oc.write(")")
@@ -717,20 +717,20 @@ impl exprCoder {
 			match {
 			| m.Type.Sptr() != nil:
 				self.oc.write("cast_ptr<")
-				self.oc.tc.kind(self.oc.Buf, m.Type.Sptr().Value)
+				self.oc.tc.kind(&self.oc.Buf, m.Type.Sptr().Value)
 			| m.Type.Map() != nil:
 				self.oc.write("cast_ptr<")
 				mp := m.Type.Map()
 				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Value)
-				self.oc.tc.structureIns(self.oc.Buf, mps)
+				self.oc.tc.structureIns(&self.oc.Buf, mps)
 			| m.Type.Chan() != nil:
 				self.oc.write("cast_ptr<")
 				ch := m.Type.Chan()
 				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
-				self.oc.tc.structureIns(self.oc.Buf, chs)
+				self.oc.tc.structureIns(&self.oc.Buf, chs)
 			|:
 				self.oc.write("cast<")
-				self.oc.tc.kind(self.oc.Buf, m.Type)
+				self.oc.tc.kind(&self.oc.Buf, m.Type)
 			}
 			self.oc.write(">(")
 			if !env::Production {
@@ -739,7 +739,7 @@ impl exprCoder {
 				self.oc.write("\", ")
 			}
 			self.oc.write("(" + typeTrait + "::Type*)&")
-			identCoder.traitDecl(self.oc.Buf, m.Expr.Type.Trait())
+			identCoder.traitDecl(&self.oc.Buf, m.Expr.Type.Trait())
 			self.oc.write("_mptr_data")
 			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Expr.Type.Trait(), m.Type)))
 			self.oc.write(")")
@@ -747,7 +747,7 @@ impl exprCoder {
 		}
 		if m.Expr.Type.Ptr() != nil || m.Type.Ptr() != nil {
 			self.oc.write("((")
-			self.oc.tc.kind(self.oc.Buf, m.Type)
+			self.oc.tc.kind(&self.oc.Buf, m.Type)
 			self.oc.write(")(")
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write("))")
@@ -758,11 +758,11 @@ impl exprCoder {
 				self.oc.write(typeTrait + "()")
 				ret
 			}
-			self.oc.tc.kind(self.oc.Buf, m.Type)
+			self.oc.tc.kind(&self.oc.Buf, m.Type)
 			self.oc.write("(")
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write(", (" + typeTrait + "::Type*)&")
-			identCoder.traitDecl(self.oc.Buf, m.Type.Trait())
+			identCoder.traitDecl(&self.oc.Buf, m.Type.Trait())
 			self.oc.write("_mptr_data")
 			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Type.Trait(), m.Expr.Type)))
 			self.oc.write(")")
@@ -812,13 +812,13 @@ impl exprCoder {
 			}
 		}
 		self.oc.write("static_cast<")
-		self.oc.tc.kind(self.oc.Buf, m.Type)
+		self.oc.tc.kind(&self.oc.Buf, m.Type)
 		self.oc.write(">(")
 		self.possibleRefExpr(m.Expr.Model)
 		self.oc.write(")")
 	}
 
-	fn args(mut &self, mut &m: &sema::FuncCallExpr) {
+	fn args(mut &self, mut m: &sema::FuncCallExpr) {
 		mut j := 0
 		if m.Func.Owner != nil && !m.Func.Decl.Static ||
 			len(m.Func.Params) > 0 && m.Func.Params[0].Decl.IsSelf() {
@@ -850,7 +850,7 @@ impl exprCoder {
 		self.possibleRefExpr(expr)
 	}
 
-	fn pushCallInf(mut &self, &m: &sema::FuncCallExpr) {
+	fn pushCallInf(mut &self, m: &sema::FuncCallExpr) {
 		if env::Production || !m.Func.Anon {
 			self.oc.write("(")
 			ret
@@ -871,7 +871,7 @@ impl exprCoder {
 		}
 	}
 
-	fn isWrapped(mut &self, mut &m: &sema::FuncCallExpr): bool {
+	fn isWrapped(mut &self, mut m: &sema::FuncCallExpr): bool {
 		if !m.Func.IsBuiltin() && len(m.Func.Decl.Params) > 0 && m.Func.Decl.Params[0].IsSelf() {
 			mut ssie, _ := m.Expr.(&sema::StructSubIdentExpr)
 			if ssie != nil {
@@ -885,7 +885,7 @@ impl exprCoder {
 				| ssie.Expr.Type.SoftStruct() != nil:
 					// Check whether expression type is struct to caught strict type alias structs.
 					self.oc.write("({ ")
-					self.oc.tc.kind(self.oc.Buf, ssie.Expr.Type)
+					self.oc.tc.kind(&self.oc.Buf, ssie.Expr.Type)
 					self.oc.write(" _wrap_copy = ")
 					self.model(ssie.Expr.Model)
 					self.oc.write("; ")
@@ -910,7 +910,7 @@ impl exprCoder {
 		}
 	}
 
-	fn pureFuncCall(mut &self, mut &m: &sema::FuncCallExpr) {
+	fn pureFuncCall(mut &self, mut m: &sema::FuncCallExpr) {
 		wrapped := self.isWrapped(m)
 		self.modelForCall(m.Expr)
 		if !m.Func.IsBuiltin() {
@@ -918,7 +918,7 @@ impl exprCoder {
 				if !obj::HasDirective(m.Func.Decl.Directives, directive::Cdef) {
 					self.oc.write("<")
 					for (i, mut g) in m.Func.Generics {
-						self.oc.tc.kind(self.oc.Buf, g.Type)
+						self.oc.tc.kind(&self.oc.Buf, g.Type)
 						if len(m.Func.Generics)-i > 1 {
 							self.oc.write(", ")
 						}
@@ -1006,7 +1006,7 @@ impl exprCoder {
 		}
 	}
 
-	fn coFuncCall(mut &self, mut &m: &sema::FuncCallExpr) {
+	fn coFuncCall(mut &self, mut m: &sema::FuncCallExpr) {
 		self.oc.write("{\n")
 		self.oc.addIndent()
 		self.oc.indent()
@@ -1057,7 +1057,7 @@ impl exprCoder {
 		}
 		self.oc.write("__jule_coSpawn((void*)")
 		if i == noWrap {
-			identCoder.funcIns(self.oc.Buf, m.Func)
+			identCoder.funcIns(&self.oc.Buf, m.Func)
 		} else {
 			self.oc.write(coSpawnPrefix + coSpawnMethodSuffix + i)
 		}
@@ -1084,7 +1084,7 @@ impl exprCoder {
 		self.oc.write("}")
 	}
 
-	fn writeUseExpr(mut &self, mut &f: &sema::FuncIns, mut val: &sema::Value, mut dest: useExprMemory) {
+	fn writeUseExpr(mut &self, mut f: &sema::FuncIns, mut val: &sema::Value, mut dest: useExprMemory) {
 		if dest.Model != nil {
 			mut fc, ok := val.Model.(&sema::FuncCallExpr)
 			if ok && fc.Func.Decl != nil && fc.Func.Decl.Exceptional {
@@ -1107,7 +1107,7 @@ impl exprCoder {
 			ret
 		}
 		mut tup := val.Model.(&sema::TupleExpr)
-		self.oc.tc.rc.tuple(self.oc.Buf, f.Result.Tuple())
+		self.oc.tc.rc.tuple(&self.oc.Buf, f.Result.Tuple())
 		self.oc.write("{")
 		for (i, mut tupval) in tup.Values {
 			self.oc.write("." + resultArgName)
@@ -1168,9 +1168,9 @@ impl exprCoder {
 			self.oc.doneIndent()
 		} else {
 			self.oc.write(`if (!except.ok()) __jule_panicStr(`)
-			strLit(self.oc.Buf, "unhandled exceptional: ", "23")
+			strLit(&self.oc.Buf, "unhandled exceptional: ", "23")
 			self.oc.write(" + except.error.type->to_str(except.error.data) + ")
-			strLitF(self.oc.Buf, fn|| {
+			strLitF(&self.oc.Buf, fn|| {
 				self.oc.write("\"\\nlocation: ")
 				mut len := 11 // \nlocation:
 				len += self.oc.locInfo(m.Token)
@@ -1222,7 +1222,7 @@ impl exprCoder {
 
 	fn slice(mut &self, mut m: &sema::SliceExpr) {
 		self.oc.write("({ auto " + collectionIdent + " = ")
-		self.oc.tc.asSlice(self.oc.Buf, m.ElemType)
+		self.oc.tc.asSlice(&self.oc.Buf, m.ElemType)
 		size := conv::Itoa(len(m.Elems))
 		self.oc.write("::alloc(")
 		self.oc.write(size)
@@ -1251,7 +1251,7 @@ impl exprCoder {
 			mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Value)
 			const Static = false
 			mut f := ins.FindMethod("get", Static).Instances[0]
-			identCoder.funcIns(self.oc.Buf, f)
+			identCoder.funcIns(&self.oc.Buf, f)
 			self.oc.write("(")
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write(", ")
@@ -1292,7 +1292,7 @@ impl exprCoder {
 			}
 			self.oc.write("reinterpret_cast<const " + typeU8 + "*>(")
 			s := m.Expr.Model.(&constant::Const).ReadStr()
-			cstrLit(self.oc.Buf, s)
+			cstrLit(&self.oc.Buf, s)
 			self.oc.write("), ")
 			self.oc.write(conv::Itoa(len(s)))
 			self.oc.write(", ")
@@ -1312,7 +1312,7 @@ impl exprCoder {
 		closure := obj::IsClosure(m)
 		ident := self.oc.pushAnonFunc(m)
 		self.oc.write("jule::__new_closure<")
-		self.oc.tc.anonFunc(self.oc.Buf, m.Func)
+		self.oc.tc.anonFunc(&self.oc.Buf, m.Func)
 		self.oc.write(">((void*)")
 		self.oc.write(ident)
 		if closure {
@@ -1324,7 +1324,7 @@ impl exprCoder {
 			self.oc.write(anonFuncCtxSuffix + "{")
 			for (i, mut v) in m.Captured {
 				self.oc.write(".")
-				identCoder.anonFuncVar(self.oc.Buf, v)
+				identCoder.anonFuncVar(&self.oc.Buf, v)
 				self.oc.write("=")
 				self.var(v)
 				if len(m.Captured)-i > 1 {
@@ -1344,7 +1344,7 @@ impl exprCoder {
 		const Static = true
 		mut maker := ins.FindMethod("make", Static).Instances[0]
 		if len(m.Entries) == 0 {
-			identCoder.funcIns(self.oc.Buf, maker)
+			identCoder.funcIns(&self.oc.Buf, maker)
 			self.oc.write("()")
 			ret
 		}
@@ -1353,15 +1353,15 @@ impl exprCoder {
 
 		const mapVar = "__jule_map"
 		self.oc.write("({ ")
-		self.oc.tc.mapType(self.oc.Buf, m.Kind)
+		self.oc.tc.mapType(&self.oc.Buf, m.Kind)
 		self.oc.write(" ")
 		self.oc.write(mapVar)
 		self.oc.write(" = ")
-		identCoder.funcIns(self.oc.Buf, maker)
+		identCoder.funcIns(&self.oc.Buf, maker)
 		self.oc.write("(); ")
 		for (_, mut pair) in m.Entries {
 			self.oc.write("(*")
-			identCoder.funcIns(self.oc.Buf, f)
+			identCoder.funcIns(&self.oc.Buf, f)
 			self.oc.write("(")
 			self.oc.write(mapVar)
 			self.oc.write(", ")
@@ -1396,7 +1396,7 @@ impl exprCoder {
 
 	fn traitSub(mut &self, mut m: &sema::TraitSubIdentExpr) {
 		self.oc.write("((")
-		identCoder.traitDecl(self.oc.Buf, m.Trt)
+		identCoder.traitDecl(&self.oc.Buf, m.Trt)
 		self.oc.write("MptrData")
 		self.oc.write("*)")
 		self.possibleRefExpr(m.Expr)
@@ -1407,7 +1407,7 @@ impl exprCoder {
 			self.oc.write("\"")
 		}
 		self.oc.write("))->")
-		identCoder.func(self.oc.Buf, m.Method)
+		identCoder.func(&self.oc.Buf, m.Method)
 	}
 
 	fn structureSub(mut &self, mut m: &sema::StructSubIdentExpr) {
@@ -1416,21 +1416,21 @@ impl exprCoder {
 			ret
 		}
 		self.oc.write(".")
-		identCoder.field(self.oc.Buf, m.Field.Decl)
+		identCoder.field(&self.oc.Buf, m.Field.Decl)
 	}
 
 	fn array(mut &self, mut m: &sema::ArrayExpr) {
 		// Plain initialization if array is zero-length or
 		// no specific expression and not able to init elements.
 		if m.Kind.N == 0 || len(m.Elems) == 0 && !ableToInit(m.Kind.Value) {
-			self.oc.tc.array(self.oc.Buf, m.Kind)
+			self.oc.tc.array(&self.oc.Buf, m.Kind)
 			self.oc.write("()")
 			ret
 		}
 
 		// Filled.
 		if len(m.Elems) == 2 && m.Elems[1] == nil {
-			self.oc.tc.array(self.oc.Buf, m.Kind)
+			self.oc.tc.array(&self.oc.Buf, m.Kind)
 			self.oc.write("(")
 			self.possibleRefExpr(m.Elems[0].Model)
 			self.oc.write(")")
@@ -1438,7 +1438,7 @@ impl exprCoder {
 		}
 
 		self.oc.write("({ auto " + collectionIdent + " = ")
-		self.oc.tc.array(self.oc.Buf, m.Kind)
+		self.oc.tc.array(&self.oc.Buf, m.Kind)
 		self.oc.write("(); auto ")
 		self.oc.write(collectionItIdent)
 		self.oc.write(" = ")
@@ -1470,7 +1470,7 @@ impl exprCoder {
 	// Writes complete expression model of function instance.
 	// Useful for strict type safety.
 	fn funcInsCommon(mut &self, mut m: &sema::FuncIns) {
-		self.oc.tc.func(self.oc.Buf, m)
+		self.oc.tc.func(&self.oc.Buf, m)
 		self.oc.write("(")
 		self.funcIns(m)
 		self.oc.write(")")
@@ -1484,7 +1484,7 @@ impl exprCoder {
 				self.oc.write("::")
 			}
 		}
-		identCoder.funcIns(self.oc.Buf, m)
+		identCoder.funcIns(&self.oc.Buf, m)
 	}
 
 	fn tuple(mut &self, mut m: &sema::TupleExpr) {
@@ -1500,7 +1500,7 @@ impl exprCoder {
 
 	fn newCall(mut &self, mut m: &sema::BuiltinNewCallExpr) {
 		self.oc.write("jule::new_ptr<")
-		self.oc.tc.kind(self.oc.Buf, m.Type)
+		self.oc.tc.kind(&self.oc.Buf, m.Type)
 		self.oc.write(">(")
 		if m.Init != nil {
 			self.possibleRefExpr(m.Init)
@@ -1511,20 +1511,20 @@ impl exprCoder {
 	}
 
 	fn printCall(mut &self, mut m: &sema::BuiltinPrintCallExpr) {
-		identCoder.funcIns(self.oc.Buf, meta::Program.Runtime.Zprint)
+		identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Zprint)
 		self.oc.write("(")
 		mut f := obj::FindFuncGenericInstance(meta::Program.Runtime.ToStr, m.Expr.Type)
-		identCoder.funcIns(self.oc.Buf, f)
+		identCoder.funcIns(&self.oc.Buf, f)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Expr.Model)
 		self.oc.write("))")
 	}
 
 	fn printlnCall(mut &self, mut m: &sema::BuiltinPrintlnCallExpr) {
-		identCoder.funcIns(self.oc.Buf, meta::Program.Runtime.Zprintln)
+		identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Zprintln)
 		self.oc.write("(")
 		mut f := obj::FindFuncGenericInstance(meta::Program.Runtime.ToStr, m.Expr.Type)
-		identCoder.funcIns(self.oc.Buf, f)
+		identCoder.funcIns(&self.oc.Buf, f)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Expr.Model)
 		self.oc.write("))")
@@ -1534,9 +1534,9 @@ impl exprCoder {
 		self.oc.write("__jule_panicStr(")
 		self.possibleRefExpr(m.Expr)
 		self.oc.write(" + ")
-		strLit(self.oc.Buf, "\nlocation: ", "12")
+		strLit(&self.oc.Buf, "\nlocation: ", "12")
 		self.oc.write(" + ")
-		strLitF(self.oc.Buf, fn|| {
+		strLitF(&self.oc.Buf, fn|| {
 			self.oc.write("\"")
 			len := self.oc.locInfo(m.Token)
 			self.oc.write("\"")
@@ -1560,7 +1560,7 @@ impl exprCoder {
 			self.oc.write("return jule::VoidExceptional{.error=")
 		} else {
 			self.oc.write("return jule::Exceptional<")
-			self.oc.tc.rc.codeMut1(self.oc.Buf, m.Func.Result)
+			self.oc.tc.rc.codeMut1(&self.oc.Buf, m.Func.Result)
 			v, _ := m.Err.Model.(&sema::Var)
 			if v != nil && v.Name == "error" {
 				self.oc.write(">{.error=except.error}")
@@ -1588,7 +1588,7 @@ impl exprCoder {
 			ie.Expr.Model = unsafe { *(*sema::Expr)(&model) }
 		}
 		mut ins := obj::FindFuncGenericInstance(meta::Program.Runtime.Memcopy, m.Dest.Type, m.Src.Type)
-		identCoder.funcIns(self.oc.Buf, ins)
+		identCoder.funcIns(&self.oc.Buf, ins)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Dest.Model)
 		self.oc.write(", ")
@@ -1602,7 +1602,7 @@ impl exprCoder {
 			mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Value)
 			const Static = false
 			mut f := ins.FindMethod("len", Static).Instances[0]
-			identCoder.funcIns(self.oc.Buf, f)
+			identCoder.funcIns(&self.oc.Buf, f)
 			self.oc.write("(")
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write(")")
@@ -1626,7 +1626,7 @@ impl exprCoder {
 		const Static = false
 		if m.Key != nil {
 			mut f := ins.FindMethod("del", Static).Instances[0]
-			identCoder.funcIns(self.oc.Buf, f)
+			identCoder.funcIns(&self.oc.Buf, f)
 			self.oc.write("(")
 			self.possibleRefExpr(m.Dest.Model)
 			self.oc.write(", ")
@@ -1634,20 +1634,20 @@ impl exprCoder {
 			self.oc.write(")")
 		} else {
 			mut f := ins.FindMethod("clear", Static).Instances[0]
-			identCoder.funcIns(self.oc.Buf, f)
+			identCoder.funcIns(&self.oc.Buf, f)
 			self.oc.write("(")
 			self.possibleRefExpr(m.Dest.Model)
 			self.oc.write(")")
 		}
 	}
 
-	fn makeCallSlice(mut &self, mut &m: &sema::BuiltinMakeCallExpr) {
+	fn makeCallSlice(mut &self, mut m: &sema::BuiltinMakeCallExpr) {
 		mut slice := m.Type.Slice()
 		init := ableToInit(slice.Value)
 		if init {
 			self.oc.write("({ auto " + collectionIdent + " = ")
 		}
-		self.oc.tc.kind(self.oc.Buf, m.Type)
+		self.oc.tc.kind(&self.oc.Buf, m.Type)
 		self.oc.write("::alloc(")
 		self.possibleRefExpr(m.Len)
 		self.oc.write(", ")
@@ -1665,12 +1665,12 @@ impl exprCoder {
 		self.oc.write(" " + collectionIdent + "; })")
 	}
 
-	fn makeCallChan(mut &self, mut &m: &sema::BuiltinMakeCallExpr) {
+	fn makeCallChan(mut &self, mut m: &sema::BuiltinMakeCallExpr) {
 		ch := m.Type.Chan()
 		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
 		const Static = true
 		mut f := ins.FindMethod("new", Static).Instances[0]
-		identCoder.funcIns(self.oc.Buf, f)
+		identCoder.funcIns(&self.oc.Buf, f)
 		self.oc.write("(")
 		if m.Cap == nil {
 			// Channel is not buffered.
@@ -1701,7 +1701,7 @@ impl exprCoder {
 		mut s := m.Base.Elements.Model.(&sema::SliceExpr)
 
 		self.oc.write("{ ")
-		self.oc.tc.asSlice(self.oc.Buf, s.ElemType)
+		self.oc.tc.asSlice(&self.oc.Buf, s.ElemType)
 
 		mut ptr := false
 		match type m.Base.Dest.Model {
@@ -1724,7 +1724,7 @@ impl exprCoder {
 		// Pushed more than single item.
 		// Pre-allocate enough capacity if not exist for appendation.
 		mut ins := obj::FindFuncGenericInstance(meta::Program.Runtime.Prememappend, m.Base.Dest.Type, s.ElemType)
-		identCoder.funcIns(self.oc.Buf, ins)
+		identCoder.funcIns(&self.oc.Buf, ins)
 		self.oc.write("(")
 		if !ptr {
 			self.oc.write("&")
@@ -1748,7 +1748,7 @@ impl exprCoder {
 
 	fn appendCall(mut &self, mut m: &sema::BuiltinAppendCallExpr) {
 		mut ins := obj::FindFuncGenericInstance(meta::Program.Runtime.Memappend, m.Dest.Type, m.Elements.Type)
-		identCoder.funcIns(self.oc.Buf, ins)
+		identCoder.funcIns(&self.oc.Buf, ins)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Dest.Model)
 		self.oc.write(",")
@@ -1779,11 +1779,11 @@ impl exprCoder {
 			self.oc.Buf.WriteByte('\'')!
 			ret
 		}
-		itoa(self.oc.Buf, i64(m.Code))
+		itoa(&self.oc.Buf, i64(m.Code))
 	}
 
 	fn structureStatic(mut &self, mut m: &sema::StructStaticIdentExpr) {
-		identCoder.funcIns(self.oc.Buf, m.Method)
+		identCoder.funcIns(&self.oc.Buf, m.Method)
 	}
 
 	fn backendEmit(mut &self, mut m: &sema::BackendEmitExpr) {
@@ -1807,7 +1807,7 @@ impl exprCoder {
 		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
 		const Static = false
 		mut f := ins.FindMethod("recv", Static).Instances[0]
-		identCoder.funcIns(self.oc.Buf, f)
+		identCoder.funcIns(&self.oc.Buf, f)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Expr.Model)
 		self.oc.write(".ptr(")
@@ -1835,7 +1835,7 @@ impl exprCoder {
 		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, c.Value)
 		const Static = false
 		mut f := ins.FindMethod("send", Static).Instances[0]
-		identCoder.funcIns(self.oc.Buf, f)
+		identCoder.funcIns(&self.oc.Buf, f)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Chan.Model)
 		self.oc.write(".ptr(")
@@ -1856,7 +1856,7 @@ impl exprCoder {
 		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
 		const Static = false
 		mut f := ins.FindMethod("close", Static).Instances[0]
-		identCoder.funcIns(self.oc.Buf, f)
+		identCoder.funcIns(&self.oc.Buf, f)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Chan.Model)
 		self.oc.write(".ptr(")
@@ -1873,7 +1873,7 @@ impl exprCoder {
 		if m.Result == nil {
 			self.oc.write("void")
 		} else {
-			self.oc.tc.kind(self.oc.Buf, m.Result)
+			self.oc.tc.kind(&self.oc.Buf, m.Result)
 		}
 		self.oc.write("(*)(")
 		if len(m.Args) == 0 {
@@ -1883,7 +1883,7 @@ impl exprCoder {
 				if i > 0 {
 					self.oc.write(", ")
 				}
-				self.oc.tc.kind(self.oc.Buf, arg.Type)
+				self.oc.tc.kind(&self.oc.Buf, arg.Type)
 			}
 		}
 		self.oc.write("))(")
@@ -1905,7 +1905,7 @@ impl exprCoder {
 		s := m.Right.ReadStr()
 		self.possibleRefExpr(m.Left)
 		self.oc.write(".equal(")
-		cstrLit(self.oc.Buf, s)
+		cstrLit(&self.oc.Buf, s)
 		self.oc.write(", ")
 		self.oc.write(conv::Itoa(len(s)))
 		self.oc.write(")")
@@ -1944,20 +1944,20 @@ impl exprCoder {
 			match {
 			| m.Base.Type.Sptr() != nil:
 				self.oc.write(".unsafe_cast_ptr<")
-				self.oc.tc.kind(self.oc.Buf, m.Base.Type.Sptr().Value)
+				self.oc.tc.kind(&self.oc.Buf, m.Base.Type.Sptr().Value)
 			| m.Base.Type.Map() != nil:
 				self.oc.write(".unsafe_cast_ptr<")
 				mp := m.Base.Type.Map()
 				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Value)
-				self.oc.tc.structureIns(self.oc.Buf, mps)
+				self.oc.tc.structureIns(&self.oc.Buf, mps)
 			| m.Base.Type.Chan() != nil:
 				self.oc.write(".unsafe_cast_ptr<")
 				ch := m.Base.Type.Chan()
 				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
-				self.oc.tc.structureIns(self.oc.Buf, chs)
+				self.oc.tc.structureIns(&self.oc.Buf, chs)
 			|:
 				self.oc.write(".unsafe_cast<")
-				self.oc.tc.kind(self.oc.Buf, m.Base.Type)
+				self.oc.tc.kind(&self.oc.Buf, m.Base.Type)
 			}
 			self.oc.write(">()")
 		|:
@@ -1988,14 +1988,14 @@ impl exprCoder {
 	}
 
 	fn strFromBytes(mut &self, mut m: &opt::StrFromBytes) {
-		identCoder.funcIns(self.oc.Buf, meta::Program.Runtime.SliceAsStr)
+		identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.SliceAsStr)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Expr)
 		self.oc.write(")")
 	}
 
 	fn bytesFromStr(mut &self, mut m: &opt::BytesFromStr) {
-		identCoder.funcIns(self.oc.Buf, meta::Program.Runtime.StrAsSlice)
+		identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.StrAsSlice)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Expr)
 		self.oc.write(")")
@@ -2016,7 +2016,7 @@ impl exprCoder {
 		| &constant::Const:
 			self.constant(m.(&constant::Const))
 		| &sema::Type:
-			self.oc.tc.kind(self.oc.Buf, m.(&sema::Type))
+			self.oc.tc.kind(&self.oc.Buf, m.(&sema::Type))
 		| &sema::Var:
 			self.var(m.(&sema::Var))
 		| &sema::StructIns:
@@ -2121,21 +2121,21 @@ impl exprCoder {
 	}
 
 	// Writes default initialization of struct field.
-	fn handleFieldByDefault(mut &self, mut &f: &sema::FieldIns): (inited: bool) {
+	fn handleFieldByDefault(mut &self, mut f: &sema::FieldIns): (inited: bool) {
 		// If field have default expression, initialize with it.
 		// Otherwise, initialize it by default expression.
 		if !ableToInit(f.Type) {
 			ret false
 		}
 		self.oc.write(".")
-		identCoder.field(self.oc.Buf, f.Decl)
+		identCoder.field(&self.oc.Buf, f.Decl)
 		self.oc.write("=")
 		self.initExpr(f.Type)
 		ret true
 	}
 
 	// Writes default struct literal expression to initialize it by default.
-	fn initStructLit(mut &self, mut &s: &sema::StructIns) {
+	fn initStructLit(mut &self, mut s: &sema::StructIns) {
 		if obj::IsBindStruct(s) {
 			self.oc.write("(")
 			self.structureIns(s)
@@ -2157,7 +2157,7 @@ impl exprCoder {
 	// Writes iteration to initialize collection elements by default.
 	// Assumes collectionItIdent and collectionIdent + "_end" is already defined.
 	// Assumes collection element kind able to init.
-	fn fillCollectionByDefault(mut &self, mut &elem: &sema::Type) {
+	fn fillCollectionByDefault(mut &self, mut elem: &sema::Type) {
 		self.oc.write("for (; ")
 		self.oc.write(collectionItIdent)
 		self.oc.write(" < ")
@@ -2172,7 +2172,7 @@ impl exprCoder {
 	}
 
 	// Assumes collection element kind able to init.
-	fn initCollection(mut &self, mut &elem: &sema::Type) {
+	fn initCollection(mut &self, mut elem: &sema::Type) {
 		self.oc.write("auto ")
 		self.oc.write(collectionItIdent)
 		self.oc.write(" = ")
@@ -2186,15 +2186,15 @@ impl exprCoder {
 	}
 
 	// Writes default array literal expression to initialize it by default.
-	fn initArray(mut &self, mut &arr: &sema::Array) {
+	fn initArray(mut &self, mut arr: &sema::Array) {
 		// Plain initialization if array is zero-length.
 		if arr.N == 0 {
-			self.oc.tc.array(self.oc.Buf, arr)
+			self.oc.tc.array(&self.oc.Buf, arr)
 			self.oc.write("()")
 			ret
 		}
 		self.oc.write("({ auto " + collectionIdent + " = ")
-		self.oc.tc.array(self.oc.Buf, arr)
+		self.oc.tc.array(&self.oc.Buf, arr)
 		self.oc.write("(); ")
 		self.initCollection(arr.Value)
 		self.oc.write(" " + collectionIdent + "; })")
@@ -2203,21 +2203,21 @@ impl exprCoder {
 	fn initExpr(mut &self, mut t: &sema::Type) {
 		if t.NilCompatible() {
 			if t.Map() != nil {
-				self.oc.tc.kind(self.oc.Buf, t)
+				self.oc.tc.kind(&self.oc.Buf, t)
 				self.oc.write("{}")
 				ret
 			}
 			if t.Ptr() != nil {
 				self.oc.write("nullptr")
 			} else {
-				self.oc.tc.kind(self.oc.Buf, t)
+				self.oc.tc.kind(&self.oc.Buf, t)
 				self.oc.write("(nullptr)")
 			}
 			ret
 		}
 		mut tup := t.Tuple()
 		if tup != nil {
-			self.oc.tc.rc.tuple(self.oc.Buf, tup)
+			self.oc.tc.rc.tuple(&self.oc.Buf, tup)
 			self.oc.write("{")
 			for (i, mut tt) in tup.Types {
 				if !shouldInitialized(tt) {
@@ -2260,7 +2260,7 @@ impl exprCoder {
 			self.initStructLit(s)
 			ret
 		}
-		self.oc.tc.kind(self.oc.Buf, t)
+		self.oc.tc.kind(&self.oc.Buf, t)
 		self.oc.write("()")
 	}
 }
@@ -2316,19 +2316,19 @@ fn sbtoa(b: byte): str {
 	}
 }
 
-fn cstrBytes(mut &s: strings::Builder, ctx: str) {
+fn cstrBytes(mut &s: *strings::Builder, ctx: str) {
 	for _, b in []byte(ctx) {
 		s.WriteStr(sbtoa(b))!
 	}
 }
 
-fn cstrLit(mut &s: strings::Builder, ctx: str) {
+fn cstrLit(mut &s: *strings::Builder, ctx: str) {
 	s.WriteByte('"')!
 	cstrBytes(s, ctx)
 	s.WriteByte('"')!
 }
 
-fn ftoa(mut &s: strings::Builder, f: f64, bitsize: int) {
+fn ftoa(mut &s: *strings::Builder, f: f64, bitsize: int) {
 	if bitsize != 32 {
 		if f == f64(i64(f)) {
 			itoa(s, i64(f))
@@ -2346,7 +2346,7 @@ fn ftoa(mut &s: strings::Builder, f: f64, bitsize: int) {
 	}
 }
 
-fn itoa(mut &s: strings::Builder, x: i64) {
+fn itoa(mut &s: *strings::Builder, x: i64) {
 	if x == types::MinI64 {
 		s.WriteStr("(-9223372036854775807LL-1LL)")!
 		ret
@@ -2359,7 +2359,7 @@ fn itoa(mut &s: strings::Builder, x: i64) {
 	s.WriteByte('L')!
 }
 
-fn utoa(mut &s: strings::Builder, x: u64) {
+fn utoa(mut &s: *strings::Builder, x: u64) {
 	s.WriteStr(conv::FormatUint(x, 10))!
 	if dist::Is64bit(runtime::Arch) {
 		s.WriteByte('L')!
@@ -2367,8 +2367,8 @@ fn utoa(mut &s: strings::Builder, x: u64) {
 	s.WriteStr("LU")!
 }
 
-fn structBinary(mut &buf: strings::Builder, mut &s: &sema::StructIns, &l: str,
-	&r: str, op: int, kind: str) {
+fn structBinary(mut &buf: *strings::Builder, mut s: &sema::StructIns, l: str,
+	r: str, op: int, kind: str) {
 	if op != token::EQL && op != token::NEQ {
 		panic("cxx: unsupported token occurred for structure binary, this is an implementation mistake")
 	}
@@ -2386,7 +2386,7 @@ fn structBinary(mut &buf: strings::Builder, mut &s: &sema::StructIns, &l: str,
 
 // Writes string literal expression for constant literal to buf.
 // Literal is not including quotes, just string content in bytes.
-fn strLit(mut &buf: strings::Builder, lit: str, len: str) {
+fn strLit(mut &buf: *strings::Builder, lit: str, len: str) {
 	identCoder.funcIns(buf, meta::Program.Runtime.StrBytePtr)
 	buf.WriteStr("((" + typeU8 + "*)")!
 	cstrLit(buf, lit)
@@ -2397,7 +2397,7 @@ fn strLit(mut &buf: strings::Builder, lit: str, len: str) {
 
 // Same as the strLit function, but uses the lit function to write content.
 // The lit function should return the length of content.
-fn strLitF(mut &buf: strings::Builder, lit: fn(): int) {
+fn strLitF(mut &buf: *strings::Builder, lit: fn(): int) {
 	identCoder.funcIns(buf, meta::Program.Runtime.StrBytePtr)
 	buf.WriteStr("((" + typeU8 + "*)")!
 	len := conv::Itoa(lit())
@@ -2407,7 +2407,7 @@ fn strLitF(mut &buf: strings::Builder, lit: fn(): int) {
 }
 
 // Like the strLit function, but writes as slice (will not perform allocation).
-fn strLitAsSlice(mut &buf: strings::Builder, lit: str, len: str) {
+fn strLitAsSlice(mut &buf: *strings::Builder, lit: str, len: str) {
 	identCoder.funcIns(buf, meta::Program.Runtime.SliceBytePtr)
 	buf.WriteStr("((" + typeU8 + "*)")!
 	cstrLit(buf, lit)
@@ -2419,7 +2419,7 @@ fn strLitAsSlice(mut &buf: strings::Builder, lit: str, len: str) {
 }
 
 // Returns string expr as byte slice (will not perform allocation).
-fn strToSlice(mut &buf: strings::Builder, expr: str) {
+fn strToSlice(mut &buf: *strings::Builder, expr: str) {
 	identCoder.funcIns(buf, meta::Program.Runtime.StrAsSlice)
 	buf.WriteByte('(')!
 	buf.WriteStr(expr)!
@@ -2429,7 +2429,7 @@ fn strToSlice(mut &buf: strings::Builder, expr: str) {
 // Function f writes buffer buf and this function returns
 // as separate string the written part. Buffer will not contain
 // written part.
-fn writeAndReadFromBuf(mut &buf: strings::Builder, f: fn()): str {
+fn writeAndReadFromBuf(mut &buf: *strings::Builder, f: fn()): str {
 	mut i := buf.Len()
 	f()
 	s := str(unsafe { buf.Buf()[i:] })

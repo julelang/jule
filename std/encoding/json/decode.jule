@@ -232,7 +232,7 @@ impl jsonDecoder {
 		self.parseState = self.parseState[:len(self.parseState)-1]
 	}
 
-	fn array[T](self, mut &a: T)! {
+	fn array[T](self, mut &a: *T)! {
 		const t = comptime::TypeOf(T)
 		comptime::TypeAlias(valueTyp, t.Value())
 		self.i++
@@ -243,7 +243,7 @@ impl jsonDecoder {
 		} else {
 			const match t.Kind() {
 			| comptime::Slice:
-				a = a[:0] // Keep capacity, but clear current elements.
+				*a = (*a)[:0] // Keep capacity, but clear current elements.
 			}
 			self.pushParseState(parseArray) else { error(error) }
 			for {
@@ -254,15 +254,15 @@ impl jsonDecoder {
 				}
 				const match t.Kind() {
 				| comptime::Array:
-					if i >= len(a) {
+					if i >= len(*a) {
 						// Ran out of fixed array.
 						error(errors::New("json: array exceeds length of fixed array of type :" + t.Str() + ", got " + conv::Itoa(i)))
 					}
-					self.value(a[i]) else { error(error) }
+					self.value(&(*a)[i]) else { error(error) }
 				| comptime::Slice:
 					let mut v: valueTyp
-					self.value(v) else { error(error) }
-					a = append(a, v)
+					self.value(&v) else { error(error) }
+					*a = append(*a, v)
 				|:
 					panic("json: unimplemented type, this panic call should be unreachable")
 				}
@@ -285,24 +285,24 @@ impl jsonDecoder {
 			}
 			self.popParseState()
 		}
-		if i < len(a) {
+		if i < len(*a) {
 			const match t.Kind() {
 			| comptime::Array:
 				// Assign to default value of array's zero remainder.
 				let mut default: valueTyp
-				for i < len(a); i++ {
-					a[i] = default
+				for i < len(*a); i++ {
+					(*a)[i] = default
 				}
 			| comptime::Slice:
 				// Truncate the slice.
-				a = a[:i]
+				*a = (*a)[:i]
 			|:
 				panic("json: unimplemented type, this panic call should be unreachable")
 			}
 		}
 	}
 
-	fn objectMap[Map](self, mut &m: Map)! {
+	fn objectMap[Map](self, mut &m: *Map)! {
 		const mapT = comptime::TypeOf(Map)
 		comptime::TypeAlias(K, mapT.Key())
 		comptime::TypeAlias(V, mapT.Value())
@@ -356,24 +356,24 @@ impl jsonDecoder {
 				error(errors::New("json: object is not ended"))
 			}
 			let mut value: V
-			self.value(value) else { error(error) }
+			self.value(&value) else { error(error) }
 			const match {
 			| quoted:
 				// String type, assign directly to the key.
 				// Use [self.decodeStr] method to efficient string handling.
 				mut s := ""
-				ok := decodeString(s, lit)
+				ok := decodeString(&s, lit)
 				if !ok {
 					error(errors::New("json: invalid value for type " + keyT.Str() + ": " + str(lit)))
 				}
-				if m == nil {
-					m = {} // create new map
+				if *m == nil {
+					*m = Map{} // create new map
 				}
 				const match {
 				| keyT == valueT:
-					m[String(s)] = value
+					(*m)[String(s)] = value
 				|:
-					m[K(s)] = value
+					(*m)[K(s)] = value
 				}
 			|:
 				// Quoted non-string type, parse unquoted value by type to assign.
@@ -384,16 +384,16 @@ impl jsonDecoder {
 				let mut keyV: K
 				const match keyT.Kind() {
 				| comptime::Int | comptime::I8 | comptime::I16 | comptime::I32 | comptime::I64:
-					decodeInt(keyV, key) else { error(error) }
+					decodeInt(&keyV, key) else { error(error) }
 				| comptime::Uint | comptime::Uintptr | comptime::U8 | comptime::U16 | comptime::U32 | comptime::U64:
-					decodeUint(keyV, key) else { error(error) }
+					decodeUint(&keyV, key) else { error(error) }
 				|:
 					panic("json: unimplemented type, this panic call should be unreachable")
 				}
-				if m == nil {
-					m = {} // Create new empty map.
+				if *m == nil {
+					*m = Map{} // Create new empty map.
 				}
-				m[keyV] = value
+				(*m)[keyV] = value
 			}
 			self.skipSpace()
 			if self.eof() {
@@ -414,7 +414,7 @@ impl jsonDecoder {
 		self.popParseState()
 	}
 
-	fn objectStruct[T](self, mut &t: T)! {
+	fn objectStruct[T](self, mut &t: *T)! {
 		self.i++
 		self.skipSpace()
 		if !self.eof() && self.data.Get(self.i) == '}' {
@@ -423,7 +423,7 @@ impl jsonDecoder {
 		}
 		self.pushParseState(parseObject) else { error(error) }
 		cache := cachedFields[T]()
-		p := uintptr(&t)
+		p := uintptr(t)
 		for {
 			self.skipSpace()
 			if self.eof() {
@@ -520,7 +520,7 @@ impl jsonDecoder {
 	// Reports whether it found and decoded successfully.
 	// Forwards any exception, all exceptionals are forwarded.
 	// So, any exception means custom decode method found and it threw exception.
-	fn tryCustomDecode[T](self, mut &t: T)!: bool {
+	fn tryCustomDecode[T](self, mut &t: *T)!: bool {
 		const tt = comptime::TypeOf(T)
 		const match {
 		| tt.Strict() || tt.Kind() == comptime::Struct:
@@ -536,7 +536,7 @@ impl jsonDecoder {
 							// check params[1] here to avoid index-overflow error.
 							const match {
 							| !params[1].Mutable():
-								const m = comptime::ValueOf(t).Method(method.Name())
+								const m = comptime::ValueOf(*t).Method(method.Name())
 								const match type m.Type().Params()[1].Type() {
 								| []byte:
 									const match {
@@ -570,7 +570,7 @@ impl jsonDecoder {
 		ret false
 	}
 
-	fn value1[T](self, mut &t: T)! {
+	fn value1[T](self, mut &t: *T)! {
 		// Before using the default decoding strategy, look for the custom decoder
 		// methods and use it, if any. If not exist any custom decoder method,
 		// fallback to default decoding.
@@ -585,8 +585,8 @@ impl jsonDecoder {
 			const match {
 			| tt == valueT | tt == objectT:
 				mut m := Object{}
-				self.objectMap(m) else { error(error) }
-				t = m
+				self.objectMap(&m) else { error(error) }
+				*t = m
 				ret
 			| tt.Kind() == comptime::Map:
 				self.objectMap(t) else { error(error) }
@@ -601,8 +601,8 @@ impl jsonDecoder {
 			const match {
 			| tt == valueT | tt == arrayT:
 				mut array := Array(nil)
-				self.array(array) else { error(error) }
-				t = array
+				self.array(&array) else { error(error) }
+				*t = array
 				ret
 			| tt.Kind() == comptime::Array
 			| tt.Kind() == comptime::Slice:
@@ -617,16 +617,16 @@ impl jsonDecoder {
 				// Don't check validity for literal, following algorithms will check it.
 				lit := self.scanLit() else { error(error) }
 				mut s := ""
-				ok = decodeString(s, lit)
+				ok = decodeString(&s, lit)
 				if !ok {
 					error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
 				}
-				t = String(s)
+				*t = String(s)
 				ret
 			| tt.Kind() == comptime::Str:
 				// Don't check validity for literal, following algorithms will check it.
 				lit := self.scanLit() else { error(error) }
-				ok = decodeString(unsafe { *(*str)(&t) }, lit)
+				ok = decodeString(unsafe { &(*(*str)(t)) }, lit)
 				if !ok {
 					error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
 				}
@@ -640,7 +640,7 @@ impl jsonDecoder {
 						error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
 					}
 					mut r := base64::Decode(s2)
-					t = unsafe { *(*T)(&r) }
+					*t = unsafe { *(*T)(&r) }
 					ret
 				}
 			}
@@ -649,7 +649,7 @@ impl jsonDecoder {
 			self.scanValidLit() else { error(error) }
 			const match {
 			| tt.CanNil():
-				t = nil
+				*t = nil
 				ret
 			|:
 				error(errors::New("json: invalid value for type " + tt.Str() + ": null"))
@@ -658,10 +658,10 @@ impl jsonDecoder {
 			self.scanValidLit() else { error(error) }
 			const match {
 			| tt == valueT | tt == boolT:
-				t = Bool(b == 't')
+				*t = Bool(b == 't')
 				ret
 			| tt.Kind() == comptime::Bool:
-				t = b == 't'
+				*t = b == 't'
 				ret
 			|:
 				error(errors::New("json: invalid value for type " + tt.Str() + ": boolean"))
@@ -674,8 +674,8 @@ impl jsonDecoder {
 			const match {
 			| tt == valueT | tt == numberT:
 				mut f := f64(0)
-				decodeFloat(f, lit) else { error(error) }
-				t = Number(f)
+				decodeFloat(&f, lit) else { error(error) }
+				*t = Number(f)
 				ret
 			| tt.Kind() == comptime::Int
 			| tt.Kind() == comptime::I8
@@ -703,7 +703,7 @@ impl jsonDecoder {
 		error(errors::New("json: invalid character " + quoteChar(b) + " looking for beginning of value"))
 	}
 
-	fn value[T](self, mut &t: T)! {
+	fn value[T](self, mut &t: *T)! {
 		// Before using the default decoding strategy, look for the custom decoder
 		// methods and use it, if any. If not exist any custom decoder method,
 		// fallback to default decoding.
@@ -717,20 +717,20 @@ impl jsonDecoder {
 			b := self.data.Get(self.i)
 			if b == 'n' { // Null literal.
 				self.scanValidLit() else { error(error) }
-				t = nil
+				*t = nil
 				ret
 			}
-			if t == nil {
+			if *t == nil {
 				comptime::TypeAlias(valueTyp, tt.Value())
-				t = T(new(valueTyp))
+				*t = T(new(valueTyp))
 			}
-			self.value1(*t) else { error(error) }
+			self.value1(&(**t)) else { error(error) }
 		|:
 			self.value1(t) else { error(error) }
 		}
 	}
 
-	fn decode[T](self, mut &t: T)! {
+	fn decode[T](self, mut &t: *T)! {
 		self.skipSpace()
 		if !self.eof() {
 			self.value(t) else { error(error) }
@@ -822,7 +822,10 @@ impl jsonDecoder {
 // Supported trait implementations by higher-to-lower precedence
 // (having methods without implementing the trait is valid):
 //	JSONDecoder, TextDecoder
-fn Decode[T](data: []byte, mut &t: T)! {
+fn Decode[T](data: []byte, mut &t: *T)! {
+	if t == nil {
+		panic("std/encoding/json: destination type reference pointer is nil")
+	}
 	decoder := jsonDecoder{}
 	decoder.data.SetData(data)
 	decoder.decode(t) else { error(error) }
@@ -984,54 +987,54 @@ fn unquoteBytes(s: []byte): []byte {
 	ret b.GetData()[:w]
 }
 
-fn decodeInt[T](mut &t: T, lit: []byte)! {
+fn decodeInt[T](mut &t: *T, lit: []byte)! {
 	// Use [unsafe::ByteStr] instead of casting.
 	// The byte buffer will not change, so it's safe and efficient.
 	const tt = comptime::TypeOf(T)
 	n := conv::ParseInt(unsafe::BytesStr(lit), 10, tt.Bits()) else {
 		error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
 	}
-	t = (T)(n)
+	*t = (T)(n)
 }
 
-fn decodeUInt[T](mut &t: T, lit: []byte)! {
+fn decodeUInt[T](mut &t: *T, lit: []byte)! {
 	// Use [unsafe::ByteStr] instead of casting.
 	// The byte buffer will not change, so it's safe and efficient.
 	const tt = comptime::TypeOf(T)
 	n := conv::ParseUint(unsafe::BytesStr(lit), 10, tt.Bits()) else {
 		error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
 	}
-	t = (T)(n)
+	*t = (T)(n)
 }
 
-fn decodeFloat[T](mut &t: T, lit: []byte)! {
+fn decodeFloat[T](mut &t: *T, lit: []byte)! {
 	// Use [unsafe::ByteStr] instead of casting.
 	// The byte buffer will not change, so it's safe and efficient.
 	const tt = comptime::TypeOf(T)
 	n := conv::ParseFloat(unsafe::BytesStr(lit), tt.Bits()) else {
 		error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
 	}
-	t = (T)(n)
+	*t = (T)(n)
 }
 
-fn decodeString(mut &s: str, lit: []byte): (ok: bool) {
+fn decodeString(mut &s: *str, lit: []byte): (ok: bool) {
 	mut s2 := unquoteBytes(lit)
 	if s2 == nil {
 		ret false
 	}
 	if len(s2) == 0 {
-		s = ""
+		*s = ""
 		ret true
 	}
 	if &lit[1] == &s2[0] {
 		// Returned mutable slice from self.data slice.
 		// We should to cast string to make new allocation.
-		s = str(s2)
+		*s = str(s2)
 	} else {
 		// Returned slice from new allocation.
 		// First element always will point to head element of allocation.
 		// So we can return as string directly without making new allocation.
-		s = unsafe::StrFromBytes(s2)
+		*s = unsafe::StrFromBytes(s2)
 	}
 	ret true
 }

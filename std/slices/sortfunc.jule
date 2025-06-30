@@ -95,7 +95,7 @@ fn breakPatternsFunc[S: []E, E](mut data: S, a: int, b: int, cmp: fn(a: E, b: E)
 
 		mut idx := a + (length>>2)<<1 - 1
 		for idx <= a+(length>>2)<<1+1; idx++ {
-			mut other := int(uint(xorshiftNext(random)) & (modulus - 1))
+			mut other := int(uint(xorshiftNext(&random)) & (modulus - 1))
 			if other >= length {
 				other -= length
 			}
@@ -105,16 +105,16 @@ fn breakPatternsFunc[S: []E, E](mut data: S, a: int, b: int, cmp: fn(a: E, b: E)
 }
 
 // Returns x,y where data[x] <= data[y], where x,y=a,b or x,y=b,a.
-fn order2Func[S: []E, E](data: S, a: int, b: int, mut &swaps: int, cmp: fn(a: E, b: E): int): (int, int) {
+fn order2Func[S: []E, E](data: S, a: int, b: int, mut &swaps: *int, cmp: fn(a: E, b: E): int): (int, int) {
 	if cmp(data[b], data[a]) < 0 {
-		swaps++
+		*swaps++
 		ret b, a
 	}
 	ret a, b
 }
 
 // Returns x where data[x] is the median of data[a],data[b],data[c], where x is a, b, or c.
-fn medianFunc[S: []E, E](data: S, mut a: int, mut b: int, mut c: int, mut &swaps: int, cmp: fn(a: E, b: E): int): int {
+fn medianFunc[S: []E, E](data: S, mut a: int, mut b: int, mut c: int, mut &swaps: *int, cmp: fn(a: E, b: E): int): int {
 	a, b = order2Func(data, a, b, swaps, cmp)
 	b, c = order2Func(data, b, c, swaps, cmp)
 	a, b = order2Func(data, a, b, swaps, cmp)
@@ -122,7 +122,7 @@ fn medianFunc[S: []E, E](data: S, mut a: int, mut b: int, mut c: int, mut &swaps
 }
 
 // Finds the median of data[a - 1], data[a], data[a + 1] and stores the index into a.
-fn medianAdjacentFunc[S: []E, E](mut data: S, a: int, mut &swaps: int, cmp: fn(a: E, b: E): int): int {
+fn medianAdjacentFunc[S: []E, E](mut data: S, a: int, mut &swaps: *int, cmp: fn(a: E, b: E): int): int {
 	ret medianFunc(data, a-1, a, a+1, swaps, cmp)
 }
 
@@ -145,12 +145,12 @@ fn choosePivotFunc[S: []E, E](mut data: S, a: int, b: int, cmp: fn(a: E, b: E): 
 	if l >= 8 {
 		if l >= shortestNinther {
 			// Tukey ninther method, the idea came from Rust's implementation.
-			i = medianAdjacentFunc(data, i, swaps, cmp)
-			j = medianAdjacentFunc(data, j, swaps, cmp)
-			k = medianAdjacentFunc(data, k, swaps, cmp)
+			i = medianAdjacentFunc(data, i, &swaps, cmp)
+			j = medianAdjacentFunc(data, j, &swaps, cmp)
+			k = medianAdjacentFunc(data, k, &swaps, cmp)
 		}
 		// Find the median among i, j, k and stores it into j.
-		j = medianFunc(data, i, j, k, swaps, cmp)
+		j = medianFunc(data, i, j, k, &swaps, cmp)
 	}
 
 	match swaps {

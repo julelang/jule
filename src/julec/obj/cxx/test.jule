@@ -19,7 +19,7 @@ struct TestCoder {
 }
 
 impl TestCoder {
-	fn New(mut &oc: &ObjectCoder): &TestCoder {
+	fn New(mut oc: &ObjectCoder): &TestCoder {
 		ret &TestCoder{
 			oc: oc,
 		}
@@ -40,20 +40,20 @@ impl TestCoder {
 		self.oc.write(";\n")
 		self.oc.indent()
 		self.oc.write("__jule_writeStdout(")
-		strLitAsSlice(self.oc.Buf, ">>> TEST RUNNING: ", "18")
+		strLitAsSlice(&self.oc.Buf, ">>> TEST RUNNING: ", "18")
 		self.oc.write("); __jule_writeStdout(")
-		strLitAsSlice(self.oc.Buf, f.Decl.Name, conv::Itoa(len(f.Decl.Name)))
+		strLitAsSlice(&self.oc.Buf, f.Decl.Name, conv::Itoa(len(f.Decl.Name)))
 		self.oc.write("); __jule_writeStdout(")
-		strLitAsSlice(self.oc.Buf, "\n", "1")
+		strLitAsSlice(&self.oc.Buf, "\n", "1")
 		self.oc.write(");\n")
 		self.oc.indent()
-		identCoder.funcIns(self.oc.Buf, f)
+		identCoder.funcIns(&self.oc.Buf, f)
 		self.oc.write("(_t);\n")
 		self.oc.indent()
 		self.oc.write("post_test();\n")
 	}
 
-	fn appendPackageTests(mut &self, mut &p: &sema::Package) {
+	fn appendPackageTests(mut &self, mut p: &sema::Package) {
 		for (_, mut file) in p.Files {
 			for (_, mut f) in file.Funcs {
 				if obj::HasDirective(f.Directives, directive::Test) {
@@ -82,17 +82,17 @@ impl TestCoder {
 	}
 
 	fn callTmReset(mut &self) {
-		identCoder.func(self.oc.Buf, self.tmReset)
+		identCoder.func(&self.oc.Buf, self.tmReset)
 		self.oc.write("(_t)")
 	}
 
 	fn callTmFailed(mut &self) {
-		identCoder.func(self.oc.Buf, self.tmFailed)
+		identCoder.func(&self.oc.Buf, self.tmFailed)
 		self.oc.write("(_t)")
 	}
 
 	fn callTmSkipped(mut &self) {
-		identCoder.func(self.oc.Buf, self.tmSkipped)
+		identCoder.func(&self.oc.Buf, self.tmSkipped)
 		self.oc.write("(_t)")
 	}
 
@@ -113,9 +113,8 @@ impl TestCoder {
 		}
 
 		mut tb := strings::Builder{}
-		tb.Grow(40)
-		self.oc.tc.structureIns(tb, self.t)
-		self.oc.tc.asSptr(self.oc.Buf, unsafe { tb.Buf() })
+		self.oc.tc.structureIns(&tb, self.t)
+		self.oc.tc.asSptr(&self.oc.Buf, unsafe { tb.Buf() })
 		self.oc.write(" _t = jule::new_ptr<")
 		self.oc.writeBytes(unsafe { tb.Buf() })
 		self.oc.write(">(); _t.ref = nullptr;\n")
@@ -132,17 +131,17 @@ impl TestCoder {
 		self.oc.write("if (")
 		self.callTmFailed()
 		self.oc.write(") { ++failed; __jule_writeStdout(")
-		strLitAsSlice(self.oc.Buf, "    [*] FAILED\n", "15")
+		strLitAsSlice(&self.oc.Buf, "    [*] FAILED\n", "15")
 		self.oc.write("); }\n")
 		self.oc.indent()
 		self.oc.write("else if (")
 		self.callTmSkipped()
 		self.oc.write(") { ++skipped; __jule_writeStdout(")
-		strLitAsSlice(self.oc.Buf, "    [*] SKIPPED\n", "16")
+		strLitAsSlice(&self.oc.Buf, "    [*] SKIPPED\n", "16")
 		self.oc.write("); }\n")
 		self.oc.indent()
 		self.oc.write("else { __jule_writeStdout(")
-		strLitAsSlice(self.oc.Buf, "    [*] PASSED\n", "15")
+		strLitAsSlice(&self.oc.Buf, "    [*] PASSED\n", "15")
 		self.oc.write("); }\n")
 		self.oc.doneIndent()
 		self.oc.indent()
@@ -153,39 +152,39 @@ impl TestCoder {
 		self.oc.write("\n\n")
 		self.oc.indent()
 		self.oc.write("__jule_writeStdout(")
-		strLitAsSlice(self.oc.Buf, "\ntotal tests: ", "14")
+		strLitAsSlice(&self.oc.Buf, "\ntotal tests: ", "14")
 		self.oc.write(");\n")
 		self.oc.indent()
 		self.oc.write("__jule_writeStdout(")
-		strToSlice(self.oc.Buf, "__jule_u64ToStr(total)")
+		strToSlice(&self.oc.Buf, "__jule_u64ToStr(total)")
 		self.oc.write(");\n")
 		self.oc.indent()
 		self.oc.write("__jule_writeStdout(")
-		strLitAsSlice(self.oc.Buf, ` skipped: `, "10")
+		strLitAsSlice(&self.oc.Buf, ` skipped: `, "10")
 		self.oc.write(");\n")
 		self.oc.indent()
 		self.oc.write("__jule_writeStdout(")
-		strToSlice(self.oc.Buf, "__jule_u64ToStr(skipped)")
+		strToSlice(&self.oc.Buf, "__jule_u64ToStr(skipped)")
 		self.oc.write(");\n")
 		self.oc.indent()
 		self.oc.write("__jule_writeStdout(")
-		strLitAsSlice(self.oc.Buf, ` failed: `, "9")
+		strLitAsSlice(&self.oc.Buf, ` failed: `, "9")
 		self.oc.write(");\n")
 		self.oc.indent()
 		self.oc.write("__jule_writeStdout(")
-		strToSlice(self.oc.Buf, "__jule_u64ToStr(failed)")
+		strToSlice(&self.oc.Buf, "__jule_u64ToStr(failed)")
 		self.oc.write(");\n")
 		self.oc.indent()
 		self.oc.write("__jule_writeStdout(")
-		strLitAsSlice(self.oc.Buf, ` pass: `, "7")
+		strLitAsSlice(&self.oc.Buf, ` pass: `, "7")
 		self.oc.write(");\n")
 		self.oc.indent()
 		self.oc.write("__jule_writeStdout(")
-		strToSlice(self.oc.Buf, "__jule_u64ToStr(total-failed-skipped)")
+		strToSlice(&self.oc.Buf, "__jule_u64ToStr(total-failed-skipped)")
 		self.oc.write(");\n")
 		self.oc.indent()
 		self.oc.write("__jule_writeStdout(")
-		strLitAsSlice(self.oc.Buf, "\n", "1")
+		strLitAsSlice(&self.oc.Buf, "\n", "1")
 		self.oc.write(");\n")
 		self.oc.indent()
 		self.oc.write("if (failed != 0) std::exit(1);\n")

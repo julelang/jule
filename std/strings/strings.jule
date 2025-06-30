@@ -35,7 +35,7 @@ impl asciiSet {
 
 	// Reports whether c is inside the set.
 	fn contains(self, c: byte): bool {
-		ret (self[c/32]&(1<<(c%32))) != 0
+		ret ((*self)[c/32]&(1<<(c%32))) != 0
 	}
 }
 
@@ -675,7 +675,7 @@ fn TrimRight(s: str, cutset: str): str {
 	}
 	as, ok := asciiSet.make(cutset)
 	if ok {
-		ret trimRightASCII(s, as)
+		ret trimRightASCII(s, &as)
 	}
 	ret trimRightUnicode(s, cutset)
 }
@@ -728,7 +728,7 @@ fn Trim(s: str, cutset: str): str {
 	}
 	as, ok := asciiSet.make(cutset)
 	if ok {
-		ret trimLeftASCII(trimRightASCII(s, as), as)
+		ret trimLeftASCII(trimRightASCII(s, &as), &as)
 	}
 	ret trimLeftUnicode(trimRightUnicode(s, cutset), cutset)
 }
@@ -746,7 +746,7 @@ fn TrimLeft(s: str, cutset: str): str {
 	}
 	as, ok := asciiSet.make(cutset)
 	if ok {
-		ret trimLeftASCII(s, as)
+		ret trimLeftASCII(s, &as)
 	}
 	ret trimLeftUnicode(s, cutset)
 }
@@ -758,7 +758,7 @@ fn trimLeftByte(mut s: str, c: byte): str {
 	ret s
 }
 
-fn trimLeftASCII(mut s: str, &as: asciiSet): str {
+fn trimLeftASCII(mut s: str, &as: *asciiSet): str {
 	for len(s) > 0 {
 		if !as.contains(s[0]) {
 			break
@@ -789,7 +789,7 @@ fn trimRightByte(mut s: str, c: byte): str {
 	ret s
 }
 
-fn trimRightASCII(mut s: str, &as: asciiSet): str {
+fn trimRightASCII(mut s: str, &as: *asciiSet): str {
 	for len(s) > 0 {
 		if !as.contains(s[len(s)-1]) {
 			break

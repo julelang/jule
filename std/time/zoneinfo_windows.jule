@@ -46,7 +46,7 @@ fn extractCAPS(desc: str): str {
 }
 
 // Returns the abbreviations to use for the given zone z.
-fn abbrev(&z: timezoneinformation): (std: str, dst: str) {
+fn abbrev(&z: *timezoneinformation): (std: str, dst: str) {
 	stdNameU16 := unsafe::Slice(&z.StandardName[0], len(z.StandardName), len(z.StandardName))
 	stdName := integ::UTF16ToStr(stdNameU16)
 	mut a, mut ok := abbrs[stdName]
@@ -62,7 +62,7 @@ fn abbrev(&z: timezoneinformation): (std: str, dst: str) {
 // Returns the pseudo-Unix time (seconds since Jan 1 1970 *LOCAL TIME*)
 // denoted by the system date+time d in the given year.
 // It is up to the caller to convert this local time into a UTC-based time.
-fn pseudoUnix(year: int, &d: systemtime): i64 {
+fn pseudoUnix(year: int, d: systemtime): i64 {
 	// Windows specifies daylight savings information in "day in month" format:
 	// d.Month is month number (1-12)
 	// d.DayOfWeek is appropriate weekday (Sunday=0 to Saturday=6)
@@ -88,8 +88,8 @@ fn pseudoUnix(year: int, &d: systemtime): i64 {
 	ret t.sec + i64(day-1)*secPerDay
 }
 
-fn initLocalFromTZI(&i: timezoneinformation) {
-	mut &l := localLoc
+fn initLocalFromTZI(i: timezoneinformation) {
+	mut &l := &localLoc
 
 	l.name = "Local"
 
@@ -99,7 +99,7 @@ fn initLocalFromTZI(&i: timezoneinformation) {
 	}
 	l.zone = make([]zone, nzone)
 
-	stdname, dstname := abbrev(i)
+	stdname, dstname := abbrev(&i)
 
 	mut std := unsafe { (&zone)(&l.zone[0]) }
 	std.name = stdname

@@ -12,7 +12,7 @@ use "std/jule/token"
 use "std/os/filepath"
 use "std/strings"
 
-fn makeErr(row: int, col: int, &f: &token::FileSet, fmt: str, args: ...any): log::Log {
+fn makeErr(row: int, col: int, f: &token::FileSet, fmt: str, args: ...any): log::Log {
 	ret log::Log{
 		Kind: log::Error,
 		Row: row,
@@ -30,19 +30,19 @@ fn makeErr(row: int, col: int, &f: &token::FileSet, fmt: str, args: ...any): log
 // Special cases are:
 //	range(i, open, close, tokens) = nil if i > len(tokens)
 //	range(i, open, close, tokens) = nil if tokens[i].ID != open
-fn range(mut &i: int, open: int, close: int, mut &tokens: []&token::Token): []&token::Token {
-	if i >= len(tokens) {
+fn range(mut &i: *int, open: int, close: int, mut tokens: []&token::Token): []&token::Token {
+	if *i >= len(tokens) {
 		ret nil
 	}
-	tok := tokens[i]
+	tok := tokens[*i]
 	if tok.ID != open {
 		ret nil
 	}
-	i++
+	*i++
 	mut rangeN := 1
-	start := i
-	for rangeN != 0 && i < len(tokens); i++ {
-		token := tokens[i]
+	start := *i
+	for rangeN != 0 && *i < len(tokens); *i++ {
+		token := tokens[*i]
 		match token.ID {
 		| open:
 			rangeN++
@@ -50,7 +50,7 @@ fn range(mut &i: int, open: int, close: int, mut &tokens: []&token::Token): []&t
 			rangeN--
 		}
 	}
-	ret tokens[start : i-1]
+	ret tokens[start : *i-1]
 }
 
 // Returns last range from tokens.
@@ -60,7 +60,7 @@ fn range(mut &i: int, open: int, close: int, mut &tokens: []&token::Token): []&t
 // Special cases are;
 //	rangeLast(tokens) = tokens, nil if len(tokens) == 0
 //	rangeLast(tokens) = tokens, nil if tokens is not has range at last
-fn rangeLast(mut &tokens: []&token::Token): (rest: []&token::Token, cut: []&token::Token) {
+fn rangeLast(mut tokens: []&token::Token): (rest: []&token::Token, cut: []&token::Token) {
 	if len(tokens) == 0 {
 		ret tokens, nil
 	}
@@ -98,7 +98,7 @@ fn rangeLast(mut &tokens: []&token::Token): (rest: []&token::Token, cut: []&toke
 //
 // Special case is;
 //	parts(tokens) = nil if len(tokens) == 0
-fn parts(mut &tokens: []&token::Token, id: int, exprMust: bool): (parts: [][]&token::Token, errors: []log::Log) {
+fn parts(mut tokens: []&token::Token, id: int, exprMust: bool): (parts: [][]&token::Token, errors: []log::Log) {
 	if len(tokens) == 0 {
 		ret nil, nil
 	}
@@ -128,7 +128,7 @@ fn parts(mut &tokens: []&token::Token, id: int, exprMust: bool): (parts: [][]&to
 	ret
 }
 
-fn isTupleExpr(mut &tokens: []&token::Token): bool {
+fn isTupleExpr(mut tokens: []&token::Token): bool {
 	if len(tokens) == 0 {
 		ret false
 	}
@@ -162,7 +162,7 @@ fn getCloseOfBrace(left: int): int {
 	}
 }
 
-fn compilerErr(&token: &token::Token, &fmt: str, args: ...any): log::Log {
+fn compilerErr(token: &token::Token, fmt: str, args: ...any): log::Log {
 	ret log::Log{
 		Kind: log::Error,
 		Row: token.Row,
@@ -205,7 +205,7 @@ impl parser {
 
 	// Reports whether tok is identifier.
 	// Must be used by definitions that must support the AllowKeywordIdentifiers mode.
-	fn isIdent(mut self, &tok: &token::Token): bool {
+	fn isIdent(mut self, tok: &token::Token): bool {
 		ret tok.ID == token::NAME ||
 			self.mode&allowKeywordIdentifiers == allowKeywordIdentifiers && token::IsKeyword(tok.Kind)
 	}
@@ -214,7 +214,7 @@ impl parser {
 		ret exprBuilder.new(self)
 	}
 
-	fn buildExpr(mut &self, mut &tokens: []&token::Token): &ast::Expr {
+	fn buildExpr(mut &self, mut tokens: []&token::Token): &ast::Expr {
 		ret self.getExprBuilder().parseFromTokens(tokens)
 	}
 
@@ -247,7 +247,7 @@ impl parser {
 		self.directives = append(self.directives, d)
 	}
 
-	fn buildScope(mut &self, mut &tokens: []&token::Token, mut end: &token::Token): &ast::ScopeTree {
+	fn buildScope(mut &self, mut tokens: []&token::Token, mut end: &token::Token): &ast::ScopeTree {
 		mut s := newScope()
 		s.End = end
 		mut sp := scopeParser{
@@ -258,20 +258,20 @@ impl parser {
 	}
 
 	// Builds AST model of data-type.
-	fn buildType(mut &self, mut &tokens: []&token::Token, mut &i: int, err: bool): (typ: &ast::Expr, ok: bool) {
+	fn buildType(mut &self, mut tokens: []&token::Token, mut &i: *int, err: bool): (typ: &ast::Expr, ok: bool) {
 		mut eb := self.getExprBuilder()
-		eb.setForNewTokens(tokens[i:])
+		eb.setForNewTokens(tokens[*i:])
 		if err {
 			typ = eb.parseType()
 		} else {
 			typ = eb.tryIdentOrType()
 		}
-		i += eb.i
+		*i += eb.i
 		ok = typ != nil
 		ret
 	}
 
-	fn buildTypeAliasDecl(mut &self, mut &tokens: []&token::Token): &ast::TypeAlias {
+	fn buildTypeAliasDecl(mut &self, mut tokens: []&token::Token): &ast::TypeAlias {
 		mut i := 1 // Skip "type" keyword.
 		if i >= len(tokens) {
 			self.pushErr(tokens[i-1], log::InvalidSyntax)
@@ -308,7 +308,7 @@ impl parser {
 			self.pushErr(tokens[i-1], log::MissingType)
 			ret tad
 		}
-		mut t, ok := self.buildType(tokens, i, true)
+		mut t, ok := self.buildType(tokens, &i, true)
 		tad.Type = t
 		if ok && i < len(tokens) {
 			self.pushErr(tokens[i], log::InvalidSyntax)
@@ -317,9 +317,9 @@ impl parser {
 		ret tad
 	}
 
-	fn buildConstVarGroup(mut &self, mut &tokens: []&token::Token): &ast::Var {
+	fn buildConstVarGroup(mut &self, mut tokens: []&token::Token): &ast::Var {
 		mut i := 1 // Point to open parentheses.
-		mut rangeTokens := range(i, token::LPAREN, token::RPAREN, tokens)
+		mut rangeTokens := range(&i, token::LPAREN, token::RPAREN, tokens)
 		if i < len(tokens) {
 			self.pushErr(tokens[i], log::InvalidSyntax)
 		}
@@ -345,7 +345,7 @@ impl parser {
 		ret group[0]
 	}
 
-	fn buildVarTypeAndExpr(mut &self, mut &v: &ast::Var, mut &tokens: []&token::Token) {
+	fn buildVarTypeAndExpr(mut &self, mut v: &ast::Var, mut tokens: []&token::Token) {
 		mut i := 0
 		mut tok := tokens[i]
 		if tok.ID == token::COLON {
@@ -354,7 +354,7 @@ impl parser {
 				self.pushErr(tok, log::MissingType)
 				ret
 			}
-			mut t, ok := self.buildType(tokens, i, true)
+			mut t, ok := self.buildType(tokens, &i, true)
 			if ok {
 				v.Type = t
 				if i >= len(tokens) {
@@ -378,7 +378,7 @@ impl parser {
 		v.X = self.buildExpr(exprTokens)
 	}
 
-	fn buildVarCommon(mut &self, mut &v: &ast::Var, mut tokens: []&token::Token) {
+	fn buildVarCommon(mut &self, mut v: &ast::Var, mut tokens: []&token::Token) {
 		v.Token = tokens[0]
 		if !self.isIdent(v.Token) {
 			self.pushErr(v.Token, log::InvalidSyntax)
@@ -394,27 +394,27 @@ impl parser {
 		}
 	}
 
-	fn buildVarBegin(mut self, mut &v: &ast::Var, mut &tokens: []&token::Token) {
-		tok := tokens[0]
+	fn buildVarBegin(mut self, mut v: &ast::Var, mut &tokens: *[]&token::Token) {
+		tok := (*tokens)[0]
 		match tok.ID {
 		| token::LET:
 			// Initialize 1 for skip the let keyword
-			if len(tokens) == 1 {
-				tokens = nil
+			if len(*tokens) == 1 {
+				*tokens = nil
 				self.pushErr(tok, log::InvalidSyntax)
 				ret
 			}
-			tokens = tokens[1:]
-			if tokens[0].ID == token::MUT {
+			*tokens = (*tokens)[1:]
+			if (*tokens)[0].ID == token::MUT {
 				v.Mutable = true
 				// Skip the mut keyword
-				tokens = tokens[1:]
+				*tokens = (*tokens)[1:]
 			}
 		| token::CONST:
 			v.Const = true
-			tokens = tokens[1:]
+			*tokens = (*tokens)[1:]
 		|:
-			tokens = nil
+			*tokens = nil
 			self.pushErr(tok, log::InvalidSyntax)
 		}
 	}
@@ -427,7 +427,7 @@ impl parser {
 		mut v := &ast::Var{
 			Token: tokens[0],
 		}
-		self.buildVarBegin(v, tokens)
+		self.buildVarBegin(v, &tokens)
 		if len(tokens) == 0 {
 			if tokens != nil {
 				// Log error if tokens != nil, if tokens is nil, an error already logged.
@@ -452,7 +452,7 @@ impl parser {
 		ret v
 	}
 
-	fn buildGeneric(mut &self, mut &tokens: []&token::Token): &ast::Generic {
+	fn buildGeneric(mut &self, mut tokens: []&token::Token): &ast::Generic {
 		mut g := &ast::Generic{
 			Token: tokens[0],
 		}
@@ -479,7 +479,7 @@ impl parser {
 			g.Constraint = &ast::Constraint{Mask: make([]&ast::Expr, 0, len(parts))}
 			for (_, mut part) in parts {
 				mut i := 0
-				mut kind, _ := self.buildType(part, i, true)
+				mut kind, _ := self.buildType(part, &i, true)
 				g.Constraint.Mask = append(g.Constraint.Mask, kind)
 				if i < len(part) {
 					self.pushErr(part[i], log::InvalidSyntax)
@@ -489,7 +489,7 @@ impl parser {
 		ret g
 	}
 
-	fn buildGenerics(mut &self, mut &tokens: []&token::Token, &errorToken: &token::Token): []&ast::Generic {
+	fn buildGenerics(mut &self, mut tokens: []&token::Token, errorToken: &token::Token): []&ast::Generic {
 		if len(tokens) == 0 {
 			self.pushErr(errorToken, log::MissingExpr)
 			ret nil
@@ -550,9 +550,9 @@ impl parser {
 		ret param
 	}
 
-	fn paramTypeBegin(mut self, mut &param: &ast::Param, mut &i: int, &tokens: []&token::Token) {
-		for i < len(tokens); i++ {
-			token := tokens[i]
+	fn paramTypeBegin(mut self, mut param: &ast::Param, mut &i: *int, tokens: []&token::Token) {
+		for *i < len(tokens); *i++ {
+			token := tokens[*i]
 			if token.ID != token::ELLIPSIS {
 				ret
 			}
@@ -565,20 +565,20 @@ impl parser {
 		}
 	}
 
-	fn buildParamType(mut &self, mut &param: &ast::Param, mut &tokens: []&token::Token) {
+	fn buildParamType(mut &self, mut param: &ast::Param, mut tokens: []&token::Token) {
 		mut i := 0
-		self.paramTypeBegin(param, i, tokens)
+		self.paramTypeBegin(param, &i, tokens)
 		if i >= len(tokens) {
 			ret
 		}
 
-		param.Type, _ = self.buildType(tokens, i, true)
+		param.Type, _ = self.buildType(tokens, &i, true)
 		if i < len(tokens) {
 			self.pushErr(tokens[i], log::InvalidSyntax)
 		}
 	}
 
-	fn buildParamBody(mut &self, mut &param: &ast::Param, mut tokens: []&token::Token) {
+	fn buildParamBody(mut &self, mut param: &ast::Param, mut tokens: []&token::Token) {
 		mut tok := tokens[0]
 		if len(tokens) == 1 {
 			// Just identifier token.
@@ -641,7 +641,7 @@ impl parser {
 		ret param
 	}
 
-	fn checkParams(mut self, mut &params: []&ast::Param) {
+	fn checkParams(mut self, mut params: []&ast::Param) {
 		for (_, mut param) in params {
 			if param.IsSelf() || param.Type != nil {
 				continue
@@ -662,7 +662,7 @@ impl parser {
 		}
 	}
 
-	fn buildParams(mut &self, mut &tokens: []&token::Token, method: bool): []&ast::Param {
+	fn buildParams(mut &self, mut tokens: []&token::Token, method: bool): []&ast::Param {
 		mut parts, errs := parts(tokens, token::COMMA, true)
 		self.errors = append(self.errors, errs...)
 		if len(parts) == 0 {
@@ -692,15 +692,15 @@ impl parser {
 		ret params
 	}
 
-	fn buildMultiRetType(mut &self, mut &t: &ast::RetType, mut &tokens: []&token::Token, mut &i: int): (ok: bool) {
-		i++
-		if i >= len(tokens) {
-			i--
+	fn buildMultiRetType(mut &self, mut t: &ast::RetType, mut tokens: []&token::Token, mut &i: *int): (ok: bool) {
+		*i++
+		if *i >= len(tokens) {
+			*i--
 			t.Type, ok = self.buildType(tokens, i, false)
 			ret
 		}
 
-		i-- // For point to parentheses - ( -
+		*i-- // For point to parentheses - ( -
 		mut rangeTokens := range(i, token::LPAREN, token::RPAREN, tokens)
 
 		mut parts, errs := parts(rangeTokens, token::COMMA, true)
@@ -739,7 +739,7 @@ impl parser {
 				t.Names = append(t.Names, token)
 			}
 
-			mut tk, _ := self.buildType(part, offset, true)
+			mut tk, _ := self.buildType(part, &offset, true)
 			if offset < len(part) {
 				self.pushErr(part[offset], log::InvalidSyntax)
 			}
@@ -764,15 +764,15 @@ impl parser {
 
 	// Builds function return type from tokens.
 	// If expression mode enabled, it will not complain about trailing invalid tokens.
-	fn buildRetType(mut &self, mut &tokens: []&token::Token, mut expr: bool, mut &i: int): (t: &ast::RetType, ok: bool) {
+	fn buildRetType(mut &self, mut tokens: []&token::Token, mut expr: bool, mut &i: *int): (t: &ast::RetType, ok: bool) {
 		t = new(ast::RetType)
-		if i >= len(tokens) {
+		if *i >= len(tokens) {
 			// EOF, void return type.
 			ok = true
 			ret
 		}
 
-		mut token := tokens[i]
+		mut token := tokens[*i]
 		match token.ID {
 		| token::LBRACE:
 			// Body started, void return type.
@@ -783,13 +783,13 @@ impl parser {
 			ok = true
 			ret
 		| token::COLON:
-			if i+1 >= len(tokens) {
+			if *i+1 >= len(tokens) {
 				self.pushErr(token, log::MissingType)
 				ret
 			}
 
-			i++
-			token = tokens[i]
+			*i++
+			token = tokens[*i]
 			match token.ID {
 			| token::LPAREN:
 				ok = self.buildMultiRetType(t, tokens, i)
@@ -802,7 +802,7 @@ impl parser {
 			ret
 		}
 		if !expr {
-			i++
+			*i++
 			self.pushErr(token, log::InvalidSyntax)
 		}
 		ret
@@ -811,33 +811,33 @@ impl parser {
 	// Build function prototype.
 	// Body is not necessary for successful parsing, just declaration.
 	// If expression mode enabled, it will not complain about trailing invalid tokens.
-	fn buildFuncPrototype(mut &self, mut &tokens: []&token::Token, mut &i: int, expr: bool, method: bool): &ast::Func {
+	fn buildFuncPrototype(mut &self, mut tokens: []&token::Token, mut &i: *int, expr: bool, method: bool): &ast::Func {
 		mut f := &ast::Func{
-			Token: tokens[i],
+			Token: tokens[*i],
 		}
 
 		// Detect unsafe keyword.
 		if f.Token.ID == token::UNSAFE {
 			f.Unsafe = true
-			i++
-			if i >= len(tokens) {
+			*i++
+			if *i >= len(tokens) {
 				self.pushErr(f.Token, log::InvalidSyntax)
 				ret nil
 			}
-			f.Token = tokens[i]
+			f.Token = tokens[*i]
 		}
 
 		// Skips fn token.
-		i++
-		if i >= len(tokens) {
+		*i++
+		if *i >= len(tokens) {
 			self.pushErr(f.Token, log::InvalidSyntax)
 			ret nil
 		}
 
-		tok := tokens[i]
+		tok := tokens[*i]
 		if self.isIdent(tok) {
-			i++
-			if i >= len(tokens) {
+			*i++
+			if *i >= len(tokens) {
 				self.pushErr(f.Token, log::InvalidSyntax)
 				ret nil
 			}
@@ -846,14 +846,14 @@ impl parser {
 			f.Name = jule::Anon
 		}
 
-		errorToken := tokens[i]
+		errorToken := tokens[*i]
 		mut genericsTokens := range(i, token::LBRACK, token::RBRACK, tokens)
 		if genericsTokens != nil {
 			f.Generics = self.buildGenerics(genericsTokens, errorToken)
 		}
 
-		if tokens[i].ID != token::LPAREN {
-			self.pushErr(tokens[i], log::MissingFuncParentheses)
+		if tokens[*i].ID != token::LPAREN {
+			self.pushErr(tokens[*i], log::MissingFuncParentheses)
 			ret nil
 		}
 
@@ -862,11 +862,11 @@ impl parser {
 			f.Params = self.buildParams(paramsToks, method)
 		}
 
-		if i < len(tokens) {
-			token := tokens[i]
+		if *i < len(tokens) {
+			token := tokens[*i]
 			if token.ID == token::NOT {
 				f.Exceptional = true
-				i++
+				*i++
 			}
 		}
 
@@ -882,20 +882,20 @@ impl parser {
 	// Prototype and body.
 	// If prototype is true, it only parses declaration, body and following tokens considired illegal.
 	// It advances i by token, it will be point to the last handled legal token.
-	fn buildFunc(mut &self, mut &i: int, mut &tokens: []&token::Token, method: bool, prototype: bool): &ast::Func {
+	fn buildFunc(mut &self, mut &i: *int, mut tokens: []&token::Token, method: bool, prototype: bool): &ast::Func {
 		const ExprMode = false
 		mut f := self.buildFuncPrototype(tokens, i, ExprMode, method)
 		if f == nil {
 			ret f
 		}
 		if prototype {
-			if i < len(tokens) {
-				self.pushErr(tokens[i], log::InvalidSyntax)
+			if *i < len(tokens) {
+				self.pushErr(tokens[*i], log::InvalidSyntax)
 			}
 			ret f
 		}
 
-		if i >= len(tokens) {
+		if *i >= len(tokens) {
 			self.stop()
 			self.pushErr(f.Token, log::BodyNotExist)
 			self.pushSuggestion(log::ExpectedBody)
@@ -903,21 +903,21 @@ impl parser {
 		}
 		mut blockTokens := range(i, token::LBRACE, token::RBRACE, tokens)
 		if blockTokens != nil {
-			f.Scope = self.buildScope(blockTokens, tokens[i-1])
+			f.Scope = self.buildScope(blockTokens, tokens[*i-1])
 			f.Scope.Unsafe = f.Unsafe
-			if i < len(tokens) {
-				self.pushErr(tokens[i], log::InvalidSyntax)
+			if *i < len(tokens) {
+				self.pushErr(tokens[*i], log::InvalidSyntax)
 			}
 		} else {
 			self.stop()
-			self.pushErr(tokens[i], log::BodyNotExist)
+			self.pushErr(tokens[*i], log::BodyNotExist)
 			self.pushSuggestion(log::ExpectedBody)
 			ret nil
 		}
 		ret f
 	}
 
-	fn buildBindUseDecl(mut self, mut &decl: &ast::Use, mut &tokens: []&token::Token) {
+	fn buildBindUseDecl(mut self, mut decl: &ast::Use, mut tokens: []&token::Token) {
 		if len(tokens) > 1 {
 			self.pushErr(tokens[1], log::InvalidSyntax)
 		}
@@ -930,7 +930,7 @@ impl parser {
 		decl.Path = token
 	}
 
-	fn parseUseDecl(mut self, mut &decl: &ast::Use, mut tokens: []&token::Token) {
+	fn parseUseDecl(mut self, mut decl: &ast::Use, mut tokens: []&token::Token) {
 		if decl.Bind {
 			self.buildBindUseDecl(decl, tokens)
 			ret
@@ -978,11 +978,11 @@ impl parser {
 		ret decl
 	}
 
-	fn buildTypeEnumItemKind(mut &self, mut &i: int, mut &tokens: []&token::Token): &ast::Expr {
+	fn buildTypeEnumItemKind(mut &self, mut &i: *int, mut tokens: []&token::Token): &ast::Expr {
 		mut braceN := 0
-		exprStart := i
-		for i < len(tokens); i++ {
-			t := tokens[i]
+		exprStart := *i
+		for *i < len(tokens); *i++ {
+			t := tokens[*i]
 			match t.ID {
 			| token::LBRACE
 			| token::LBRACK
@@ -997,15 +997,15 @@ impl parser {
 			if braceN > 0 {
 				continue
 			}
-			if t.ID == token::COMMA || i+1 >= len(tokens) {
+			if t.ID == token::COMMA || *i+1 >= len(tokens) {
 				let mut kindTokens: []&token::Token = nil
 				if t.ID == token::COMMA {
-					kindTokens = tokens[exprStart:i]
+					kindTokens = tokens[exprStart:*i]
 				} else {
 					kindTokens = tokens[exprStart:]
 				}
 				mut j := 0
-				mut kind, _ := self.buildType(kindTokens, j, true)
+				mut kind, _ := self.buildType(kindTokens, &j, true)
 				if j < len(kindTokens) {
 					self.pushErr(kindTokens[j], log::InvalidSyntax)
 				}
@@ -1015,7 +1015,7 @@ impl parser {
 		ret nil
 	}
 
-	fn buildTypeEnumItems(mut &self, mut &tokens: []&token::Token): []&ast::TypeEnumItem {
+	fn buildTypeEnumItems(mut &self, mut tokens: []&token::Token): []&ast::TypeEnumItem {
 		mut items := make([]&ast::TypeEnumItem, 0, 1)
 		mut i := 0
 		for i < len(tokens); i++ {
@@ -1031,13 +1031,13 @@ impl parser {
 					ret nil
 				}
 			}
-			item.Type = self.buildTypeEnumItemKind(i, tokens)
+			item.Type = self.buildTypeEnumItemKind(&i, tokens)
 			items = append(items, item)
 		}
 		ret items
 	}
 
-	fn buildTypeEnum(mut &self, mut &tokens: []&token::Token): &ast::TypeEnum {
+	fn buildTypeEnum(mut &self, mut tokens: []&token::Token): &ast::TypeEnum {
 		mut i := 1
 		mut e := &ast::TypeEnum{
 			// Skip "enum" tokens.
@@ -1049,7 +1049,7 @@ impl parser {
 		}
 		e.Name = e.Token.Kind
 		i += 3 // Skip "identifier: type" tokens.
-		mut itemTokens := range(i, token::LBRACE, token::RBRACE, tokens)
+		mut itemTokens := range(&i, token::LBRACE, token::RBRACE, tokens)
 		if itemTokens == nil {
 			self.stop()
 			self.pushErr(e.Token, log::BodyNotExist)
@@ -1064,11 +1064,11 @@ impl parser {
 		ret e
 	}
 
-	fn buildEnumItemExpr(mut &self, mut &i: int, mut &tokens: []&token::Token): &ast::Expr {
+	fn buildEnumItemExpr(mut &self, mut &i: *int, mut tokens: []&token::Token): &ast::Expr {
 		mut braceN := 0
-		exprStart := i
-		for i < len(tokens); i++ {
-			t := tokens[i]
+		exprStart := *i
+		for *i < len(tokens); *i++ {
+			t := tokens[*i]
 			match t.ID {
 			| token::LBRACE
 			| token::LBRACK
@@ -1083,10 +1083,10 @@ impl parser {
 			if braceN > 0 {
 				continue
 			}
-			if t.ID == token::COMMA || i+1 >= len(tokens) {
+			if t.ID == token::COMMA || *i+1 >= len(tokens) {
 				let mut exprTokens: []&token::Token = nil
 				if t.ID == token::COMMA {
-					exprTokens = tokens[exprStart:i]
+					exprTokens = tokens[exprStart:*i]
 				} else {
 					exprTokens = tokens[exprStart:]
 				}
@@ -1096,7 +1096,7 @@ impl parser {
 		ret nil
 	}
 
-	fn buildEnumItems(mut &self, mut &tokens: []&token::Token): []&ast::EnumItem {
+	fn buildEnumItems(mut &self, mut tokens: []&token::Token): []&ast::EnumItem {
 		mut items := make([]&ast::EnumItem, 0, 1)
 		mut i := 0
 		for i < len(tokens); i++ {
@@ -1127,13 +1127,13 @@ impl parser {
 				self.pushErr(t, log::MissingExpr)
 				continue
 			}
-			item.X = self.buildEnumItemExpr(i, tokens)
+			item.X = self.buildEnumItemExpr(&i, tokens)
 			items = append(items, item)
 		}
 		ret items
 	}
 
-	fn buildEnum(mut &self, mut &tokens: []&token::Token): &ast::Enum {
+	fn buildEnum(mut &self, mut tokens: []&token::Token): &ast::Enum {
 		if len(tokens) < 3 {
 			self.pushErr(tokens[0], log::InvalidSyntax)
 			ret nil
@@ -1153,7 +1153,7 @@ impl parser {
 				self.pushErr(tokens[i-1], log::InvalidSyntax)
 				ret e
 			}
-			e.Type, _ = self.buildType(tokens, i, true)
+			e.Type, _ = self.buildType(tokens, &i, true)
 			if i >= len(tokens) {
 				self.stop()
 				self.pushErr(e.Token, log::BodyNotExist)
@@ -1163,7 +1163,7 @@ impl parser {
 		} else {
 			e.Type = nil
 		}
-		mut itemTokens := range(i, token::LBRACE, token::RBRACE, tokens)
+		mut itemTokens := range(&i, token::LBRACE, token::RBRACE, tokens)
 		if itemTokens == nil {
 			self.stop()
 			self.pushErr(e.Token, log::BodyNotExist)
@@ -1178,7 +1178,7 @@ impl parser {
 		ret e
 	}
 
-	fn buildNodeEnum(mut &self, mut &tokens: []&token::Token): ast::NodeData {
+	fn buildNodeEnum(mut &self, mut tokens: []&token::Token): ast::NodeData {
 		if len(tokens) > 3 && tokens[2].ID == token::COLON {
 			if tokens[3].ID == token::TYPE {
 				ret self.buildTypeEnum(tokens)
@@ -1217,7 +1217,7 @@ impl parser {
 
 		tokens = tokens[2:] // Remove identifier and colon tokens.
 		mut i := 0
-		f.Type, _ = self.buildType(tokens, i, true)
+		f.Type, _ = self.buildType(tokens, &i, true)
 		if i < len(tokens) {
 			mut token := tokens[i]
 			if token.ID == token::STR {
@@ -1245,7 +1245,7 @@ impl parser {
 		ret fields
 	}
 
-	fn buildStructDecl(mut &self, mut &tokens: []&token::Token): &ast::Struct {
+	fn buildStructDecl(mut &self, mut tokens: []&token::Token): &ast::Struct {
 		if len(tokens) < 3 {
 			self.pushErr(tokens[0], log::InvalidSyntax)
 			ret nil
@@ -1267,7 +1267,7 @@ impl parser {
 		s.Name = s.Token.Kind
 
 		errorToken := tokens[i]
-		mut genericsTokens := range(i, token::LBRACK, token::RBRACK, tokens)
+		mut genericsTokens := range(&i, token::LBRACK, token::RBRACK, tokens)
 		if genericsTokens != nil {
 			s.Generics = self.buildGenerics(genericsTokens, errorToken)
 		}
@@ -1277,7 +1277,7 @@ impl parser {
 			ret s
 		}
 
-		mut bodyTokens := range(i, token::LBRACE, token::RBRACE, tokens)
+		mut bodyTokens := range(&i, token::LBRACE, token::RBRACE, tokens)
 		if bodyTokens == nil {
 			self.stop()
 			self.pushErr(s.Token, log::BodyNotExist)
@@ -1293,7 +1293,7 @@ impl parser {
 		ret s
 	}
 
-	fn checkMethodReceiver(mut self, mut &f: &ast::Func, mustRecv: bool) {
+	fn checkMethodReceiver(mut self, mut f: &ast::Func, mustRecv: bool) {
 		if len(f.Params) == 0 {
 			f.Static = true
 			if mustRecv {
@@ -1310,7 +1310,7 @@ impl parser {
 		}
 	}
 
-	fn buildTraitBody(mut &self, mut &t: &ast::Trait, mut tokens: []&token::Token) {
+	fn buildTraitBody(mut &self, mut t: &ast::Trait, mut tokens: []&token::Token) {
 		mut stmts := splitStmts(tokens)
 		for (_, mut stmt) in stmts {
 			tokens = stmt.tokens
@@ -1320,7 +1320,7 @@ impl parser {
 			match tokens[0].ID {
 			| token::FN:
 				mut i := 0
-				mut f := self.buildFunc(i, tokens, true, true)
+				mut f := self.buildFunc(&i, tokens, true, true)
 				if f == nil {
 					break
 				}
@@ -1331,7 +1331,7 @@ impl parser {
 				t.Methods = append(t.Methods, f)
 			|:
 				mut i := 0
-				mut ti, ok := self.buildType(tokens, i, true)
+				mut ti, ok := self.buildType(tokens, &i, true)
 				if !ok {
 					break
 				}
@@ -1343,7 +1343,7 @@ impl parser {
 		}
 	}
 
-	fn buildTraitDecl(mut &self, mut &tokens: []&token::Token): &ast::Trait {
+	fn buildTraitDecl(mut &self, mut tokens: []&token::Token): &ast::Trait {
 		if len(tokens) < 3 {
 			self.pushErr(tokens[0], log::InvalidSyntax)
 			ret nil
@@ -1357,7 +1357,7 @@ impl parser {
 		}
 		t.Name = t.Token.Kind
 		mut i := 2
-		mut bodyTokens := range(i, token::LBRACE, token::RBRACE, tokens)
+		mut bodyTokens := range(&i, token::LBRACE, token::RBRACE, tokens)
 		if bodyTokens == nil {
 			self.stop()
 			self.pushErr(t.Token, log::BodyNotExist)
@@ -1375,7 +1375,7 @@ impl parser {
 
 	fn buildBindFunc(mut &self, mut tokens: []&token::Token): &ast::Func {
 		mut i := 1 // Skip "cpp" keyword.
-		mut f := self.buildFunc(i, tokens, false, true)
+		mut f := self.buildFunc(&i, tokens, false, true)
 		if f != nil {
 			f.Public = false
 			f.Bind = true
@@ -1434,7 +1434,7 @@ impl parser {
 		ret self.buildUseDecl(tokens, Binded)
 	}
 
-	fn buildBind(mut &self, mut &tokens: []&token::Token): (data: ast::NodeData) {
+	fn buildBind(mut &self, mut tokens: []&token::Token): (data: ast::NodeData) {
 		mut token := tokens[0]
 		if len(tokens) == 1 {
 			self.pushErr(token, log::InvalidSyntax)
@@ -1466,7 +1466,7 @@ impl parser {
 		ret
 	}
 
-	fn getMethod(mut &self, mut &tokens: []&token::Token): &ast::Func {
+	fn getMethod(mut &self, mut tokens: []&token::Token): &ast::Func {
 		mut i := 0
 		mut token := tokens[i]
 		if token.ID == token::UNSAFE {
@@ -1484,10 +1484,10 @@ impl parser {
 		}
 
 		i = 0
-		ret self.buildFunc(i, tokens, true, false)
+		ret self.buildFunc(&i, tokens, true, false)
 	}
 
-	fn parseImplBody(mut &self, mut &ipl: &ast::Impl, mut &tokens: []&token::Token) {
+	fn parseImplBody(mut &self, mut ipl: &ast::Impl, mut tokens: []&token::Token) {
 		mut stmts := splitStmts(tokens)
 		for (_, mut stmt) in stmts {
 			tokens = stmt.tokens
@@ -1523,7 +1523,7 @@ impl parser {
 
 		mut i := 1
 
-		mut base, mut ok := self.buildType(tokens, i, true)
+		mut base, mut ok := self.buildType(tokens, &i, true)
 		if !ok {
 			ret nil
 		}
@@ -1558,7 +1558,7 @@ impl parser {
 			ret nil
 		}
 
-		ipl.Dest, ok = self.buildType(tokens, i, true)
+		ipl.Dest, ok = self.buildType(tokens, &i, true)
 		if !ok {
 			ret nil
 		}
@@ -1570,7 +1570,7 @@ impl parser {
 		}
 
 	body:
-		mut bodyTokens := range(i, token::LBRACE, token::RBRACE, tokens)
+		mut bodyTokens := range(&i, token::LBRACE, token::RBRACE, tokens)
 		if bodyTokens == nil {
 			self.stop()
 			self.pushErr(token, log::BodyNotExist)
@@ -1585,13 +1585,13 @@ impl parser {
 		ret ipl
 	}
 
-	fn buildNodeData(mut &self, mut &tokens: []&token::Token): ast::NodeData {
+	fn buildNodeData(mut &self, mut tokens: []&token::Token): ast::NodeData {
 		mut token := tokens[0]
 		match token.ID {
 		| token::FN
 		| token::UNSAFE:
 			mut i := 0
-			mut f := self.buildFunc(i, tokens, false, false)
+			mut f := self.buildFunc(&i, tokens, false, false)
 			if f != nil {
 				f.Global = true
 			}
@@ -1622,12 +1622,12 @@ impl parser {
 		}
 	}
 
-	fn applyFuncMeta(mut self, mut &f: &ast::Func) {
+	fn applyFuncMeta(mut self, mut f: &ast::Func) {
 		f.Directives = self.directives
 		self.directives = nil
 	}
 
-	fn applyMeta(mut self, mut &node: ast::Node) {
+	fn applyMeta(mut self, mut node: ast::Node) {
 		match type node.Data {
 		| &ast::Var:
 			mut v := node.Data.(&ast::Var)
@@ -1654,7 +1654,7 @@ impl parser {
 		}
 	}
 
-	fn pushUseDecl(mut &self, mut &decl: &ast::Use) {
+	fn pushUseDecl(mut &self, mut decl: &ast::Use) {
 		self.ast.UseDecls = append(self.ast.UseDecls, decl)
 		if len(self.ast.Nodes) > 0 {
 			self.pushErr(decl.Token, log::UseDeclAtBody)
@@ -1662,7 +1662,7 @@ impl parser {
 		}
 	}
 
-	fn pushMetaNodes(mut &self, mut &tokens: []&token::Token): bool {
+	fn pushMetaNodes(mut &self, mut tokens: []&token::Token): bool {
 		match tokens[0].ID {
 		| token::USE:
 			const Binded = false
@@ -1682,7 +1682,7 @@ impl parser {
 		ret false
 	}
 
-	fn parseNode(mut &self, mut &st: []&token::Token): ast::Node {
+	fn parseNode(mut &self, mut st: []&token::Token): ast::Node {
 		mut node := ast::Node{
 			Token: st[0],
 		}
@@ -1706,7 +1706,7 @@ impl parser {
 		ret node
 	}
 
-	fn appendNode(mut &self, mut &st: []&token::Token) {
+	fn appendNode(mut &self, mut st: []&token::Token) {
 		if len(st) == 0 {
 			ret
 		}
@@ -1716,20 +1716,20 @@ impl parser {
 		}
 	}
 
-	fn removeRange(self, mut i: int, id: int, &tokens: []&token::Token, mut &ranges: []int) {
+	fn removeRange(self, mut i: int, id: int, tokens: []&token::Token, mut &ranges: *[]int) {
 		close := getCloseOfBrace(id)
 		for i >= 0; i-- {
-			tok := tokens[ranges[i]]
+			tok := tokens[(*ranges)[i]]
 			if tok.ID != close {
 				continue
 			}
-			ranges = append(ranges[:i], ranges[i+1:]...)
+			*ranges = append((*ranges)[:i], (*ranges)[i+1:]...)
 			break
 		}
 	}
 
-	fn pushWrongOrderCloseErr(mut self, &t: &token::Token, &tokens: []&token::Token, &ranges: []int) {
-		match tokens[ranges[len(ranges)-1]].ID {
+	fn pushWrongOrderCloseErr(mut self, t: &token::Token, tokens: []&token::Token, &ranges: *[]int) {
+		match tokens[(*ranges)[len(*ranges)-1]].ID {
 		| token::LPAREN:
 			self.pushErr(t, log::ExpectedParentClose)
 		| token::LBRACE:
@@ -1739,8 +1739,8 @@ impl parser {
 		}
 	}
 
-	fn pushRangeClose(mut self, t: &token::Token, left: int, &tokens: []&token::Token, mut &ranges: []int) {
-		n := len(ranges)
+	fn pushRangeClose(mut self, t: &token::Token, left: int, tokens: []&token::Token, mut &ranges: *[]int) {
+		n := len(*ranges)
 		if n == 0 {
 			match t.ID {
 			| token::RBRACK:
@@ -1751,13 +1751,13 @@ impl parser {
 				self.pushErr(t, log::ExtraClosedParent)
 			}
 			ret
-		} else if tokens[ranges[n-1]].ID != left {
+		} else if tokens[(*ranges)[n-1]].ID != left {
 			self.pushWrongOrderCloseErr(t, tokens, ranges)
 		}
 		self.removeRange(n-1, t.ID, tokens, ranges)
 	}
 
-	fn checkRanges(mut self, &tokens: []&token::Token) {
+	fn checkRanges(mut self, tokens: []&token::Token) {
 		let mut ranges: []int = nil
 
 		for i, token in tokens {
@@ -1767,11 +1767,11 @@ impl parser {
 			| token::LBRACK:
 				ranges = append(ranges, i)
 			| token::RPAREN:
-				self.pushRangeClose(token, token::LPAREN, tokens, ranges)
+				self.pushRangeClose(token, token::LPAREN, tokens, &ranges)
 			| token::RBRACE:
-				self.pushRangeClose(token, token::LBRACE, tokens, ranges)
+				self.pushRangeClose(token, token::LBRACE, tokens, &ranges)
 			| token::RBRACK:
-				self.pushRangeClose(token, token::LBRACK, tokens, ranges)
+				self.pushRangeClose(token, token::LBRACK, tokens, &ranges)
 			}
 		}
 
@@ -1788,7 +1788,7 @@ impl parser {
 		}
 	}
 
-	fn parse(mut &self, mut &f: &token::FileSet) {
+	fn parse(mut &self, mut f: &token::FileSet) {
 		self.ast = &ast::AST{
 			File: f,
 		}

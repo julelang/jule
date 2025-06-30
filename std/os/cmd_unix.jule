@@ -19,14 +19,14 @@ struct cmdAttrs {
 	pid: int
 }
 
-fn cmdsetenv(mut &envv: []str)! {
-	for j, env in envv {
+fn cmdsetenv(mut &envv: *[]str)! {
+	for j, env in *envv {
 		i := byteslite::IndexByteStr(env, '=')
 		if i == -1 {
 			error(sys::Errno(sys::EINVAL))
 		}
 		if len(env)-i == 1 {
-			envv[j] = env[:i] + "=\x00"
+			(*envv)[j] = env[:i] + "=\x00"
 		}
 	}
 }
@@ -62,7 +62,7 @@ impl Cmd {
 				}
 			}
 
-			cmdsetenv(env) else {
+			cmdsetenv(&env) else {
 				writeErrAndExit(error.(sys::Errno))
 			}
 
@@ -111,7 +111,7 @@ impl Cmd {
 		pid := self.attrs.pid
 		stat := ignoringEINTR2(fn()!: i32 {
 			mut stat := i32(0)
-			sys::Waitpid(pid, stat, 0) else { error(error) }
+			sys::Waitpid(pid, &stat, 0) else { error(error) }
 			ret stat
 		}) else { error(error) }
 		self.attrs.pid = invalidPid

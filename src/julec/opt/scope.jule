@@ -54,7 +54,7 @@ impl scopeOptimizer {
 	}
 
 	fn optimizeValue(mut &self, mut val: &sema::Value) {
-		exprOptimizer.optimizeValue(val.Model, self.data, self)
+		exprOptimizer.optimizeValue(&val.Model, self.data, self)
 	}
 
 	fn optimizeVar(mut &self, mut v: &sema::Var) {
@@ -74,7 +74,7 @@ impl scopeOptimizer {
 					}
 				}
 			}
-			exprOptimizer.optimizeValue(v.ValueSym.Value.Model, self.data, self)
+			exprOptimizer.optimizeValue(&v.ValueSym.Value.Model, self.data, self)
 		}
 	}
 
@@ -89,7 +89,7 @@ impl scopeOptimizer {
 		mut checkpoint := self.data.getCheckpoint()
 
 		for (_, mut elif) in c.Elifs {
-			exprOptimizer.optimizeConditionalValue(elif.Expr, self.data, self)
+			exprOptimizer.optimizeConditionalValue(&elif.Expr, self.data, self)
 			self.optimizeChild(elif.Scope)
 			alive.removeDeads(self.data)
 			self.data.loadCheckpoint(checkpoint)
@@ -161,24 +161,24 @@ impl scopeOptimizer {
 		}
 	}
 
-	fn buildDefaultConstantTrueCase(mut &self, mut case: &sema::Case, mut &i: int, mut &m: &sema::Match) {
+	fn buildDefaultConstantTrueCase(mut &self, mut case: &sema::Case, mut &i: *int, mut m: &sema::Match) {
 		case.Exprs = nil // Remove expressions to remove eval overhead.
-		start := i
+		start := *i
 	loop:
 		for {
 			if len(case.Scope.Stmts) == 0 {
 				break
 			}
-			mut &stmt := unsafe { *(&case.Scope.Stmts[len(case.Scope.Stmts)-1]) }
-			match type stmt {
+			mut &stmt := unsafe { &(*(&case.Scope.Stmts[len(case.Scope.Stmts)-1])) }
+			match type *stmt {
 			| &sema::Fall:
-				i++
-				if i >= len(m.Cases) {
-					stmt = m.Default.Scope
+				*i++
+				if *i >= len(m.Cases) {
+					*stmt = m.Default.Scope
 					break loop
 				}
-				case = m.Cases[i]
-				stmt = case.Scope
+				case = m.Cases[*i]
+				*stmt = case.Scope
 			|:
 				break loop
 			}
@@ -204,7 +204,7 @@ impl scopeOptimizer {
 
 		for (i, mut case) in m.Cases {
 			for (_, mut expr) in case.Exprs {
-				exprOptimizer.optimizeConditionalValue(expr.Model, self.data, self)
+				exprOptimizer.optimizeConditionalValue(&expr.Model, self.data, self)
 			}
 			// We can know the exact kind of dynamic type if expression is single.
 			// So we can optimize any casting for this type.
@@ -255,7 +255,7 @@ impl scopeOptimizer {
 				continue
 			}
 			constCase = true
-			self.buildDefaultConstantTrueCase(case, i, m)
+			self.buildDefaultConstantTrueCase(case, &i, m)
 			break
 		}
 
@@ -310,7 +310,7 @@ impl scopeOptimizer {
 
 		for (_, mut case) in slct.Cases {
 			for (_, mut expr) in case.Exprs {
-				exprOptimizer.optimizeValue(expr.Model, self.data, self)
+				exprOptimizer.optimizeValue(&expr.Model, self.data, self)
 			}
 			if len(case.Exprs) == 1 && self.data.dynamic != nil {
 				// We can know the exact kind of dynamic type if expression is single.
@@ -370,7 +370,7 @@ impl scopeOptimizer {
 				| prim.IsI32():
 					// Expression is: []rune(str)
 					// Avoid making allocation, iterate runes of string.
-					exprOptimizer.optimizeValue(cem.Expr.Model, self.data, self) // Optimize string expression.
+					exprOptimizer.optimizeValue(&cem.Expr.Model, self.data, self) // Optimize string expression.
 					self.setCurrentStmt(&StrRuneIter{
 						Expr: cem.Expr,
 						Base: it,
@@ -393,11 +393,11 @@ impl scopeOptimizer {
 				// no-op
 			}
 		}
-		exprOptimizer.optimizeValue(it.Expr.Model, self.data, self)
+		exprOptimizer.optimizeValue(&it.Expr.Model, self.data, self)
 	}
 
 	fn optimizeWhileIter(mut &self, mut it: &sema::WhileIter) {
-		exprOptimizer.optimizeValue(it.Expr, self.data, self)
+		exprOptimizer.optimizeValue(&it.Expr, self.data, self)
 		self.optimizeStmt(it.Next)
 		self.optimizeChildHard(it.Scope)
 	}
@@ -443,10 +443,10 @@ impl scopeOptimizer {
 		if self.data.boundary != nil {
 			possibleBoundaryRemove(self.data.boundary, postfix.Expr)
 		}
-		exprOptimizer.optimizeValue(postfix.Expr, self.data, self)
+		exprOptimizer.optimizeValue(&postfix.Expr, self.data, self)
 	}
 
-	fn cmplxAssign(mut &self, mut &assign: &sema::Assign): bool {
+	fn cmplxAssign(mut &self, mut assign: &sema::Assign): bool {
 		if !StdMathCmplx || assign.Op.ID != token::ASSIGN || meta::Program.MathCmplx == nil {
 			ret false
 		}
@@ -530,8 +530,8 @@ impl scopeOptimizer {
 			ret
 		}
 
-		exprOptimizer.optimizeValue(assign.Left.Model, self.data, self)
-		exprOptimizer.optimizeValue(assign.Right.Model, self.data, self)
+		exprOptimizer.optimizeValue(&assign.Left.Model, self.data, self)
+		exprOptimizer.optimizeValue(&assign.Right.Model, self.data, self)
 
 		match assign.Op.ID {
 		| token::XOR_ASSIGN | token::QUO_ASSIGN | token::REM_ASSIGN
@@ -572,7 +572,7 @@ impl scopeOptimizer {
 				Right: assign.Right,
 			}
 			mut model := sema::Expr(b)
-			exprOptimizer.optimizeValue(model, self.data, self)
+			exprOptimizer.optimizeValue(&model, self.data, self)
 			if model != b || b.Op != assign.Op {
 				// Binary model optimized.
 				// Use optimized model directly.
@@ -614,7 +614,7 @@ impl scopeOptimizer {
 	// Normalizes multi-assign expression.
 	// Simplifies possible operands and removes them.
 	// Designed for tuple expressions, so the right expression should be tuple.
-	fn normalizeAssign(mut &self, mut &assign: &sema::MultiAssign, mut &tup: &sema::TupleExpr) {
+	fn normalizeAssign(mut &self, mut assign: &sema::MultiAssign, mut tup: &sema::TupleExpr) {
 		mut i := 0
 		for i < len(assign.Left) {
 			mut l := assign.Left[i]
@@ -686,7 +686,7 @@ impl scopeOptimizer {
 
 	// Tries to optimize swap assignments, such as "x, y = y, x", and reports whether optimization applied.
 	// Designed for tuple expressions, so the right expression should be tuple.
-	fn tryOptimizeSwap(mut &self, mut &assign: &sema::MultiAssign, mut &tup: &sema::TupleExpr): (applied: bool) {
+	fn tryOptimizeSwap(mut &self, mut assign: &sema::MultiAssign, mut tup: &sema::TupleExpr): (applied: bool) {
 		if len(tup.Values) != 2 || len(assign.Left) != 2 ||
 			assign.Left[0] == nil || assign.Left[1] == nil {
 			ret false
@@ -708,7 +708,7 @@ impl scopeOptimizer {
 
 	// Tries to split multi-assign into single assign statements.
 	// Designed for tuple expressions, so the right expression should be tuple.
-	fn splitAssign(mut &self, mut &assign: &sema::MultiAssign, mut &tup: &sema::TupleExpr) {
+	fn splitAssign(mut &self, mut assign: &sema::MultiAssign, mut tup: &sema::TupleExpr) {
 		// Optimize only variables, because we cannot know other possibilities.
 		// For example, "*x" and "*y" or "x[y]" and "z[z]" may point to same memory.
 		// Therefore, we can just able to split variable assignments.
@@ -928,17 +928,17 @@ impl scopeOptimizer {
 						possibleDynamicRemove(checkpoint.dynamic, l.Model)
 					}
 				}
-				exprOptimizer.optimizeValue(l.Model, self.data, self)
+				exprOptimizer.optimizeValue(&l.Model, self.data, self)
 			}
 		}
-		exprOptimizer.optimizeValue(assign.Right, self.data, self)
+		exprOptimizer.optimizeValue(&assign.Right, self.data, self)
 
 		// Load data to optimized checkpoint.
 		self.data.loadCheckpoint(checkpoint)
 	}
 
 	fn optimizeRet(mut &self, mut r: &sema::Ret) {
-		exprOptimizer.optimizeValue(r.Expr, self.data, self)
+		exprOptimizer.optimizeValue(&r.Expr, self.data, self)
 
 		// Break algorithm is exceptional-specific optimizations are not enabled.
 		// The following algorithms tries to apply specific optimizations for exceptionals.
@@ -1057,12 +1057,12 @@ impl scopeOptimizer {
 	}
 }
 
-fn isConstantValidConditionalCase(&i: &sema::If): bool {
+fn isConstantValidConditionalCase(i: &sema::If): bool {
 	c, ok := i.Expr.(&constant::Const)
 	ret ok && c.IsBool() && c.ReadBool()
 }
 
-fn isUnreachableExpr(&expr: sema::Expr): bool {
+fn isUnreachableExpr(expr: sema::Expr): bool {
 	match type expr {
 	| &constant::Const:
 		c := expr.(&constant::Const)
@@ -1079,7 +1079,7 @@ fn isUnreachableExpr(&expr: sema::Expr): bool {
 	}
 }
 
-fn isConstantValidMatchCase(&case: &sema::Case): bool {
+fn isConstantValidMatchCase(case: &sema::Case): bool {
 	for _, expr in case.Exprs {
 		if expr.IsConst() && expr.Constant.IsBool() && expr.Constant.ReadBool() {
 			ret true
@@ -1088,11 +1088,11 @@ fn isConstantValidMatchCase(&case: &sema::Case): bool {
 	ret false
 }
 
-fn isUnreachableConditionalCase(&i: &sema::If): bool {
+fn isUnreachableConditionalCase(i: &sema::If): bool {
 	ret isUnreachableExpr(i.Expr)
 }
 
-fn isUnreachableMatchCase(&case: &sema::Case): bool {
+fn isUnreachableMatchCase(case: &sema::Case): bool {
 	for _, expr in case.Exprs {
 		if !isUnreachableExpr(expr.Model) {
 			ret false

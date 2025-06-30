@@ -3827,7 +3827,7 @@ fn Fsync(fd: int)! {
 	}
 }
 
-unsafe fn pselect6(nfd: int, r: *FdSet, w: *FdSet, e: *FdSet, timeout: *Timespec, sigmask: *sigset_argpack)!: (n: int) {
+fn pselect6(nfd: int, &r: *FdSet, &w: *FdSet, &e: *FdSet, &timeout: *Timespec, &sigmask: *sigset_argpack)!: (n: int) {
 	r0, e1 := syscall(SYS_PSELECT6, uintptr(nfd), uintptr(r), uintptr(w), uintptr(e), uintptr(timeout), uintptr(sigmask))
 	n = int(r0)
 	if e1 != _NO_ERROR {
@@ -3867,8 +3867,8 @@ fn Pipe2(mut p: []int, flags: int)! {
 	p[1] = int(x[1])
 }
 
-fn Capget(hdr: CapUserHeader, mut &data: CapUserData)! {
-	_, e1 := syscall(SYS_CAPGET, uintptr(&hdr), uintptr(&data), 0, 0, 0, 0)
+fn Capget(hdr: CapUserHeader, mut &data: *CapUserData)! {
+	_, e1 := syscall(SYS_CAPGET, uintptr(&hdr), uintptr(data), 0, 0, 0, 0)
 	if e1 != _NO_ERROR {
 		error(e1)
 	}
@@ -3925,7 +3925,7 @@ fn isGroupMember(gid: int): bool {
 fn isCapDacOverrideSet(): bool {
 	hdr := CapUserHeader{Version: LINUX_CAPABILITY_VERSION_3}
 	let mut data: [2]CapUserData
-	Capget(hdr, data[0]) else {
+	Capget(hdr, &data[0]) else {
 		ret false
 	}
 	ret data[0].Effective&(1<<CAP_DAC_OVERRIDE) != 0
@@ -3953,7 +3953,7 @@ fn Faccessat(dirfd: int, path: str, mut mode: u32, flags: int)! {
 	}
 
 	let mut st: SysStat
-	Fstatat(dirfd, path, st, flags&AT_SYMLINK_NOFOLLOW) else { error(error) }
+	Fstatat(dirfd, path, &st, flags&AT_SYMLINK_NOFOLLOW) else { error(error) }
 
 	mode &= 7
 	if mode == 0 {
@@ -4017,12 +4017,12 @@ fn SchedYield()! {
 	}
 }
 
-fn strSliceToCstrSlice(&s: []str, mut &args: [][]byte): []*byte {
-	mut p_args := make([]*byte, len(s)+1)
-	args = make([][]byte, len(s))
-	for i, arg in s {
+fn strSliceToCstrSlice(&s: *[]str, mut &args: *[][]byte): []*byte {
+	mut p_args := make([]*byte, len(*s)+1)
+	*args = make([][]byte, len(*s))
+	for i, arg in *s {
 		mut p_arg := integ::StrToBytes(arg)
-		args[i] = p_arg
+		(*args)[i] = p_arg
 		p_args[i] = &p_arg[0]
 	}
 	p_args[len(p_args)-1] = nil
@@ -4033,8 +4033,8 @@ fn Exec(file: str, args: []str, env: []str)! {
 	let mut c_args2: [][]byte // Avoid deallocation of converted args for safety.
 	let mut c_env2: [][]byte  // Avoid deallocation of converted env for safety.
 	c_file := integ::StrToBytes(file)
-	c_args := strSliceToCstrSlice(args, c_args2)
-	c_env := strSliceToCstrSlice(env, c_env2)
+	c_args := strSliceToCstrSlice(&args, &c_args2)
+	c_env := strSliceToCstrSlice(&env, &c_env2)
 	_, e1 := syscall(SYS_EXECVE, uintptr(&c_file[0]), uintptr(&c_args[0]), uintptr(&c_env[0]), 0, 0, 0)
 	// If execve was successful, this statement would not be reached.
 	// But play safe and check there is error.

@@ -562,19 +562,19 @@ const (
 	_HIDIOCGRAWUNIQ                  = 0x80404808
 )
 
-fn Fstatat(fd: int, path: str, mut &stat: SysStat, flags: int)! {
+fn Fstatat(fd: int, path: str, mut &stat: *SysStat, flags: int)! {
 	cpath := integ::StrToBytes(path)
-	_, e := syscall(SYS_NEWFSTATAT, uintptr(fd), uintptr(&cpath[0]), uintptr(&stat), uintptr(flags), 0, 0)
+	_, e := syscall(SYS_NEWFSTATAT, uintptr(fd), uintptr(&cpath[0]), uintptr(stat), uintptr(flags), 0, 0)
 	if e != _NO_ERROR {
 		error(e)
 	}
 }
 
-fn Stat(path: str, mut &stat: SysStat)! {
+fn Stat(path: str, mut &stat: *SysStat)! {
 	Fstatat(AT_FDCWD, path, stat, 0) else { error(error) }
 }
 
-fn Lstat(path: str, mut &stat: SysStat)! {
+fn Lstat(path: str, mut &stat: *SysStat)! {
 	Fstatat(AT_FDCWD, path, stat, AT_SYMLINK_NOFOLLOW) else { error(error) }
 }
 
@@ -585,16 +585,9 @@ fn Ftruncate(fd: int, length: i64)! {
 	}
 }
 
-fn Select(nfd: int, mut &r: FdSet, mut &w: FdSet, mut &e: FdSet, mut &timeout: Timeval)!: (n: int) {
-	if timeout.Sec == 0 && timeout.Usec == 0 {
-		unsafe {
-			ret pselect6(nfd, &r, &w, &e, nil, nil) else { error(error) }
-		}
-	}
+fn Select(nfd: int, mut &r: *FdSet, mut &w: *FdSet, mut &e: *FdSet, mut &timeout: *Timeval)!: (n: int) {
 	ts := Timespec{Sec: timeout.Sec, Nsec: timeout.Usec * 1000}
-	unsafe {
-		ret pselect6(nfd, &r, &w, &e, &ts, nil) else { error(error) }
-	}
+	ret pselect6(nfd, r, w, e, &ts, nil) else { error(error) }
 }
 
 fn Socket(domain: int, typ: int, proto: int)!: (fd: int) {
@@ -627,8 +620,8 @@ fn Listen(s: int, backlog: int)! {
 	}
 }
 
-fn Accept(s: int, addr: uintptr, &addrLen: Socklen)!: (fd: int) {
-	r0, e := syscall(SYS_ACCEPT4, uintptr(s), addr, uintptr(&addrLen), 0, 0, 0)
+fn Accept(s: int, addr: uintptr, &addrLen: *Socklen)!: (fd: int) {
+	r0, e := syscall(SYS_ACCEPT4, uintptr(s), addr, uintptr(addrLen), 0, 0, 0)
 	fd = int(r0)
 	if e != _NO_ERROR {
 		error(e)

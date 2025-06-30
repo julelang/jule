@@ -22,7 +22,7 @@ struct exprBuilder {
 }
 
 impl exprBuilder {
-	fn new(mut &p: &parser): exprBuilder {
+	fn new(mut p: &parser): exprBuilder {
 		ret exprBuilder{
 			err: true,
 			p: p,
@@ -157,7 +157,7 @@ impl exprBuilder {
 			Method   = false
 		)
 		mut t := self.t
-		mut f := self.p.buildFuncPrototype(self.l, self.i, ExprMode, Method)
+		mut f := self.p.buildFuncPrototype(self.l, &self.i, ExprMode, Method)
 		self.i-- // back to next token to advance properly
 		self.next()
 		ret &ast::Expr{
@@ -851,7 +851,7 @@ impl exprBuilder {
 			})
 		} else {
 			// We have explicit block body.
-			mut bodyTokens := range(self.i, token::LBRACE, token::RBRACE, self.l)
+			mut bodyTokens := range(&self.i, token::LBRACE, token::RBRACE, self.l)
 			self.i-- // back to }
 			self.next()
 			f.Scope = self.p.buildScope(bodyTokens, self.l[self.i-1])
@@ -884,7 +884,7 @@ impl exprBuilder {
 			ExprMode = true
 			Method   = false
 		)
-		mut f := self.p.buildFuncPrototype(self.l, self.i, ExprMode, Method)
+		mut f := self.p.buildFuncPrototype(self.l, &self.i, ExprMode, Method)
 		self.i-- // back to last consumed token by the function
 		self.next()
 		if f == nil {
@@ -895,7 +895,7 @@ impl exprBuilder {
 			// No extra attention needed.
 		} else {
 			// We found LBRACE, handle scope of the function literal.
-			mut blockTokens := range(self.i, token::LBRACE, token::RBRACE, self.l)
+			mut blockTokens := range(&self.i, token::LBRACE, token::RBRACE, self.l)
 			self.i-- // back to }
 			self.next()
 			f.Scope = self.p.buildScope(blockTokens, self.l[self.i-1])
@@ -1082,7 +1082,7 @@ impl exprBuilder {
 					self.pushErr(t, "expected {")
 					ret nil
 				}
-				mut blockTokens := range(self.i, token::LBRACE, token::RBRACE, self.l)
+				mut blockTokens := range(&self.i, token::LBRACE, token::RBRACE, self.l)
 				self.i-- // back to }, to advance properly
 				self.next()
 				mut rbrace := self.l[self.i-1]
@@ -1321,7 +1321,7 @@ impl exprBuilder {
 }
 
 // Returns expression tokens comes before block if exist, nil if not.
-fn getBlockExpr(mut &tokens: []&token::Token): []&token::Token {
+fn getBlockExpr(mut tokens: []&token::Token): []&token::Token {
 	mut braceN := 0
 	mut skipToNextBraceClose := 0
 	for i, tok in tokens {

@@ -87,7 +87,7 @@ impl float {
 		mut shortest := false
 		if prec < 0 {
 			shortest = true
-			roundShortest(d, self)
+			roundShortest(&d, self)
 			// Precision for shortest representation mode.
 			match fmt {
 			| 'e' | 'E':
@@ -176,11 +176,11 @@ impl float {
 		match {
 		| w < self.prec:
 			mut r := []Word(nil)
-			lshW(r, m, uint(self.prec-w))
+			lshW(&r, m, uint(self.prec-w))
 			m = r
 		| w > self.prec:
 			mut r := []Word(nil)
-			rshW(r, m, uint(w-self.prec))
+			rshW(&r, m, uint(w-self.prec))
 			m = r
 		}
 
@@ -228,7 +228,7 @@ impl float {
 		let mut x: float
 		x.SetPrec(n)
 		x.SetMode(self.mode)
-		x.Set(self)
+		x.Set(*self)
 
 		// adjust mantissa to use exactly n bits
 		mut m := unsafe { *(&self.mant) } // Do not mutate.
@@ -236,11 +236,11 @@ impl float {
 		match {
 		| w < n:
 			mut r := []Word(nil)
-			lshW(r, m, n-w)
+			lshW(&r, m, n-w)
 			m = r
 		| w > n:
 			mut r := []Word(nil)
-			rshW(r, m, w-n)
+			rshW(&r, m, w-n)
 			m = r
 		}
 		mut exp64 := i64(self.exp) - 1 // avoid wrap-around
@@ -373,7 +373,7 @@ fn fmtF(mut buf: []byte, prec: int, d: decimal): []byte {
 	ret buf
 }
 
-fn roundShortest(mut &d: decimal, &x: float) {
+fn roundShortest(mut &d: *decimal, &x: *float) {
 	// if the mantissa is zero, the number is zero - stop now
 	if len(d.mant) == 0 {
 		ret
@@ -391,14 +391,14 @@ fn roundShortest(mut &d: decimal, &x: float) {
 	// that the lsb of mant corresponds to 1/2 ulp for the precision of
 	// x (i.e., for mant we want x.prec + 1 bits).
 	mut mant := []Word(nil)
-	setWW(mant, x.mant)
+	setWW(&mant, x.mant)
 	mut exp := int(x.exp) - bitLenW(mant)
 	s := bitLenW(mant) - int(x.prec+1)
 	match {
 	| s < 0:
-		lshW(mant, mant, uint(-s))
+		lshW(&mant, mant, uint(-s))
 	| s > 0:
-		rshW(mant, mant, uint(+s))
+		rshW(&mant, mant, uint(+s))
 	}
 	exp += s
 	// x = mant * 2**exp with lsb(mant) == 1/2 ulp of x.prec
@@ -406,12 +406,12 @@ fn roundShortest(mut &d: decimal, &x: float) {
 	// 2) Compute lower bound by subtracting 1/2 ulp.
 	let mut lower: decimal
 	let mut tmp: []Word
-	subW(tmp, mant, wordOne)
+	subW(&tmp, mant, wordOne)
 	lower.init(tmp, exp)
 
 	// 3) Compute upper bound by adding 1/2 ulp.
 	let mut upper: decimal
-	addW(tmp, mant, wordOne)
+	addW(&tmp, mant, wordOne)
 	upper.init(tmp, exp)
 
 	// The upper and lower bounds are possible outputs only if

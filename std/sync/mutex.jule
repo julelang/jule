@@ -72,7 +72,7 @@ impl Mutex {
 	// blocks until the mutex is available.
 	fn Lock(self) {
 		// Fast path: grab unlocked mutex.
-		if atomic::CompareAndSwap(self.state, 0, mutexLocked, atomic::SeqCst) {
+		if atomic::CompareAndSwap(&self.state, 0, mutexLocked, atomic::SeqCst) {
 			ret
 		}
 		// Slow path (outlined so that the fast path may be inlined)
@@ -93,7 +93,7 @@ impl Mutex {
 				// Try to set mutexWoken flag to inform Unlock
 				// to not wake other blocked threads.
 				if !awoke && old&mutexWoken == 0 && old>>mutexWaiterShift != 0 {
-					awoke = atomic::CompareAndSwap(self.state, old, old|mutexWoken, atomic::SeqCst)
+					awoke = atomic::CompareAndSwap(&self.state, old, old|mutexWoken, atomic::SeqCst)
 				}
 				iter <<= 1
 				old = self.state
@@ -122,7 +122,7 @@ impl Mutex {
 				}
 				new &= ^mutexWoken
 			}
-			if atomic::CompareAndSwap(self.state, old, new, atomic::SeqCst) {
+			if atomic::CompareAndSwap(&self.state, old, new, atomic::SeqCst) {
 				if old&(mutexLocked|mutexStarving) == 0 {
 					break // locked the mutex with CAS
 				}
@@ -131,7 +131,7 @@ impl Mutex {
 				if waitStartTime == 0 {
 					waitStartTime = runtime::nanotime()
 				}
-				runtime::semacquire(self.sema, queueLifo, runtime::semaMutex)
+				runtime::semacquire(&self.sema, queueLifo, runtime::semaMutex)
 				starving = starving || runtime::nanotime()-waitStartTime > starvationThresholdNs
 				old = self.state
 				if old&mutexStarving != 0 {
@@ -151,7 +151,7 @@ impl Mutex {
 						// to starvation mode.
 						delta -= mutexStarving
 					}
-					atomic::Add(self.state, delta, atomic::SeqCst)
+					atomic::Add(&self.state, delta, atomic::SeqCst)
 					break
 				}
 				awoke = true
@@ -176,14 +176,14 @@ impl Mutex {
 		// There may be a thread waiting for the mutex, but we are
 		// running now and can try to grab the mutex before that
 		// thread wakes up.
-		ret atomic::CompareAndSwap(self.state, old, old|mutexLocked, atomic::SeqCst)
+		ret atomic::CompareAndSwap(&self.state, old, old|mutexLocked, atomic::SeqCst)
 	}
 
 	// Unlocks mutex.
 	// It is a runtime error if mutex is not locked on entry to Unlock.
 	fn Unlock(self) {
 		// Fast path: drop lock bit.
-		new := atomic::Add(self.state, -mutexLocked, atomic::SeqCst)
+		new := atomic::Add(&self.state, -mutexLocked, atomic::SeqCst)
 		if new != 0 {
 			// Outlined slow path to may allow inlining the fast path.
 			self.unlockSlow(new)
@@ -209,8 +209,8 @@ impl Mutex {
 				// Grab the right to wake someone.
 				new = (old - 1<<mutexWaiterShift) | mutexWoken
 				{
-					if atomic::CompareAndSwap(self.state, old, new, atomic::SeqCst) {
-						runtime::semrelease(self.sema, false)
+					if atomic::CompareAndSwap(&self.state, old, new, atomic::SeqCst) {
+						runtime::semrelease(&self.sema, false)
 						ret
 					}
 				}
@@ -222,7 +222,7 @@ impl Mutex {
 			// Note: mutexLocked is not set, the waiter will set it after wakeup.
 			// But mutex is still considered locked if mutexStarving is set,
 			// so new coming thread will not acquire it.
-			runtime::semrelease(self.sema, true)
+			runtime::semrelease(&self.sema, true)
 		}
 	}
 }

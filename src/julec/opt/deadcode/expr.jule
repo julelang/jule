@@ -11,23 +11,23 @@ struct exprDeadCode {
 }
 
 impl exprDeadCode {
-	fn new(mut &s: &scopeDeadCode): exprDeadCode {
+	fn new(mut s: &scopeDeadCode): exprDeadCode {
 		ret exprDeadCode{
 			s: s,
 		}
 	}
 
-	fn optimize(self, mut &model: sema::Expr) {
+	fn optimize(self, mut &model: *sema::Expr) {
 		mut inspector := obj::ExprInspector.New()
 		inspector.Inspect(model, fn|mut expr| {
-			match type expr {
+			match type *expr {
 			| &sema::FuncCallExpr:
-				mut m := expr.(&sema::FuncCallExpr)
+				mut m := (*expr).(&sema::FuncCallExpr)
 				if m.Except != nil {
 					unsafe { self.s.optimizeBodyChildExceptional(m.Except) }
 				}
 			| &sema::AnonFuncExpr:
-				mut m := expr.(&sema::AnonFuncExpr)
+				mut m := (*expr).(&sema::AnonFuncExpr)
 				eliminateDeadCodeOfScope(m.Func.Scope)
 			|:
 				// no-op

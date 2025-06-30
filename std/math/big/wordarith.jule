@@ -261,7 +261,7 @@ fn reciprocalWord(d1: Word): Word {
 }
 
 // Base function for common addition computations.
-fn addW(mut &z: []Word, x: []Word, y: []Word) {
+fn addW(mut &z: *[]Word, x: []Word, y: []Word) {
 	m := len(x)
 	n := len(y)
 
@@ -273,7 +273,7 @@ fn addW(mut &z: []Word, x: []Word, y: []Word) {
 	match {
 	| m == 0:
 		// n == 0 because m >= n; result is 0
-		z = z[:0]
+		*z = (*z)[:0]
 		ret
 	| n == 0:
 		// result is x
@@ -282,17 +282,17 @@ fn addW(mut &z: []Word, x: []Word, y: []Word) {
 	}
 	// m > 0
 
-	z = makeW(z, m+1)
-	mut c := addVV(z[0:n], x, y)
+	*z = makeW(*z, m+1)
+	mut c := addVV((*z)[0:n], x, y)
 	if m > n {
-		c = addVW(z[n:m], x[n:], c)
+		c = addVW((*z)[n:m], x[n:], c)
 	}
-	z[m] = c
-	z = normW(z)
+	(*z)[m] = c
+	*z = normW(*z)
 }
 
 // Base function for common subtraction computations.
-fn subW(mut &z: []Word, x: []Word, y: []Word) {
+fn subW(mut &z: *[]Word, x: []Word, y: []Word) {
 	m := len(x)
 	n := len(y)
 
@@ -301,7 +301,7 @@ fn subW(mut &z: []Word, x: []Word, y: []Word) {
 		panic("math/big: nat.SubAssign: underflow")
 	| m == 0:
 		// n == 0 because m >= n; result is 0
-		z = z[:0]
+		*z = (*z)[:0]
 		ret
 	| n == 0:
 		// result is x
@@ -310,18 +310,18 @@ fn subW(mut &z: []Word, x: []Word, y: []Word) {
 	}
 	// m > 0
 
-	z = makeW(z, m)
-	mut c := subVV(z[0:n], x, y)
+	*z = makeW(*z, m)
+	mut c := subVV((*z)[0:n], x, y)
 	if m > n {
-		c = subVW(z[n:], x[n:], c)
+		c = subVW((*z)[n:], x[n:], c)
 	}
 	if c != 0 {
 		panic("math/big: nat.SubAssign: underflow")
 	}
-	z = normW(z)
+	*z = normW(*z)
 }
 
-fn mulAddWW(mut &z: []Word, x: []Word, y: Word, r: Word) {
+fn mulAddWW(mut &z: *[]Word, x: []Word, y: Word, r: Word) {
 	m := len(x)
 	if m == 0 || y == 0 {
 		setWV(z, r) // result is r
@@ -329,9 +329,9 @@ fn mulAddWW(mut &z: []Word, x: []Word, y: Word, r: Word) {
 	}
 	// m > 0
 
-	z = makeW(z, m+1)
-	z[m] = mulAddVWW(z[0:m], x, y, r)
-	z = normW(z)
+	*z = makeW(*z, m+1)
+	(*z)[m] = mulAddVWW((*z)[0:m], x, y, r)
+	*z = normW(*z)
 }
 
 // Operands that are shorter than karatsubaThreshold are multiplied using
@@ -354,11 +354,11 @@ fn karatsubaLen(mut n: int, threshold: int): int {
 
 // Multiplies x and y and leaves the result in z.
 // The (non-normalized) result is placed in z[0 : len(x) + len(y)].
-fn basicMul(mut &z: []Word, x: []Word, y: []Word) {
-	clearW(z[0 : len(x)+len(y)]) // initialize z
+fn basicMul(mut &z: *[]Word, x: []Word, y: []Word) {
+	clearW((*z)[0 : len(x)+len(y)]) // initialize z
 	for i, d in y {
 		if d != 0 {
-			z[len(x)+i] = addMulVVW(z[i:i+len(x)], x, d)
+			(*z)[len(x)+i] = addMulVVW((*z)[i:i+len(x)], x, d)
 		}
 	}
 }
@@ -391,7 +391,7 @@ fn karatsuba(mut z: []Word, x: []Word, y: []Word) {
 	// (n is always even if karatsubaThreshold is even, but be
 	// conservative)
 	if n&1 != 0 || n < karatsubaThreshold || n < 2 {
-		basicMul(z, x, y)
+		basicMul(&z, x, y)
 		ret
 	}
 	// n&1 == 0 && n >= karatsubaThreshold && n >= 2
@@ -494,7 +494,7 @@ fn min(a: int, b: int): int {
 }
 
 // Base function for common multiplication computations.
-fn mulW(mut &z: []Word, mut x: []Word, mut y: []Word) {
+fn mulW(mut &z: *[]Word, mut x: []Word, mut y: []Word) {
 	m := len(x)
 	n := len(y)
 
@@ -505,7 +505,7 @@ fn mulW(mut &z: []Word, mut x: []Word, mut y: []Word) {
 
 	match {
 	| m == 0 || n == 0:
-		z = z[:0]
+		*z = (*z)[:0]
 		ret
 	| n == 1:
 		mulAddWW(z, x, y[0], 0)
@@ -514,15 +514,15 @@ fn mulW(mut &z: []Word, mut x: []Word, mut y: []Word) {
 	// m >= n > 1
 
 	// determine if z can be reused
-	if aliasW(z, x) || aliasW(z, y) {
-		z = nil // z is an alias for x or y - cannot reuse
+	if aliasW(*z, x) || aliasW(*z, y) {
+		*z = nil // z is an alias for x or y - cannot reuse
 	}
 
 	// use basic multiplication if the numbers are small
 	if n < karatsubaThreshold {
-		z = makeW(z, m+n)
+		*z = makeW(*z, m+n)
 		basicMul(z, x, y)
-		z = normW(z)
+		*z = normW(*z)
 		ret
 	}
 	// m >= n && n >= karatsubaThreshold && n >= 2
@@ -537,12 +537,12 @@ fn mulW(mut &z: []Word, mut x: []Word, mut y: []Word) {
 	// k <= n
 
 	// multiply x0 and y0 via Karatsuba
-	mut x0 := x[0:k]            // x0 is not normalized
-	mut y0 := y[0:k]            // y0 is not normalized
-	z = makeW(z, max(6*k, m+n)) // enough space for karatsuba of x0*y0 and full result of x*y
-	karatsuba(z, x0, y0)
-	z = z[0 : m+n]  // z has final length but may be incomplete
-	clearW(z[2*k:]) // upper portion of z is garbage (and 2*k <= m+n since k <= n <= m)
+	mut x0 := x[0:k]              // x0 is not normalized
+	mut y0 := y[0:k]              // y0 is not normalized
+	*z = makeW(*z, max(6*k, m+n)) // enough space for karatsuba of x0*y0 and full result of x*y
+	karatsuba(*z, x0, y0)
+	*z = (*z)[0 : m+n] // z has final length but may be incomplete
+	clearW((*z)[2*k:]) // upper portion of z is garbage (and 2*k <= m+n since k <= n <= m)
 
 	// If xh != 0 or yh != 0, add the missing terms to z. For
 	//
@@ -562,9 +562,9 @@ fn mulW(mut &z: []Word, mut x: []Word, mut y: []Word) {
 
 		// add x0*y1*b
 		x0 = normW(x0)
-		mut y1 := y[k:] // y1 is normalized because y is
-		mulW(t, x0, y1) // update t so we don't lose t's underlying array
-		addAtW(z, t, k)
+		mut y1 := y[k:]  // y1 is normalized because y is
+		mulW(&t, x0, y1) // update t so we don't lose t's underlying array
+		addAtW(*z, t, k)
 
 		// add xi*y0<<i, xi*y1*b<<(i+k)
 		y0 = normW(y0)
@@ -575,14 +575,14 @@ fn mulW(mut &z: []Word, mut x: []Word, mut y: []Word) {
 				xi = xi[:k]
 			}
 			xi = normW(xi)
-			mulW(t, xi, y0)
-			addAtW(z, t, i)
-			mulW(t, xi, y1)
-			addAtW(z, t, i+k)
+			mulW(&t, xi, y0)
+			addAtW(*z, t, i)
+			mulW(&t, xi, y1)
+			addAtW(*z, t, i+k)
 		}
 	}
 
-	z = normW(z)
+	*z = normW(*z)
 }
 
 // Implements z += x<<(_W*i); z must be long enough.
@@ -669,35 +669,35 @@ fn karatsubaSqr(mut z: []Word, x: []Word) {
 // Base function for common square computations.
 // Based on karatsuba algorithm but optimized for square computations.
 // z = x²
-fn sqrW(mut &z: []Word, mut x: []Word) {
+fn sqrW(mut &z: *[]Word, mut x: []Word) {
 	n := len(x)
 	match {
 	| n == 0:
-		z = z[:0]
+		*z = (*z)[:0]
 		ret
 	| n == 1:
 		d := x[0]
-		z = makeW(z, 2)
-		z[1], z[0] = mulWW(d, d)
-		z = normW(z)
+		*z = makeW(*z, 2)
+		(*z)[1], (*z)[0] = mulWW(d, d)
+		*z = normW(*z)
 		ret
 	}
 
-	if aliasW(z, x) {
-		z = nil // z is an alias for x - cannot reuse
+	if aliasW(*z, x) {
+		*z = nil // z is an alias for x - cannot reuse
 	}
 
 	if n < basicSqrThreshold {
-		z = makeW(z, 2*n)
+		*z = makeW(*z, 2*n)
 		basicMul(z, x, x)
-		z = normW(z)
+		*z = normW(*z)
 		ret
 	}
 
 	if n < karatsubaSqrThreshold {
-		z = makeW(z, 2*n)
-		basicSqr(z, x)
-		z = normW(z)
+		*z = makeW(*z, 2*n)
+		basicSqr(*z, x)
+		*z = normW(*z)
 		ret
 	}
 
@@ -708,23 +708,23 @@ fn sqrW(mut &z: []Word, mut x: []Word) {
 	k := karatsubaLen(n, karatsubaSqrThreshold)
 
 	mut x0 := x[0:k]
-	z = makeW(z, max(6*k, 2*n))
-	karatsubaSqr(z, x0) // z = x0^2
-	z = z[0 : 2*n]
-	clearW(z[2*k:])
+	*z = makeW(*z, max(6*k, 2*n))
+	karatsubaSqr(*z, x0) // z = x0^2
+	*z = (*z)[0 : 2*n]
+	clearW((*z)[2*k:])
 
 	if k < n {
 		mut t := getW(2 * k)
 		x0 = normW(x0)
 		mut x1 := x[k:]
-		mulW(t, x0, x1)
-		addAtW(z, t, k)
-		addAtW(z, t, k) // z = 2*x1*x0*b + x0^2
-		sqrW(t, x1)
-		addAtW(z, t, 2*k) // z = x1^2*b^2 + 2*x1*x0*b + x0^2
+		mulW(&t, x0, x1)
+		addAtW(*z, t, k)
+		addAtW(*z, t, k) // z = 2*x1*x0*b + x0^2
+		sqrW(&t, x1)
+		addAtW(*z, t, 2*k) // z = x1^2*b^2 + 2*x1*x0*b + x0^2
 	}
 
-	z = normW(z)
+	*z = normW(*z)
 }
 
 // Computes z mod m = x*y*2**(-n*_W) mod m,
@@ -736,7 +736,7 @@ fn sqrW(mut &z: []Word, mut x: []Word) {
 // In the terminology of that paper, this is an "Almost Montgomery Multiplication":
 // x and y are required to satisfy 0 <= z < 2**(n*_W) and then the result
 // z is guaranteed to satisfy 0 <= z < 2**(n*_W), but it may not be < m.
-fn montgomery(mut &z: []Word, x: []Word, y: []Word, m: []Word, k: Word, n: int) {
+fn montgomery(mut &z: *[]Word, x: []Word, y: []Word, m: []Word, k: Word, n: int) {
 	// This code assumes x, y, m are all the same length, n.
 	// (required by addMulVVW and the for loop).
 	// It also assumes that x, y are already reduced mod m,
@@ -744,18 +744,18 @@ fn montgomery(mut &z: []Word, x: []Word, y: []Word, m: []Word, k: Word, n: int) 
 	if len(x) != n || len(y) != n || len(m) != n {
 		panic("math/big: mismatched montgomery number lengths")
 	}
-	z = makeW(z, n*2)
-	clearW(z)
+	*z = makeW(*z, n*2)
+	clearW(*z)
 	mut c := Word(0)
 	mut i := 0
 	for i < n; i++ {
 		d := y[i]
-		c2 := addMulVVW(z[i:n+i], x, d)
-		t := z[i] * k
-		c3 := addMulVVW(z[i:n+i], m, t)
+		c2 := addMulVVW((*z)[i:n+i], x, d)
+		t := (*z)[i] * k
+		c3 := addMulVVW((*z)[i:n+i], m, t)
 		cx := c + c2
 		cy := cx + c3
-		z[n+i] = cy
+		(*z)[n+i] = cy
 		if cx < c2 || cy < c3 {
 			c = 1
 		} else {
@@ -763,11 +763,11 @@ fn montgomery(mut &z: []Word, x: []Word, y: []Word, m: []Word, k: Word, n: int) 
 		}
 	}
 	if c != 0 {
-		subVV(z[:n], z[n:], m)
+		subVV((*z)[:n], (*z)[n:], m)
 	} else {
-		copy(z[:n], z[n:])
+		copy((*z)[:n], (*z)[n:])
 	}
-	z = z[:n]
+	*z = (*z)[:n]
 }
 
 // Calculates x**y mod m where m = m1 × m2 for m1 = 2ⁿ and m2 odd.
@@ -778,13 +778,13 @@ fn montgomery(mut &z: []Word, x: []Word, y: []Word, m: []Word, k: Word, n: int) 
 // For more details, see Ç. K. Koç, “Montgomery Reduction with Even Modulus”,
 // IEE Proceedings: Computers and Digital Techniques, 141(5) 314-316, September 1994.
 // http://www.people.vcu.edu/~jwang3/CMSC691/j34monex.pdf
-fn expWWMontgomeryEven(mut &z: []Word, mut x: []Word, y: []Word, m: []Word) {
+fn expWWMontgomeryEven(mut &z: *[]Word, mut x: []Word, y: []Word, m: []Word) {
 	// Split m = m₁ × m₂ where m₁ = 2ⁿ
 	n := trailingZeroBitsW(m)
 	mut m1 := []Word(nil)
-	lshW(m1, wordOne, n)
+	lshW(&m1, wordOne, n)
 	mut m2 := []Word(nil)
-	rshW(m2, m, n)
+	rshW(&m2, m, n)
 
 	// We want z = x**y mod m.
 	// z₁ = x**y mod m1 = (x**y mod m) mod m1 = z mod m1
@@ -793,9 +793,9 @@ fn expWWMontgomeryEven(mut &z: []Word, mut x: []Word, y: []Word, m: []Word) {
 	// where the computation is z = x**y mod m, so its parts are z1 and z2.
 	// The paper is computing x = a**e mod n; it refers to these as x2 and z1.)
 	mut z1 := []Word(nil)
-	expWW(z1, x, y, m1, false)
+	expWW(&z1, x, y, m1, false)
 	mut z2 := []Word(nil)
-	expWW(z2, x, y, m2, false)
+	expWW(&z2, x, y, m2, false)
 
 	// Reconstruct z from z₁, z₂ using CRT, using algorithm from paper,
 	// which uses only a single modInverse (and an easy one at that).
@@ -810,28 +810,28 @@ fn expWWMontgomeryEven(mut &z: []Word, mut x: []Word, y: []Word, m: []Word) {
 	setWW(z, z2)
 
 	// Compute (z₁ - z₂) mod m1 [m1 == 2**n] into z1.
-	subMod2N(z1, z1, z2, n)
+	subMod2N(&z1, z1, z2, n)
 
 	// Reuse z2 for p = (z₁ - z₂) [in z1] * m2⁻¹ (mod m₁ [= 2ⁿ]).
 	mut m2inv := []Word(nil)
-	modInverseW(m2inv, m2, m1)
-	mulW(z2, z1, m2inv)
-	truncW(z2, z2, n)
+	modInverseW(&m2inv, m2, m1)
+	mulW(&z2, z1, m2inv)
+	truncW(&z2, z2, n)
 
 	// Reuse z1 for p * m2.
-	mulW(z1, z2, m2)
-	addW(z, z, z1)
+	mulW(&z1, z2, m2)
+	addW(z, *z, z1)
 }
 
-fn modInverseW(mut &z: []Word, mut g: []Word, mut n: []Word) {
+fn modInverseW(mut &z: *[]Word, mut g: []Word, mut n: []Word) {
 	mut gi := Int{abs: g}
 	mut ni := Int{abs: n}
-	z = gi.ModInverse(ni).abs
+	*z = gi.ModInverse(ni).abs
 }
 
 // Calculates x**y mod m using a fixed, 4-bit window.
 // Uses Montgomery representation.
-fn expWWMontgomery(mut &z: []Word, mut x: []Word, y: []Word, m: []Word) {
+fn expWWMontgomery(mut &z: *[]Word, mut x: []Word, y: []Word, m: []Word) {
 	numWords := len(m)
 
 	// We want the lengths of x and m to be equal.
@@ -839,7 +839,7 @@ fn expWWMontgomery(mut &z: []Word, mut x: []Word, y: []Word, m: []Word) {
 	if len(x) > numWords {
 		mut tz := []Word(nil)
 		mut z2 := []Word(nil)
-		divW(tz, z2, x, m)
+		divW(&tz, &z2, x, m)
 		x = z2
 		// Note: now len(x) <= numWords, not guaranteed ==.
 	}
@@ -863,11 +863,11 @@ fn expWWMontgomery(mut &z: []Word, mut x: []Word, y: []Word, m: []Word) {
 
 	// RR = 2**(2*_W*len(m)) mod m
 	mut RR := []Word(nil)
-	setWV(RR, 1)
+	setWV(&RR, 1)
 	mut zz := []Word(nil)
-	lshW(zz, RR, uint(2*numWords*_W))
+	lshW(&zz, RR, uint(2*numWords*_W))
 	mut tz := []Word(nil)
-	divW(tz, RR, zz, m)
+	divW(&tz, &RR, zz, m)
 	if len(RR) < numWords {
 		zz = makeW(zz, numWords)
 		copy(zz, RR)
@@ -880,16 +880,16 @@ fn expWWMontgomery(mut &z: []Word, mut x: []Word, y: []Word, m: []Word) {
 	const n = 1 << 2
 	// powers[i] contains x^i
 	let mut powers: [1 << n][]Word
-	montgomery(powers[0], one, RR, m, k0, numWords)
-	montgomery(powers[1], x, RR, m, k0, numWords)
+	montgomery(&powers[0], one, RR, m, k0, numWords)
+	montgomery(&powers[1], x, RR, m, k0, numWords)
 	i = 2
 	for i < 1<<n; i++ {
-		montgomery(powers[i], powers[i-1], powers[1], m, k0, numWords)
+		montgomery(&powers[i], powers[i-1], powers[1], m, k0, numWords)
 	}
 
 	// initialize z = 1 (Montgomery 1)
-	z = makeW(z, numWords)
-	copy(z, powers[0])
+	*z = makeW(*z, numWords)
+	copy(*z, powers[0])
 
 	zz = makeW(zz, numWords)
 
@@ -900,18 +900,18 @@ fn expWWMontgomery(mut &z: []Word, mut x: []Word, y: []Word, m: []Word) {
 		mut j := 0
 		for j < _W; j += n {
 			if i != len(y)-1 || j != 0 {
-				montgomery(zz, z, z, m, k0, numWords)
+				montgomery(&zz, *z, *z, m, k0, numWords)
 				montgomery(z, zz, zz, m, k0, numWords)
-				montgomery(zz, z, z, m, k0, numWords)
+				montgomery(&zz, *z, *z, m, k0, numWords)
 				montgomery(z, zz, zz, m, k0, numWords)
 			}
-			montgomery(zz, z, powers[yi>>(_W-n)], m, k0, numWords)
-			z, zz = zz, z
+			montgomery(&zz, *z, powers[yi>>(_W-n)], m, k0, numWords)
+			*z, zz = zz, *z
 			yi <<= n
 		}
 	}
 	// convert to regular number
-	montgomery(zz, z, one, m, k0, numWords)
+	montgomery(&zz, *z, one, m, k0, numWords)
 
 	// One last reduction, just in case.
 	if cmpW(zz, m) >= 0 {
@@ -922,20 +922,20 @@ fn expWWMontgomery(mut &z: []Word, mut x: []Word, y: []Word, m: []Word) {
 		// so do that unconditionally, but double-check,
 		// in case our beliefs are wrong.
 		// The div is not expected to be reached.
-		subW(zz, zz, m)
+		subW(&zz, zz, m)
 		if cmpW(zz, m) >= 0 {
 			tz = []Word(nil)
 			mut r := []Word(nil)
-			divW(tz, r, zz, m)
+			divW(&tz, &r, zz, m)
 			zz = r
 		}
 	}
 
-	z = normW(zz)
+	*z = normW(zz)
 }
 
 // Calculates x**y mod m using a fixed, 4-bit window, where m = 2**logM.
-fn expWWWindowed(mut &z: []Word, mut x: []Word, y: []Word, logM: uint) {
+fn expWWWindowed(mut &z: *[]Word, mut x: []Word, y: []Word, logM: uint) {
 	if len(y) <= 1 {
 		panic("math/big: misuse of expWWWindowed")
 	}
@@ -961,16 +961,16 @@ fn expWWWindowed(mut &z: []Word, mut x: []Word, y: []Word, logM: uint) {
 	for i in powers {
 		powers[i] = getW(w)
 	}
-	setWW(powers[0], wordOne)
-	truncW(powers[1], x, logM)
+	setWW(&powers[0], wordOne)
+	truncW(&powers[1], x, logM)
 	mut i := 2
 	for i < 1<<n; i += 2 {
 		mut p2, mut p, mut p1 := powers[i/2], &powers[i], &powers[i+1]
 		unsafe {
-			sqrW(*p, p2)
-			truncW(*p, *p, logM)
-			mulW(*p1, *p, x)
-			truncW(*p1, *p1, logM)
+			sqrW(&(*p), p2)
+			truncW(&(*p), *p, logM)
+			mulW(&(*p1), *p, x)
+			truncW(&(*p1), *p1, logM)
 		}
 	}
 
@@ -1003,41 +1003,41 @@ fn expWWWindowed(mut &z: []Word, mut x: []Word, y: []Word, logM: uint) {
 				// Unrolled loop for significant performance
 				// gain. Use go test -bench=".*" in crypto/rsa
 				// to check performance before making changes.
-				sqrW(zz, z)
-				zz, z = z, zz
-				truncW(z, z, logM)
+				sqrW(&zz, *z)
+				zz, *z = *z, zz
+				truncW(z, *z, logM)
 
-				sqrW(zz, z)
-				zz, z = z, zz
-				truncW(z, z, logM)
+				sqrW(&zz, *z)
+				zz, *z = *z, zz
+				truncW(z, *z, logM)
 
-				sqrW(zz, z)
-				zz, z = z, zz
-				truncW(z, z, logM)
+				sqrW(&zz, *z)
+				zz, *z = *z, zz
+				truncW(z, *z, logM)
 
-				sqrW(zz, z)
-				zz, z = z, zz
-				truncW(z, z, logM)
+				sqrW(&zz, *z)
+				zz, *z = *z, zz
+				truncW(z, *z, logM)
 			}
 
-			mulW(zz, z, powers[yi>>(_W-n)])
-			zz, z = z, zz
-			truncW(z, z, logM)
+			mulW(&zz, *z, powers[yi>>(_W-n)])
+			zz, *z = *z, zz
+			truncW(z, *z, logM)
 
 			yi <<= n
 			advance = true
 		}
 	}
 
-	z = normW(z)
+	*z = normW(*z)
 }
 
 // If m != 0 (i.e., len(m) != 0), expWW sets z to x**y mod m;
 // otherwise it sets z to x**y. The result is the value of z.
-fn expWW(mut &z: []Word, mut x: []Word, y: []Word, m: []Word, slow: bool) {
-	if aliasW(z, x) || aliasW(z, y) {
+fn expWW(mut &z: *[]Word, mut x: []Word, y: []Word, m: []Word, slow: bool) {
+	if aliasW(*z, x) || aliasW(*z, y) {
 		// We cannot allow in-place modification of x or y.
-		z = nil
+		*z = nil
 	}
 
 	// x**y mod 1 == 0
@@ -1081,7 +1081,7 @@ fn expWW(mut &z: []Word, mut x: []Word, y: []Word, m: []Word, slow: bool) {
 
 	if len(m) != 0 {
 		// We likely end up being as long as the modulus.
-		z = makeW(z, len(m))
+		*z = makeW(*z, len(m))
 
 		// If the exponent is large, we use the Montgomery method for odd values,
 		// and a 4-bit, windowed exponentiation for powers of two,
@@ -1121,17 +1121,17 @@ fn expWW(mut &z: []Word, mut x: []Word, y: []Word, m: []Word, slow: bool) {
 	mut r := []Word(nil)
 	mut i := 0
 	for i < w; i++ {
-		sqrW(zz, z)
-		zz, z = z, zz
+		sqrW(&zz, *z)
+		zz, *z = *z, zz
 
 		if v&mask != 0 {
-			mulW(zz, z, x)
-			zz, z = z, zz
+			mulW(&zz, *z, x)
+			zz, *z = *z, zz
 		}
 
 		if len(m) != 0 {
-			divW(zz, r, z, m)
-			zz, r, q, z = q, z, zz, r
+			divW(&zz, &r, *z, m)
+			zz, r, q, *z = q, *z, zz, r
 		}
 
 		v <<= 1
@@ -1143,24 +1143,24 @@ fn expWW(mut &z: []Word, mut x: []Word, y: []Word, m: []Word, slow: bool) {
 
 		mut j := 0
 		for j < _W; j++ {
-			sqrW(zz, z)
-			zz, z = z, zz
+			sqrW(&zz, *z)
+			zz, *z = *z, zz
 
 			if v&mask != 0 {
-				mulW(zz, z, x)
-				zz, z = z, zz
+				mulW(&zz, *z, x)
+				zz, *z = *z, zz
 			}
 
 			if len(m) != 0 {
-				divW(zz, r, z, m)
-				zz, r, q, z = q, z, zz, r
+				divW(&zz, &r, *z, m)
+				zz, r, q, *z = q, *z, zz, r
 			}
 
 			v <<= 1
 		}
 	}
 
-	z = normW(z)
+	*z = normW(*z)
 }
 
 // Returns i, true when z == 2**i and 0, false otherwise.
@@ -1176,12 +1176,12 @@ fn isPow2(z: []Word): (uint, bool) {
 }
 
 // z = x << s
-fn lshW(mut &z: []Word, x: []Word, s: uint) {
+fn lshW(mut &z: *[]Word, x: []Word, s: uint) {
 	if s == 0 {
-		if sameW(z, x) {
+		if sameW(*z, x) {
 			ret
 		}
-		if !aliasW(z, x) {
+		if !aliasW(*z, x) {
 			setWW(z, x)
 			ret
 		}
@@ -1189,26 +1189,26 @@ fn lshW(mut &z: []Word, x: []Word, s: uint) {
 
 	m := len(x)
 	if m == 0 {
-		z = z[:0]
+		*z = (*z)[:0]
 		ret
 	}
 	// m > 0
 
 	n := m + int(s/_W)
-	z = makeW(z, n+1)
-	z[n] = shlVU(z[n-m:n], x, s%_W)
-	clearW(z[0 : n-m])
+	*z = makeW(*z, n+1)
+	(*z)[n] = shlVU((*z)[n-m:n], x, s%_W)
+	clearW((*z)[0 : n-m])
 
-	z = normW(z)
+	*z = normW(*z)
 }
 
 // z = x >> s
-fn rshW(mut &z: []Word, x: []Word, s: uint) {
+fn rshW(mut &z: *[]Word, x: []Word, s: uint) {
 	if s == 0 {
-		if sameW(z, x) {
+		if sameW(*z, x) {
 			ret
 		}
-		if !aliasW(z, x) {
+		if !aliasW(*z, x) {
 			setWW(z, x)
 			ret
 		}
@@ -1217,51 +1217,51 @@ fn rshW(mut &z: []Word, x: []Word, s: uint) {
 	m := len(x)
 	n := m - int(s/_W)
 	if n <= 0 {
-		z = z[:0]
+		*z = (*z)[:0]
 		ret
 	}
 	// n > 0
 
-	z = makeW(z, n)
-	shrVU(z, x[m-n:], s%_W)
+	*z = makeW(*z, n)
+	shrVU(*z, x[m-n:], s%_W)
 
-	z = normW(z)
+	*z = normW(*z)
 }
 
 // z = x mod 2ⁿ.
-fn truncW(mut &z: []Word, x: []Word, n: uint) {
+fn truncW(mut &z: *[]Word, x: []Word, n: uint) {
 	w := (n + _W - 1) / _W
 	if uint(len(x)) < w {
 		setWW(z, x)
 		ret
 	}
-	z = makeW(z, int(w))
-	copy(z, x)
+	*z = makeW(*z, int(w))
+	copy(*z, x)
 	if n%_W != 0 {
-		z[len(z)-1] &= 1<<(n%_W) - 1
+		(*z)[len(*z)-1] &= 1<<(n%_W) - 1
 	}
-	z = normW(z)
+	*z = normW(*z)
 }
 
 // z = (x - y) mod 2ⁿ.
-fn subMod2N(mut &z: []Word, mut x: []Word, mut y: []Word, n: uint) {
+fn subMod2N(mut &z: *[]Word, mut x: []Word, mut y: []Word, n: uint) {
 	if uint(bitLenW(x)) > n {
-		if aliasW(z, x) {
+		if aliasW(*z, x) {
 			// ok to overwrite x in place
-			truncW(x, x, n)
+			truncW(&x, x, n)
 		} else {
 			mut xn := []Word(nil)
-			truncW(xn, x, n)
+			truncW(&xn, x, n)
 			x = xn
 		}
 	}
 	if uint(bitLenW(y)) > n {
-		if aliasW(z, y) {
+		if aliasW(*z, y) {
 			// ok to overwrite y in place
-			truncW(y, y, n)
+			truncW(&y, y, n)
 		} else {
 			mut yn := []Word(nil)
-			truncW(yn, y, n)
+			truncW(&yn, y, n)
 			y = yn
 		}
 	}
@@ -1271,24 +1271,24 @@ fn subMod2N(mut &z: []Word, mut x: []Word, mut y: []Word, n: uint) {
 	}
 	// x - y < 0; x - y mod 2ⁿ = x - y + 2ⁿ = 2ⁿ - (y - x) = 1 + 2ⁿ-1 - (y - x) = 1 + ^(y - x).
 	subW(z, y, x)
-	for uint(len(z))*_W < n {
-		z = append(z, 0)
+	for uint(len(*z))*_W < n {
+		*z = append(*z, 0)
 	}
-	for i in z {
-		z[i] = ^z[i]
+	for i in *z {
+		(*z)[i] = ^(*z)[i]
 	}
-	truncW(z, z, n)
-	addW(z, z, wordOne)
+	truncW(z, *z, n)
+	addW(z, *z, wordOne)
 }
 
 // Sets z = |√x|
-fn sqrtW(mut &z: []Word, x: []Word) {
+fn sqrtW(mut &z: *[]Word, x: []Word) {
 	if cmpW(x, wordOne) <= 0 {
 		setWW(z, x)
 		ret
 	}
-	if aliasW(z, x) {
-		z = nil
+	if aliasW(*z, x) {
+		*z = nil
 	}
 
 	// Start with value known to be too large and repeat "z = ⌊(z + ⌊x/z⌋)/2⌋" until it stops getting smaller.
@@ -1298,19 +1298,19 @@ fn sqrtW(mut &z: []Word, x: []Word) {
 	// otherwise it converges to the correct z and stays there.
 	mut z2 := []Word(nil)
 	mut z1 := []Word(nil)
-	setWU64(z1, 1)
-	lshW(z1, z1, uint(bitLenW(x)+1)/2) // must be ≥ √x
+	setWU64(&z1, 1)
+	lshW(&z1, z1, uint(bitLenW(x)+1)/2) // must be ≥ √x
 	mut n := 0
 	for {
 		mut r := []Word(nil)
-		divW(z2, r, x, z1)
-		addW(z2, z2, z1)
-		rshW(z2, z2, 1)
+		divW(&z2, &r, x, z1)
+		addW(&z2, z2, z1)
+		rshW(&z2, z2, 1)
 		if cmpW(z2, z1) >= 0 {
 			// z1 is answer.
 			// Figure out whether z1 or z2 is currently aliased to z by looking at loop count.
 			if n&1 == 0 {
-				z = z1
+				*z = z1
 				ret
 			}
 			setWW(z, z1)
@@ -1324,7 +1324,7 @@ fn sqrtW(mut &z: []Word, x: []Word) {
 // Computes the product of all the unsigned integers in the
 // range [a, b] inclusively. If a > b (empty range), the result is 1.
 // Sets result to z.
-fn mulRangeW(mut &z: []Word, a: u64, b: u64) {
+fn mulRangeW(mut &z: *[]Word, a: u64, b: u64) {
 	match {
 	| a == 0:
 		// cut long ranges short (optimization)
@@ -1339,14 +1339,14 @@ fn mulRangeW(mut &z: []Word, a: u64, b: u64) {
 	| a+1 == b:
 		mut aw := []Word(nil)
 		mut bw := []Word(nil)
-		setWU64(aw, a)
-		setWU64(bw, b)
+		setWU64(&aw, a)
+		setWU64(&bw, b)
 		mulW(z, aw, bw)
 		ret
 	}
 	m := a + (b-a)/2 // avoid overflow
 	mut amw := []Word(nil)
-	mulRangeW(amw, a, m) // amw = a * m
-	mulRangeW(z, m+1, b) // z = m+1 * b
-	mulW(z, amw, z)      // z = z * amw
+	mulRangeW(&amw, a, m) // amw = a * m
+	mulRangeW(z, m+1, b)  // z = m+1 * b
+	mulW(z, amw, *z)      // z = z * amw
 }

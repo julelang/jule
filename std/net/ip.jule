@@ -35,19 +35,19 @@ impl IP {
 
 	// Reports whether IP is empty.
 	fn Empty(self): bool {
-		ret len(self) == 0
+		ret len(*self) == 0
 	}
 
 	// Reports wherher IPs are points to the same address.
 	// An IPv4 address and that same address in IPv6 from are considered to be equal.
 	fn Equal(self, other: IP): bool {
 		match {
-		| len(self) == len(other):
-			ret str(self) == str(other)
-		| len(self) == IPv4Len && len(other) == IPv6Len:
-			ret str(other[:12]) == str(v4InV6Prefix) && str(self) == str(other[12:])
-		| len(self) == IPv6Len && len(other) == IPv4Len:
-			ret str(self[:12]) == str(v4InV6Prefix) && str(self[12:]) == str(other)
+		| len(*self) == len(other):
+			ret str(*self) == str(other)
+		| len(*self) == IPv4Len && len(other) == IPv6Len:
+			ret str(other[:12]) == str(v4InV6Prefix) && str(*self) == str(other[12:])
+		| len(*self) == IPv6Len && len(other) == IPv4Len:
+			ret str((*self)[:12]) == str(v4InV6Prefix) && str((*self)[12:]) == str(other)
 		|:
 			ret false
 		}
@@ -85,21 +85,21 @@ impl IP {
 		}
 		// Following RFC 4193, Section 8. IANA Considerations which says:
 		//	The IANA has assigned the FC00::/7 prefix to "Unique Local Unicast".
-		ret len(self) == IPv6Len && self[0]&0xFE == 0xFC
+		ret len(*self) == IPv6Len && (*self)[0]&0xFE == 0xFC
 	}
 
 	// Converts the IPv4 address to a 4-byte representation.
 	// Returns empty if IP is not an IPv4 address.
 	// Returned IP may use the common mutable allocation with self.
 	fn To4(mut self): IP {
-		if len(self) == IPv4Len {
-			ret self
+		if len(*self) == IPv4Len {
+			ret *self
 		}
-		if len(self) == IPv6Len &&
-			isZeros(self[:10]) &&
-			self[10] == 0xFF &&
-			self[11] == 0xFF {
-			ret self[12:16]
+		if len(*self) == IPv6Len &&
+			isZeros((*self)[:10]) &&
+			(*self)[10] == 0xFF &&
+			(*self)[11] == 0xFF {
+			ret (*self)[12:16]
 		}
 		ret IP.Empty()
 	}
@@ -108,10 +108,10 @@ impl IP {
 	// Returns empty if address is not an IP address (it is the wrong length).
 	fn To16(mut self): IP {
 		match {
-		| len(self) == IPv4Len:
-			ret IPv4(self[0], self[1], self[2], self[3])
-		| len(self) == IPv6Len:
-			ret self
+		| len(*self) == IPv4Len:
+			ret IPv4((*self)[0], (*self)[1], (*self)[2], (*self)[3])
+		| len(*self) == IPv6Len:
+			ret *self
 		|:
 			ret IP.Empty()
 		}
@@ -127,14 +127,14 @@ impl IP {
 		if self.Empty() {
 			ret "<nil>"
 		}
-		if len(self) != IPv4Len && len(self) != IPv6Len {
-			ret "?" + hexStr(self)
+		if len(*self) != IPv4Len && len(*self) != IPv6Len {
+			ret "?" + hexStr(*self)
 		}
 		ip4 := unsafe { (*(&self)).To4() }
 		if len(ip4) == IPv4Len {
 			ret str4(ipAddrFrom4(ip4))
 		}
-		ret str16(ipAddrFrom16(self))
+		ret str16(ipAddrFrom16(*self))
 	}
 }
 

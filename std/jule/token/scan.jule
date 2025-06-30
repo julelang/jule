@@ -170,7 +170,7 @@ impl Scanner {
 		}
 	}
 
-	fn scanLineComment(mut self, mut &token: &Token) {
+	fn scanLineComment(mut self, mut token: &Token) {
 		offs := self.offset - 1 // leading '/' consumed
 		token.ID = COMMENT
 		for {
@@ -182,7 +182,7 @@ impl Scanner {
 		}
 	}
 
-	fn scanRangeComment(mut self, mut &token: &Token) {
+	fn scanRangeComment(mut self, mut token: &Token) {
 		offs := self.offset - 1 // leading '/' consumed
 		for {
 			self.next()
@@ -207,7 +207,7 @@ impl Scanner {
 	//
 	// Be careful when making changes to this function: it is optimized and affects
 	// scanning performance significantly.
-	fn scanName(mut self, mut &token: &Token): bool {
+	fn scanName(mut self, mut token: &Token): bool {
 		offs := self.offset
 
 		// Optimize for the common case of an ASCII identifier.
@@ -262,15 +262,15 @@ impl Scanner {
 	// in *invalid, if *invalid < 0.
 	// digits returns a bitset describing whether the sequence contained
 	// digits (bit 0 is set), or separators '_' (bit 1 is set).
-	fn digits(mut self, base: int, mut &invalid: int): (digsep: int) {
+	fn digits(mut self, base: int, mut &invalid: *int): (digsep: int) {
 		if base <= 10 {
 			max := rune('0' + base)
 			for isDecimal(self.r) || self.r == '_' {
 				mut ds := 1
 				if self.r == '_' {
 					ds = 2
-				} else if self.r >= max && invalid < 0 {
-					invalid = self.offset // record invalid rune offset
+				} else if self.r >= max && *invalid < 0 {
+					*invalid = self.offset // record invalid rune offset
 				}
 				digsep |= ds
 				self.next()
@@ -288,7 +288,7 @@ impl Scanner {
 		ret
 	}
 
-	fn scanNumber(mut self, mut &token: &Token) {
+	fn scanNumber(mut self, mut token: &Token) {
 		offs := self.offset
 		mut base := 10        // number base
 		mut prefix := rune(0) // one of 0 (decimal), '0' (0-octal), 'x', 'o', or 'b'
@@ -315,7 +315,7 @@ impl Scanner {
 					digsep = 1 // leading 0
 				}
 			}
-			digsep |= self.digits(base, invalid)
+			digsep |= self.digits(base, &invalid)
 		}
 
 		// fractional part
@@ -325,7 +325,7 @@ impl Scanner {
 				self.pushErr(self.offset, "invalid radix point in "+litname(prefix))
 			}
 			self.next()
-			digsep |= self.digits(base, invalid)
+			digsep |= self.digits(base, &invalid)
 		}
 
 		if digsep&1 == 0 {
@@ -347,7 +347,7 @@ impl Scanner {
 				self.next()
 			}
 			mut _invalid := 0
-			ds := self.digits(10, _invalid)
+			ds := self.digits(10, &_invalid)
 			digsep |= ds
 			if ds&1 == 0 {
 				self.pushErr(self.offset, "exponent has no digits")
@@ -434,7 +434,7 @@ impl Scanner {
 		ret true
 	}
 
-	fn scanRune(mut self, mut &token: &Token) {
+	fn scanRune(mut self, mut token: &Token) {
 		// '\'' opening already consumed
 		offs := self.offset - 1
 
@@ -473,7 +473,7 @@ impl Scanner {
 		}
 	}
 
-	fn scanStr(mut self, mut &token: &Token) {
+	fn scanStr(mut self, mut token: &Token) {
 		// '"' opening already consumed
 		offs := self.offset - 1
 
@@ -501,7 +501,7 @@ impl Scanner {
 		}
 	}
 
-	fn scanRawStr(mut self, mut &token: &Token) {
+	fn scanRawStr(mut self, mut token: &Token) {
 		// '`' opening already consumed
 		offs := self.offset - 1
 
@@ -888,7 +888,7 @@ fn stripCR(b: []byte, comment: bool): []byte {
 }
 
 // Scans all tokens into FileSet f and returns error logs.
-fn ScanAll(mut &f: &FileSet, opt: int): []log::Log {
+fn ScanAll(mut f: &FileSet, opt: int): []log::Log {
 	mut scan := Scanner.New(f, opt)
 	mut i := 0
 Loop:

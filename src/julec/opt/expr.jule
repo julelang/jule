@@ -21,20 +21,20 @@ struct exprOptimizer {
 }
 
 impl exprOptimizer {
-	fn optimize(mut &model: sema::Expr) {
+	fn optimize(mut &model: *sema::Expr) {
 		exprOptimizer.optimizeValue(model, emptyData, nil)
 	}
 
-	fn new(mut &model: sema::Expr, mut &d: &data, mut s: &scopeOptimizer): &exprOptimizer {
+	fn new(mut &model: *sema::Expr, mut d: &data, mut s: &scopeOptimizer): &exprOptimizer {
 		ret &exprOptimizer{
-			model: unsafe { (&sema::Expr)(&model) },
+			model: unsafe { (&sema::Expr)(model) },
 			data: d,
 			inspector: obj::ExprInspector.New(),
 			scopeOpt: s,
 		}
 	}
 
-	fn optimizeValue(mut &model: sema::Expr, mut &d: &data, mut s: &scopeOptimizer) {
+	fn optimizeValue(mut &model: *sema::Expr, mut d: &data, mut s: &scopeOptimizer) {
 		// Do optimizatitons if any enabled.
 		if exprEnabled {
 			mut exop := exprOptimizer.new(model, d, s)
@@ -45,13 +45,13 @@ impl exprOptimizer {
 	// Like the optimizeData method, but any conditional expression
 	// (such as x != nil) will be considered as optimization informative data.
 	// Designed for conditional structures like if or match statements.
-	fn optimizeConditionalValue(mut &model: sema::Expr, mut &d: &data, mut s: &scopeOptimizer) {
+	fn optimizeConditionalValue(mut &model: *sema::Expr, mut d: &data, mut s: &scopeOptimizer) {
 		// Do optimizatitons if any enabled.
 		if !exprEnabled {
 			ret
 		}
 		mut exop := exprOptimizer.new(model, d, s)
-		match type model {
+		match type *model {
 		| &sema::BinaryExpr:
 			// Binary expression model.
 			// It should be handled in separate optimization routine.
@@ -68,9 +68,9 @@ impl exprOptimizer {
 		mut check := true
 		mut _check := unsafe { (&bool)(&check) } // reference for the check variable used from closure
 
-		exop.inspector.Inspect(*exop.model, fn|mut m| {
+		exop.inspector.Inspect(&(*exop.model), fn|mut m| {
 			if *_check {
-				mut binary, _ := m.(&sema::BinaryExpr)
+				mut binary, _ := (*m).(&sema::BinaryExpr)
 				if binary != nil {
 					// Do not continue to checking. Binary expression is using || operator.
 					// So we can't know whether operands are guaranteed to be executed.
@@ -95,7 +95,7 @@ impl exprOptimizer {
 		})
 	}
 
-	fn selfCmpCond(self, mut &m: &sema::BinaryExpr): bool {
+	fn selfCmpCond(self, mut m: &sema::BinaryExpr): bool {
 		if m.Left.Type.Prim() != nil && types::IsFloat(m.Left.Type.Prim().Kind) {
 			// Do not apply this optimization for flota data types.
 			// It prevents tricks such as NaN conditions (x != x).
@@ -124,7 +124,7 @@ impl exprOptimizer {
 		}
 	}
 
-	fn boolCond(self, mut &m: &sema::BinaryExpr): bool {
+	fn boolCond(self, mut m: &sema::BinaryExpr): bool {
 		lp := m.Left.Type.Prim()
 		if lp == nil || !lp.IsBool() {
 			ret false
@@ -192,7 +192,7 @@ impl exprOptimizer {
 	// Optimizes string conversions if possible.
 	// It may apply optimizations with unsafe behaviors.
 	// So make sure this optimizations are always safe for the scope.
-	fn strConv(self, mut &m: &sema::OperandExpr) {
+	fn strConv(self, mut m: &sema::OperandExpr) {
 		p := m.Type.Prim()
 		if p == nil || !p.IsStr() {
 			ret
@@ -217,7 +217,7 @@ impl exprOptimizer {
 		}
 	}
 
-	fn strCond(self, mut &m: &sema::BinaryExpr): bool {
+	fn strCond(self, mut m: &sema::BinaryExpr): bool {
 		lp := m.Left.Type.Prim()
 		if lp == nil || !lp.IsStr() {
 			ret false
@@ -275,7 +275,7 @@ impl exprOptimizer {
 	}
 
 	// Tries to optimize string concatenations and reports whether applied.
-	fn strConcat(self, mut &m: &sema::BinaryExpr): bool {
+	fn strConcat(self, mut m: &sema::BinaryExpr): bool {
 		lp := m.Left.Type.Prim()
 		if lp == nil || !lp.IsStr() {
 			ret false
@@ -303,7 +303,7 @@ impl exprOptimizer {
 		let mut step: fn(mut m: sema::Expr)
 		// Point to the step variable in the closure. Otherwise it will be copied,
 		// so the step function remains as nil, which is causes nil dereferencing.
-		&_step := step
+		&_step := &step
 		step = fn|mut m| {
 			match type m {
 			| &sema::BinaryExpr:
@@ -324,8 +324,8 @@ impl exprOptimizer {
 					// Apply common optimizations for each binary expression.
 					self.binaryStrCommon(binary)
 
-					_step(binary.Left.Model)
-					_step(binary.Right.Model)
+					(*_step)(binary.Left.Model)
+					(*_step)(binary.Right.Model)
 				}
 			|:
 				model.Parts = append(model.Parts, m)
@@ -340,7 +340,7 @@ impl exprOptimizer {
 		ret true
 	}
 
-	fn tryNeutralElement1(self, mut &m: &sema::BinaryExpr, mut c: &constant::Const, mut &nc: &sema::OperandExpr): bool {
+	fn tryNeutralElement1(self, mut m: &sema::BinaryExpr, mut c: &constant::Const, mut nc: &sema::OperandExpr): bool {
 		if c.IsStr() { // Constant is string, check for string optimizations.
 			if !Str {
 				ret false
@@ -390,7 +390,7 @@ impl exprOptimizer {
 
 	// Tries optimize binary expression for neutral elements.
 	// Specialized in math optimizations.
-	fn tryNeutralElement(self, mut &m: &sema::BinaryExpr): bool {
+	fn tryNeutralElement(self, mut m: &sema::BinaryExpr): bool {
 		// For neutral element optimization, one of the operands should be constant.
 		mut c, mut constant := m.Left.Model.(&constant::Const)
 		if constant {
@@ -403,7 +403,7 @@ impl exprOptimizer {
 		ret false
 	}
 
-	fn checkBinaryForBoundary(self, mut &m: &sema::BinaryExpr) {
+	fn checkBinaryForBoundary(self, mut m: &sema::BinaryExpr) {
 		if self.data.boundary == nil {
 			ret
 		}
@@ -453,7 +453,7 @@ impl exprOptimizer {
 		}
 	}
 
-	fn checkBinaryForNil(self, mut &m: &sema::BinaryExpr) {
+	fn checkBinaryForNil(self, mut m: &sema::BinaryExpr) {
 		if self.data.nils == nil {
 			ret
 		}
@@ -507,7 +507,7 @@ impl exprOptimizer {
 	// Tries to optimize binary expression with --opt-math optimization flag.
 	// Assumes the math optimizations are enabled.
 	// Reports whether optimization applied.
-	fn binaryMath(self, mut &m: &sema::BinaryExpr): (applied: bool) {
+	fn binaryMath(self, mut m: &sema::BinaryExpr): (applied: bool) {
 		// Break optimizations if types are not primitive.
 		// No need for checking whether types are arithmetic,
 		// because relevant operators are only available for arithmetic primitives.
@@ -643,7 +643,7 @@ impl exprOptimizer {
 
 	// Common string optimizations for binary expressions.
 	// Always make sure this optimization will not block the following analysis.
-	fn binaryStrCommon(self, mut &m: &sema::BinaryExpr) {
+	fn binaryStrCommon(self, mut m: &sema::BinaryExpr) {
 		self.strConv(m.Left)
 		self.strConv(m.Right)
 	}
@@ -708,14 +708,14 @@ impl exprOptimizer {
 			mut checkpoint := data{}
 			checkpoint.loadCheckpoint(self.data.getCheckpoint())
 
-			unsafe { self.inspector.InspectStep(m.Left.Model) }
+			unsafe { self.inspector.InspectStep(&m.Left.Model) }
 			// Load from hard copy checkpoint of checkpoint data here.
 			// Because soft checkpoint loading uses direct data.
 			// So if data mutated, checkpoint will be mutated also.
 			// We may lost the checkpoint data, therefore use hard-copy.
 			self.data.loadCheckpoint(checkpoint.getCheckpoint())
 
-			unsafe { self.inspector.InspectStep(m.Right.Model) }
+			unsafe { self.inspector.InspectStep(&m.Right.Model) }
 			// There is no risk for checkpoint data mutation. Do soft load.
 			self.data.loadCheckpoint(checkpoint.getMutCheckpoint())
 
@@ -784,7 +784,7 @@ impl exprOptimizer {
 		}
 	}
 
-	fn args(self, mut params: []&sema::ParamIns, mut &args: []sema::Expr) {
+	fn args(self, mut params: []&sema::ParamIns, mut args: []sema::Expr) {
 		for (i, mut arg) in args {
 			if i >= len(params) {
 				continue
@@ -809,7 +809,7 @@ impl exprOptimizer {
 	// Tries to optimize scope.
 	// If the |child| true and |self.scopeOpt| is not nil, calls the optimizeChildHard().
 	// Otherwise optimizes the scope with immutable copy of the data if exist.
-	fn scope(self, mut &s: &sema::Scope, child: bool) {
+	fn scope(self, mut s: &sema::Scope, child: bool) {
 		if child && self.scopeOpt != nil {
 			self.scopeOpt.optimizeChildHard(s)
 			ret
@@ -825,7 +825,7 @@ impl exprOptimizer {
 		scopt.optimize()
 	}
 
-	fn optimizeStrBuilderCall(self, mut &m: &sema::FuncCallExpr) {
+	fn optimizeStrBuilderCall(self, mut m: &sema::FuncCallExpr) {
 		// Some strings::Builder methods are not real-exceptional implementations.
 		// They just implements interfaces and not throws any exceptional.
 		// Therefore we can remove exceptional handling algorithms for these method calls.
@@ -997,36 +997,36 @@ impl exprOptimizer {
 		self.scope(m.Func.Scope, Child)
 	}
 
-	fn inspectStep(self, mut &m: sema::Expr) {
-		self.model = unsafe { (&sema::Expr)(&m) }
-		match type m {
+	fn inspectStep(self, mut &m: *sema::Expr) {
+		self.model = unsafe { (&sema::Expr)(m) }
+		match type *m {
 		| &sema::BinaryExpr:
-			self.binary(m.(&sema::BinaryExpr))
+			self.binary((*m).(&sema::BinaryExpr))
 		| &sema::UnaryExpr:
-			self.unary(m.(&sema::UnaryExpr))
+			self.unary((*m).(&sema::UnaryExpr))
 		| &sema::StructLitExpr:
-			self.structureLit(m.(&sema::StructLitExpr))
+			self.structureLit((*m).(&sema::StructLitExpr))
 		| &sema::TypeAssertionExpr:
-			self.typeAssertion(m.(&sema::TypeAssertionExpr))
+			self.typeAssertion((*m).(&sema::TypeAssertionExpr))
 		| &sema::FuncCallExpr:
-			self.funcCall(m.(&sema::FuncCallExpr))
+			self.funcCall((*m).(&sema::FuncCallExpr))
 		| &sema::BuiltinCopyCallExpr:
-			self.copyCall(m.(&sema::BuiltinCopyCallExpr))
+			self.copyCall((*m).(&sema::BuiltinCopyCallExpr))
 		| &sema::BuiltinAppendCallExpr:
-			self.appendCall(m.(&sema::BuiltinAppendCallExpr))
+			self.appendCall((*m).(&sema::BuiltinAppendCallExpr))
 		| &sema::BuiltinLenCallExpr:
-			self.lenCall(m.(&sema::BuiltinLenCallExpr))
+			self.lenCall((*m).(&sema::BuiltinLenCallExpr))
 		| &sema::IndexingExpr:
-			self.indexing(m.(&sema::IndexingExpr))
+			self.indexing((*m).(&sema::IndexingExpr))
 		| &sema::AnonFuncExpr:
-			self.anonFunc(m.(&sema::AnonFuncExpr))
+			self.anonFunc((*m).(&sema::AnonFuncExpr))
 		|:
 			// no-op
 		}
 	}
 
 	fn do(self) {
-		self.inspector.Inspect(*self.model,
+		self.inspector.Inspect(&(*self.model),
 			fn|mut m| unsafe { self.inspectStep(m) })
 	}
 }
@@ -1041,7 +1041,7 @@ impl exprOptimizer {
 //
 // As a result: returns whether bit-shifting is possible and what nth power of 2^r.
 // Assumes the model r is constant.
-fn checkForBitShiftOpt(mut &l: &sema::OperandExpr, mut &r: &sema::OperandExpr): (ok: bool, x: u64) {
+fn checkForBitShiftOpt(mut l: &sema::OperandExpr, mut r: &sema::OperandExpr): (ok: bool, x: u64) {
 	lp := l.Type.Prim()
 	rp := r.Type.Prim()
 	if !types::IsInt(lp.Str()) || !types::IsInt(rp.Str()) {
@@ -1061,7 +1061,7 @@ fn isPowerOfTwo(x: u64): bool {
 }
 
 // Reports l and r the same lvalue expression.
-fn areSameLvalueExpr(&l: sema::Expr, &r: sema::Expr): bool {
+fn areSameLvalueExpr(l: sema::Expr, r: sema::Expr): bool {
 	match type l {
 	| &sema::Var:
 		// Compare values directly.

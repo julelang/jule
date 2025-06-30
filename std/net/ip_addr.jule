@@ -87,7 +87,7 @@ fn v6u16(ip: u128, i: u8): u16 {
 // appendDecimal and appendHex to format IP addresses.
 const digits = "0123456789abcdef"
 
-fn appendDecimal(mut &s: strings::Builder, x: u8) {
+fn appendDecimal(mut &s: *strings::Builder, x: u8) {
 	if x >= 100 {
 		s.WriteByte(digits[x/100])!
 	}
@@ -97,7 +97,7 @@ fn appendDecimal(mut &s: strings::Builder, x: u8) {
 	s.WriteByte(digits[x%10])!
 }
 
-fn appendHex(mut &s: strings::Builder, x: u16) {
+fn appendHex(mut &s: *strings::Builder, x: u16) {
 	if x >= 0x1000 {
 		s.WriteByte(digits[x>>12])!
 	}
@@ -114,13 +114,13 @@ fn str4(ip: u128): str {
 	const Max = len("255.255.255.255")
 	mut s := strings::Builder{}
 	s.Grow(Max)
-	appendDecimal(s, v4(ip, 0))
+	appendDecimal(&s, v4(ip, 0))
 	s.WriteByte('.')!
-	appendDecimal(s, v4(ip, 1))
+	appendDecimal(&s, v4(ip, 1))
 	s.WriteByte('.')!
-	appendDecimal(s, v4(ip, 2))
+	appendDecimal(&s, v4(ip, 2))
 	s.WriteByte('.')!
-	appendDecimal(s, v4(ip, 3))
+	appendDecimal(&s, v4(ip, 3))
 	ret s.Str()
 }
 
@@ -153,13 +153,13 @@ fn str16(ip: u128): str {
 		} else if i > 0 {
 			s.WriteByte(':')!
 		}
-		appendHex(s, v6u16(ip, i))
+		appendHex(&s, v6u16(ip, i))
 	}
 
 	ret s.Str()
 }
 
-fn parseIPv4Fields(&addr: str, off: int, end: int, mut ip: IP)! {
+fn parseIPv4Fields(addr: str, off: int, end: int, mut ip: IP)! {
 	mut val, mut pos := 0, 0
 	mut digLen := 0 // number of digits in current octet
 	mut s := addr[off:end]
@@ -199,14 +199,14 @@ fn parseIPv4Fields(&addr: str, off: int, end: int, mut ip: IP)! {
 	ip[3] = byte(val)
 }
 
-fn parseIPv4(&addr: str)!: IP {
+fn parseIPv4(addr: str)!: IP {
 	mut ip := make(IP, 4)
 	parseIPv4Fields(addr, 0, len(addr), ip) else { error(error) }
 	ret ip
 }
 
 // Parses addr as an IPv6 address (in form "2001:db8::68").
-fn parseIPv6(&addr: str)!: TCPAddr {
+fn parseIPv6(addr: str)!: TCPAddr {
 	mut s := addr
 
 	// Split off the zone right from the start. Yes it's a second scan

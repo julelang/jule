@@ -113,7 +113,7 @@ fn buildField(mut decl: &ast::Field): &Field {
 	}
 }
 
-fn buildFields(mut &decls: []&ast::Field): []&Field {
+fn buildFields(mut decls: []&ast::Field): []&Field {
 	mut fields := make([]&Field, 0, len(decls))
 	for (_, mut decl) in decls {
 		fields = append(fields, buildField(decl))
@@ -144,7 +144,7 @@ fn buildParam(mut decl: &ast::Param): &Param {
 	}
 }
 
-fn buildParams(mut &decls: []&ast::Param): []&Param {
+fn buildParams(mut decls: []&ast::Param): []&Param {
 	mut params := make([]&Param, 0, len(decls))
 	for (_, mut decl) in decls {
 		params = append(params, buildParam(decl))
@@ -180,7 +180,7 @@ fn buildFunc(mut decl: &ast::Func): &Func {
 	}
 }
 
-fn buildMethods(mut &decls: []&ast::Func): []&Func {
+fn buildMethods(mut decls: []&ast::Func): []&Func {
 	mut methods := make([]&Func, 0, len(decls))
 	for (_, mut decl) in decls {
 		methods = append(methods, buildFunc(decl))
@@ -188,7 +188,7 @@ fn buildMethods(mut &decls: []&ast::Func): []&Func {
 	ret methods
 }
 
-fn buildTraitInherits(mut &inherits: []&ast::Expr): []&TypeSym {
+fn buildTraitInherits(mut inherits: []&ast::Expr): []&TypeSym {
 	mut symbols := make([]&TypeSym, 0, len(inherits))
 	for (_, mut it) in inherits {
 		symbols = append(symbols, buildType(it))
@@ -206,7 +206,7 @@ fn buildTrait(mut decl: &ast::Trait): &Trait {
 	}
 }
 
-fn buildEnumItems(mut &decls: []&ast::EnumItem): []&Var {
+fn buildEnumItems(mut decls: []&ast::EnumItem): []&Var {
 	mut items := make([]&Var, len(decls)+1)
 	for (i, mut decl) in decls {
 		items[i] = &Var{
@@ -243,7 +243,7 @@ fn buildTypeEnumItem(mut decl: &ast::TypeEnumItem): &TypeEnumItem {
 	}
 }
 
-fn buildTypeEnumItems(mut &decls: []&ast::TypeEnumItem): []&TypeEnumItem {
+fn buildTypeEnumItems(mut decls: []&ast::TypeEnumItem): []&TypeEnumItem {
 	mut items := make([]&TypeEnumItem, 0, len(decls))
 	for (_, mut decl) in decls {
 		items = append(items, buildTypeEnumItem(decl))
@@ -305,11 +305,11 @@ impl symBuilder {
 		ret root
 	}
 
-	fn pushErr(mut self, &token: &token::Token, fmt: str, args: ...any) {
+	fn pushErr(mut self, token: &token::Token, fmt: str, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, true, fmt, args...))
 	}
 
-	fn pushErrText(mut self, &token: &token::Token, fmt: str, args: ...any) {
+	fn pushErrText(mut self, token: &token::Token, fmt: str, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, false, fmt, args...))
 	}
 
@@ -318,7 +318,7 @@ impl symBuilder {
 		unsafe { pushSuggestion(&self.errors[len(self.errors)-1], fmt, args...) }
 	}
 
-	fn checkCppUseDeclPath(mut self, &decl: &ast::Use, &path: str): (ok: bool) {
+	fn checkCppUseDeclPath(mut self, decl: &ast::Use, path: str): (ok: bool) {
 		ext := filepath::Ext(path)
 		if !build::IsValidHeaderExt(ext) && !build::IsValidCppExt(ext) {
 			self.pushErr(decl.Token, log::InvalidCppExt, ext)
@@ -338,7 +338,7 @@ impl symBuilder {
 		ret true
 	}
 
-	fn buildCppHeaderImport(mut self, mut &decl: &ast::Use): &ImportInfo {
+	fn buildCppHeaderImport(mut self, mut decl: &ast::Use): &ImportInfo {
 		mut path := decl.Path.Kind[1 : len(decl.Path.Kind)-1] // remove quotes
 
 		if !build::IsStdHeaderPath(path) {
@@ -368,7 +368,7 @@ impl symBuilder {
 	// Checks and returns absolute path of import filepath.
 	// Designed for non-std package paths.
 	// Returns empty string if error occurs.
-	fn checkAbsPath(mut &self, mut filepath: str, mut &decl: &ast::Use): str {
+	fn checkAbsPath(mut &self, mut filepath: str, mut decl: &ast::Use): str {
 		modPath := self.importer.GetModPath()
 		if len(modPath) == 0 {
 			self.pushErr(decl.Path, log::ModuleNotFound)
@@ -396,7 +396,7 @@ impl symBuilder {
 	}
 
 	// Same as the [checkAbsPath] method but designed for std package paths.
-	fn checkStdAbsPath(mut &self, mut filepath: str, mut &decl: &ast::Use): str {
+	fn checkStdAbsPath(mut &self, mut filepath: str, mut decl: &ast::Use): str {
 		if filepath == "std" {
 			self.pushErr(decl.Path, log::InvalidImportPath, decl.Path.Kind)
 			ret ""
@@ -422,7 +422,7 @@ impl symBuilder {
 	}
 
 	// Checks import path and returns as filepath if no error exist.
-	fn checkImpPath(mut &self, mut &decl: &ast::Use): (std: bool, filepath: str) {
+	fn checkImpPath(mut &self, mut decl: &ast::Use): (std: bool, filepath: str) {
 		path := decl.Path.Kind[1 : len(decl.Path.Kind)-1] // remove quotes
 		if strings::HasSuffix(path, jule::ImportPathSep) {
 			self.pushErr(decl.Path, log::InvalidImportPath, decl.Path.Kind)
@@ -452,14 +452,14 @@ impl symBuilder {
 	}
 
 	// Assigns an alias to import.
-	fn assignAlias(mut &self, mut &imp: &ImportInfo) {
+	fn assignAlias(mut &self, mut imp: &ImportInfo) {
 		mut i := strings::LastIndex(imp.LinkPath, jule::ImportPathSep)
 		i++ // skip separator and also if -1 it takes full path
 		path := imp.LinkPath[i:]
 		imp.Alias = path
 	}
 
-	fn buildImport(mut &self, mut &decl: &ast::Use): &ImportInfo {
+	fn buildImport(mut &self, mut decl: &ast::Use): &ImportInfo {
 		if decl.Bind {
 			ret self.buildCppHeaderImport(decl)
 		}
@@ -486,13 +486,13 @@ impl symBuilder {
 		ret imp
 	}
 
-	fn findUseDecl(mut self, &pkg: &ImportInfo): &ImportInfo {
+	fn findUseDecl(mut self, pkg: &ImportInfo): &ImportInfo {
 		// Find package by path to detect cpp header imports.
 		// Ignore implicit imports, see developer reference (6).
 		ret self.table.SelectPackage(fn|spkg| !isImplicitImport(spkg) && unsafe { pkg.Path == spkg.Path })
 	}
 
-	fn checkDuplicateUseDecl(mut self, mut &pkg: &ImportInfo): (ok: bool) {
+	fn checkDuplicateUseDecl(mut self, mut pkg: &ImportInfo): (ok: bool) {
 		mut lpkg := self.findUseDecl(pkg)
 		if lpkg == nil {
 			ret true
@@ -527,7 +527,7 @@ impl symBuilder {
 		ret sb.Str()
 	}
 
-	fn pushCycleError(mut &self, &sb: &symBuilder, path: str, mut &message: strings::Builder) {
+	fn pushCycleError(mut &self, sb: &symBuilder, path: str, mut message: strings::Builder) {
 		const Padding = 7
 		refersTo := log::Logf(
 			log::RefersTo,
@@ -538,7 +538,7 @@ impl symBuilder {
 		message.WriteByte('\n')!
 	}
 
-	fn pushCrossCycleError(mut &self, &target: &symBuilder, &imp: &ImportInfo, &errorToken: &token::Token) {
+	fn pushCrossCycleError(mut &self, target: &symBuilder, imp: &ImportInfo, errorToken: &token::Token) {
 		mut message := strings::Builder{}
 		message.Grow(1 << 5)
 		self.pushCycleError(self, imp.Path, message)
@@ -556,7 +556,7 @@ impl symBuilder {
 		self.pushErr(errorToken, log::PkgIllegalCrossCycle, message.Str())
 	}
 
-	fn checkImportCycles(mut &self, imp: &ImportInfo, &decl: &ast::Use): bool {
+	fn checkImportCycles(mut &self, imp: &ImportInfo, decl: &ast::Use): bool {
 		if imp.Path == self.table.File.Dir() {
 			self.pushErr(decl.Token, log::PkgIllegalCycleRefersItself, self.getAsLinkPath(imp.Path))
 			ret false
@@ -580,7 +580,7 @@ impl symBuilder {
 	//	- decl: relevant use declaration.
 	//	- mod: module that imports relevant package.
 	//	- path: path of package that importing.
-	fn checkPackageAccessibility(mut self, &decl: &ast::Use, &mod: str, &path: str) {
+	fn checkPackageAccessibility(mut self, decl: &ast::Use, mod: str, path: str) {
 		if self.importer.GetModPath() == mod {
 			ret
 		}
@@ -610,7 +610,7 @@ impl symBuilder {
 		}
 	}
 
-	fn importPackage(mut &self, mut &imp: &ImportInfo, mut &decl: &ast::Use): (ok: bool) {
+	fn importPackage(mut &self, mut imp: &ImportInfo, mut decl: &ast::Use): (ok: bool) {
 		if imp.Bind {
 			ret true
 		}
@@ -656,7 +656,7 @@ impl symBuilder {
 		ret true
 	}
 
-	fn importUseDecl(mut &self, mut &decl: &ast::Use): &ImportInfo {
+	fn importUseDecl(mut &self, mut decl: &ast::Use): &ImportInfo {
 		mut imp := self.buildImport(decl)
 		// Break analysis if error occurs.
 		if imp == nil {
@@ -685,7 +685,7 @@ impl symBuilder {
 		}
 	}
 
-	fn appendNode(mut self, mut &node: ast::Node) {
+	fn appendNode(mut self, mut node: ast::Node) {
 		match type node.Data {
 		| &ast::Impl:
 			self.table.Impls = append(self.table.Impls, buildImpl(node.Data.(&ast::Impl)))
@@ -738,7 +738,7 @@ impl symBuilder {
 		}
 	}
 
-	fn pushDirectivePass(mut self, mut &d: &ast::Directive) {
+	fn pushDirectivePass(mut self, mut d: &ast::Directive) {
 		if len(d.Args) == 0 {
 			self.pushErr(d.Tag, log::MissingExpr)
 			ret

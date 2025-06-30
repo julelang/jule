@@ -18,23 +18,23 @@ struct Optimizer {
 
 impl Optimizer {
 	// Returns new optimizer for IR.
-	fn New(mut &ir: &obj::IR): &Optimizer {
+	fn New(mut ir: &obj::IR): &Optimizer {
 		ret &Optimizer{
 			ir: ir,
 		}
 	}
 
-	fn optimizeExpr(mut self, mut &model: sema::Expr) {
+	fn optimizeExpr(mut self, mut &model: *sema::Expr) {
 		exprOptimizer.optimize(model)
 	}
 
-	fn optimizeGlobal(mut self, mut &v: &sema::Var) {
+	fn optimizeGlobal(mut self, mut v: &sema::Var) {
 		if !v.Bind {
-			self.optimizeExpr(v.ValueSym.Value.Model)
+			self.optimizeExpr(&v.ValueSym.Value.Model)
 		}
 	}
 
-	fn optimizeFunction(mut self, mut &func: &sema::Func) {
+	fn optimizeFunction(mut self, mut func: &sema::Func) {
 		if func.Bind {
 			ret
 		}
@@ -55,7 +55,7 @@ impl Optimizer {
 		}
 	}
 
-	fn optimizeGlobals(mut self, mut &p: &sema::Package) {
+	fn optimizeGlobals(mut self, mut p: &sema::Package) {
 		for (_, mut f) in p.Files {
 			for (_, mut v) in f.Vars {
 				self.optimizeGlobal(v)
@@ -63,7 +63,7 @@ impl Optimizer {
 		}
 	}
 
-	fn optimizeFunctions(mut self, mut &p: &sema::Package) {
+	fn optimizeFunctions(mut self, mut p: &sema::Package) {
 		for (_, mut f) in p.Files {
 			for (_, mut func) in f.Funcs {
 				self.optimizeFunction(func)
@@ -71,7 +71,7 @@ impl Optimizer {
 		}
 	}
 
-	fn optimizeStructs(mut self, mut &p: &sema::Package) {
+	fn optimizeStructs(mut self, mut p: &sema::Package) {
 		for (_, mut f) in p.Files {
 			for (_, mut s) in f.Structs {
 				self.optimizeStruct(s)
@@ -84,7 +84,7 @@ impl Optimizer {
 		}
 	}
 
-	fn optimizePackage(mut self, mut &p: &sema::Package) {
+	fn optimizePackage(mut self, mut p: &sema::Package) {
 		self.optimizeGlobals(p)
 		self.optimizeFunctions(p)
 		self.optimizeStructs(p)

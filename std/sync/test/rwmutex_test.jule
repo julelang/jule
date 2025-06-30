@@ -10,7 +10,7 @@ fn reader(mut rwm: &sync::RWMutex, numIterations: int, mut activity: &i32, cdone
 	mut i := 0
 	for i < numIterations; i++ {
 		rwm.RLock()
-		n := atomic::Add(*activity, 1, atomic::SeqCst)
+		n := atomic::Add(&(*activity), 1, atomic::SeqCst)
 		if n < 1 || n >= 10000 {
 			rwm.RUnlock()
 			panic("wlock()")
@@ -18,7 +18,7 @@ fn reader(mut rwm: &sync::RWMutex, numIterations: int, mut activity: &i32, cdone
 		mut j := 0
 		for j < 100; j++ {
 		}
-		atomic::Add(*activity, -1, atomic::SeqCst)
+		atomic::Add(&(*activity), -1, atomic::SeqCst)
 		rwm.RUnlock()
 	}
 	cdone <- true
@@ -28,7 +28,7 @@ fn writer(mut rwm: &sync::RWMutex, numIterations: int, mut activity: &i32, cdone
 	mut i := 0
 	for i < numIterations; i++ {
 		rwm.Lock()
-		n := atomic::Add(*activity, 10000, atomic::SeqCst)
+		n := atomic::Add(&(*activity), 10000, atomic::SeqCst)
 		if n != 10000 {
 			rwm.Unlock()
 			panic("wlock()")
@@ -36,7 +36,7 @@ fn writer(mut rwm: &sync::RWMutex, numIterations: int, mut activity: &i32, cdone
 		mut j := 0
 		for j < 100; j++ {
 		}
-		atomic::Add(*activity, -10000, atomic::SeqCst)
+		atomic::Add(&(*activity), -10000, atomic::SeqCst)
 		rwm.Unlock()
 	}
 	cdone <- true

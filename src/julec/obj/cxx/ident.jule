@@ -26,7 +26,7 @@ impl identCoder {
 	// Write identifiers to buf. If identifier contains unicode runes,
 	// handle as ASCII characters. Some backend compilers are not supports
 	// unicode identifiers and causes compile errors.
-	fn writeIdentTo(mut &buf: strings::Builder, &name: str) {
+	fn writeIdentTo(mut &buf: *strings::Builder, name: str) {
 		for _, b in name {
 			if b >= utf8::RuneSelf {
 				// identifier contains unicode runes.
@@ -54,7 +54,7 @@ impl identCoder {
 	// Parameters:
 	//	name: Identifier.
 	//	addr:  Pointer address of package file handler.
-	fn toOut(mut &buf: strings::Builder, name: str, addr: uintptr) {
+	fn toOut(mut &buf: *strings::Builder, name: str, addr: uintptr) {
 		buf.WriteByte('_')!
 		if addr != 0 {
 			buf.WriteStr(conv::FormatUint(u64(addr), 0xF))!
@@ -69,7 +69,7 @@ impl identCoder {
 	//	row:   Row of definition.
 	//	col:   Column of definition.
 	//	name: Identifier of definition.
-	fn toLocal(mut &buf: strings::Builder, row: int, col: int, &name: str) {
+	fn toLocal(mut &buf: *strings::Builder, row: int, col: int, name: str) {
 		buf.WriteByte('_')!
 		buf.WriteStr(conv::Itoa(row))!
 		buf.WriteStr(conv::Itoa(col))!
@@ -77,7 +77,7 @@ impl identCoder {
 		identCoder.writeIdentTo(buf, name)
 	}
 
-	fn func(mut &buf: strings::Builder, mut &f: &sema::Func) {
+	fn func(mut &buf: *strings::Builder, mut f: &sema::Func) {
 		match {
 		| f.Bind:
 			buf.WriteStr(f.Name)!
@@ -95,7 +95,7 @@ impl identCoder {
 		identCoder.toOut(buf, f.Name, uintptr(f))
 	}
 
-	fn funcIns(mut &buf: strings::Builder, mut &f: &sema::FuncIns) {
+	fn funcIns(mut &buf: *strings::Builder, mut f: &sema::FuncIns) {
 		if f.IsBuiltin() {
 			// Do not use [identCoder.writeIdentTo] for this.
 			// Built-in functions are always ASCII.
@@ -110,11 +110,11 @@ impl identCoder {
 		identCoder.toOut(buf, f.Decl.Name, uintptr(f))
 	}
 
-	fn traitDecl(mut &buf: strings::Builder, t: &sema::Trait) {
+	fn traitDecl(mut &buf: *strings::Builder, t: &sema::Trait) {
 		identCoder.toOut(buf, t.Name, uintptr(t))
 	}
 
-	fn param(mut &buf: strings::Builder, &p: &sema::Param) {
+	fn param(mut &buf: *strings::Builder, p: &sema::Param) {
 		if jule::IsAnon(p.Name) || jule::IsBlank(p.Name) {
 			ret
 		}
@@ -129,7 +129,7 @@ impl identCoder {
 		identCoder.toLocal(buf, p.Token.Row, p.Token.Column, p.Name)
 	}
 
-	fn structure(mut &buf: strings::Builder, &s: &sema::Struct) {
+	fn structure(mut &buf: *strings::Builder, s: &sema::Struct) {
 		if s.Bind {
 			if !obj::HasDirective(s.Directives, directive::Typedef) {
 				buf.WriteStr("struct ")!
@@ -140,7 +140,7 @@ impl identCoder {
 		identCoder.toOut(buf, s.Name, uintptr(s))
 	}
 
-	fn structureIns(mut &buf: strings::Builder, &s: &sema::StructIns) {
+	fn structureIns(mut &buf: *strings::Builder, s: &sema::StructIns) {
 		if s.Decl.Bind || len(s.Generics) == 0 {
 			identCoder.structure(buf, s.Decl)
 			ret
@@ -148,7 +148,7 @@ impl identCoder {
 		identCoder.toOut(buf, s.Decl.Name, uintptr(s))
 	}
 
-	fn field(mut &buf: strings::Builder, &f: &sema::Field) {
+	fn field(mut &buf: *strings::Builder, f: &sema::Field) {
 		if f.Owner.Bind {
 			export, ok := f.Tags["#export"]
 			if ok {
@@ -169,7 +169,7 @@ impl identCoder {
 	}
 
 	// Returns output identifier of captured variable by anonymous function.
-	fn anonFuncVar(mut &buf: strings::Builder, mut v: &sema::Var) {
+	fn anonFuncVar(mut &buf: *strings::Builder, mut v: &sema::Var) {
 		match v.RetState {
 		| Tuple:
 			// This means variable one of the structure fields of multiple-return.
@@ -185,7 +185,7 @@ impl identCoder {
 	}
 
 	// Returns output identifier of variable.
-	fn var(mut &buf: strings::Builder, mut v: &sema::Var) {
+	fn var(mut &buf: *strings::Builder, mut v: &sema::Var) {
 		match v.RetState {
 		| NA:
 			// no-op
@@ -218,32 +218,32 @@ impl identCoder {
 		}
 	}
 
-	fn iterBegin(mut &buf: strings::Builder, it: uintptr) {
+	fn iterBegin(mut &buf: *strings::Builder, it: uintptr) {
 		buf.WriteStr("_iter_begin_")!
 		buf.WriteStr(conv::FormatUint(u64(it), 0xF))!
 	}
 
-	fn iterEnd(mut &buf: strings::Builder, it: uintptr) {
+	fn iterEnd(mut &buf: *strings::Builder, it: uintptr) {
 		buf.WriteStr("_iter_end_")!
 		buf.WriteStr(conv::FormatUint(u64(it), 0xF))!
 	}
 
-	fn iterNext(mut &buf: strings::Builder, it: uintptr) {
+	fn iterNext(mut &buf: *strings::Builder, it: uintptr) {
 		buf.WriteStr("_iter_next_")!
 		buf.WriteStr(conv::FormatUint(u64(it), 0xF))!
 	}
 
-	fn label(mut &buf: strings::Builder, u: uintptr) {
+	fn label(mut &buf: *strings::Builder, u: uintptr) {
 		buf.WriteStr("_julec_label_")!
 		buf.WriteStr(conv::FormatUint(u64(u), 0xF))!
 	}
 
-	fn matchEnd(mut &buf: strings::Builder, m: uintptr) {
+	fn matchEnd(mut &buf: *strings::Builder, m: uintptr) {
 		buf.WriteStr("_match_end_")!
 		buf.WriteStr(conv::FormatUint(u64(m), 0xF))!
 	}
 
-	fn caseBegin(mut &buf: strings::Builder, c: uintptr) {
+	fn caseBegin(mut &buf: *strings::Builder, c: uintptr) {
 		buf.WriteStr("_case_begin_")!
 		buf.WriteStr(conv::FormatUint(u64(c), 0xF))!
 	}

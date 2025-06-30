@@ -146,7 +146,7 @@ impl Type {
 	// Reports whether actual kind is comparable.
 	fn Comparable(self): bool {
 		unsafe {
-			mut _self := &self
+			mut _self := *(&self)
 			if _self.SoftStruct() != nil {
 				ret _self.SoftStruct().Comparable
 			}
@@ -160,7 +160,7 @@ impl Type {
 	// Reports whether actual kind is mutable.
 	fn Mutable(self): bool {
 		unsafe {
-			mut _self := &self
+			mut _self := *(&self)
 			if _self.SoftStruct() != nil {
 				ret _self.SoftStruct().Mutable
 			}
@@ -190,7 +190,7 @@ impl Type {
 	// Reports whether actual kind supports ordered constraint.
 	fn Ordered(self): bool {
 		unsafe {
-			mut _self := &self
+			mut _self := *(&self)
 			prim := _self.Prim()
 			if prim != nil {
 				ret types::IsNum(prim.Kind) || prim.IsStr()
@@ -209,7 +209,7 @@ impl Type {
 	// Reports whether actual kind is nil compatible.
 	fn NilCompatible(self): bool {
 		unsafe {
-			mut _self := &self
+			mut _self := *(&self)
 
 			prim := _self.Prim()
 			if prim != nil && prim.IsAny() {
@@ -231,7 +231,7 @@ impl Type {
 	// Reports whether actual kind performs garbage collection.
 	fn GC(self): bool {
 		unsafe {
-			mut _self := &self
+			mut _self := *(&self)
 			prim := _self.Prim()
 			if prim != nil {
 				ret prim.IsAny() || prim.IsStr()
@@ -243,8 +243,10 @@ impl Type {
 
 	// Reports whether actual kind is variadicable.
 	fn Variadicable(self): bool {
-		mut _self := &self
-		ret unsafe { _self.Slice() != nil }
+		unsafe {
+			mut _self := *(&self)
+			ret _self.Slice() != nil
+		}
 	}
 
 	// Returns primitive type if actual kind is primitive type, nil if not.
@@ -838,7 +840,7 @@ impl typeChecker {
 		}
 	}
 
-	fn pushReference[T](mut self, mut &t: T) {
+	fn pushReference[T](mut self, mut t: T) {
 		if self.refers == nil {
 			ret
 		}
@@ -848,7 +850,7 @@ impl typeChecker {
 		self.refers.Push(t)
 	}
 
-	fn pushReferenceByKind(mut self, mut &k: &Type) {
+	fn pushReferenceByKind(mut self, mut k: &Type) {
 		match {
 		| k.SoftStruct() != nil:
 			mut t := k.SoftStruct()
@@ -903,7 +905,7 @@ impl typeChecker {
 		self.pushReference[&StructIns](ins)
 	}
 
-	fn pushCycleError(self, def1: str, def2: str, mut &message: strings::Builder) {
+	fn pushCycleError(self, def1: str, def2: str, mut &message: *strings::Builder) {
 		const Padding = 7
 		refersTo := log::Logf(log::RefersTo, def1, def2)
 		message.WriteStr(strings::Repeat(" ", Padding))!
@@ -911,7 +913,7 @@ impl typeChecker {
 		message.WriteByte('\n')!
 	}
 
-	fn checkCrossCycle(mut self, mut decl: any, mut &message: strings::Builder): (ok: bool, oselfExist: bool) {
+	fn checkCrossCycle(mut self, mut decl: any, mut &message: *strings::Builder): (ok: bool, oselfExist: bool) {
 		// No cross risk, because referencer have not any previous node.
 		// Referencer is the root referencer.
 		// So, it is means there are only inline cycle possibility,
@@ -923,7 +925,7 @@ impl typeChecker {
 		for r != nil && r.prev != nil; r = r.prev {
 		}
 		mut root := r
-		printErr := fn(mut &message: strings::Builder) {
+		printErr := fn(mut &message: *strings::Builder) {
 			r = root
 			for r != nil && r.next != nil; r = r.next {
 				unsafe { self.pushCycleError(r.name, r.next.name, message) }
@@ -966,11 +968,11 @@ impl typeChecker {
 		ret self.referencer
 	}
 
-	fn checkIllegalCycles(mut self, &name: &token::Token, mut decl: any): (ok: bool) {
+	fn checkIllegalCycles(mut self, name: &token::Token, mut decl: any): (ok: bool) {
 		ret self.isIllegalCycleSafe(name, decl, self.cycleErr&cycleErrDisable != cycleErrDisable)
 	}
 
-	fn isIllegalCycleSafe(mut self, &name: &token::Token, mut decl: any, err: bool): (ok: bool) {
+	fn isIllegalCycleSafe(mut self, name: &token::Token, mut decl: any, err: bool): (ok: bool) {
 		self.cycleErr &= ^cycleErrFail // clear the cycleErrFail flag for the new analysis
 		if self.referencer == nil {
 			ret true
@@ -1009,7 +1011,7 @@ impl typeChecker {
 		}
 
 		mut message := strings::Builder{}
-		ok, oselfExist := self.checkCrossCycle(decl, message)
+		ok, oselfExist := self.checkCrossCycle(decl, &message)
 		if !ok {
 			if err {
 				self.pushErr(name, log::IllegalCrossCycle, message.Str())
@@ -1034,7 +1036,7 @@ impl typeChecker {
 		ret true
 	}
 
-	fn fromTypeAlias(mut self, mut &decl: &token::Token, mut &ta: &TypeAlias): Kind {
+	fn fromTypeAlias(mut self, mut decl: &token::Token, mut ta: &TypeAlias): Kind {
 		if !self.s.isAccessibleDefine(ta.Public, ta.Token) {
 			self.pushErr(decl, log::IdentNotExist, decl.Kind)
 			ret nil
@@ -1091,7 +1093,7 @@ impl typeChecker {
 		ret tk
 	}
 
-	fn fromEnum(mut self, &decl: &token::Token, mut &e: &Enum): &Enum {
+	fn fromEnum(mut self, decl: &token::Token, mut e: &Enum): &Enum {
 		if !self.s.isAccessibleDefine(e.Public, e.Token) {
 			self.pushErr(decl, log::IdentNotExist, decl.Kind)
 			ret nil
@@ -1099,7 +1101,7 @@ impl typeChecker {
 		ret e
 	}
 
-	fn fromTypeEnum(mut self, &decl: &token::Token, mut &e: &TypeEnum): &TypeEnum {
+	fn fromTypeEnum(mut self, decl: &token::Token, mut e: &TypeEnum): &TypeEnum {
 		if !self.s.isAccessibleDefine(e.Public, e.Token) {
 			self.pushErr(decl, log::IdentNotExist, decl.Kind)
 			ret nil
@@ -1107,7 +1109,7 @@ impl typeChecker {
 		ret e
 	}
 
-	fn fromTrait(mut self, &decl: &token::Token, mut &t: &Trait): &Trait {
+	fn fromTrait(mut self, decl: &token::Token, mut t: &Trait): &Trait {
 		if !self.s.isAccessibleDefine(t.Public, t.Token) {
 			self.pushErr(decl, log::IdentNotExist, decl.Kind)
 			ret nil
@@ -1117,7 +1119,7 @@ impl typeChecker {
 		ret t
 	}
 
-	fn checkStructIns(mut self, mut &ins: &StructIns, mut &errorToken: &token::Token): (ok: bool) {
+	fn checkStructIns(mut self, mut ins: &StructIns, mut errorToken: &token::Token): (ok: bool) {
 		if ins.checked {
 			ret true
 		}
@@ -1193,7 +1195,7 @@ impl typeChecker {
 	// The identifier slice will not include method generics, if any.
 	// Because we can't know exactly there is no cycle risk with no more analysis.
 	// Keep it simple.
-	fn inscatchNeeded(mut self, mut &s: &Struct): (yes: bool, letGenerics: []&ast::Generic) {
+	fn inscatchNeeded(mut self, mut s: &Struct): (yes: bool, letGenerics: []&ast::Generic) {
 		if len(s.Generics) == 0 {
 			ret false, nil
 		}
@@ -1239,7 +1241,7 @@ impl typeChecker {
 		defer { self.lookup = lookup }
 
 		// Whether the instance pushed to recheck stack.
-		mut &_recheck := recheckNeeded // For closure.
+		mut &_recheck := &recheckNeeded // For closure.
 
 		pushGenericToIns := fn(mut typDecl: &ast::Expr): bool {
 			mut typ := unsafe { self.checkDecl(typDecl) }
@@ -1269,10 +1271,10 @@ impl typeChecker {
 			Ok:
 			}
 			// Insert type to recheck collection if recheck needed.
-			if unsafe { !_recheck && len(self.ignoreGenerics) > 0 } {
+			if unsafe { !*_recheck && len(self.ignoreGenerics) > 0 } {
 				prim := typ.Prim()
 				if prim != nil && unsafe { self.isIgnoredGeneric(prim.Kind) } {
-					unsafe { _recheck = true }
+					unsafe { *_recheck = true }
 				}
 			}
 			s.Generics = append(s.Generics, &InsGeneric{Type: typ})
@@ -1355,7 +1357,7 @@ impl typeChecker {
 	}
 
 	// Checks structure instance.
-	fn _fromStructIns(mut self, mut &ins: &StructIns, mut token: &token::Token): (ok: bool) {
+	fn _fromStructIns(mut self, mut ins: &StructIns, mut token: &token::Token): (ok: bool) {
 		ok = self.checkStructIns(ins, token)
 		if ok {
 			self.pushReference[&StructIns](ins)
@@ -1365,7 +1367,7 @@ impl typeChecker {
 
 	// Calls _fromStructIns and returns the instance if the instance is new,
 	// otherwise returns the exist instance.
-	fn fromStructIns(mut self, mut &ins: &StructIns, mut token: &token::Token): &StructIns {
+	fn fromStructIns(mut self, mut ins: &StructIns, mut token: &token::Token): &StructIns {
 		mut existInstance := ins.Decl.appendInstance(ins)
 		if existInstance != nil {
 			if !self.s.checkConstraintsStruct(ins, token, existInstance) {
@@ -1380,7 +1382,7 @@ impl typeChecker {
 		ret ins
 	}
 
-	fn fromStruct(mut self, mut &decl: &token::Token, mut &s: &Struct): &StructIns {
+	fn fromStruct(mut self, mut decl: &token::Token, mut s: &Struct): &StructIns {
 		if !self.s.isAccessibleDefine(s.Public, s.Token) {
 			self.pushErr(decl, log::IdentNotExist, decl.Kind)
 			ret nil
@@ -1404,7 +1406,7 @@ impl typeChecker {
 	// If another lookup nedeed, uses internal lookup, so any generic type build
 	// process will use internal lookup. This might be useful for building
 	// genericed type from another package.
-	fn getDef(mut self, mut &decl: &token::Token, _bind: bool): Kind {
+	fn getDef(mut self, mut decl: &token::Token, _bind: bool): Kind {
 		if self.isIgnoredGeneric(decl.Kind) {
 			ret buildPrimType(decl.Kind)
 		}
@@ -1475,7 +1477,7 @@ impl typeChecker {
 		ret self.getDef(decl, _bind)
 	}
 
-	fn buildSptrFromType(mut self, mut &valueTyp: &Type): &Sptr {
+	fn buildSptrFromType(mut self, mut valueTyp: &Type): &Sptr {
 		// Check special cases.
 		match {
 		| valueTyp == nil:
@@ -1534,7 +1536,7 @@ impl typeChecker {
 		}
 	}
 
-	fn buildPtrFromType(mut self, mut &valueTyp: &Type): &Ptr {
+	fn buildPtrFromType(mut self, mut valueTyp: &Type): &Ptr {
 		// Check special cases.
 		match {
 		| valueTyp == nil:
@@ -1730,7 +1732,7 @@ impl typeChecker {
 		ret &Tuple{Types: types}
 	}
 
-	fn checkFuncTypes(mut self, mut &f: &FuncIns): (ok: bool) {
+	fn checkFuncTypes(mut self, mut f: &FuncIns): (ok: bool) {
 		for (_, mut p) in f.Params {
 			p.Type = self.checkDecl(p.Decl.TypeSym.Decl)
 			ok = p.Type != nil
@@ -1921,7 +1923,7 @@ impl typeChecker {
 		ret typ
 	}
 
-	fn checkDecl(mut self, mut &decl: &ast::Expr): &Type {
+	fn checkDecl(mut self, mut decl: &ast::Expr): &Type {
 		mut errorToken := self.errorToken
 		defer { self.errorToken = errorToken }
 		self.errorToken = decl.Token
@@ -1948,7 +1950,7 @@ impl typeChecker {
 		ret typ
 	}
 
-	fn check(mut self, mut &t: &TypeSym) {
+	fn check(mut self, mut t: &TypeSym) {
 		if t.Decl == nil {
 			ret
 		}
@@ -1962,14 +1964,14 @@ impl typeChecker {
 
 	// Rechecks structure instance.
 	// Updates s to common instance before return.
-	fn recheckStructIns(mut self, mut &s: &StructIns, mut &errorToken: &token::Token): (ok: bool) {
-		s.checked = false
+	fn recheckStructIns(mut self, mut &s: *&StructIns, mut errorToken: &token::Token): (ok: bool) {
+		(*s).checked = false
 
 		// We need to hard-check methods, if it have any method.
 		// Because method types will not be rechecked with the recheck strategy.
 		// So if any method refers to generic type, it may use unresolved type.
 		// Reload (resolve) types from scratch.
-		for (_, mut m) in s.Methods {
+		for (_, mut m) in (*s).Methods {
 			// If method have parameters (except receiver) or have result type,
 			// then reload types. Otherwise, it is not needed.
 			if len(m.Params) > 1 || !m.IsVoid() {
@@ -1987,22 +1989,22 @@ impl typeChecker {
 		// The buildStructIns returns common instance to avoid using duplicated instances.
 		// So the returned instance may be already existing or the same instance we pass.
 		// In both cases, use the result to make sure we have common instance.
-		s = self.buildStructIns(s, errorToken)
+		*s = self.buildStructIns(*s, errorToken)
 		// The result instance is not nil, so analysis were successful.
-		ok = s != nil
+		ok = *s != nil
 		ret
 	}
 
 	// Rechecks the recheckable type.
 	// See developer reference (15).
-	fn recheck(mut self, mut &t: recheckableType, mut &errorToken: &token::Token): (ok: bool) {
+	fn recheck(mut self, mut t: recheckableType, mut errorToken: &token::Token): (ok: bool) {
 		match type t {
 		| &Type:
 			mut typ := t.(&Type)
 			match {
 			| typ.Struct() != nil:
 				mut s := typ.Struct()
-				ok = self.recheckStructIns(s, errorToken)
+				ok = self.recheckStructIns(&s, errorToken)
 				// Analysis returned successfully.
 				// Update typ.Kind with the instance s to make sure using common instance.
 				// Because all types must be point to the same common instance.
@@ -2014,7 +2016,7 @@ impl typeChecker {
 			}
 		| &StructIns:
 			mut s := t.(&StructIns)
-			ret self.recheckStructIns(s, errorToken)
+			ret self.recheckStructIns(&s, errorToken)
 		}
 		ret
 	}
@@ -2024,11 +2026,11 @@ impl typeChecker {
 struct identTypeLookup{}
 
 impl identTypeLookup {
-	fn prim(&name: str, t: &Prim): bool {
+	fn prim(name: str, t: &Prim): bool {
 		ret t.Kind == name
 	}
 
-	fn exist(&name: str, mut &k: &Type): bool {
+	fn exist(name: str, mut k: &Type): bool {
 		match {
 		| k.Prim() != nil:
 			ret identTypeLookup.prim(name, k.Prim())
@@ -2087,7 +2089,7 @@ impl identTypeLookup {
 	}
 }
 
-fn kindUsesGenerics(mut &k: &Type, &generics: []&ast::Generic): bool {
+fn kindUsesGenerics(mut k: &Type, generics: []&ast::Generic): bool {
 	for _, g in generics {
 		if identTypeLookup.exist(g.Name, k) {
 			ret true
@@ -2097,7 +2099,7 @@ fn kindUsesGenerics(mut &k: &Type, &generics: []&ast::Generic): bool {
 }
 
 // Reports whether directive is exist.
-fn hasDirective(mut &directives: []&ast::Directive, tag: str): bool {
+fn hasDirective(mut directives: []&ast::Directive, tag: str): bool {
 	for (_, mut dr) in directives {
 		if dr.Tag.Kind == tag {
 			ret true
@@ -2106,10 +2108,10 @@ fn hasDirective(mut &directives: []&ast::Directive, tag: str): bool {
 	ret false
 }
 
-fn canGetPtr(mut &v: &Value): bool { ret v.Lvalue }
+fn canGetPtr(mut v: &Value): bool { ret v.Lvalue }
 
 // Reports whether type has built-in string conversion support.
-fn isBuiltinStrConvertible(mut &t: &Type): bool {
+fn isBuiltinStrConvertible(mut t: &Type): bool {
 	ret !t.Void() && t.Func() == nil && t.Tuple() == nil && !t.comptime()
 }
 
@@ -2142,7 +2144,7 @@ fn getStructFromKind(mut k: &Type): &Struct {
 }
 
 // Reports whether type is valid for SizeOf/AlignOf functions.
-fn validTypeForXof(mut &t: &Type): bool {
+fn validTypeForXof(mut t: &Type): bool {
 	ret !t.Void() && t.Func() == nil && t.Tuple() == nil && !t.comptime()
 }
 

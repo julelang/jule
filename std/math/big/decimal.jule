@@ -61,7 +61,7 @@ impl decimal {
 				s = ntz // shift at most ntz bits
 			}
 			mut r := []Word(nil)
-			rshW(r, m, s)
+			rshW(&r, m, s)
 			unsafe { *(&m) = r }
 			shift += int(s)
 		}
@@ -69,7 +69,7 @@ impl decimal {
 		// Do any shift left in binary representation.
 		if shift > 0 {
 			mut r := []Word(nil)
-			lshW(r, m, uint(shift))
+			lshW(&r, m, uint(shift))
 			unsafe { *(&m) = r }
 			shift = 0
 		}
@@ -153,7 +153,7 @@ impl decimal {
 }
 
 // Implements x >> s, for s <= maxShift.
-fn shr(mut &x: decimal, s: uint) {
+fn shr(mut &x: *decimal, s: uint) {
 	// Division by 1<<s using shift-and-subtract algorithm.
 
 	// pick up enough leading digits to cover first shift
@@ -211,7 +211,7 @@ fn shr(mut &x: decimal, s: uint) {
 
 // Cuts off any trailing zeros from x's mantissa;
 // they are meaningless for the value of x.
-fn trim(mut &x: decimal) {
+fn trim(mut &x: *decimal) {
 	mut i := len(x.mant)
 	for i > 0 && x.mant[i-1] == '0' {
 		i--
@@ -225,7 +225,7 @@ fn trim(mut &x: decimal) {
 // Reports if x should be rounded up
 // if shortened to n digits. n must be a valid index
 // for x.mant.
-fn shouldRoundUp(&x: decimal, n: int): bool {
+fn shouldRoundUp(&x: *decimal, n: int): bool {
 	if x.mant[n] == '5' && n+1 == len(x.mant) {
 		// exactly halfway - round to even
 		ret n > 0 && (x.mant[n-1]-'0')&1 != 0

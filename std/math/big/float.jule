@@ -109,7 +109,7 @@ impl float {
 		// normalized x != 0
 		f.form = finite
 		fmant, exp := math::Frexp(x) // get normalized mantissa
-		setWU64(f.mant, 1<<63|math::F64bits(fmant)<<11)
+		setWU64(&f.mant, 1<<63|math::F64bits(fmant)<<11)
 		f.exp = i32(exp) // always fits
 		if f.prec < 53 {
 			f.round(0)
@@ -287,7 +287,7 @@ impl float {
 	// Returns [Float] with the (possibly rounded) value |x(self)| (the absolute value of x).
 	fn Abs(self): float {
 		let mut z: float
-		z.Set(self)
+		z.Set(*self)
 		z.neg = false
 		ret z
 	}
@@ -295,7 +295,7 @@ impl float {
 	// Returns [Float] with the (possibly rounded) value of x(self) with its sign negated.
 	fn Neg(self): float {
 		let mut z: float
-		z.Set(self)
+		z.Set(*self)
 		z.neg = !z.neg
 		ret z
 	}
@@ -389,7 +389,7 @@ impl float {
 	// x and y must have a non-empty mantissa and valid exponent.
 	fn ucmp(self, y: float): int {
 		if debugFloat {
-			validateBinaryOperands(self, y)
+			validateBinaryOperands(*self, y)
 		}
 
 		match {
@@ -471,7 +471,7 @@ impl float {
 		// only if |mx| == 1 we have to compare the mantissae
 		match mx {
 		| -1:
-			ret y.ucmp(self)
+			ret y.ucmp(*self)
 		| +1:
 			ret self.ucmp(y)
 		}
@@ -500,7 +500,7 @@ impl float {
 			ret
 		}
 		// x != 0
-		setWW(self.mant, x.abs)
+		setWW(&self.mant, x.abs)
 		fnorm(self.mant)
 		self.setExpAndRound(i64(bits), 0)
 	}
@@ -520,7 +520,7 @@ impl float {
 		self.neg = x.neg
 		if x.form == finite {
 			self.exp = x.exp
-			setWW(self.mant, x.mant)
+			setWW(&self.mant, x.mant)
 		}
 		if self.prec == 0 {
 			self.prec = x.prec
@@ -594,7 +594,7 @@ impl float {
 			// round
 			let mut r: float
 			r.prec = u32(p)
-			r.Set(self)
+			r.Set(*self)
 			e = r.exp - 1
 
 			// Rounding may have caused r to overflow to ±Inf
@@ -714,7 +714,7 @@ impl float {
 			// round
 			let mut r: float
 			r.prec = u32(p)
-			r.Set(self)
+			r.Set(*self)
 			e = r.exp - 1
 
 			// Rounding may have caused r to overflow to ±Inf

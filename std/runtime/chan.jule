@@ -64,9 +64,9 @@ impl chanQueue {
 	// Adds the data to the end of the queue.
 	// If the channel is unbuffered, it always assumes the current data has been read.
 	// If the channel is buffered, it always assumes there is free node to enqueue.
-	fn enqueue(mut self, mut &data: T) {
+	fn enqueue(mut self, mut &data: *T) {
 		// Write data to the next available node in the queue.
-		unsafe { self.data[self.w] = data }
+		unsafe { self.data[self.w] = *data }
 		// Advance the write order.
 		self.w++
 		if self.w == len(self.buf) {
@@ -132,7 +132,7 @@ impl pchan {
 	// The returned &hchan does not exhibit GC behavior and can be used until
 	// the self pointer is freed, after which it should not be used.
 	fn hchan(mut self): &hchan {
-		ret unsafe { (&hchan)((*hchan)(&self)) }
+		ret unsafe { (&hchan)((*hchan)(self)) }
 	}
 
 	// Closes the channel.
@@ -151,24 +151,24 @@ impl pchan {
 		if self.state&chanBuffered == chanBuffered {
 			// If the capacity is completely consumed, wait until space becomes available.
 			// When some data is received, there will be space in the queue to write.
-			chanpark(self.hchan(), self.len, self.cap, reasonSend)
+			chanpark(self.hchan(), &self.len, &self.cap, reasonSend)
 			if self.state&chanClosed == chanClosed {
 				panic("runtime: send on closed channel")
 			}
-			self.queue.enqueue(data)
+			self.queue.enqueue(&data)
 			self.len++
 		} else {
 			one := 1
 			// If there is data waiting to be received, wait until it is received.
-			chanpark(self.hchan(), self.len, one, reasonSend)
+			chanpark(self.hchan(), &self.len, &one, reasonSend)
 			if self.state&chanClosed == chanClosed {
 				panic("runtime: send on closed channel")
 			}
-			self.queue.enqueue(data)
+			self.queue.enqueue(&data)
 			self.len++
 			// Wait until the length becomes zero.
 			// This means the data has been received.
-			chanpark(self.hchan(), self.len, one, reasonSend)
+			chanpark(self.hchan(), &self.len, &one, reasonSend)
 		}
 		self.lock.unlock()
 	}
@@ -177,22 +177,13 @@ impl pchan {
 	// The |ok| is the reference that points to boolean and
 	// it reports whether data dequeued and received successfully.
 	// If owned is true, assumes lock is already owned by the current caller.
-	fn recv(mut self, mut &ok: bool, owned: bool): T {
-		// References are safe, but this method may used by the compiler unsafely.
-		// And we have to support nil references for such a low-level use.
-		// So, If the |ok| reference not implemented as is nil raw pointer
-		// by the compiler, set it. Otherwise, do not touch it. Be safe.
-		//
-		// To determine whether |ok| is nil raw pointer behind the scene,
-		// take raw pointer and compare it with nil. Since taking raw pointer of
-		// the references will result as actual pointer of them, we can determine
-		// whether the reference's raw pointer is nil.
+	fn recv(mut self, mut &ok: *bool, owned: bool): T {
 		if !owned {
 			self.lock.lock()
 		}
 		zero := 0
 		// If there is no data waiting to be received in the queue, wait until there is.
-		chanpark(self.hchan(), zero, self.len, reasonRecv)
+		chanpark(self.hchan(), &zero, &self.len, reasonRecv)
 		// chanpark returns when the condition met or channel has been closed.
 		// An unbuffered channel cannot have a queue, so its length always varies
 		// between 0 and 1. If there is no data to receive, the only possibility is
@@ -210,8 +201,8 @@ impl pchan {
 			self.queue.buf = nil
 			self.queue.data = nil
 			self.lock.unlock()
-			if &ok != nil {
-				ok = false
+			if ok != nil {
+				*ok = false
 			}
 			let mut def: T
 			ret def
@@ -219,8 +210,8 @@ impl pchan {
 		mut data := self.queue.dequeue()
 		self.len--
 		self.lock.unlock()
-		if &ok != nil {
-			ok = true
+		if ok != nil {
+			*ok = true
 		}
 		ret data
 	}
@@ -231,10 +222,10 @@ impl pchan {
 // and c indicates the value that n should be smaller than.
 // This function must be called with the channel lock held by this thread.
 // Even if the condition is not met, it will return if the channel is in a closed state.
-fn chanpark(ch: &hchan, &n: int, &c: int, mut reason: u32) {
+fn chanpark(ch: &hchan, &n: *int, &c: *int, mut reason: u32) {
 	reason |= reasonStrict
 	for {
-		if ch.state&chanClosed == chanClosed || n < c {
+		if ch.state&chanClosed == chanClosed || *n < *c {
 			break
 		}
 		// The lock is acquired. This means no changes can occur in the channel.
@@ -249,7 +240,7 @@ fn chanpark(ch: &hchan, &n: int, &c: int, mut reason: u32) {
 
 // Reports whether channel can receive data.
 // Will locks the mutex, but will not release.
-fn chanCanRecv(&ch: hchan): (r: bool) {
+fn chanCanRecv(&ch: *hchan): (r: bool) {
 	ch.lock.lock()
 	r = ch.len > 0
 	ret
@@ -257,7 +248,7 @@ fn chanCanRecv(&ch: hchan): (r: bool) {
 
 // Reports whether channel can send data.
 // Will locks the mutex, but will not release.
-fn chanCanSend(&ch: hchan): (r: bool) {
+fn chanCanSend(&ch: *hchan): (r: bool) {
 	ch.lock.lock()
 	if ch.state&chanBuffered == chanBuffered {
 		r = ch.len < ch.cap
@@ -329,7 +320,7 @@ Select:
 	tch -= rch
 	for rch > 0; rch, ch = rch-1, ch+1 {
 		if *ch != nil {
-			if chanCanRecv(**ch) {
+			if chanCanRecv(&(**ch)) {
 				candidates = append(candidates, *ch)
 			} else {
 				// Release the mutex, this channel is not a candidate.
@@ -340,7 +331,7 @@ Select:
 	// Determine send candidates.
 	for tch > 0; tch, ch = tch-1, ch+1 {
 		if *ch != nil {
-			if chanCanSend(**ch) {
+			if chanCanSend(&(**ch)) {
 				candidates = append(candidates, *ch)
 			} else {
 				// Release the mutex, this channel is not a candidate.

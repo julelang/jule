@@ -155,13 +155,13 @@ fn nextslicecap(newLen: int, oldCap: int): int {
 
 // Prepreation phase of memory append.
 // If the slice s have not enough capacity for newItems, allocates a new slice for s.
-fn prememappend[Slice](mut &s: Slice, newItems: int) {
-	if cap(s)-len(s) >= newItems {
+fn prememappend[Slice](mut &s: *Slice, newItems: int) {
+	if cap(*s)-len(*s) >= newItems {
 		ret
 	}
-	mut ns := make(Slice, len(s), nextslicecap(len(s)+newItems, cap(s)))
-	memcopy(ns, s)
-	s = ns
+	mut ns := make(Slice, len(*s), nextslicecap(len(*s)+newItems, cap(*s)))
+	memcopy(ns, *s)
+	*s = ns
 }
 
 // The runtime implementation of the built-in append function.
@@ -169,7 +169,7 @@ fn memappend[Dest, Src](mut dest: Dest, mut src: Src): Dest {
 	if len(src) == 0 {
 		ret dest
 	}
-	prememappend(dest, len(src))
+	prememappend(&dest, len(src))
 	n := len(dest)
 	dest = dest[:len(dest)+len(src)]
 	memcopy(dest[n:], src)

@@ -92,14 +92,14 @@ fn AppendFloat(mut dst: []byte, f: f64, fmt: byte, prec: int, bitSize: int): []b
 
 fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int): []byte {
 	mut bits := u64(0)
-	let mut flt: &floatInfo = nil
+	let mut &flt: *floatInfo = nil
 	match bitSize {
 	| 32:
 		bits = u64(math::F32bits(f32(val)))
-		flt = unsafe { (&floatInfo)(&f32info) }
+		flt = &f32info
 	| 64:
 		bits = math::F64bits(val)
-		flt = unsafe { (&floatInfo)(&f64info) }
+		flt = &f64info
 	|:
 		panic("conv: illegal AppendFloat/FormatFloat bitSize")
 	}
@@ -130,14 +130,14 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int
 
 	// Pick off easy binary, hex formats.
 	if fmt == 'b' {
-		ret formatB(dst, neg, mant, exp, *flt)
+		ret formatB(dst, neg, mant, exp, flt)
 	}
 	if fmt == 'x' || fmt == 'X' {
-		ret formatX(dst, prec, fmt, neg, mant, exp, *flt)
+		ret formatX(dst, prec, fmt, neg, mant, exp, flt)
 	}
 
 	if !optimize {
-		ret bigFtoa(dst, prec, fmt, neg, mant, exp, *flt)
+		ret bigFtoa(dst, prec, fmt, neg, mant, exp, flt)
 	}
 
 	mut digs := decimalSlice{}
@@ -148,7 +148,7 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int
 		// Use Ryu algorithm.
 		let mut buf: [32]byte
 		digs.d = unsafe::Slice(&buf[0], len(buf), len(buf))
-		ryuFtoaShortest(digs, mant, exp-int(flt.mantbits), *flt)
+		ryuFtoaShortest(&digs, mant, exp-int(flt.mantbits), flt)
 		ok = true
 		// Precision for shortest representation mode.
 		match fmt {
@@ -177,31 +177,31 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int
 		if bitSize == 32 && digits <= 9 {
 			let mut buf: [24]byte
 			digs.d = unsafe::Slice(&buf[0], len(buf), len(buf))
-			ryuFtoaFixed32(digs, u32(mant), exp-int(flt.mantbits), digits)
+			ryuFtoaFixed32(&digs, u32(mant), exp-int(flt.mantbits), digits)
 			ok = true
 		} else if digits <= 18 {
 			let mut buf: [24]byte
 			digs.d = unsafe::Slice(&buf[0], len(buf), len(buf))
-			ryuFtoaFixed64(digs, mant, exp-int(flt.mantbits), digits)
+			ryuFtoaFixed64(&digs, mant, exp-int(flt.mantbits), digits)
 			ok = true
 		}
 	}
 	if !ok {
-		ret bigFtoa(dst, prec, fmt, neg, mant, exp, *flt)
+		ret bigFtoa(dst, prec, fmt, neg, mant, exp, flt)
 	}
 	ret formatDigits(dst, shortest, neg, digs, prec, fmt)
 }
 
 // Uses multiprecision computations to format a float.
 fn bigFtoa(mut dst: []byte, mut prec: int, fmt: byte, neg: bool,
-	mant: u64, exp: int, &flt: floatInfo): []byte {
+	mant: u64, exp: int, &flt: *floatInfo): []byte {
 	mut d := decimal{}
 	d.Assign(mant)
 	d.Shift(exp - int(flt.mantbits))
 	mut digs := decimalSlice{}
 	shortest := prec < 0
 	if shortest {
-		roundShortest(d, mant, exp, flt)
+		roundShortest(&d, mant, exp, flt)
 		digs = decimalSlice{d: d.d[:], nd: d.nd, dp: d.dp}
 		// Precision for shortest representation mode.
 		match fmt {
@@ -268,7 +268,7 @@ fn formatDigits(mut dst: []byte, shortest: bool, neg: bool,
 
 // Rounds d (= mant * 2^exp) to the shortest number of digits
 // that will let the original floating point value be precisely reconstructed.
-fn roundShortest(mut &d: decimal, mant: u64, exp: int, &flt: floatInfo) {
+fn roundShortest(mut &d: *decimal, mant: u64, exp: int, &flt: *floatInfo) {
 	// If mantissa is zero, the number is zero; stop now.
 	if mant == 0 {
 		d.nd = 0
@@ -495,7 +495,7 @@ fn formatF(mut dst: []byte, neg: bool, d: decimalSlice, prec: int): []byte {
 }
 
 // %b: -ddddddddp±ddd
-fn formatB(mut dst: []byte, neg: bool, mant: u64, mut exp: int, &flt: floatInfo): []byte {
+fn formatB(mut dst: []byte, neg: bool, mant: u64, mut exp: int, &flt: *floatInfo): []byte {
 	// sign
 	if neg {
 		dst = append(dst, '-')
@@ -518,7 +518,7 @@ fn formatB(mut dst: []byte, neg: bool, mant: u64, mut exp: int, &flt: floatInfo)
 
 // %x: -0x1.yyyyyyyyp±ddd or -0x0p+0. (y is hex digit, d is decimal digit)
 fn formatX(mut dst: []byte, prec: int, fmt: byte, neg: bool,
-	mut mant: u64, mut exp: int, &flt: floatInfo): []byte {
+	mut mant: u64, mut exp: int, &flt: *floatInfo): []byte {
 	if mant == 0 {
 		exp = 0
 	}

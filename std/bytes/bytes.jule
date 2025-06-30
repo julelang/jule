@@ -72,7 +72,7 @@ impl asciiSet {
 
 	// Reports whether c is inside the set.
 	fn contains(self, c: byte): bool {
-		ret (self[c/32]&(1<<(c%32))) != 0
+		ret ((*self)[c/32]&(1<<(c%32))) != 0
 	}
 }
 
@@ -90,7 +90,7 @@ fn Equal(a: []byte, b: []byte): bool {
 // A nil argument is equivalent to an empty slice.
 fn Compare(a: []byte, b: []byte): int {
 	as, bs := unsafe::BytesStr(a), unsafe::BytesStr(b)
-	ret runtime::compareStr(as, bs)
+	ret runtime::compareStr(&as, &bs)
 }
 
 // Counts the number of non-overlapping instances of sep in s.
@@ -689,7 +689,7 @@ fn TrimRight(mut s: []byte, cutset: str): []byte {
 	}
 	as, ok := asciiSet.make(cutset)
 	if ok {
-		ret trimRightASCII(s, as)
+		ret trimRightASCII(s, &as)
 	}
 	ret trimRightUnicode(s, cutset)
 }
@@ -746,7 +746,7 @@ fn Trim(mut s: []byte, cutset: str): []byte {
 	}
 	as, ok := asciiSet.make(cutset)
 	if ok {
-		ret trimLeftASCII(trimRightASCII(s, as), as)
+		ret trimLeftASCII(trimRightASCII(s, &as), &as)
 	}
 	ret trimLeftUnicode(trimRightUnicode(s, cutset), cutset)
 }
@@ -766,7 +766,7 @@ fn TrimLeft(mut s: []byte, cutset: str): []byte {
 	}
 	as, ok := asciiSet.make(cutset)
 	if ok {
-		ret trimLeftASCII(s, as)
+		ret trimLeftASCII(s, &as)
 	}
 	ret trimLeftUnicode(s, cutset)
 }
@@ -782,7 +782,7 @@ fn trimLeftByte(mut s: []byte, c: byte): []byte {
 	ret s
 }
 
-fn trimLeftASCII(mut s: []byte, &as: asciiSet): []byte {
+fn trimLeftASCII(mut s: []byte, &as: *asciiSet): []byte {
 	for len(s) > 0 {
 		if !as.contains(s[0]) {
 			break
@@ -821,7 +821,7 @@ fn trimRightByte(mut s: []byte, c: byte): []byte {
 	ret s
 }
 
-fn trimRightASCII(mut s: []byte, &as: asciiSet): []byte {
+fn trimRightASCII(mut s: []byte, &as: *asciiSet): []byte {
 	for len(s) > 0 {
 		if !as.contains(s[len(s)-1]) {
 			break
