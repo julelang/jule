@@ -784,7 +784,7 @@ impl sema {
 	}
 
 	// Do not checks mutability.
-	fn checkAssignType(mut &self, destIsRef: bool, mut dest: &Type,
+	fn checkAssignType(mut &self, destIsRef: bool, firstAssignToDest: bool, mut dest: &Type,
 		mut v: &Value, mut errorToken: &token::Token, mut refers: &ReferenceStack): bool {
 		if v.Decl {
 			self.pushErr(errorToken, log::InvalidExpr)
@@ -792,8 +792,13 @@ impl sema {
 		}
 
 		if destIsRef {
-			if !v.IsNil() && !dest.Equal(v.Type) {
-				self.pushErr(errorToken, log::IncompatibleTypes, dest.Str(), v.Type.Str())
+			if firstAssignToDest {
+				if !v.IsNil() && !dest.Equal(v.Type) {
+					self.pushErr(errorToken, log::IncompatibleTypes, dest.Str(), v.Type.Str())
+					ret false
+				}
+			} else if !v.IsNil() {
+				self.pushErr(errorToken, "reference pointer type @ can only assign to nil", dest.Str())
 				ret false
 			}
 		} else {
@@ -2186,7 +2191,8 @@ impl sema {
 				}
 			}
 
-			if self.checkAssignType(v.Reference, v.TypeSym.Type, v.ValueSym.Value, v.ValueSym.Expr.Token, v.Refers) {
+			const FirstAssignToDest = true // The variable takes first assignment with the initializer value.
+			if self.checkAssignType(v.Reference, FirstAssignToDest, v.TypeSym.Type, v.ValueSym.Value, v.ValueSym.Expr.Token, v.Refers) {
 				self.checkValidityForInitExpr(
 					v.Mutable,
 					v.Reference,

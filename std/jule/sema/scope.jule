@@ -1276,14 +1276,9 @@ impl scopeChecker {
 		self.scope.Stmts = append(self.scope.Stmts, &Assign{Left: lm, Right: rm, Op: a.Op})
 
 		if a.Op.ID == token::ASSIGN {
-			mut checker := assignTypeChecker{
-				s: self.s,
-				dest: l.Type,
-				v: r,
-				errorToken: a.Op,
-				refers: self.getOwnerRefers(),
-			}
-			if checker.check() {
+			const firstAssignToDest = false // this is not the first assignment to the variable
+			reference := isRef(l) != nil
+			if self.s.checkAssignType(reference, firstAssignToDest, l.Type, r, a.Op, self.getOwnerRefers()) {
 				rm.Model = r.Model
 				lm.Model = l.Model
 			}
@@ -1367,8 +1362,9 @@ impl scopeChecker {
 		// So, we don't need to check reference assignment should using lvalue.
 		mut reference := false
 		if self.s.checkValidityForInitExpr(l.Mutable, reference, l.Type, r.data, r.expr.Token) {
-			reference = strict // enable reference checking if strict mode enabled
-			self.s.checkAssignType(reference, l.Type, r.data, r.expr.Token, self.getOwnerRefers())
+			reference = strict              // enable reference checking if strict mode enabled
+			const firstAssignToDest = false // this is not the first assignment to the variable
+			self.s.checkAssignType(reference, firstAssignToDest, l.Type, r.data, r.expr.Token, self.getOwnerRefers())
 		}
 		st.Left = append(st.Left, l)
 	}

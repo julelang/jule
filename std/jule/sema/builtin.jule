@@ -329,9 +329,10 @@ fn builtinCallerNew(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value
 		if init != nil {
 			mut token := fc.Args[1].Token
 			const Reference = false
+			const FirstAssignToDest = false
 			e.s.checkValidityForInitExpr(
 				e.target.mutable, Reference, t.Type, init, token)
-			_ = e.s.checkAssignType(Reference, t.Type, init, token, e.getOwnerRefers())
+			_ = e.s.checkAssignType(Reference, FirstAssignToDest, t.Type, init, token, e.getOwnerRefers())
 
 			v.Model = &BuiltinNewCallExpr{
 				Type: t.Type,
@@ -479,13 +480,14 @@ fn builtinCallerAppend(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Va
 		ret nil
 	}
 
-	const reference = false // Element parameter is not reference.
-	const mutable = true    // Element parameter is mutable.
+	const reference = false         // Element parameter is not reference.
+	const firstAssignToDest = false // Element parameter is not reference, so this info will not be used.
+	const mutable = true            // Element parameter is mutable.
 
 	if e.s.checkValidityForInitExpr(mutable, reference, t.Type, t, firstArg.Token) {
 		// Check type if validity is good.
 		// Helps to reduce error logs and duplicated logs.
-		_ = e.s.checkAssignType(reference, t.Type, t, firstArg.Token, e.getOwnerRefers())
+		_ = e.s.checkAssignType(reference, firstAssignToDest, t.Type, t, firstArg.Token, e.getOwnerRefers())
 	}
 
 	mut prefix := e.prefix
@@ -566,7 +568,7 @@ fn builtinCallerAppend(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Va
 			e1.Type.Variadic = true
 			// Check type if validity is good.
 			// Helps to reduce error logs and duplicated logs.
-			_ = e.s.checkAssignType(reference, s.Value, e1, secondArg.Token, e.getOwnerRefers())
+			_ = e.s.checkAssignType(reference, firstAssignToDest, s.Value, e1, secondArg.Token, e.getOwnerRefers())
 		} else {
 			e1.Type.Variadic = true
 		}
@@ -590,7 +592,7 @@ fn builtinCallerAppend(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Va
 		if e.s.checkValidityForInitExpr(mutable, reference, s.Value, e1, arg.Token) {
 			// Check type if validity is good.
 			// Helps to reduce error logs and duplicated logs.
-			_ = e.s.checkAssignType(reference, s.Value, e1, arg.Token, e.getOwnerRefers())
+			_ = e.s.checkAssignType(reference, firstAssignToDest, s.Value, e1, arg.Token, e.getOwnerRefers())
 		}
 		slice.Elems = append(slice.Elems, e1)
 	}
@@ -846,8 +848,9 @@ fn callerDeleteMap(mut e: &eval, mut fc: &ast::CallExpr, mut expr: &Value, mut v
 			ret nil
 		|:
 			const Reference = false
+			const FirstAssignToDest = false
 			mut keyType := expr.Type.Map().Key
-			if !e.s.checkAssignType(Reference, keyType, key, fc.Args[1].Token, e.getOwnerRefers()) {
+			if !e.s.checkAssignType(Reference, FirstAssignToDest, keyType, key, fc.Args[1].Token, e.getOwnerRefers()) {
 				ret nil
 			}
 		}

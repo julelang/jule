@@ -958,7 +958,8 @@ impl fnCallArgChecker {
 		// Check type if validity is good.
 		// Helps to reduce error logs and duplicated logs.
 		if self.e.s.checkValidityForInitExpr(p.Decl.Mutable, p.Decl.Reference, p.Type, arg, errorToken) {
-			ret self.e.s.checkAssignType(p.Decl.Reference, p.Type, arg, errorToken, self.e.getOwnerRefers())
+			const FirstAssignToDest = true // The argument takes first assignment with the function call.
+			ret self.e.s.checkAssignType(p.Decl.Reference, FirstAssignToDest, p.Type, arg, errorToken, self.e.getOwnerRefers())
 		}
 		ret false
 	}
@@ -1187,6 +1188,7 @@ impl structLitChecker {
 
 	fn pushMatch(mut self, mut f: &FieldIns, mut v: &Value, mut errorToken: &token::Token) {
 		const Reference = false
+		const FirstAssignToDest = false
 		// If evaluated for the immutable memory, check as immutable.
 		// But if field in scope of the interior mutability, check as mutable.
 		// Do not accept as risky if structure is not have any method.
@@ -1195,7 +1197,7 @@ impl structLitChecker {
 		// Check type if validity is good.
 		// Helps to reduce error logs and duplicated logs.
 		if self.e.s.checkValidityForInitExpr(mutable, Reference, f.Type, v, errorToken) {
-			_ = self.e.s.checkAssignType(Reference, f.Type, v, errorToken, self.e.getOwnerRefers())
+			_ = self.e.s.checkAssignType(Reference, FirstAssignToDest, f.Type, v, errorToken, self.e.getOwnerRefers())
 		}
 		self.args = append(self.args, &StructArgExpr{
 			Token: errorToken,
