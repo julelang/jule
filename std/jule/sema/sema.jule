@@ -16,37 +16,53 @@ use "std/slices"
 use "std/strings"
 use "std/unicode/utf8"
 
-fn isValidModelForRef(mut m: Expr): bool {
-	match type m {
-	| &Var:
-		ret true
-	| &StructSubIdentExpr:
-		mut model := m.(&StructSubIdentExpr)
-		ret model.Field != nil && isValidModelForRef(model.Expr.Model)
-	| &UnaryExpr:
-		mut unary := m.(&UnaryExpr)
-		if unary.Op.ID != token::MUL {
-			ret false
-		}
-		// Return true because of raw pointer dereferencing is an Unsafe Jule feature.
-		if unary.Expr.Type.Ptr() != nil {
+fn isValidModelForRef(mut m: Expr, mut &mutable: *bool): bool {
+	for {
+		match type m {
+		| &Var:
+			// We found a variable, so the expression based on a variable.
+			// Report true.
+			// Also update the mutability according to the variable.
+			// See the sema.checkRefValidityForInitExpr function for details.
+			*mutable = m.(&Var).Mutable
 			ret true
-		}
-		// Dereferencing should be smart pointer, otherwise return false.
-		if unary.Expr.Type.Sptr() == nil {
+		| &StructSubIdentExpr:
+			mut model := m.(&StructSubIdentExpr)
+			if model.Field == nil {
+				ret false
+			}
+			m = model.Expr.Model
+			continue
+		| &UnaryExpr:
+			mut unary := m.(&UnaryExpr)
+			if unary.Op.ID != token::MUL {
+				ret false
+			}
+			// Return true because of raw-pointer dereferencing is an Unsafe Jule feature.
+			if unary.Expr.Type.Ptr() != nil {
+				// No extra effor for the mutability.
+				// Unary eval algorithm will use mutable state of dereferenced
+				// reference pointers, so mutability will always be fine.
+				ret true
+			}
+			// Dereferencing should use smart-pointer, otherwise return false.
+			if unary.Expr.Type.Sptr() == nil {
+				ret false
+			}
+			m = unary.Expr.Model
+			continue
+		| &IndexingExpr:
+			mut index := m.(&IndexingExpr)
+			if index.Expr.Type.Array() == nil {
+				// allow only arrays, slice allocations will may be deallocated at runtime
+				// arrays always guaranteed to be have fixed size at runtime
+				ret false
+			}
+			m = index.Expr.Model
+			continue
+		|:
 			ret false
 		}
-		ret isValidModelForRef(unary.Expr.Model)
-	| &IndexingExpr:
-		mut indexing := m.(&IndexingExpr)
-		if indexing.Expr.Type.Array() == nil {
-			// allow only arrays, slice allocations will may be deallocated at runtime
-			// arrays always guaranteed to be have fixed size at runtime
-			ret false
-		}
-		ret isValidModelForRef(indexing.Expr.Model)
-	|:
-		ret false
 	}
 }
 
@@ -1080,15 +1096,32 @@ impl sema {
 
 		_v, _ := v.Model.(&Var)
 		if _v != nil && v.Reference {
-			// no-op
+			// No extra effort needed.
+			// We point to another reference pointer.
 		} else {
+			// Check if the expression model is suitable to initializate a reference pointer.
+			// Since reference pointers are use raw-pointers, initialize expression must be unary.
+			// For a quick return, check whether the expression is unary.
+			// The isValidModelForRef function checks expression more deeply.
+			//
+			// In addition to compatibility analysis, it will update the mutability
+			// of the value, if needed. Because getting raw-pointer to any memory
+			// will always result with mutable raw-pointer. This is needed for Unsafe Jule.
+			// Usually used to break immutability. But we are in Safe Jule, even in unsafe scope.
+			// Reference pointers must be safe all the time. So we must check
+			// mutability of the source memory to make sure we point to mutable memory.
+			// If reference pointer is mutable and points to an immutable memory,
+			// compler must complain. Therefore, isValidModelForRef will update
+			// mutability of the value according to the source memory.
 			mut unary, _ := v.Model.(&UnaryExpr)
-			if unary == nil || !isValidModelForRef(unary.Expr.Model) {
+			if unary == nil || !isValidModelForRef(unary.Expr.Model, &v.Mutable) {
 				self.pushErr(errorToken, log::RefAssignNonVar)
 				ret false
 			}
 		}
 
+		// Check mutability for the reference pointer.
+		// Mutability will be updated according to base memory, if necessary.
 		if leftMut && !v.Mutable {
 			self.pushErr(errorToken, log::MutRefPointsImmut)
 			ret false
@@ -1131,7 +1164,18 @@ impl sema {
 
 	fn checkValidityForInitExpr(mut &self, leftMut: bool, leftRef: bool,
 		leftKind: &Type, mut v: &Value, mut errorToken: &token::Token): bool {
-		if leftMut && !v.Mutable {
+		// Check value for reference pointers if value will be assigned to a reference pointer.
+		// The checkRefValidityForInitExpr will update mutability of the value, if necessary.
+		// See documentation of the checkRefValidityForInitExpr function.
+		if leftRef {
+			if !self.checkRefValidityForInitExpr(leftMut, v, errorToken) {
+				ret false
+			}
+		} else if leftMut && !v.Mutable {
+			// This case is an "else if", because if the destination memory
+			// is a reference pointer, the checkRefValidityForInitExpr function
+			// will check the mutability.
+
 			// Check classical assignment mutability.
 			if v.Type.Mutable() || v.Type.Variadic {
 				self.pushErr(errorToken, log::AssignNonMutToMut, v.Type.Str())
@@ -1141,11 +1185,6 @@ impl sema {
 			s := v.Type.Struct()
 			if s != nil && self.isMutRiskyStruct(s) {
 				self.pushErr(errorToken, log::CopyWithMutableData, v.Type.Str())
-				ret false
-			}
-		}
-		if leftRef {
-			if !self.checkRefValidityForInitExpr(leftMut, v, errorToken) {
 				ret false
 			}
 		}

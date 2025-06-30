@@ -44,8 +44,10 @@ struct floatInfo {
 	bias:     int
 }
 
-let f32info = floatInfo{23, 8, -127}
-let f64info = floatInfo{52, 11, -1023}
+// Data is mutable to avoid using Unsafe Jule.
+// But any mutation is unnecessary and unsafe.
+let mut f32info = floatInfo{23, 8, -127}
+let mut f64info = floatInfo{52, 11, -1023}
 
 struct decimalSlice {
 	d:   []byte
@@ -96,10 +98,10 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int
 	match bitSize {
 	| 32:
 		bits = u64(math::F32bits(f32(val)))
-		flt = &f32info
+		unsafe { *(&flt) = &f32info }
 	| 64:
 		bits = math::F64bits(val)
-		flt = &f64info
+		unsafe { *(&flt) = &f64info }
 	|:
 		panic("conv: illegal AppendFloat/FormatFloat bitSize")
 	}
