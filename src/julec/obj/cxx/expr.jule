@@ -981,7 +981,7 @@ impl exprCoder {
 							self.model(ssie.Expr.Model)
 						} else {
 							// Ignore dereferencing, use data directly to call method.
-							self.possibleRefExpr(ssie.Expr.Model.(&sema::UnaryExpr).Expr.Model)
+							self.writeReceiver(ssie.Expr.Model)
 						}
 					}
 				}
@@ -1925,6 +1925,10 @@ impl exprCoder {
 
 	fn unsafeDeref(mut &self, mut m: &opt::UnsafeDerefExpr) {
 		match {
+		| m.Base.Expr.Type.Ptr() != nil:
+			self.oc.write("(*")
+			self.possibleRefExpr(m.Base.Expr.Model)
+			self.oc.write(")")
 		| m.Base.Expr.Type.Sptr() != nil:
 			self.oc.write("(*")
 			self.possibleRefExpr(m.Base.Expr.Model)

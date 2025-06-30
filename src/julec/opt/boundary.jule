@@ -159,29 +159,41 @@ fn isBoundaryRiskyType(mut t: &sema::Type): bool {
 
 fn isBoundaryValidType(mut t: &sema::Type): bool { ret t.Slice() != nil || t.Array() != nil }
 
-fn getBoundaryVar(m: sema::Expr): uintptr {
+fn getBoundaryVar(mut m: sema::Expr): uintptr {
 	if !Access {
 		ret invalidBoundary
 	}
-	match type m {
-	| &sema::Var:
-		v := m.(&sema::Var)
-		if !v.Reference || v.ValueSym == nil || v.ValueSym.Value == nil {
-			// Variable is not reference (or points to unknown such as parameters), return address of it.
-			ret uintptr(m.(&sema::Var))
-		}
-		// Variable is reference, it should be initialized at source code.
-		// Investigate the initial expression for variable address.
-		ret getBoundaryVar(v.ValueSym.Value.Model)
-	| &sema::StructSubIdentExpr:
-		ret uintptr(m.(&sema::StructSubIdentExpr).Field)
-	| &sema::UnaryExpr:
-		uem := m.(&sema::UnaryExpr)
-		if uem.Op.ID == token::MUL { // Dereferencing.
-			ret getBoundaryVar(uem.Expr.Model)
-		}
+
+	// Special case: if expression is reference pointer, return invalid address directly.
+	// Otherwise it might be dereferenced, investigate deeper.
+	mut v, _ := m.(&sema::Var)
+	if v != nil && v.Reference {
 		ret invalidBoundary
-	|:
-		ret invalidBoundary
+	}
+
+	for {
+		match type m {
+		| &sema::Var:
+			mut v := m.(&sema::Var)
+			if !v.Reference || v.ValueSym == nil || v.ValueSym.Value == nil {
+				// Variable is not reference (or points to unknown such as parameters), return address of it.
+				ret uintptr(m.(&sema::Var))
+			}
+			// Variable is reference, it should be initialized at source code.
+			// Investigate the initial expression for variable address.
+			m = v.ValueSym.Value.Model
+			continue
+		| &sema::StructSubIdentExpr:
+			ret uintptr(m.(&sema::StructSubIdentExpr).Field)
+		| &sema::UnaryExpr:
+			mut uem := m.(&sema::UnaryExpr)
+			if uem.Op.ID == token::MUL { // Dereferencing.
+				m = uem.Expr.Model
+				continue
+			}
+			ret invalidBoundary
+		|:
+			ret invalidBoundary
+		}
 	}
 }
