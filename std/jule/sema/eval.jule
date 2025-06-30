@@ -420,9 +420,9 @@ impl eval {
 		ret nil
 	}
 
-	fn pushReference[T](mut self, mut ref: T) {
+	fn pushReference[T](mut self, mut ref: &T) {
 		mut refers := self.getOwnerRefers()
-		if refers != nil && !refers.Exist[T](ref) {
+		if refers != nil && !refers.Exist(ref) {
 			refers.Push(ref)
 		}
 	}
@@ -498,7 +498,7 @@ impl eval {
 				}
 			}
 		}
-		self.pushReference[&StructIns](ins)
+		self.pushReference(ins)
 		ret self._evalStruct(ins)
 	}
 
@@ -530,7 +530,7 @@ impl eval {
 				ins = exist
 			}
 		}
-		self.pushReference[&FuncIns](ins)
+		self.pushReference(ins)
 		ret self.evalFuncIns(ins)
 	}
 
@@ -575,7 +575,7 @@ impl eval {
 
 		// Push reference to global variable.
 		if v.Scope == nil {
-			self.pushReference[&Var](v)
+			self.pushReference(v)
 		}
 
 		// Value is nil, kind is not determined.
@@ -671,7 +671,7 @@ impl eval {
 			// But, as far as tested, there is no risk for current implementation.
 			// Future implementations should pay attention for here.
 			mut s := kind.(&StructIns)
-			self.pushReference[&StructIns](s)
+			self.pushReference(s)
 			v = self._evalStruct(s)
 		| &Enum:
 			v = self._evalEnum(kind.(&Enum))
@@ -1122,8 +1122,8 @@ impl eval {
 	// If instance is already exist, f will point to exist instantantiation.
 	// If recheckNeed is not nil, function will checked with recheck strategy.
 	fn checkGenericFunc(mut &self, mut &f: *&FuncIns, mut et: &token::Token,
-		mut model: Expr, mut recheckNeed: []recheckableType): (ok: bool, exist: bool) {
-		mut old := f
+		mut &model: *Expr, mut recheckNeed: []recheckableType): (ok: bool, exist: bool) {
+		mut old := *f
 		if recheckNeed == nil {
 			ok, exist = self.s.checkGenericFunc(f, et)
 		} else {
@@ -1136,8 +1136,8 @@ impl eval {
 			// So, if this absolute instance is already exist, update model.
 			// Otherwise, model's instance will be a dangling, because it never
 			// be appended into instances of function declaration since already exist.
-			updateModelToGenericIns(&model, *f)
-			updateRefer(self.getOwnerRefers(), old, f)
+			updateModelToGenericIns(model, *f)
+			updateRefer(self.getOwnerRefers(), old, *f)
 		}
 		ret
 	}
@@ -1163,7 +1163,7 @@ impl eval {
 			ret
 		}
 
-		ok, _ := self.checkGenericFunc(&f, i.X.Token, (*v).Model, nil)
+		ok, _ := self.checkGenericFunc(&f, i.X.Token, &(*v).Model, nil)
 		if ok {
 			(*v).Type.Kind = f
 		} else {
@@ -1444,7 +1444,7 @@ impl eval {
 
 		v.Constant = nil
 		v.untyped = false
-		self.pushReference[&StructIns](s)
+		self.pushReference(s)
 
 		if !s.Decl.IsImplements(tr) {
 			// Log error but do not return false.
@@ -1902,7 +1902,7 @@ impl eval {
 			self.pushErr(errorToken, log::IllegalCycleRefersItself, s.Decl.Name)
 		}
 
-		self.pushReference[&StructIns](s)
+		self.pushReference(s)
 
 		mut slc := structLitChecker{
 			e: self,
@@ -2204,7 +2204,7 @@ impl eval {
 			// As a result, generic type aliases may be missing during analysis.
 			// To avoid this, clear the cache of generic type aliases.
 			f.env.generics = nil
-			ok, _ = self.checkGenericFunc(&f, fc.Token, (*v).Model, recheckNeed)
+			ok, _ = self.checkGenericFunc(&f, fc.Token, &(*v).Model, recheckNeed)
 			if !ok {
 				*v = nil
 				ret
@@ -2335,7 +2335,7 @@ impl eval {
 
 			mut ins := method.instance()
 			ins.Owner = s
-			self.pushReference[&FuncIns](ins)
+			self.pushReference(ins)
 			v.Model = &StructStaticIdentExpr{
 				Structure: s,
 				Expr: v.Model,
@@ -2417,7 +2417,7 @@ impl eval {
 
 		mut ins := m.instance()
 		ins.Owner = s
-		self.pushReference[&FuncIns](ins)
+		self.pushReference(ins)
 		mut model := new(Value, *v)
 		v.Model = &StructSubIdentExpr{
 			Token: tok,
@@ -3128,7 +3128,7 @@ impl eval {
 		// push reference to the anonymous function.
 		isGlobal := self.isGlobal()
 		if isGlobal && self.owner != nil {
-			self.pushReference[&FuncIns](ins)
+			self.pushReference(ins)
 		}
 
 		ret &Value{
@@ -4184,7 +4184,7 @@ impl binaryEval {
 				if !ok {
 					panic("sema: arrayCmp evaluation failed, this is an implementation mistake")
 				}
-				self.e.pushReference[&FuncIns](f)
+				self.e.pushReference(f)
 			}
 			ret &Value{
 				untyped: true,
@@ -5260,7 +5260,7 @@ fn makeImplicitDeref(mut v: &Value, mut baseToken: &token::Token) {
 }
 
 // Updates ref's old references to new.
-fn updateRefer[T](mut ref: &ReferenceStack, old: T, mut new: T) {
+fn updateRefer[T](mut ref: &ReferenceStack, old: &T, mut new: &T) {
 	for i, sym in ref.buffer {
 		if sym == old {
 			ref.buffer[i] = new
