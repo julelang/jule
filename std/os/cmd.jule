@@ -28,7 +28,7 @@ struct lookpathError {
 }
 
 impl lookpathError {
-	fn Str(self): str {
+	fn Str(*self): str {
 		ret "std/os: Cmd: " + conv::Quote(self.Name) + ": " + runtime::toStr(self.Err)
 	}
 }
@@ -102,7 +102,7 @@ impl Cmd {
 	// Sets reader that will be connected to the command's
 	// standard input when the command starts.
 	// The reader will not be closed automatically after [Cmd.Wait] sees the command exit.
-	fn Stdin(self, mut r: &File)! {
+	fn Stdin(*self, mut r: &File)! {
 		if self.stdin != nil {
 			error(errors::New("std/os: Cmd.Stdin used when stdin already assigned"))
 		}
@@ -115,7 +115,7 @@ impl Cmd {
 	// Sets writer that will be connected to the command's
 	// standard output when the command starts.
 	// The reader will not be closed automatically after [Cmd.Wait] sees the command exit.
-	fn Stdout(self, mut w: &File)! {
+	fn Stdout(*self, mut w: &File)! {
 		if self.stdout != nil {
 			error(errors::New("std/os: Cmd.Stdout used when stdout already assigned"))
 		}
@@ -128,7 +128,7 @@ impl Cmd {
 	// Sets writer that will be connected to the command's
 	// standard error when the command starts.
 	// The reader will not be closed automatically after [Cmd.Wait] sees the command exit.
-	fn Stderr(self, mut w: &File)! {
+	fn Stderr(*self, mut w: &File)! {
 		if self.stderr != nil {
 			error(errors::New("std/os: Cmd.Stderr used when stderr already assigned"))
 		}
@@ -144,7 +144,7 @@ impl Cmd {
 	// A caller need only call Close to force the pipe to close sooner.
 	// For example, if the command being run will not exit until standard input
 	// is closed, the caller must close the pipe.
-	fn StdinPipe(self)!: io::WriteCloser {
+	fn StdinPipe(*self)!: io::WriteCloser {
 		if self.stdin != nil {
 			error(errors::New("std/os: Cmd.StdinPipe used when stdin already assigned"))
 		}
@@ -165,7 +165,7 @@ impl Cmd {
 	// need not close the pipe themselves. It is thus incorrect to call Wait
 	// before all reads from the pipe have completed.
 	// For the same reason, it is incorrect to call [Cmd.Run] when using StdoutPipe.
-	fn StdoutPipe(self)!: io::ReadCloser {
+	fn StdoutPipe(*self)!: io::ReadCloser {
 		if self.stdout != nil {
 			error(errors::New("std/os: Cmd.StdoutPipe used when stdout already assigned"))
 		}
@@ -186,7 +186,7 @@ impl Cmd {
 	// need not close the pipe themselves. It is thus incorrect to call Wait
 	// before all reads from the pipe have completed.
 	// For the same reason, it is incorrect to use [Cmd.Run] when using StderrPipe.
-	fn StderrPipe(self)!: io::ReadCloser {
+	fn StderrPipe(*self)!: io::ReadCloser {
 		if self.stderr != nil {
 			error(errors::New("std/os: Cmd.StderrPipe used when stderr already assigned"))
 		}
@@ -200,7 +200,7 @@ impl Cmd {
 		ret r
 	}
 
-	fn childStdin(self)!: &File {
+	fn childStdin(*self)!: &File {
 		if self.stdin == nil {
 			mut f := Open(DevNull) else { error(error) }
 			self.childIOFiles = append(self.childIOFiles, f)
@@ -209,18 +209,18 @@ impl Cmd {
 		ret self.stdin
 	}
 
-	fn childStdout(self)!: &File {
+	fn childStdout(*self)!: &File {
 		ret self.writerDescriptor(self.stdout) else { error(error) }
 	}
 
-	fn childStderr(self)!: &File {
+	fn childStderr(*self)!: &File {
 		if self.stdout != nil && self.stderr != nil && self.stdout.fd.File == self.stderr.fd.File {
 			ret self.stdout
 		}
 		ret self.writerDescriptor(self.stdout) else { error(error) }
 	}
 
-	fn writerDescriptor(self, mut f: &File)!: &File {
+	fn writerDescriptor(*self, mut f: &File)!: &File {
 		if f == nil {
 			f = OpenFile(DevNull, O_WRONLY, 0) else { error(error) }
 			self.childIOFiles = append(self.childIOFiles, f)
@@ -232,7 +232,7 @@ impl Cmd {
 	// Starts the specified command but does not wait for it to complete.
 	// After a successful call to Start the [Cmd.Wait] method must be called in
 	// order to release associated system resources.
-	fn Start(self)! {
+	fn Start(*self)! {
 		// Check for doubled Start calls before we defer failure cleanup. If the prior
 		// call to Start succeeded, we don't want to spuriously close its pipes.
 		if atomic::Load(&self.started, atomic::Acquire) == 1 {
@@ -278,14 +278,14 @@ impl Cmd {
 	}
 
 	// Starts the specified command and waits for it to complete.
-	fn Run(self)! {
+	fn Run(*self)! {
 		self.Start() else { error(error) }
 		self.Wait() else { error(error) }
 	}
 
 	// Clean should call after process completed.
 	// It cleans resources and Cmd will be ready to reuse.
-	fn clean(self)! {
+	fn clean(*self)! {
 		for (_, mut f) in self.parentIOFiles {
 			f.Close() else { error(error) }
 		}
@@ -298,7 +298,7 @@ impl Cmd {
 	// The command must have been started by [Cmd.Start].
 	// It releases any resources associated with the [Cmd].
 	// After calling it, Cmd will be ready to reuse.
-	fn Wait(self)!: int {
+	fn Wait(*self)!: int {
 		if atomic::Load(&self.started, atomic::Acquire) == 0 {
 			panic("std/os: Cmd.Wait: command is not started")
 		}
@@ -308,7 +308,7 @@ impl Cmd {
 	}
 
 	// Returns command-line arguments to start command.
-	fn args(self): []str {
+	fn args(*self): []str {
 		if len(self.Args) == 0 {
 			ret [self.Path]
 		}
@@ -316,7 +316,7 @@ impl Cmd {
 	}
 
 	// Returns environment variables to start command.
-	fn env(self)!: []str {
+	fn env(*self)!: []str {
 		mut env := unsafe { *(&self.Env) } // do not mutate content
 		if env == nil {
 			env = Environ()

@@ -35,11 +35,11 @@ struct jsonDecoder {
 }
 
 impl jsonDecoder {
-	fn eof(self): bool {
+	fn eof(*self): bool {
 		ret self.i >= self.data.Len()
 	}
 
-	fn skipSpace(self) {
+	fn skipSpace(*self) {
 		for !self.eof() && isSpace(self.data.Get(self.i)); self.i++ {
 		}
 	}
@@ -47,7 +47,7 @@ impl jsonDecoder {
 	// Scans to the end of what was started.
 	// Checks syntax errors.
 	// Unlike [scanValidLit], it supports objects and arrays.
-	fn scanValidValue(self)!: []byte {
+	fn scanValidValue(*self)!: []byte {
 		mut b := self.data.Get(self.i)
 		if b != '[' && b != '{' { // Literal.
 			ret self.scanValidLit() else { error(error) }
@@ -163,7 +163,7 @@ impl jsonDecoder {
 	}
 
 	// Calls the [scanLit] and checks it with the [isValidLit] function.
-	fn scanValidLit(self)!: []byte {
+	fn scanValidLit(*self)!: []byte {
 		mut lit := self.scanLit() else { error(error) }
 		if !isValidLit(lit) {
 			error(errors::New("json: invalid character " + quoteChar(lit[0]) + " looking for beginning of value"))
@@ -174,7 +174,7 @@ impl jsonDecoder {
 	// Scans inputs efficiently, not checks validity.
 	// Only checks for length.
 	// It only supports basic literals, not objects or arrays.
-	fn scanLit(self)!: []byte {
+	fn scanLit(*self)!: []byte {
 		i := self.i
 		b := self.data.Get(self.i)
 	Match:
@@ -219,7 +219,7 @@ impl jsonDecoder {
 
 	// Pushes a new parse state p onto the parse stack.
 	// Throws exceptional if maxNestingDepth was exceeded.
-	fn pushParseState(self, newParseState: int)! {
+	fn pushParseState(*self, newParseState: int)! {
 		self.parseState = append(self.parseState, newParseState)
 		if len(self.parseState) > maxNestingDepth {
 			error(errors::New("json: exceeded max depth"))
@@ -228,11 +228,11 @@ impl jsonDecoder {
 
 	// Pops a parse state (already obtained) off the stack
 	// and updates self.step accordingly.
-	fn popParseState(self) {
+	fn popParseState(*self) {
 		self.parseState = self.parseState[:len(self.parseState)-1]
 	}
 
-	fn array[T](self, mut &a: *T)! {
+	fn array[T](*self, mut &a: *T)! {
 		const t = comptime::TypeOf(T)
 		comptime::TypeAlias(valueTyp, t.Value())
 		self.i++
@@ -302,7 +302,7 @@ impl jsonDecoder {
 		}
 	}
 
-	fn objectMap[Map](self, mut &m: *Map)! {
+	fn objectMap[Map](*self, mut &m: *Map)! {
 		const mapT = comptime::TypeOf(Map)
 		comptime::TypeAlias(K, mapT.Key())
 		comptime::TypeAlias(V, mapT.Value())
@@ -414,7 +414,7 @@ impl jsonDecoder {
 		self.popParseState()
 	}
 
-	fn objectStruct[T](self, mut &t: *T)! {
+	fn objectStruct[T](*self, mut &t: *T)! {
 		self.i++
 		self.skipSpace()
 		if !self.eof() && self.data.Get(self.i) == '}' {
@@ -497,7 +497,7 @@ impl jsonDecoder {
 
 	// Check literal validity in quick way rather than using the Valid function.
 	// It should be used after the scanValidLit.
-	fn checkScanValidLit(self)! {
+	fn checkScanValidLit(*self)! {
 		lb := self.data.Get(self.i - 1)
 		self.skipSpace()
 		if self.eof() {
@@ -520,7 +520,7 @@ impl jsonDecoder {
 	// Reports whether it found and decoded successfully.
 	// Forwards any exception, all exceptionals are forwarded.
 	// So, any exception means custom decode method found and it threw exception.
-	fn tryCustomDecode[T](self, mut &t: *T)!: bool {
+	fn tryCustomDecode[T](*self, mut &t: *T)!: bool {
 		const tt = comptime::TypeOf(T)
 		const match {
 		| tt.Strict() || tt.Kind() == comptime::Struct:
@@ -570,7 +570,7 @@ impl jsonDecoder {
 		ret false
 	}
 
-	fn value1[T](self, mut &t: *T)! {
+	fn value1[T](*self, mut &t: *T)! {
 		// Before using the default decoding strategy, look for the custom decoder
 		// methods and use it, if any. If not exist any custom decoder method,
 		// fallback to default decoding.
@@ -703,7 +703,7 @@ impl jsonDecoder {
 		error(errors::New("json: invalid character " + quoteChar(b) + " looking for beginning of value"))
 	}
 
-	fn value[T](self, mut &t: *T)! {
+	fn value[T](*self, mut &t: *T)! {
 		// Before using the default decoding strategy, look for the custom decoder
 		// methods and use it, if any. If not exist any custom decoder method,
 		// fallback to default decoding.
@@ -730,7 +730,7 @@ impl jsonDecoder {
 		}
 	}
 
-	fn decode[T](self, mut &t: *T)! {
+	fn decode[T](*self, mut &t: *T)! {
 		self.skipSpace()
 		if !self.eof() {
 			self.value(t) else { error(error) }

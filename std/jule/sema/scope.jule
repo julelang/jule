@@ -107,7 +107,7 @@ struct WhileIter {
 
 impl WhileIter {
 	// Reports whether iteration is while-next kind.
-	fn IsWhileNext(self): bool {
+	fn IsWhileNext(*self): bool {
 		ret self.Next != nil
 	}
 }
@@ -182,7 +182,7 @@ struct Match {
 
 impl Match {
 	// Reports whether match is type-match for generic type.
-	fn IsGenericTypeMatch(self): bool {
+	fn IsGenericTypeMatch(*self): bool {
 		ret self.TypeMatch && self.Expr != nil && self.Expr.Type.Generic
 	}
 }
@@ -206,7 +206,7 @@ type caseOwner: CaseOwner
 impl caseOwner {
 	// Returns data in uintptr.
 	// Assumes self is not nil.
-	fn asUintptr(self): uintptr {
+	fn asUintptr(*self): uintptr {
 		match type *self {
 		| &Match:
 			ret uintptr((*self).(&Match))
@@ -228,7 +228,7 @@ struct Case {
 
 impl Case {
 	// Reports whether case is default.
-	fn isDefault(self): bool { ret self.Exprs == nil }
+	fn isDefault(*self): bool { ret self.Exprs == nil }
 }
 
 // Fall statement.
@@ -286,7 +286,7 @@ impl Lookup for scopeChecker {
 	//
 	// Lookups:
 	//	- Sema.
-	fn SelectPackage(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
+	fn SelectPackage(mut *self, selector: fn(&ImportInfo): bool): &ImportInfo {
 		ret self.s.SelectPackage(selector)
 	}
 
@@ -297,7 +297,7 @@ impl Lookup for scopeChecker {
 	//	- Current scope.
 	//	- Parent scopes.
 	//	- Sema.
-	fn FindVar(mut self, name: str, _bind: bool): &Var {
+	fn FindVar(mut *self, name: str, _bind: bool): &Var {
 		const Closure = true // allow capturing variables from parent scope
 		if !_bind { // Local variables cannot be bind.
 			mut v := self.findVar(name, Closure)
@@ -315,7 +315,7 @@ impl Lookup for scopeChecker {
 	//	- Current scope.
 	//	- Parent scopes.
 	//	- Sema.
-	fn FindTypeAlias(mut self, name: str, _bind: bool): &TypeAlias {
+	fn FindTypeAlias(mut *self, name: str, _bind: bool): &TypeAlias {
 		// Search reverse for correct shadowing.
 		const Reverse = true
 		mut ta := self.table.findTypeAlias(name, _bind, Reverse)
@@ -340,7 +340,7 @@ impl Lookup for scopeChecker {
 	//
 	// Lookups:
 	//	- Sema.
-	fn FindStruct(mut self, name: str, _bind: bool): &Struct {
+	fn FindStruct(mut *self, name: str, _bind: bool): &Struct {
 		ret self.s.FindStruct(name, _bind)
 	}
 
@@ -349,7 +349,7 @@ impl Lookup for scopeChecker {
 	//
 	// Lookups:
 	//	- Sema.
-	fn FindFunc(mut self, name: str, _bind: bool): &Func {
+	fn FindFunc(mut *self, name: str, _bind: bool): &Func {
 		ret self.s.FindFunc(name, _bind)
 	}
 
@@ -358,7 +358,7 @@ impl Lookup for scopeChecker {
 	//
 	// Lookups:
 	//	- Sema.
-	fn FindTrait(mut self, name: str): &Trait {
+	fn FindTrait(mut *self, name: str): &Trait {
 		ret self.s.FindTrait(name)
 	}
 
@@ -367,7 +367,7 @@ impl Lookup for scopeChecker {
 	//
 	// Lookups:
 	//	- Sema.
-	fn FindEnum(mut self, name: str): &Enum {
+	fn FindEnum(mut *self, name: str): &Enum {
 		ret self.s.FindEnum(name)
 	}
 
@@ -376,7 +376,7 @@ impl Lookup for scopeChecker {
 	//
 	// Lookups:
 	//	- Sema.
-	fn FindTypeEnum(mut self, name: str): &TypeEnum {
+	fn FindTypeEnum(mut *self, name: str): &TypeEnum {
 		ret self.s.FindTypeEnum(name)
 	}
 }
@@ -401,17 +401,17 @@ impl scopeChecker {
 
 	// Reports scope is root.
 	// Accepts anonymous functions as root.
-	fn isRoot(self): bool {
+	fn isRoot(*self): bool {
 		ret self.parent == nil || self.owner != nil
 	}
 
 	// Stop checking.
-	fn stop(mut self) {
+	fn stop(mut *self) {
 		self.i = -1
 	}
 
 	// Reports whether checking is stopped.
-	fn stopped(self): bool {
+	fn stopped(*self): bool {
 		ret self.i == -1
 	}
 
@@ -485,7 +485,7 @@ impl scopeChecker {
 	}
 
 	// Like [Lookup.FindVar] but designed for local variables only.
-	fn findVar(mut self, name: str, closure: bool): &Var {
+	fn findVar(mut *self, name: str, closure: bool): &Var {
 		const Reverse = true // Search reverse for correct shadowing.
 		const Bind = false   // Local variables cannot be bind.
 		mut parent := unsafe { (&scopeChecker)(self) }
@@ -507,7 +507,7 @@ impl scopeChecker {
 	// Returns label by identifier.
 	// Returns nil if not exist any label in this identifier.
 	// Just lookups current scope.
-	fn findLabel(mut self, name: str): &Label {
+	fn findLabel(mut *self, name: str): &Label {
 		for (_, mut st) in self.scope.Stmts {
 			mut label, ok := st.(&Label)
 			if ok && label.Name == name {
@@ -531,7 +531,7 @@ impl scopeChecker {
 	// Returns label by identifier.
 	// Returns nil if not exist any label in this identifier.
 	// Lookups all labels.
-	fn findLabelAll(mut self, name: str): &scopeLabel {
+	fn findLabelAll(mut *self, name: str): &scopeLabel {
 		for (_, mut lbl) in *self.labels {
 			if lbl.node.Name == name {
 				ret lbl
@@ -543,7 +543,7 @@ impl scopeChecker {
 	// Reports this identifier duplicated in scope.
 	// The "self" parameter represents address of exception identifier.
 	// If founded identifier address equals to self, will be skipped.
-	fn isDuplicatedName(mut self, itself: uintptr, name: str): bool {
+	fn isDuplicatedName(mut *self, itself: uintptr, name: str): bool {
 		const Closure = false
 		v := self.findVar(name, Closure)
 		if v != nil && uintptr(v) != itself {
@@ -640,7 +640,7 @@ impl scopeChecker {
 		self.checkTypeAlias(ta)
 	}
 
-	fn getChild(mut self): &Scope {
+	fn getChild(mut *self): &Scope {
 		ret &Scope{
 			Parent: self.scope,
 		}
@@ -1178,7 +1178,7 @@ impl scopeChecker {
 		})
 	}
 
-	fn isNewAssignIdent(mut self, name: str): bool {
+	fn isNewAssignIdent(mut *self, name: str): bool {
 		if jule::IsBlank(name) || name == "" {
 			ret false
 		}
@@ -2354,7 +2354,7 @@ impl scopeChecker {
 		}
 	}
 
-	fn checkGoto(mut self, mut gt: &Goto, mut label: &scopeLabel) {
+	fn checkGoto(mut *self, mut gt: &Goto, mut label: &scopeLabel) {
 		mut n := 0
 		if gt.Scope == label.node.Scope {
 			// Scopes are same and label at above, so it is safe.
@@ -2441,7 +2441,7 @@ impl scopeChecker {
 		}
 	}
 
-	fn checkGotos(mut self) {
+	fn checkGotos(mut *self) {
 		for (_, mut gt) in *self.gotos {
 			mut label := self.findLabelAll(gt.Name)
 			if label == nil {
@@ -2454,7 +2454,7 @@ impl scopeChecker {
 		}
 	}
 
-	fn checkLabels(mut self) {
+	fn checkLabels(mut *self) {
 		for _, l in *self.labels {
 			if !l.used {
 				self.s.pushErr(l.token, log::DeclaredButNotUsed, l.node.Name)
@@ -2462,7 +2462,7 @@ impl scopeChecker {
 		}
 	}
 
-	fn checkVars(mut self) {
+	fn checkVars(mut *self) {
 		for _, v in self.table.Vars {
 			if !v.Used && !v.Constant && !jule::IsBlank(v.Name) && !jule::IsAnon(v.Name) {
 				self.s.pushErr(v.Token, log::DeclaredButNotUsed, v.Name)
@@ -2470,7 +2470,7 @@ impl scopeChecker {
 		}
 	}
 
-	fn checkAliases(mut self) {
+	fn checkAliases(mut *self) {
 		for _, a in self.table.TypeAliases {
 			if !a.Used && !jule::IsBlank(a.Name) && !jule::IsAnon(a.Name) {
 				self.s.pushErr(a.Token, log::DeclaredButNotUsed, a.Name)

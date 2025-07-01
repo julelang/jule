@@ -50,17 +50,17 @@ struct Value {
 
 impl Value {
 	// Reports whether Value is nil literal.
-	fn IsNil(self): bool {
+	fn IsNil(*self): bool {
 		ret self.Type.IsNil()
 	}
 
 	// Reports whether Value is void.
-	fn IsVoid(self): bool {
+	fn IsVoid(*self): bool {
 		ret self.Type.Void()
 	}
 
 	// Reports whether Value is constant expression.
-	fn IsConst(self): bool {
+	fn IsConst(*self): bool {
 		ret self.Constant != nil
 	}
 
@@ -68,7 +68,7 @@ impl Value {
 	// Reports left and right operand is good order.
 	// If reports false, left and right operand should be swapped.
 	// Accepts itself as left operand.
-	fn GoodOperand(self, mut other: &Value): bool {
+	fn GoodOperand(*self, mut other: &Value): bool {
 		if other.Type.TypeEnum() != nil {
 			ret false
 		}
@@ -116,35 +116,35 @@ struct eval {
 }
 
 impl eval {
-	fn pushErr(mut self, token: &token::Token, fmt: str, args: ...any) {
+	fn pushErr(mut *self, token: &token::Token, fmt: str, args: ...any) {
 		self.s.pushErr(token, fmt, args...)
 	}
 
 	// Push suggestion to last log.
-	fn pushSuggestion(mut self, fmt: str, args: ...any) {
+	fn pushSuggestion(mut *self, fmt: str, args: ...any) {
 		self.s.pushSuggestion(fmt, args...)
 	}
 
-	fn allowBuiltin(mut self) {
+	fn allowBuiltin(mut *self) {
 		self.disBuiltin = false
 	}
 
-	fn disallowBuiltin(mut self) {
+	fn disallowBuiltin(mut *self) {
 		self.disBuiltin = true
 	}
 
 	// Reports whether evaluation in unsafe scope.
-	fn isUnsafe(self): bool {
+	fn isUnsafe(*self): bool {
 		ret self.unsafety
 	}
 
 	// Reports whether evaluated expression is in global scope.
-	fn isGlobal(self): bool {
+	fn isGlobal(*self): bool {
 		_, ok := self.lookup.(&sema)
 		ret ok
 	}
 
-	fn applyNumericPrefix(mut self, mut v: &Value): bool {
+	fn applyNumericPrefix(mut *self, mut v: &Value): bool {
 		if v == nil ||
 			!v.IsConst() ||
 			v.Type.Prim() == nil ||
@@ -179,7 +179,7 @@ impl eval {
 		ret true
 	}
 
-	fn litStr(mut self, l: &ast::LitExpr): &Value {
+	fn litStr(mut *self, l: &ast::LitExpr): &Value {
 		mut s := ""
 		if l.Value[0] == '`' {
 			s = lit::ToRawStr(l.Value)
@@ -202,7 +202,7 @@ impl eval {
 		}
 	}
 
-	fn litRune(mut self, l: &ast::LitExpr): &Value {
+	fn litRune(mut *self, l: &ast::LitExpr): &Value {
 		r, errors := lit::ToRune(l.Value)
 		if len(errors) != 0 {
 			self.s.pushErrorsFromLitErrors(l.Token, errors)
@@ -225,7 +225,7 @@ impl eval {
 		ret data
 	}
 
-	fn litFloat(mut self, l: &ast::LitExpr): &Value {
+	fn litFloat(mut *self, l: &ast::LitExpr): &Value {
 		f := conv::ParseFloat(l.Value, 64) else {
 			self.pushErr(l.Token, log::ConstantOverflow)
 			ret nil
@@ -240,7 +240,7 @@ impl eval {
 		}
 	}
 
-	fn litInt(mut self, l: &ast::LitExpr): &Value {
+	fn litInt(mut *self, l: &ast::LitExpr): &Value {
 		// Maximum value of bitLimit integer.
 		const (
 			maxbinary  = "1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
@@ -301,7 +301,7 @@ impl eval {
 		ret v
 	}
 
-	fn evalLit(mut self, lit: &ast::LitExpr): &Value {
+	fn evalLit(mut *self, lit: &ast::LitExpr): &Value {
 		match lit.Token.ID {
 		| token::STR:
 			ret self.litStr(lit)
@@ -316,7 +316,7 @@ impl eval {
 		}
 	}
 
-	fn findBuiltins(mut self, name: str): any {
+	fn findBuiltins(mut *self, name: str): any {
 		if mod::IsPub(name) {
 			match type self.lookup {
 			| &ImportInfo:
@@ -343,7 +343,7 @@ impl eval {
 		ret findBuiltinDef(name)
 	}
 
-	fn getDef(mut self, name: str, _bind: bool): any {
+	fn getDef(mut *self, name: str, _bind: bool): any {
 		// Return nil for blank identifiers.
 		if jule::IsBlank(name) {
 			ret nil
@@ -402,7 +402,7 @@ impl eval {
 		ret self.findBuiltins(name)
 	}
 
-	fn getOwnerRefers(mut self): &ReferenceStack {
+	fn getOwnerRefers(mut *self): &ReferenceStack {
 		match type self.lookup {
 		| &scopeChecker:
 			ret self.lookup.(&scopeChecker).getOwnerRefers()
@@ -420,14 +420,14 @@ impl eval {
 		ret nil
 	}
 
-	fn pushReference[T](mut self, mut ref: &T) {
+	fn pushReference[T](mut *self, mut ref: &T) {
 		mut refers := self.getOwnerRefers()
 		if refers != nil && !refers.Exist(ref) {
 			refers.Push(ref)
 		}
 	}
 
-	fn _evalEnum(self, mut enm: &Enum): &Value {
+	fn _evalEnum(*self, mut enm: &Enum): &Value {
 		ret &Value{
 			Decl: true,
 			Type: &Type{
@@ -436,7 +436,7 @@ impl eval {
 		}
 	}
 
-	fn evalEnum(mut self, mut enm: &Enum, errorToken: &token::Token): &Value {
+	fn evalEnum(mut *self, mut enm: &Enum, errorToken: &token::Token): &Value {
 		if !self.s.isAccessibleDefine(enm.Public, enm.Token) {
 			self.pushErr(errorToken, log::IdentIsNotAccessible, enm.Name)
 			self.pushSuggestion(log::MakePubToAccess)
@@ -445,7 +445,7 @@ impl eval {
 		ret self._evalEnum(enm)
 	}
 
-	fn _evalTypeEnum(self, mut enm: &TypeEnum): &Value {
+	fn _evalTypeEnum(*self, mut enm: &TypeEnum): &Value {
 		ret &Value{
 			Decl: true,
 			Type: &Type{
@@ -454,7 +454,7 @@ impl eval {
 		}
 	}
 
-	fn evalTypeEnum(mut self, mut enm: &TypeEnum, errorToken: &token::Token): &Value {
+	fn evalTypeEnum(mut *self, mut enm: &TypeEnum, errorToken: &token::Token): &Value {
 		if !self.s.isAccessibleDefine(enm.Public, enm.Token) {
 			self.pushErr(errorToken, log::IdentIsNotAccessible, enm.Name)
 			self.pushSuggestion(log::MakePubToAccess)
@@ -463,7 +463,7 @@ impl eval {
 		ret self._evalTypeEnum(enm)
 	}
 
-	fn _evalStruct(self, mut s: &StructIns): &Value {
+	fn _evalStruct(*self, mut s: &StructIns): &Value {
 		mut v := &Value{
 			Decl: true,
 			Type: &Type{
@@ -474,7 +474,7 @@ impl eval {
 		ret v
 	}
 
-	fn evalStruct(mut self, mut s: &Struct, mut errorToken: &token::Token): &Value {
+	fn evalStruct(mut *self, mut s: &Struct, mut errorToken: &token::Token): &Value {
 		if !self.s.isAccessibleDefine(s.Public, s.Token) {
 			self.pushErr(errorToken, log::IdentIsNotAccessible, s.Name)
 			self.pushSuggestion(log::MakePubToAccess)
@@ -502,7 +502,7 @@ impl eval {
 		ret self._evalStruct(ins)
 	}
 
-	fn evalFuncIns(self, mut f: &FuncIns): &Value {
+	fn evalFuncIns(*self, mut f: &FuncIns): &Value {
 		ret &Value{
 			Type: &Type{
 				Kind: f,
@@ -511,7 +511,7 @@ impl eval {
 		}
 	}
 
-	fn evalFunc(mut self, mut f: &Func, errorToken: &token::Token): &Value {
+	fn evalFunc(mut *self, mut f: &Func, errorToken: &token::Token): &Value {
 		if !self.s.isAccessibleDefine(f.Public, f.Token) {
 			self.pushErr(errorToken, log::IdentIsNotAccessible, f.Name)
 			self.pushSuggestion(log::MakePubToAccess)
@@ -534,7 +534,7 @@ impl eval {
 		ret self.evalFuncIns(ins)
 	}
 
-	fn evalVar(mut self, mut v: &Var, errorToken: &token::Token): &Value {
+	fn evalVar(mut *self, mut v: &Var, errorToken: &token::Token): &Value {
 		// Do not check accessibility if variable is scope-based.
 		// If this variable is available, it should be defined in the scope.
 		// Then, it is accessible.
@@ -635,7 +635,7 @@ impl eval {
 		ret val
 	}
 
-	fn evalTypeAlias(mut self, mut ta: &TypeAlias, errorToken: &token::Token): &Value {
+	fn evalTypeAlias(mut *self, mut ta: &TypeAlias, errorToken: &token::Token): &Value {
 		if !self.s.isAccessibleDefine(ta.Public, ta.Token) {
 			self.pushErr(errorToken, log::IdentIsNotAccessible, ta.Name)
 			self.pushSuggestion(log::MakePubToAccess)
@@ -691,7 +691,7 @@ impl eval {
 		ret v
 	}
 
-	fn evalTrait(mut self, mut t: &Trait): &Value {
+	fn evalTrait(mut *self, mut t: &Trait): &Value {
 		ret &Value{
 			Decl: true,
 			Type: &Type{
@@ -700,7 +700,7 @@ impl eval {
 		}
 	}
 
-	fn evalDef(mut self, mut def: any, mut name: &token::Token): &Value {
+	fn evalDef(mut *self, mut def: any, mut name: &token::Token): &Value {
 		match type def {
 		| &Var:
 			ret self.evalVar(def.(&Var), name)
@@ -726,7 +726,7 @@ impl eval {
 		ret nil
 	}
 
-	fn evalName(mut self, mut name: &ast::NameExpr): &Value {
+	fn evalName(mut *self, mut name: &ast::NameExpr): &Value {
 		mut def := self.getDef(name.Name, name.Bind)
 		ret self.evalDef(def, name.Token)
 	}
@@ -927,7 +927,7 @@ impl eval {
 		ret v
 	}
 
-	fn checkIntegerIndexByData(mut self, mut v: &Value, mut token: &token::Token): bool {
+	fn checkIntegerIndexByData(mut *self, mut v: &Value, mut token: &token::Token): bool {
 		errKey := checkDataForIntegerIndex(self.s, v, token, self.getOwnerRefers())
 		match errKey {
 		| "":
@@ -940,7 +940,7 @@ impl eval {
 		ret false
 	}
 
-	fn indexPtr(mut self, mut v: &Value, mut index: &Value, mut i: &ast::IndexExpr) {
+	fn indexPtr(mut *self, mut v: &Value, mut index: &Value, mut i: &ast::IndexExpr) {
 		self.checkIntegerIndexByData(index, i.Token)
 		v.Lvalue = true
 
@@ -963,7 +963,7 @@ impl eval {
 		v.Type = ptr.Value
 	}
 
-	fn indexArr(mut self, mut v: &Value, mut index: &Value, mut i: &ast::IndexExpr) {
+	fn indexArr(mut *self, mut v: &Value, mut index: &Value, mut i: &ast::IndexExpr) {
 		mut arr := v.Type.Array()
 		v.Type = arr.Value
 		self.checkIntegerIndexByData(index, i.Token)
@@ -973,14 +973,14 @@ impl eval {
 		}
 	}
 
-	fn indexSlice(mut self, mut v: &Value, mut index: &Value, mut i: &ast::IndexExpr) {
+	fn indexSlice(mut *self, mut v: &Value, mut index: &Value, mut i: &ast::IndexExpr) {
 		mut slc := v.Type.Slice()
 		v.Type = slc.Value
 		self.checkIntegerIndexByData(index, i.Token)
 		v.Lvalue = true
 	}
 
-	fn indexMap(mut self, mut v: &Value, mut index: &Value, mut i: &ast::IndexExpr) {
+	fn indexMap(mut *self, mut v: &Value, mut index: &Value, mut i: &ast::IndexExpr) {
 		v.Lvalue = false
 		if index == nil {
 			ret
@@ -997,7 +997,7 @@ impl eval {
 		v.Type = m.Value
 	}
 
-	fn indexStr(mut self, mut v: &Value, mut index: &Value, mut i: &ast::IndexExpr) {
+	fn indexStr(mut *self, mut v: &Value, mut index: &Value, mut i: &ast::IndexExpr) {
 		v.Type = findBuiltinTypeAlias("byte").TypeSym.Type
 		v.Mutable = false
 		v.Lvalue = true
@@ -1026,7 +1026,7 @@ impl eval {
 		}
 	}
 
-	fn comptimeRange(mut self, mut &v: *&Value, mut index: &Value, mut i: &ast::IndexExpr) {
+	fn comptimeRange(mut *self, mut &v: *&Value, mut index: &Value, mut i: &ast::IndexExpr) {
 		if index == nil {
 			*v = nil
 			ret
@@ -1051,7 +1051,7 @@ impl eval {
 		ci.kind.index(*v, j)
 	}
 
-	fn toIndex(mut self, mut &v: *&Value, mut index: &Value, mut i: &ast::IndexExpr) {
+	fn toIndex(mut *self, mut &v: *&Value, mut index: &Value, mut i: &ast::IndexExpr) {
 		match {
 		| (*v).Type.Ptr() != nil:
 			self.indexPtr(*v, index, i)
@@ -1282,7 +1282,7 @@ impl eval {
 		ret
 	}
 
-	fn slicingArr(mut self, s: &ast::SlicingExpr, mut v: &Value, c: &Value) {
+	fn slicingArr(mut *self, s: &ast::SlicingExpr, mut v: &Value, c: &Value) {
 		if c != nil {
 			self.pushErr(s.Token, log::UnsupportedTypeIndex3Slice, v.Type.Str())
 		}
@@ -1301,7 +1301,7 @@ impl eval {
 		v.Mutable = v.Mutable || !valueTyp.Mutable()
 	}
 
-	fn slicingStr(mut self, s: &ast::SlicingExpr, mut v: &Value, l: &Value, c: &Value, r: &Value) {
+	fn slicingStr(mut *self, s: &ast::SlicingExpr, mut v: &Value, l: &Value, c: &Value, r: &Value) {
 		v.Lvalue = false
 		v.Mutable = true
 		if !v.IsConst() {
@@ -1343,7 +1343,7 @@ impl eval {
 		}
 	}
 
-	fn checkSlicing(mut self, mut v: &Value, l: &Value, r: &Value, c: &Value, s: &ast::SlicingExpr) {
+	fn checkSlicing(mut *self, mut v: &Value, l: &Value, r: &Value, c: &Value, s: &ast::SlicingExpr) {
 		// NOTE: catch 3-index slicing expressions if type does not support it.
 		match {
 		| v.Type.Array() != nil:
@@ -1406,7 +1406,7 @@ impl eval {
 		ret v
 	}
 
-	fn castPtr(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
+	fn castPtr(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		v.Constant = nil
 		v.untyped = false
 		sptr := v.Type.Sptr()
@@ -1435,7 +1435,7 @@ impl eval {
 	// The preStrict mode is useful to checking type and value is suitable for
 	// struct casting. It returns with no error and checked as false, if not suitable.
 	// Otherwise, logs errors and returns checked as true.
-	fn castStruct(mut self, mut t: &Type, mut s: &StructIns, mut v: &Value, errorToken: &token::Token, preStrict: bool): (checked: bool) {
+	fn castStruct(mut *self, mut t: &Type, mut s: &StructIns, mut v: &Value, errorToken: &token::Token, preStrict: bool): (checked: bool) {
 		mut tr := v.Type.Trait()
 		if tr == nil {
 			if !preStrict {
@@ -1456,7 +1456,7 @@ impl eval {
 		ret true
 	}
 
-	fn castSptr(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
+	fn castSptr(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		v.Constant = nil
 		v.untyped = false
 		mut sptr := t.Sptr()
@@ -1474,7 +1474,7 @@ impl eval {
 		self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
 	}
 
-	fn castSlice(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
+	fn castSlice(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		c := v.Constant
 		v.Constant = nil
 		v.untyped = false
@@ -1537,14 +1537,14 @@ impl eval {
 		}
 	}
 
-	fn castBool(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
+	fn castBool(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		prim := v.Type.Prim()
 		if prim == nil || !prim.IsBool() {
 			self.pushErr(errorToken, log::TypeNotSupportsCastingTo, t.Str(), v.Type.Str())
 		}
 	}
 
-	fn castStr(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
+	fn castStr(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		if v.Type.Enum() != nil {
 			mut e := v.Type.Enum()
 			if e.TypeSym.Type.Prim() != nil && e.TypeSym.Type.Prim().IsStr() {
@@ -1594,7 +1594,7 @@ impl eval {
 		}
 	}
 
-	fn castInt(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
+	fn castInt(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		if v.IsConst() {
 			castConstByType(self.s, errorToken, t, v)
 			v.Decl = true // Do not use casting model. See developer reference (11).
@@ -1636,7 +1636,7 @@ impl eval {
 		self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
 	}
 
-	fn castNum(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
+	fn castNum(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		if v.IsConst() {
 			castConstByType(self.s, errorToken, t, v)
 			v.Decl = true // Do not use casting model. See developer reference (11).
@@ -1660,7 +1660,7 @@ impl eval {
 		self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
 	}
 
-	fn castPrim(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
+	fn castPrim(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		prim := t.Prim()
 		match {
 		| prim.IsAny():
@@ -1678,7 +1678,7 @@ impl eval {
 		}
 	}
 
-	fn castTypeEnumT(mut self, mut t: &Type, mut v: &Value, mut errorToken: &token::Token) {
+	fn castTypeEnumT(mut *self, mut t: &Type, mut v: &Value, mut errorToken: &token::Token) {
 		n := len(self.s.errors)
 		// quick check: if type t and value type comparable.
 		if !self.s.checkTypeCompatibility(t, v.Type, errorToken, typeCompDefault) {
@@ -1689,7 +1689,7 @@ impl eval {
 		v.untyped = false
 	}
 
-	fn castTrait(mut self, mut t: &Type, mut v: &Value, mut errorToken: &token::Token) {
+	fn castTrait(mut *self, mut t: &Type, mut v: &Value, mut errorToken: &token::Token) {
 		n := len(self.s.errors)
 		if !self.s.checkTypeCompatibility(t, v.Type, errorToken, typeCompDefault) {
 			self.s.errors = self.s.errors[:n] // Remove logged errors by checkTypeCompatibility.
@@ -1699,7 +1699,7 @@ impl eval {
 		v.untyped = false
 	}
 
-	fn castChan(mut self, mut t: &Type, mut v: &Value, mut errorToken: &token::Token) {
+	fn castChan(mut *self, mut t: &Type, mut v: &Value, mut errorToken: &token::Token) {
 		vc := v.Type.Chan()
 		if vc == nil {
 			self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
@@ -1716,7 +1716,7 @@ impl eval {
 		}
 	}
 
-	fn evalCastByTypeNData(mut self, mut t: &Type, mut v: &Value, mut errorToken: &token::Token): &Value {
+	fn evalCastByTypeNData(mut *self, mut t: &Type, mut v: &Value, mut errorToken: &token::Token): &Value {
 		if v != nil && v.Decl {
 			self.pushErr(errorToken, log::InvalidExpr)
 			ret nil
@@ -1872,7 +1872,7 @@ impl eval {
 		ret self.evalCastByTypeNData(t, v, et)
 	}
 
-	fn evalNamespace(mut self, mut s: &ast::NamespaceExpr): &Value {
+	fn evalNamespace(mut *self, mut s: &ast::NamespaceExpr): &Value {
 		mut imp := findNamespace(self.lookup, s.Namespace.Kind)
 		if imp == nil {
 			self.pushErr(s.Namespace, log::NamespaceNotExist, s.Namespace.Kind)
@@ -1964,7 +1964,7 @@ impl eval {
 		ret v
 	}
 
-	fn typeChecker(mut self): &typeChecker {
+	fn typeChecker(mut *self): &typeChecker {
 		mut tc := new(typeChecker)
 		tc.s = self.s
 		tc.refers = self.getOwnerRefers()
@@ -1987,11 +1987,11 @@ impl eval {
 		ret tc
 	}
 
-	fn evalType1(mut self, mut t: &ast::Expr): &Type {
+	fn evalType1(mut *self, mut t: &ast::Expr): &Type {
 		ret self.typeChecker().checkDecl(t)
 	}
 
-	fn evalType(mut self, mut t: &ast::Expr): &Value {
+	fn evalType(mut *self, mut t: &ast::Expr): &Value {
 		mut t1 := self.evalType1(t)
 		if t1 == nil {
 			ret nil
@@ -2041,7 +2041,7 @@ impl eval {
 		(*v).Mutable = true
 	}
 
-	fn checkFuncOfConcurrentCall(mut self, f: &FuncIns, errorToken: &token::Token) {
+	fn checkFuncOfConcurrentCall(mut *self, f: &FuncIns, errorToken: &token::Token) {
 		if self.isUnsafe() {
 			ret
 		}
@@ -2060,7 +2060,7 @@ impl eval {
 		}
 	}
 
-	fn processExceptionalHandler(mut self, mut f: &FuncIns, mut fc: &ast::CallExpr, mut v: &Value) {
+	fn processExceptionalHandler(mut *self, mut f: &FuncIns, mut fc: &ast::CallExpr, mut v: &Value) {
 		resultNeeded := !self.target.ignored && !f.Decl.IsVoid()
 		let mut csc: &scopeChecker = nil
 		let mut ch: &Scope = nil
@@ -2312,7 +2312,7 @@ impl eval {
 		ret _func
 	}
 
-	fn evalEnumStatic(mut self, mut enm: &Enum, mut name: &token::Token): &Value {
+	fn evalEnumStatic(mut *self, mut enm: &Enum, mut name: &token::Token): &Value {
 		mut item := enm.FindItem(name.Kind)
 		if item == nil {
 			self.pushErr(name, log::ObjHaveNotIdent, enm.Name, name.Kind)
@@ -2325,7 +2325,7 @@ impl eval {
 		ret v
 	}
 
-	fn evalStructStatic(mut self, mut s: &StructIns, name: &token::Token): &Value {
+	fn evalStructStatic(mut *self, mut s: &StructIns, name: &token::Token): &Value {
 		mut v := new(Value)
 		const Static = true
 		mut method := s.FindMethod(name.Kind, Static)
@@ -2352,7 +2352,7 @@ impl eval {
 		ret nil
 	}
 
-	fn evalTraitSelector(mut self, mut v: &Value, mut trt: &Trait, mut name: &token::Token): &Value {
+	fn evalTraitSelector(mut *self, mut v: &Value, mut trt: &Trait, mut name: &token::Token): &Value {
 		mut f := trt.FindMethod(name.Kind)
 		if f == nil {
 			self.pushErr(name, log::ObjHaveNotIdent, trt.Name, name.Kind)
@@ -2374,7 +2374,7 @@ impl eval {
 
 	// This method evaluates expressions, will not check public availability.
 	// The tok parameter should be identifier to accessed.
-	fn evalStructSelectorField(mut self, mut v: &Value, mut s: &StructIns, mut tok: &token::Token, mut f: &FieldIns): &Value {
+	fn evalStructSelectorField(mut *self, mut v: &Value, mut s: &StructIns, mut tok: &token::Token, mut f: &FieldIns): &Value {
 		mut model := &StructSubIdentExpr{
 			Token: tok,
 			Expr: new(Value, *v),
@@ -2398,7 +2398,7 @@ impl eval {
 	}
 
 	// Like evalStructSelector, but checks only for fields.
-	fn evalStructSelectorFieldOnly(mut self, mut v: &Value, mut s: &StructIns, mut si: &ast::SelectorExpr): (&Value, found: bool) {
+	fn evalStructSelectorFieldOnly(mut *self, mut v: &Value, mut s: &StructIns, mut si: &ast::SelectorExpr): (&Value, found: bool) {
 		mut f := s.FindField(si.Name.Kind)
 		if f != nil {
 			if !self.s.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
@@ -2412,7 +2412,7 @@ impl eval {
 
 	// This method evaluates expressions, will not check public availability.
 	// The tok parameter should be identifier to accessed.
-	fn evalStructSelectorMethod(mut self, mut v: &Value, mut s: &StructIns, mut tok: &token::Token, mut m: &Func, ref: bool): &Value {
+	fn evalStructSelectorMethod(mut *self, mut v: &Value, mut s: &StructIns, mut tok: &token::Token, mut m: &Func, ref: bool): &Value {
 		if m.Params[0].IsSmartptr() && !ref {
 			self.pushErr(tok, log::RefMethodUsedWithNotRefInstance)
 		}
@@ -2431,7 +2431,7 @@ impl eval {
 		ret v
 	}
 
-	fn evalStructSelector(mut self, mut v: &Value, mut s: &StructIns, mut si: &ast::SelectorExpr, ref: bool): &Value {
+	fn evalStructSelector(mut *self, mut v: &Value, mut s: &StructIns, mut si: &ast::SelectorExpr, ref: bool): &Value {
 		{
 			mut tempS := s
 			if s.Source != nil {
@@ -2459,7 +2459,7 @@ impl eval {
 		ret self.evalStructSelectorMethod(v, s, si.Name, m, ref)
 	}
 
-	fn evalIntTypeStatic(mut self, name: &token::Token): &Value {
+	fn evalIntTypeStatic(mut *self, name: &token::Token): &Value {
 		const kind: str = types::Int
 		match name.Kind {
 		| "Max":
@@ -2486,7 +2486,7 @@ impl eval {
 		}
 	}
 
-	fn evalUintTypeStatic(mut self, name: &token::Token): &Value {
+	fn evalUintTypeStatic(mut *self, name: &token::Token): &Value {
 		const kind: str = types::Uint
 		match name.Kind {
 		| "Max":
@@ -2504,7 +2504,7 @@ impl eval {
 		}
 	}
 
-	fn evalI8TypeStatic(mut self, name: &token::Token): &Value {
+	fn evalI8TypeStatic(mut *self, name: &token::Token): &Value {
 		const (
 			kind: str = types::I8
 			min       = types::MinI8
@@ -2535,7 +2535,7 @@ impl eval {
 		}
 	}
 
-	fn evalI16TypeStatic(mut self, name: &token::Token): &Value {
+	fn evalI16TypeStatic(mut *self, name: &token::Token): &Value {
 		const (
 			kind: str = types::I16
 			min       = types::MinI16
@@ -2566,7 +2566,7 @@ impl eval {
 		}
 	}
 
-	fn evalI32TypeStatic(mut self, name: &token::Token): &Value {
+	fn evalI32TypeStatic(mut *self, name: &token::Token): &Value {
 		const (
 			kind: str = types::I32
 			min       = types::MinI32
@@ -2597,7 +2597,7 @@ impl eval {
 		}
 	}
 
-	fn evalI64TypeStatic(mut self, name: &token::Token): &Value {
+	fn evalI64TypeStatic(mut *self, name: &token::Token): &Value {
 		const (
 			kind: str = types::I64
 			min       = types::MinI64
@@ -2628,7 +2628,7 @@ impl eval {
 		}
 	}
 
-	fn evalU8TypeStatic(mut self, name: &token::Token): &Value {
+	fn evalU8TypeStatic(mut *self, name: &token::Token): &Value {
 		const (
 			kind: str = types::U8
 			max       = types::MaxU8
@@ -2649,7 +2649,7 @@ impl eval {
 		}
 	}
 
-	fn evalU16TypeStatic(mut self, name: &token::Token): &Value {
+	fn evalU16TypeStatic(mut *self, name: &token::Token): &Value {
 		const (
 			kind: str = types::U16
 			max       = types::MaxU16
@@ -2670,7 +2670,7 @@ impl eval {
 		}
 	}
 
-	fn evalU32TypeStatic(mut self, name: &token::Token): &Value {
+	fn evalU32TypeStatic(mut *self, name: &token::Token): &Value {
 		const (
 			kind: str = types::U32
 			max       = types::MaxU32
@@ -2691,7 +2691,7 @@ impl eval {
 		}
 	}
 
-	fn evalU64TypeStatic(mut self, name: &token::Token): &Value {
+	fn evalU64TypeStatic(mut *self, name: &token::Token): &Value {
 		const (
 			kind: str = types::U64
 			max       = types::MaxU64
@@ -2712,7 +2712,7 @@ impl eval {
 		}
 	}
 
-	fn evalF32TypeStatic(mut self, name: &token::Token): &Value {
+	fn evalF32TypeStatic(mut *self, name: &token::Token): &Value {
 		const (
 			kind: str       = types::F32
 			max             = types::MaxF32
@@ -2753,7 +2753,7 @@ impl eval {
 		}
 	}
 
-	fn evalF64TypeStatic(mut self, name: &token::Token): &Value {
+	fn evalF64TypeStatic(mut *self, name: &token::Token): &Value {
 		const (
 			kind: str       = types::F64
 			max             = types::MaxF64
@@ -2794,7 +2794,7 @@ impl eval {
 		}
 	}
 
-	fn evalPrimStatic(mut self, mut t: &Type, name: &token::Token): (v: &Value) {
+	fn evalPrimStatic(mut *self, mut t: &Type, name: &token::Token): (v: &Value) {
 		kind := t.Prim().Kind
 		match kind {
 		| types::Int:
@@ -2832,7 +2832,7 @@ impl eval {
 		ret
 	}
 
-	fn evalTypeStatic(mut self, mut v: &Value, mut si: &ast::SelectorExpr): &Value {
+	fn evalTypeStatic(mut *self, mut v: &Value, mut si: &ast::SelectorExpr): &Value {
 		match {
 		| v.Type.SoftStruct() != nil:
 			// Eval soft structures first, because strict type aliases may
@@ -2848,7 +2848,7 @@ impl eval {
 		}
 	}
 
-	fn comptimeObjSelector[ComptimeType](mut self, mut ct: &ComptimeType, v: &Value, si: &ast::SelectorExpr): &Value {
+	fn comptimeObjSelector[ComptimeType](mut *self, mut ct: &ComptimeType, v: &Value, si: &ast::SelectorExpr): &Value {
 		mut cd := ct.subIdent(si.Name.Kind)
 		if cd == nil {
 			self.pushErr(si.Name, log::ObjHaveNotIdent, v.Type.Str(), si.Name.Kind)
@@ -2856,7 +2856,7 @@ impl eval {
 		ret cd
 	}
 
-	fn tryComptimeObjSelector(mut self, mut v: &Value, mut si: &ast::SelectorExpr): (&Value, bool) {
+	fn tryComptimeObjSelector(mut *self, mut v: &Value, mut si: &ast::SelectorExpr): (&Value, bool) {
 		match {
 		| v.Type.comptimeTypeInfo() != nil:
 			mut ct := v.Type.comptimeTypeInfo()
@@ -2887,7 +2887,7 @@ impl eval {
 		}
 	}
 
-	fn evalObjSelector(mut self, mut v: &Value, mut si: &ast::SelectorExpr): &Value {
+	fn evalObjSelector(mut *self, mut v: &Value, mut si: &ast::SelectorExpr): &Value {
 		if jule::IsBlank(si.Name.Kind) {
 			self.pushErr(si.Name, log::InvalidSyntax)
 			ret nil
@@ -3447,7 +3447,7 @@ impl unaryEval {
 		}
 	}
 
-	fn minus(mut self) {
+	fn minus(mut *self) {
 		match {
 		| self.v.Type == nil:
 			self.v = nil
@@ -3560,7 +3560,7 @@ impl unaryEval {
 		}
 	}
 
-	fn plus(mut self) {
+	fn plus(mut *self) {
 		match {
 		| self.v.Type == nil:
 			self.v = nil
@@ -3598,7 +3598,7 @@ impl unaryEval {
 		}
 	}
 
-	fn caret(mut self) {
+	fn caret(mut *self) {
 		match {
 		| self.v.Type == nil:
 			self.v = nil
@@ -3708,7 +3708,7 @@ impl unaryEval {
 		}
 	}
 
-	fn excl(mut self) {
+	fn excl(mut *self) {
 		t := self.v.Type.Prim()
 		if t == nil || !t.IsBool() {
 			self.v = nil
@@ -3736,7 +3736,7 @@ impl unaryEval {
 		}
 	}
 
-	fn star(mut self) {
+	fn star(mut *self) {
 		isRef := isRef(self.v) != nil
 		self.v.Model = &UnaryExpr{
 			Expr: new(Value, *self.v),
@@ -3769,7 +3769,7 @@ impl unaryEval {
 		self.v.Lvalue = true
 	}
 
-	fn amper(mut self) {
+	fn amper(mut *self) {
 		// Gettin raw-pointer returns mutable pointer by default.
 		mut mutable := true
 
@@ -3804,7 +3804,7 @@ impl unaryEval {
 		self.v.Mutable = mutable
 	}
 
-	fn chanRecv(mut self): &Value {
+	fn chanRecv(mut *self): &Value {
 		mut v := self.e.evalExpr(self.u.X, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if v == nil {
 			ret nil
@@ -3827,7 +3827,7 @@ impl unaryEval {
 		ret v
 	}
 
-	fn typeDecl(mut self) {
+	fn typeDecl(mut *self) {
 		mut tc := self.e.typeChecker()
 		match self.u.Op.ID {
 		| token::MUL:
@@ -3844,7 +3844,7 @@ impl unaryEval {
 		self.v.Decl = true
 	}
 
-	fn evalData(mut self) {
+	fn evalData(mut *self) {
 		match self.u.Op.ID {
 		| token::MUL
 		| token::AND:
@@ -3857,7 +3857,7 @@ impl unaryEval {
 		}
 	}
 
-	fn eval(mut self, mut u: &ast::UnaryExpr): &Value {
+	fn eval(mut *self, mut u: &ast::UnaryExpr): &Value {
 		self.u = u
 		// Special case: channel receive expression.
 		if self.u.Op.ID == token::ARROW {
@@ -3936,13 +3936,13 @@ impl binaryEval {
 
 	// Reports whether types are compatible.
 	// Also logs error message about incompatibility if types are incompatible.
-	fn checkTypeCompatibility(mut self): bool {
+	fn checkTypeCompatibility(mut *self): bool {
 		ret self.e.s.checkTypeCompatibility1(self.l.Type, self.r, self.op, typeCompDefault)
 	}
 
 	// Like the checkTypeCompatibility method, but tries to be compatible with
 	// constant operands. Such as; "ordinary str" == MyStr("strict typed string")
-	fn checkTypeCompatibility1(mut self): bool {
+	fn checkTypeCompatibility1(mut *self): bool {
 		if self.l.IsConst() && self.l.untyped {
 			self.l, self.r = self.r, self.l
 		}
@@ -3951,7 +3951,7 @@ impl binaryEval {
 		ret self.e.s.checkAssignType(Reference, FirstAssignToDest, self.l.Type, self.r, self.op, nil)
 	}
 
-	fn evalComptimeTypeInfo(mut self): &Value {
+	fn evalComptimeTypeInfo(mut *self): &Value {
 		mut r := self.r.Type.comptimeTypeInfo()
 		if r == nil {
 			self.e.pushErr(self.op, log::IncompatibleTypes, "comptimeTypeInfo", self.r.Type.Str())
@@ -3981,7 +3981,7 @@ impl binaryEval {
 		}
 	}
 
-	fn evalNil(mut self): &Value {
+	fn evalNil(mut *self): &Value {
 		if !self.r.Type.NilCompatible() {
 			self.e.pushErr(self.op, log::IncompatibleTypes, "nil", self.r.Type.Str())
 			ret nil
@@ -4000,7 +4000,7 @@ impl binaryEval {
 		}
 	}
 
-	fn evalEnum(mut self): &Value {
+	fn evalEnum(mut *self): &Value {
 		match self.op.ID {
 		| token::EQL
 		| token::NEQ:
@@ -4070,7 +4070,7 @@ impl binaryEval {
 		}
 	}
 
-	fn evalTypeEnum(mut self): &Value {
+	fn evalTypeEnum(mut *self): &Value {
 		if !self.checkTypeCompatibility() {
 			ret nil
 		}
@@ -4088,7 +4088,7 @@ impl binaryEval {
 		}
 	}
 
-	fn evalChan(mut self): &Value {
+	fn evalChan(mut *self): &Value {
 		if !self.checkTypeCompatibility() {
 			ret nil
 		}
@@ -4106,7 +4106,7 @@ impl binaryEval {
 		}
 	}
 
-	fn evalSptr(mut self): &Value {
+	fn evalSptr(mut *self): &Value {
 		if !self.checkTypeCompatibility() {
 			ret nil
 		}
@@ -4124,7 +4124,7 @@ impl binaryEval {
 		}
 	}
 
-	fn evalPtr(mut self): &Value {
+	fn evalPtr(mut *self): &Value {
 		if isRef(self.l) != nil {
 			match self.op.ID {
 			| token::EQL | token::NEQ:
@@ -4175,7 +4175,7 @@ impl binaryEval {
 		}
 	}
 
-	fn evalArray(mut self): &Value {
+	fn evalArray(mut *self): &Value {
 		if !self.checkTypeCompatibility() {
 			ret nil
 		}
@@ -4205,7 +4205,7 @@ impl binaryEval {
 		}
 	}
 
-	fn evalStruct(mut self): &Value {
+	fn evalStruct(mut *self): &Value {
 		match self.op.ID {
 		| token::EQL
 		| token::NEQ:
@@ -4222,7 +4222,7 @@ impl binaryEval {
 		}
 	}
 
-	fn evalTrait(mut self): &Value {
+	fn evalTrait(mut *self): &Value {
 		if !self.checkTypeCompatibility() {
 			ret nil
 		}
@@ -4240,7 +4240,7 @@ impl binaryEval {
 		}
 	}
 
-	fn evalAny(mut self): &Value {
+	fn evalAny(mut *self): &Value {
 		match self.op.ID {
 		| token::EQL
 		| token::NEQ:
@@ -4255,7 +4255,7 @@ impl binaryEval {
 		}
 	}
 
-	fn evalBool(mut self): &Value {
+	fn evalBool(mut *self): &Value {
 		if !self.checkTypeCompatibility1() {
 			ret nil
 		}
@@ -4272,7 +4272,7 @@ impl binaryEval {
 		}
 	}
 
-	fn evalStr(mut self): &Value {
+	fn evalStr(mut *self): &Value {
 		if !self.checkTypeCompatibility1() {
 			ret nil
 		}
@@ -4296,7 +4296,7 @@ impl binaryEval {
 		}
 	}
 
-	fn setTypeToGreater(mut self) {
+	fn setTypeToGreater(mut *self) {
 		lp := self.l.Type.Prim()
 		rp := self.r.Type.Prim()
 		if self.l.untyped && !self.r.untyped {
@@ -4330,7 +4330,7 @@ impl binaryEval {
 		}
 	}
 
-	fn checkModData(mut self, mut v: &Value) {
+	fn checkModData(mut *self, mut v: &Value) {
 		if !v.IsConst() {
 			if v.Type.Prim() == nil || !types::IsInt(v.Type.Prim().Kind) {
 				self.e.pushErr(self.op, log::ModuloWithNotInt)
@@ -4347,12 +4347,12 @@ impl binaryEval {
 		}
 	}
 
-	fn mod(mut self) {
+	fn mod(mut *self) {
 		self.checkModData(self.l)
 		self.checkModData(self.r)
 	}
 
-	fn numbersAreCompatible(mut self): bool {
+	fn numbersAreCompatible(mut *self): bool {
 		lk := self.l.Type.Prim().Kind
 		rk := self.r.Type.Prim().Kind
 		if !types::IsNum(rk) {
@@ -4393,7 +4393,7 @@ impl binaryEval {
 
 	// Operator guaranteed to be << or >>.
 	// Operands should be guaranteed in original order.
-	fn shift(mut self): &Value {
+	fn shift(mut *self): &Value {
 		lk := self.l.Type.Prim()
 		if lk == nil {
 			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
@@ -4472,7 +4472,7 @@ impl binaryEval {
 		ret self.l
 	}
 
-	fn evalFloat(mut self): &Value {
+	fn evalFloat(mut *self): &Value {
 		if !self.numbersAreCompatible() {
 			ret nil
 		}
@@ -4519,7 +4519,7 @@ impl binaryEval {
 		}
 	}
 
-	fn evalInt(mut self): &Value {
+	fn evalInt(mut *self): &Value {
 		if !self.numbersAreCompatible() {
 			ret nil
 		}
@@ -4564,7 +4564,7 @@ impl binaryEval {
 		}
 	}
 
-	fn evalPrim(mut self): &Value {
+	fn evalPrim(mut *self): &Value {
 		prim := self.l.Type.Prim()
 		match {
 		| prim.IsBool():
@@ -4589,7 +4589,7 @@ impl binaryEval {
 		}
 	}
 
-	fn checkSpecialCases(mut self): (ok: bool) {
+	fn checkSpecialCases(mut *self): (ok: bool) {
 		ok = true
 		comparing := self.op.ID == token::EQL || self.op.ID == token::NEQ
 		if !comparing {
@@ -4605,7 +4605,7 @@ impl binaryEval {
 		ret ok
 	}
 
-	fn evalOp(mut self): &Value {
+	fn evalOp(mut *self): &Value {
 		ok := self.checkSpecialCases()
 		if !ok {
 			ret nil
@@ -4677,7 +4677,7 @@ impl binaryEval {
 		}
 	}
 
-	fn evalConst(mut self, mut &v: *&Value) {
+	fn evalConst(mut *self, mut &v: *&Value) {
 		match {
 		| v == nil
 		| self.l.Model == nil
@@ -4832,19 +4832,19 @@ impl binaryEval {
 		applyCastModelByEnum(self.e.s, *v, (*v).Type.Enum(), self.op, self.e.getOwnerRefers())
 	}
 
-	fn checkValue(mut self, mut v: &Value, token: &token::Token) {
+	fn checkValue(mut *self, mut v: &Value, token: &token::Token) {
 		f := v.Type.Func()
 		if f != nil && f.Decl != nil && f.Decl.IsMethod() {
 			self.e.pushErr(token, log::InvalidExprForBinary)
 		}
 	}
 
-	fn checkValues(mut self) {
+	fn checkValues(mut *self) {
 		self.checkValue(self.l, self.lt)
 		self.checkValue(self.r, self.rt)
 	}
 
-	fn setModel(mut self, mut v: &Value) {
+	fn setModel(mut *self, mut v: &Value) {
 		if v.IsConst() {
 			if self.l.IsConst() && self.r.IsConst() ||
 				self.l.Type.comptime() || self.r.Type.comptime() {
@@ -4873,12 +4873,12 @@ impl binaryEval {
 		}
 	}
 
-	fn postEval(mut self, mut v: &Value) {
+	fn postEval(mut *self, mut v: &Value) {
 		v.Lvalue = false
 		self.setModel(v)
 	}
 
-	fn solveExplicit(mut self, mut l: &Value, mut r: &Value): &Value {
+	fn solveExplicit(mut *self, mut l: &Value, mut r: &Value): &Value {
 		self.l, self.r = l, r
 
 		self.checkValues()
@@ -4898,7 +4898,7 @@ impl binaryEval {
 		ret v
 	}
 
-	fn eval(mut self, mut op: &ast::BinaryExpr): &Value {
+	fn eval(mut *self, mut op: &ast::BinaryExpr): &Value {
 		if op.Op.ID == token::ASSIGN {
 			self.e.pushErr(op.Op, log::AssignInExpr)
 			self.e.pushSuggestion(log::UseImperative)

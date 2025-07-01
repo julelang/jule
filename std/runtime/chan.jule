@@ -43,7 +43,7 @@ impl chanQueue {
 
 	// Removes the first node from the queue and returns the data.
 	// Assumes that there is always data in the queue.
-	fn dequeue(mut self): T {
+	fn dequeue(mut *self): T {
 		// Copy the data before resetting to default.
 		mut data := unsafe { self.data[self.r] }
 		unsafe {
@@ -64,7 +64,7 @@ impl chanQueue {
 	// Adds the data to the end of the queue.
 	// If the channel is unbuffered, it always assumes the current data has been read.
 	// If the channel is buffered, it always assumes there is free node to enqueue.
-	fn enqueue(mut self, mut &data: *T) {
+	fn enqueue(mut *self, mut &data: *T) {
 		// Write data to the next available node in the queue.
 		unsafe { self.data[self.w] = *data }
 		// Advance the write order.
@@ -131,12 +131,12 @@ impl pchan {
 	// Returns the channel as a &hchan for general sharing of pchan[T].
 	// The returned &hchan does not exhibit GC behavior and can be used until
 	// the self pointer is freed, after which it should not be used.
-	fn hchan(mut self): &hchan {
+	fn hchan(mut *self): &hchan {
 		ret unsafe { (&hchan)((*hchan)(self)) }
 	}
 
 	// Closes the channel.
-	fn close(mut self) {
+	fn close(mut *self) {
 		self.lock.lock()
 		self.state |= chanClosed
 		self.lock.unlock()
@@ -144,7 +144,7 @@ impl pchan {
 
 	// Sends the data to the channel.
 	// If owned is true, assumes lock is already owned by the current caller.
-	fn send(mut self, mut data: T, owned: bool) {
+	fn send(mut *self, mut data: T, owned: bool) {
 		if !owned {
 			self.lock.lock()
 		}
@@ -177,7 +177,7 @@ impl pchan {
 	// The |ok| is the reference that points to boolean and
 	// it reports whether data dequeued and received successfully.
 	// If owned is true, assumes lock is already owned by the current caller.
-	fn recv(mut self, mut &ok: *bool, owned: bool): T {
+	fn recv(mut *self, mut &ok: *bool, owned: bool): T {
 		if !owned {
 			self.lock.lock()
 		}

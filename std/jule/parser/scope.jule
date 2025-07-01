@@ -137,41 +137,41 @@ struct scopeParser {
 }
 
 impl scopeParser {
-	fn stop(mut self) {
+	fn stop(mut *self) {
 		self.pos = -1
 	}
 
-	fn stopped(self): bool {
+	fn stopped(*self): bool {
 		ret self.pos == -1
 	}
 
-	fn finished(self): bool {
+	fn finished(*self): bool {
 		ret self.pos >= len(self.stmts)
 	}
 
-	fn isLastSt(self): bool {
+	fn isLastSt(*self): bool {
 		ret self.pos+1 >= len(self.stmts)
 	}
 
-	fn pushErr(mut self, token: &token::Token, fmt: str, args: ...any) {
+	fn pushErr(mut *self, token: &token::Token, fmt: str, args: ...any) {
 		self.p.pushErr(token, fmt, args...)
 	}
 
 	// Push suggestion to last log.
-	fn pushSuggestion(mut self, fmt: str, args: ...any) {
+	fn pushSuggestion(mut *self, fmt: str, args: ...any) {
 		self.p.pushSuggestion(fmt, args...)
 	}
 
-	fn insertAsNext(mut self, mut tokens: []&token::Token) {
+	fn insertAsNext(mut *self, mut tokens: []&token::Token) {
 		self.stmts = slices::Insert(self.stmts, self.pos+1, &stmt{tokens: tokens})
 	}
 
-	fn next(mut self): &stmt {
+	fn next(mut *self): &stmt {
 		self.pos++
 		ret self.stmts[self.pos]
 	}
 
-	fn buildScope(mut self, mut tokens: []&token::Token, mut end: &token::Token): &ast::ScopeTree {
+	fn buildScope(mut *self, mut tokens: []&token::Token, mut end: &token::Token): &ast::ScopeTree {
 		mut s := newScope()
 		s.Parent = self.s
 		s.End = end
@@ -182,7 +182,7 @@ impl scopeParser {
 		ret s
 	}
 
-	fn buildVarSt(mut self, mut tokens: []&token::Token): &ast::Var {
+	fn buildVarSt(mut *self, mut tokens: []&token::Token): &ast::Var {
 		mut v := self.p.buildVar(tokens)
 		if v != nil {
 			v.Scope = self.s
@@ -190,7 +190,7 @@ impl scopeParser {
 		ret v
 	}
 
-	fn buildRetSt(mut self, mut tokens: []&token::Token): &ast::Ret {
+	fn buildRetSt(mut *self, mut tokens: []&token::Token): &ast::Ret {
 		mut st := &ast::Ret{
 			Token: tokens[0],
 		}
@@ -201,7 +201,7 @@ impl scopeParser {
 		ret st
 	}
 
-	fn buildWhileNextIter(mut self, mut s: &stmt): &ast::Iter {
+	fn buildWhileNextIter(mut *self, mut s: &stmt): &ast::Iter {
 		mut it := &ast::Iter{
 			Token: s.tokens[0],
 		}
@@ -246,19 +246,19 @@ impl scopeParser {
 		ret it
 	}
 
-	fn buildWhileIterKind(mut self, mut tokens: []&token::Token): &ast::WhileKind {
+	fn buildWhileIterKind(mut *self, mut tokens: []&token::Token): &ast::WhileKind {
 		ret &ast::WhileKind{
 			X: self.p.buildExpr(tokens),
 		}
 	}
 
-	fn getRangeKindKeysTokens(mut self, mut toks: []&token::Token): [][]&token::Token {
+	fn getRangeKindKeysTokens(mut *self, mut toks: []&token::Token): [][]&token::Token {
 		mut vars, errs := parts(toks, token::COMMA, true)
 		self.p.errors = append(self.p.errors, errs...)
 		ret vars
 	}
 
-	fn buildRangeKindKey(mut self, mut tokens: []&token::Token): &ast::Var {
+	fn buildRangeKindKey(mut *self, mut tokens: []&token::Token): &ast::Var {
 		if len(tokens) == 0 {
 			ret nil
 		}
@@ -284,7 +284,7 @@ impl scopeParser {
 		ret key
 	}
 
-	fn buildRangeKindKeys(mut self, mut parts: [][]&token::Token): []&ast::Var {
+	fn buildRangeKindKeys(mut *self, mut parts: [][]&token::Token): []&ast::Var {
 		mut keys := ([]&ast::Var)(nil)
 		for (_, mut tokens) in parts {
 			keys = append(keys, self.buildRangeKindKey(tokens))
@@ -292,7 +292,7 @@ impl scopeParser {
 		ret keys
 	}
 
-	fn setupRangeKindKeysPlain(mut self, mut rng: &ast::RangeKind, mut tokens: []&token::Token) {
+	fn setupRangeKindKeysPlain(mut *self, mut rng: &ast::RangeKind, mut tokens: []&token::Token) {
 		mut keyTokens := self.getRangeKindKeysTokens(tokens)
 		if len(keyTokens) == 0 {
 			ret
@@ -307,7 +307,7 @@ impl scopeParser {
 		}
 	}
 
-	fn setupRangeKindKeysExplicit(mut self, mut rng: &ast::RangeKind, mut tokens: []&token::Token) {
+	fn setupRangeKindKeysExplicit(mut *self, mut rng: &ast::RangeKind, mut tokens: []&token::Token) {
 		mut i := 0
 		mut rang := range(&i, token::LPAREN, token::RPAREN, tokens)
 		if i < len(tokens) {
@@ -316,7 +316,7 @@ impl scopeParser {
 		self.setupRangeKindKeysPlain(rng, rang)
 	}
 
-	fn setupRangeKindKeys(mut self, mut rng: &ast::RangeKind, mut tokens: []&token::Token) {
+	fn setupRangeKindKeys(mut *self, mut rng: &ast::RangeKind, mut tokens: []&token::Token) {
 		if tokens[0].ID == token::LPAREN {
 			self.setupRangeKindKeysExplicit(rng, tokens)
 			ret
@@ -324,7 +324,7 @@ impl scopeParser {
 		self.setupRangeKindKeysPlain(rng, tokens)
 	}
 
-	fn buildRangeIterKind(mut self, mut varTokens: []&token::Token,
+	fn buildRangeIterKind(mut *self, mut varTokens: []&token::Token,
 		mut exprTokens: []&token::Token, mut inToken: &token::Token): &ast::RangeKind {
 		mut rng := &ast::RangeKind{
 			InToken: inToken,
@@ -340,7 +340,7 @@ impl scopeParser {
 		ret rng
 	}
 
-	fn buildCommonIterKind(mut self, mut tokens: []&token::Token, errTok: &token::Token): ast::IterKind {
+	fn buildCommonIterKind(mut *self, mut tokens: []&token::Token, errTok: &token::Token): ast::IterKind {
 		mut braceN := 0
 		for (i, mut tok) in tokens {
 			match tok.ID {
@@ -367,7 +367,7 @@ impl scopeParser {
 		ret self.buildWhileIterKind(tokens)
 	}
 
-	fn buildCommonIter(mut self, mut tokens: []&token::Token): &ast::Iter {
+	fn buildCommonIter(mut *self, mut tokens: []&token::Token): &ast::Iter {
 		mut it := &ast::Iter{
 			Token: tokens[0],
 		}
@@ -397,14 +397,14 @@ impl scopeParser {
 		ret it
 	}
 
-	fn buildIterSt(mut self, mut st: &stmt): &ast::Iter {
+	fn buildIterSt(mut *self, mut st: &stmt): &ast::Iter {
 		if st.terminated {
 			ret self.buildWhileNextIter(st)
 		}
 		ret self.buildCommonIter(st.tokens)
 	}
 
-	fn buildBreak(mut self, mut tokens: []&token::Token): &ast::Break {
+	fn buildBreak(mut *self, mut tokens: []&token::Token): &ast::Break {
 		mut brk := &ast::Break{
 			Token: tokens[0],
 		}
@@ -422,7 +422,7 @@ impl scopeParser {
 		ret brk
 	}
 
-	fn buildContSt(mut self, mut tokens: []&token::Token): &ast::Continue {
+	fn buildContSt(mut *self, mut tokens: []&token::Token): &ast::Continue {
 		mut cont := &ast::Continue{
 			Token: tokens[0],
 		}
@@ -440,7 +440,7 @@ impl scopeParser {
 		ret cont
 	}
 
-	fn buildIf(mut self, mut &tokens: *[]&token::Token): &ast::If {
+	fn buildIf(mut *self, mut &tokens: *[]&token::Token): &ast::If {
 		mut model := &ast::If{
 			Token: (*tokens)[0],
 		}
@@ -473,7 +473,7 @@ impl scopeParser {
 		ret model
 	}
 
-	fn buildElse(mut self, mut &tokens: *[]&token::Token): &ast::Else {
+	fn buildElse(mut *self, mut &tokens: *[]&token::Token): &ast::Else {
 		mut els := &ast::Else{
 			Token: (*tokens)[0],
 		}
@@ -497,7 +497,7 @@ impl scopeParser {
 		ret els
 	}
 
-	fn buildIfElseChain(mut self, mut tokens: []&token::Token): &ast::Conditional {
+	fn buildIfElseChain(mut *self, mut tokens: []&token::Token): &ast::Conditional {
 		mut chain := new(ast::Conditional)
 		chain.Tail = append(chain.Tail, self.buildIf(&tokens))
 		if len(chain.Tail) == 0 || chain.Tail[0] == nil {
@@ -519,7 +519,7 @@ impl scopeParser {
 		ret chain
 	}
 
-	fn buildCoCallSt(mut self, mut tokens: []&token::Token): &ast::Expr {
+	fn buildCoCallSt(mut *self, mut tokens: []&token::Token): &ast::Expr {
 		token := tokens[0]
 		tokens = tokens[1:] // Start 1 to skip "co" token.
 		if len(tokens) == 0 {
@@ -539,7 +539,7 @@ impl scopeParser {
 		ret e
 	}
 
-	fn buildGoto(mut self, mut tokens: []&token::Token): &ast::Goto {
+	fn buildGoto(mut *self, mut tokens: []&token::Token): &ast::Goto {
 		mut gt := &ast::Goto{
 			Token: tokens[0],
 		}
@@ -559,7 +559,7 @@ impl scopeParser {
 		ret gt
 	}
 
-	fn buildFall(mut self, mut tokens: []&token::Token): &ast::Fall {
+	fn buildFall(mut *self, mut tokens: []&token::Token): &ast::Fall {
 		mut fll := &ast::Fall{
 			Token: tokens[0],
 		}
@@ -569,13 +569,13 @@ impl scopeParser {
 		ret fll
 	}
 
-	fn buildTypeAliasSt(mut self, mut tokens: []&token::Token): &ast::TypeAlias {
+	fn buildTypeAliasSt(mut *self, mut tokens: []&token::Token): &ast::TypeAlias {
 		mut tad := self.p.buildTypeAliasDecl(tokens)
 		tad.Scope = self.s
 		ret tad
 	}
 
-	fn pushCaseExpr(mut self, mut tokens: []&token::Token, mut token: &token::Token,
+	fn pushCaseExpr(mut *self, mut tokens: []&token::Token, mut token: &token::Token,
 		typeMatch: bool, mut &exprs: *[]&ast::Expr) {
 		if len(tokens) == 0 {
 			ret
@@ -594,7 +594,7 @@ impl scopeParser {
 		*exprs = append(*exprs, self.p.buildExpr(tokens))
 	}
 
-	fn buildCaseExprs(mut self, mut &tokens: *[]&token::Token, mut colon: &token::Token, typeMatch: bool): ([]&ast::Expr, bool) {
+	fn buildCaseExprs(mut *self, mut &tokens: *[]&token::Token, mut colon: &token::Token, typeMatch: bool): ([]&ast::Expr, bool) {
 		mut exprs := make([]&ast::Expr, 0, 1)
 		mut braceN := 0
 		mut j := 0
@@ -643,7 +643,7 @@ impl scopeParser {
 		ret nil, false
 	}
 
-	fn buildCaseScope(mut self, mut &tokens: *[]&token::Token): &ast::ScopeTree {
+	fn buildCaseScope(mut *self, mut &tokens: *[]&token::Token): &ast::ScopeTree {
 		mut n := 0
 		for {
 			mut i := 0
@@ -670,7 +670,7 @@ impl scopeParser {
 		ret scope
 	}
 
-	fn buildCase(mut self, mut &tokens: *[]&token::Token, typeMatch: bool): (&ast::Case, bool) {
+	fn buildCase(mut *self, mut &tokens: *[]&token::Token, typeMatch: bool): (&ast::Case, bool) {
 		mut c := &ast::Case{
 			Token: (*tokens)[0],
 		}
@@ -689,7 +689,7 @@ impl scopeParser {
 		ret c, isDefault
 	}
 
-	fn buildCases(mut self, mut tokens: []&token::Token, typeMatch: bool): ([]&ast::Case, &ast::Else) {
+	fn buildCases(mut *self, mut tokens: []&token::Token, typeMatch: bool): ([]&ast::Case, &ast::Else) {
 		let mut cases: []&ast::Case = nil
 		let mut def: &ast::Else = nil
 		mut defNotLast := false
@@ -723,7 +723,7 @@ impl scopeParser {
 		ret cases, def
 	}
 
-	fn buildMatch(mut self, mut tokens: []&token::Token): &ast::Match {
+	fn buildMatch(mut *self, mut tokens: []&token::Token): &ast::Match {
 		mut m := &ast::Match{
 			Token: tokens[0],
 		}
@@ -756,7 +756,7 @@ impl scopeParser {
 		ret m
 	}
 
-	fn buildSelectCaseExpr(mut self, mut &tokens: *[]&token::Token, mut colon: &token::Token): ([]&ast::Expr, bool) {
+	fn buildSelectCaseExpr(mut *self, mut &tokens: *[]&token::Token, mut colon: &token::Token): ([]&ast::Expr, bool) {
 		mut exprs := make([]&ast::Expr, 0, 1)
 		mut braceN := 0
 		mut j := 0
@@ -809,7 +809,7 @@ impl scopeParser {
 		ret nil, false
 	}
 
-	fn buildSelectCase(mut self, mut &tokens: *[]&token::Token): (&ast::Case, bool) {
+	fn buildSelectCase(mut *self, mut &tokens: *[]&token::Token): (&ast::Case, bool) {
 		mut c := &ast::Case{
 			Token: (*tokens)[0],
 		}
@@ -828,7 +828,7 @@ impl scopeParser {
 		ret c, isDefault
 	}
 
-	fn buildSelectCases(mut self, mut tokens: []&token::Token): ([]&ast::Case, &ast::Else) {
+	fn buildSelectCases(mut *self, mut tokens: []&token::Token): ([]&ast::Case, &ast::Else) {
 		let mut cases: []&ast::Case = nil
 		let mut def: &ast::Else = nil
 		mut defNotLast := false
@@ -860,7 +860,7 @@ impl scopeParser {
 		ret cases, def
 	}
 
-	fn buildSelect(mut self, mut tokens: []&token::Token): &ast::Select {
+	fn buildSelect(mut *self, mut tokens: []&token::Token): &ast::Select {
 		mut m := &ast::Select{
 			Token: tokens[0],
 		}
@@ -879,7 +879,7 @@ impl scopeParser {
 		ret m
 	}
 
-	fn buildScopeSt(mut self, mut tokens: []&token::Token): &ast::ScopeTree {
+	fn buildScopeSt(mut *self, mut tokens: []&token::Token): &ast::ScopeTree {
 		mut isUnsafe := false
 		mut isDeferred := false
 		mut token := tokens[0]
@@ -922,7 +922,7 @@ impl scopeParser {
 		ret scope
 	}
 
-	fn buildLabel(mut self, mut tokens: []&token::Token): &ast::Label {
+	fn buildLabel(mut *self, mut tokens: []&token::Token): &ast::Label {
 		mut lbl := &ast::Label{
 			Token: tokens[0],
 			Name: tokens[0].Kind,
@@ -937,7 +937,7 @@ impl scopeParser {
 		ret lbl
 	}
 
-	fn buildIdSt(mut self, mut tokens: []&token::Token): (ast::StmtData, ok: bool) {
+	fn buildIdSt(mut *self, mut tokens: []&token::Token): (ast::StmtData, ok: bool) {
 		if len(tokens) == 1 {
 			ret
 		}
@@ -951,7 +951,7 @@ impl scopeParser {
 		ret
 	}
 
-	fn buildAssignInfo(mut self, mut tokens: []&token::Token): &assignInfo {
+	fn buildAssignInfo(mut *self, mut tokens: []&token::Token): &assignInfo {
 		mut info := &assignInfo{
 			ok: true,
 		}
@@ -997,7 +997,7 @@ impl scopeParser {
 		ret info
 	}
 
-	fn buildAssignL(mut self, mut tokens: []&token::Token): &ast::AssignLeft {
+	fn buildAssignL(mut *self, mut tokens: []&token::Token): &ast::AssignLeft {
 		mut l := &ast::AssignLeft{
 			Token: tokens[0],
 		}
@@ -1008,7 +1008,7 @@ impl scopeParser {
 		ret l
 	}
 
-	fn buildAssignLs(mut self, mut parts: [][]&token::Token): []&ast::AssignLeft {
+	fn buildAssignLs(mut *self, mut parts: [][]&token::Token): []&ast::AssignLeft {
 		let mut lefts: []&ast::AssignLeft = nil
 		for (_, mut part) in parts {
 			mut l := self.buildAssignL(part)
@@ -1017,7 +1017,7 @@ impl scopeParser {
 		ret lefts
 	}
 
-	fn buildChanSend(mut self, mut info: &assignInfo): (ast::StmtData, bool) {
+	fn buildChanSend(mut *self, mut info: &assignInfo): (ast::StmtData, bool) {
 		mut ch := self.p.buildExpr(info.l)
 		if ch == nil {
 			ret nil, false
@@ -1033,7 +1033,7 @@ impl scopeParser {
 		}, true
 	}
 
-	fn buildPlainAssign(mut self, mut tokens: []&token::Token): (ast::StmtData, bool) {
+	fn buildPlainAssign(mut *self, mut tokens: []&token::Token): (ast::StmtData, bool) {
 		mut info := self.buildAssignInfo(tokens)
 		if !info.ok {
 			ret nil, false
@@ -1092,7 +1092,7 @@ impl scopeParser {
 		ret assign, true
 	}
 
-	fn buildDeclAssign1(mut self, mut lefts: []&token::Token, mut assign: &ast::Assign): bool {
+	fn buildDeclAssign1(mut *self, mut lefts: []&token::Token, mut assign: &ast::Assign): bool {
 		// Lefts
 		mut parts, errs := parts(lefts, token::COMMA, true)
 		if len(errs) > 0 {
@@ -1140,7 +1140,7 @@ impl scopeParser {
 		ret true
 	}
 
-	fn buildDeclAssign(mut self, mut tokens: []&token::Token): (&ast::Assign, bool) {
+	fn buildDeclAssign(mut *self, mut tokens: []&token::Token): (&ast::Assign, bool) {
 		if len(tokens) < 1 {
 			ret nil, false
 		}
@@ -1174,7 +1174,7 @@ impl scopeParser {
 		ret assign, ok
 	}
 
-	fn buildAssignSt(mut self, mut tokens: []&token::Token): (st: ast::StmtData, ok: bool) {
+	fn buildAssignSt(mut *self, mut tokens: []&token::Token): (st: ast::StmtData, ok: bool) {
 		if !checkAssignTokens(tokens) {
 			ret nil, false
 		}
@@ -1187,7 +1187,7 @@ impl scopeParser {
 		ret
 	}
 
-	fn buildUseExpr(mut self, mut tokens: []&token::Token): &ast::UseExpr {
+	fn buildUseExpr(mut *self, mut tokens: []&token::Token): &ast::UseExpr {
 		if len(tokens) == 1 {
 			self.pushErr(tokens[0], log::MissingExpr)
 			ret nil
@@ -1200,7 +1200,7 @@ impl scopeParser {
 		ret ue
 	}
 
-	fn buildConstSt(mut self, mut st: &stmt): ast::StmtData {
+	fn buildConstSt(mut *self, mut st: &stmt): ast::StmtData {
 		if len(st.tokens) == 1 {
 			self.pushErr(st.tokens[0], log::InvalidSyntax)
 			ret nil
@@ -1225,7 +1225,7 @@ impl scopeParser {
 		}
 	}
 
-	fn buildSt(mut self, mut st: &stmt): ast::StmtData {
+	fn buildSt(mut *self, mut st: &stmt): ast::StmtData {
 		if len(st.tokens) == 0 {
 			// Empty statement, skip immediately.
 			// Typically caused by empty statements explicitly terminated by semicolon.
@@ -1297,7 +1297,7 @@ impl scopeParser {
 		ret nil
 	}
 
-	fn build(mut self, mut tokens: []&token::Token, mut s: &ast::ScopeTree) {
+	fn build(mut *self, mut tokens: []&token::Token, mut s: &ast::ScopeTree) {
 		if s == nil {
 			ret
 		}

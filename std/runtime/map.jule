@@ -80,26 +80,26 @@ impl bitset {
 	}
 
 	// Returns length.
-	fn len(self): u32 { ret 8 }
+	fn len(*self): u32 { ret 8 }
 
 	// Returns the ctrl by offset i.
-	fn at(mut self, i: u32): ctrl {
+	fn at(mut *self, i: u32): ctrl {
 		ret unsafe { *((*ctrl)(&self.bits) + uint(i)) }
 	}
 
 	// Sets ctrl to c by offset i.
-	fn set(mut self, i: u32, c: ctrl) {
+	fn set(mut *self, i: u32, c: ctrl) {
 		unsafe { *((*ctrl)(&self.bits) + uint(i)) = c }
 	}
 
 	// Sets all ctrls to empty.
-	fn clear(mut self) {
+	fn clear(mut *self) {
 		self.bits = bitsetEmpty
 	}
 
 	// Returns the set of bits which are full and for which the 7-bit hash
 	// matches the given value. May return false positives.
-	fn metaMatchH2(self, h: h2): bitset {
+	fn metaMatchH2(*self, h: h2): bitset {
 		// For the technique, see:
 		// http://graphics.stanford.edu/~seander/bithacks.html##ValueInWord
 		// (Determine if a word has a byte equal to n).
@@ -116,14 +116,14 @@ impl bitset {
 		ret bitset.hasZeroByte(v)
 	}
 
-	fn nextMatch(mut self): u32 {
+	fn nextMatch(mut *self): u32 {
 		s := u32(bits::TrailingZeros64(self.bits))
 		self.bits &= ^(1 << s) // clear bit |s|
 		ret s >> 3 // div by 8
 	}
 
 	// Returns the set of bits in the group that are empty.
-	fn metaMatchEmpty(self): bitset {
+	fn metaMatchEmpty(*self): bitset {
 		//    empty: 1 0 0 0 0 0 0 0
 		//  deleted: 1 1 1 1 1 1 1 0
 		//     full: 0 h h h h h h h  // h represents the hash bits.
@@ -189,7 +189,7 @@ impl _Map {
 		}
 	}
 
-	fn initData(mut self, cap: u32) {
+	fn initData(mut *self, cap: u32) {
 		groups := numGroups(cap)
 		self.ctrl = make([]bitset, groups)
 		initBitsets(self.ctrl)
@@ -198,11 +198,11 @@ impl _Map {
 	}
 
 	// Returns hash for key.
-	fn hash(self, &key: *K): u64 {
+	fn hash(*self, &key: *K): u64 {
 		ret u64(maphash(*key, self.seed))
 	}
 
-	fn rehash(mut self, n: u32) {
+	fn rehash(mut *self, n: u32) {
 		if self.groups == nil {
 			// no need for rehashing just handle nil data
 			self.initData(mapInitialSize)
@@ -227,7 +227,7 @@ impl _Map {
 		}
 	}
 
-	fn nextSize(self): (n: u32) {
+	fn nextSize(*self): (n: u32) {
 		if self.groups == nil {
 			ret mapInitialSize
 		}
@@ -299,7 +299,7 @@ impl _Map {
 	// Inserts |key| and |value|.
 	// Assumes |key| is already not exist in the map and
 	// we have enough space to add new entry.
-	fn uncheckedSet(mut self, mut key: K, mut value: V) {
+	fn uncheckedSet(mut *self, mut key: K, mut value: V) {
 		hi, lo := splitHash(self.hash(&key))
 		mut g := probeStart(hi, len(self.groups))
 		for { // inlined find loop
@@ -324,7 +324,7 @@ impl _Map {
 
 	// Attempts to insert |key|.
 	// Returns pointer to value of inserted or already exist |key|.
-	fn set(mut self, mut key: K): (value: *V) {
+	fn set(mut *self, mut key: K): (value: *V) {
 		if self.resident >= self.limit {
 			self.rehash(self.nextSize())
 		}
@@ -448,7 +448,7 @@ impl _Map {
 
 	// Returns the number of additional elements
 	// the can be added before resizing.
-	fn cap(self): int { ret int(self.limit - self.resident) }
+	fn cap(*self): int { ret int(self.limit - self.resident) }
 
 	fn iterator(mut &self): mapIterator[K, V] {
 		mut iterator := mapIterator[K, V]{m: self}
@@ -472,7 +472,7 @@ struct mapIterator[K: comparable, V] {
 }
 
 impl mapIterator {
-	fn init(mut self) {
+	fn init(mut *self) {
 		if self.m == nil {
 			ret
 		}
@@ -489,7 +489,7 @@ impl mapIterator {
 
 	// Returns pointer to the key and value.
 	// Returns nil pointer for both if iteration ended.
-	fn next(mut self): (*K, *V) {
+	fn next(mut *self): (*K, *V) {
 		for self.n < len(self.groups); self.n++ {
 			mut ctrl := self.ctrl[self.g]
 			for self.s < ctrl.len(); self.s++ {

@@ -190,22 +190,22 @@ struct parser {
 }
 
 impl parser {
-	fn stop(mut self) { self.ast = nil }
-	fn stopped(self): bool { ret self.ast == nil }
+	fn stop(mut *self) { self.ast = nil }
+	fn stopped(*self): bool { ret self.ast == nil }
 
 	// Appends error by specified token, key and args.
-	fn pushErr(mut self, token: &token::Token, fmt: str, args: ...any) {
+	fn pushErr(mut *self, token: &token::Token, fmt: str, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, fmt, args...))
 	}
 
 	// Push suggestion to last log.
-	fn pushSuggestion(mut self, fmt: str, args: ...any) {
+	fn pushSuggestion(mut *self, fmt: str, args: ...any) {
 		unsafe { pushSuggestion(&self.errors[len(self.errors)-1], fmt, args...) }
 	}
 
 	// Reports whether tok is identifier.
 	// Must be used by definitions that must support the AllowKeywordIdentifiers mode.
-	fn isIdent(mut self, tok: &token::Token): bool {
+	fn isIdent(mut *self, tok: &token::Token): bool {
 		ret tok.ID == token::NAME ||
 			self.mode&allowKeywordIdentifiers == allowKeywordIdentifiers && token::IsKeyword(tok.Kind)
 	}
@@ -218,7 +218,7 @@ impl parser {
 		ret self.getExprBuilder().parseFromTokens(tokens)
 	}
 
-	fn buildDirective(mut self, mut tokens: []&token::Token): &ast::Directive {
+	fn buildDirective(mut *self, mut tokens: []&token::Token): &ast::Directive {
 		if len(tokens) == 1 {
 			self.pushErr(tokens[0], log::InvalidSyntax)
 			ret nil
@@ -233,7 +233,7 @@ impl parser {
 		}
 	}
 
-	fn pushDirective(mut self, mut d: &ast::Directive) {
+	fn pushDirective(mut *self, mut d: &ast::Directive) {
 		if d == nil {
 			ret
 		}
@@ -394,7 +394,7 @@ impl parser {
 		}
 	}
 
-	fn buildVarBegin(mut self, mut v: &ast::Var, mut &tokens: *[]&token::Token) {
+	fn buildVarBegin(mut *self, mut v: &ast::Var, mut &tokens: *[]&token::Token) {
 		tok := (*tokens)[0]
 		match tok.ID {
 		| token::LET:
@@ -509,7 +509,7 @@ impl parser {
 		ret generics
 	}
 
-	fn buildSelfParam(mut self, mut tokens: []&token::Token): &ast::Param {
+	fn buildSelfParam(mut *self, mut tokens: []&token::Token): &ast::Param {
 		if len(tokens) == 0 {
 			ret nil
 		}
@@ -558,7 +558,7 @@ impl parser {
 		ret param
 	}
 
-	fn paramTypeBegin(mut self, mut param: &ast::Param, mut &i: *int, tokens: []&token::Token) {
+	fn paramTypeBegin(mut *self, mut param: &ast::Param, mut &i: *int, tokens: []&token::Token) {
 		for *i < len(tokens); *i++ {
 			token := tokens[*i]
 			if token.ID != token::ELLIPSIS {
@@ -649,7 +649,7 @@ impl parser {
 		ret param
 	}
 
-	fn checkParams(mut self, mut params: []&ast::Param) {
+	fn checkParams(mut *self, mut params: []&ast::Param) {
 		for (_, mut param) in params {
 			if param.IsSelf() || param.Type != nil {
 				continue
@@ -925,7 +925,7 @@ impl parser {
 		ret f
 	}
 
-	fn buildBindUseDecl(mut self, mut decl: &ast::Use, mut tokens: []&token::Token) {
+	fn buildBindUseDecl(mut *self, mut decl: &ast::Use, mut tokens: []&token::Token) {
 		if len(tokens) > 1 {
 			self.pushErr(tokens[1], log::InvalidSyntax)
 		}
@@ -938,7 +938,7 @@ impl parser {
 		decl.Path = token
 	}
 
-	fn parseUseDecl(mut self, mut decl: &ast::Use, mut tokens: []&token::Token) {
+	fn parseUseDecl(mut *self, mut decl: &ast::Use, mut tokens: []&token::Token) {
 		if decl.Bind {
 			self.buildBindUseDecl(decl, tokens)
 			ret
@@ -972,7 +972,7 @@ impl parser {
 		decl.Path = token
 	}
 
-	fn buildUseDecl(mut self, mut tokens: []&token::Token, _bind: bool): &ast::Use {
+	fn buildUseDecl(mut *self, mut tokens: []&token::Token, _bind: bool): &ast::Use {
 		mut decl := &ast::Use{
 			Token: tokens[0], // See developer reference (8).
 			Bind: _bind,
@@ -1301,7 +1301,7 @@ impl parser {
 		ret s
 	}
 
-	fn checkMethodReceiver(mut self, mut f: &ast::Func, mustRecv: bool) {
+	fn checkMethodReceiver(mut *self, mut f: &ast::Func, mustRecv: bool) {
 		if len(f.Params) == 0 {
 			f.Static = true
 			if mustRecv {
@@ -1630,12 +1630,12 @@ impl parser {
 		}
 	}
 
-	fn applyFuncMeta(mut self, mut f: &ast::Func) {
+	fn applyFuncMeta(mut *self, mut f: &ast::Func) {
 		f.Directives = self.directives
 		self.directives = nil
 	}
 
-	fn applyMeta(mut self, mut node: ast::Node) {
+	fn applyMeta(mut *self, mut node: ast::Node) {
 		match type node.Data {
 		| &ast::Var:
 			mut v := node.Data.(&ast::Var)
@@ -1724,7 +1724,7 @@ impl parser {
 		}
 	}
 
-	fn removeRange(self, mut i: int, id: int, tokens: []&token::Token, mut &ranges: *[]int) {
+	fn removeRange(*self, mut i: int, id: int, tokens: []&token::Token, mut &ranges: *[]int) {
 		close := getCloseOfBrace(id)
 		for i >= 0; i-- {
 			tok := tokens[(*ranges)[i]]
@@ -1736,7 +1736,7 @@ impl parser {
 		}
 	}
 
-	fn pushWrongOrderCloseErr(mut self, t: &token::Token, tokens: []&token::Token, &ranges: *[]int) {
+	fn pushWrongOrderCloseErr(mut *self, t: &token::Token, tokens: []&token::Token, &ranges: *[]int) {
 		match tokens[(*ranges)[len(*ranges)-1]].ID {
 		| token::LPAREN:
 			self.pushErr(t, log::ExpectedParentClose)
@@ -1747,7 +1747,7 @@ impl parser {
 		}
 	}
 
-	fn pushRangeClose(mut self, t: &token::Token, left: int, tokens: []&token::Token, mut &ranges: *[]int) {
+	fn pushRangeClose(mut *self, t: &token::Token, left: int, tokens: []&token::Token, mut &ranges: *[]int) {
 		n := len(*ranges)
 		if n == 0 {
 			match t.ID {
@@ -1765,7 +1765,7 @@ impl parser {
 		self.removeRange(n-1, t.ID, tokens, ranges)
 	}
 
-	fn checkRanges(mut self, tokens: []&token::Token) {
+	fn checkRanges(mut *self, tokens: []&token::Token) {
 		let mut ranges: []int = nil
 
 		for i, token in tokens {

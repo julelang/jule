@@ -31,17 +31,17 @@ impl Param {
 	}
 
 	// Reports whether parameter is self (receiver) parameter.
-	fn IsSelf(self): bool {
+	fn IsSelf(*self): bool {
 		ret self.Name == "&self" || self.Name == "*self"
 	}
 
 	// Reports whether self (receiver) parameter is smart pointer.
-	fn IsSmartptr(self): bool {
+	fn IsSmartptr(*self): bool {
 		ret len(self.Name) > 0 && self.Name[0] == '&'
 	}
 
 	// Reports whether self (receiver) parameter is reference pointer.
-	fn IsRefptr(self): bool {
+	fn IsRefptr(*self): bool {
 		ret len(self.Name) > 0 && self.Name[0] == '*'
 	}
 }
@@ -82,12 +82,12 @@ struct Func {
 
 impl Func {
 	// Reports whether return type is void.
-	fn IsVoid(self): bool {
+	fn IsVoid(*self): bool {
 		ret self.Result == nil
 	}
 
 	// Reports whether function is method.
-	fn IsMethod(self): bool {
+	fn IsMethod(*self): bool {
 		if self.Owner != nil {
 			ret true
 		}
@@ -101,22 +101,22 @@ impl Func {
 	}
 
 	// Reports whether function is entry point.
-	fn IsEntryPoint(self): bool {
+	fn IsEntryPoint(*self): bool {
 		ret self.Name == jule::EntryPoint
 	}
 
 	// Reports whether function is initializer function.
-	fn IsInit(self): bool {
+	fn IsInit(*self): bool {
 		ret self.Name == jule::InitFunc
 	}
 
 	// Reports whether function is anonymous function.
-	fn IsAnon(self): bool {
+	fn IsAnon(*self): bool {
 		ret jule::IsAnon(self.Name)
 	}
 
 	// Reports whether function has return variable(s).
-	fn AnyVar(self): bool {
+	fn AnyVar(*self): bool {
 		if self.Result != nil {
 			for _, name in self.Result.Names {
 				if !jule::IsAnon(name.Kind) {
@@ -157,7 +157,7 @@ impl Func {
 
 	// Appends function instance.
 	// Returns instance if already instance is already exist, nil if not.
-	fn appendInstance(mut self, mut ins: &FuncIns): &FuncIns {
+	fn appendInstance(mut *self, mut ins: &FuncIns): &FuncIns {
 		if len(self.Generics) == 0 {
 			// Skip already created instance for just one unique combination.
 			if len(self.Instances) == 1 {
@@ -194,7 +194,7 @@ struct ParamIns {
 impl ParamIns {
 	// Implement: Kind
 	// Returns ParamIns's type kind as string.
-	fn Str(self): str {
+	fn Str(*self): str {
 		mut s := strings::Builder{}
 		if self.Decl.Mutable {
 			s.WriteStr("mut ")!
@@ -249,7 +249,7 @@ struct FuncIns {
 impl Kind for FuncIns {
 	// Implement: Kind
 	// Returns function's type kind as string.
-	fn Str(self): str {
+	fn Str(*self): str {
 		const Ident = false
 		ret self.GetKindStr(Ident)
 	}
@@ -354,7 +354,7 @@ impl FuncIns {
 	// Returns all types of result.
 	// Returns nil if result is nil.
 	// Returns mutable slice if returns internal slice.
-	fn Types(mut self): []&Type {
+	fn Types(mut *self): []&Type {
 		match {
 		| self.Result == nil:
 			ret nil
@@ -366,19 +366,19 @@ impl FuncIns {
 	}
 
 	// Reports whether instance is built-in.
-	fn IsBuiltin(self): bool {
+	fn IsBuiltin(*self): bool {
 		ret self.caller != nil
 	}
 
 	// Reports whether instance is anonymous function.
-	fn IsAnon(self): bool {
+	fn IsAnon(*self): bool {
 		ret self.Anon ||
 			self.Decl != nil && self.Decl.IsAnon()
 	}
 
 	// Reports whether instances are same.
 	// Returns true if declarations and generics are same.
-	fn Same(self, f: &FuncIns): bool {
+	fn Same(*self, f: &FuncIns): bool {
 		if self.Decl != f.Decl || len(f.Generics) != len(self.Generics) {
 			ret false
 		}
@@ -395,7 +395,7 @@ impl FuncIns {
 	// Returns kind string of function instance.
 	// Appends identifier to kind of this instance.
 	// Does not appends identifier of this instance to kind if self.Decl is nil.
-	fn GetKindStr(self, name: bool): str {
+	fn GetKindStr(*self, name: bool): str {
 		mut s := strings::Builder{}
 		s.Grow(1 << 5)
 

@@ -37,26 +37,26 @@ impl ReferenceStack {
 
 impl ReferenceStack {
 	// Returns count of references.
-	fn Len(self): int {
+	fn Len(*self): int {
 		ret len(self.buffer)
 	}
 
 	// Returns reference by index.
-	fn At(mut self, i: int): any {
+	fn At(mut *self, i: int): any {
 		ret self.buffer[i]
 	}
 
 	// Push new reference to stack.
-	fn Push(mut self, mut ref: any) {
+	fn Push(mut *self, mut ref: any) {
 		self.buffer = append(self.buffer, ref)
 	}
 
-	fn clear(mut self) {
+	fn clear(mut *self) {
 		self.buffer = self.buffer[:0]
 	}
 
 	// Reports whether reference is exist.
-	fn Exist[T](self, t: T): bool {
+	fn Exist[T](*self, t: T): bool {
 		for _, ref in self.buffer {
 			if ref == t {
 				ret true
@@ -305,20 +305,20 @@ impl symBuilder {
 		ret root
 	}
 
-	fn pushErr(mut self, token: &token::Token, fmt: str, args: ...any) {
+	fn pushErr(mut *self, token: &token::Token, fmt: str, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, true, fmt, args...))
 	}
 
-	fn pushErrText(mut self, token: &token::Token, fmt: str, args: ...any) {
+	fn pushErrText(mut *self, token: &token::Token, fmt: str, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, false, fmt, args...))
 	}
 
 	// Push suggestion to last log.
-	fn pushSuggestion(mut self, fmt: str, args: ...any) {
+	fn pushSuggestion(mut *self, fmt: str, args: ...any) {
 		unsafe { pushSuggestion(&self.errors[len(self.errors)-1], fmt, args...) }
 	}
 
-	fn checkCppUseDeclPath(mut self, decl: &ast::Use, path: str): (ok: bool) {
+	fn checkCppUseDeclPath(mut *self, decl: &ast::Use, path: str): (ok: bool) {
 		ext := filepath::Ext(path)
 		if !build::IsValidHeaderExt(ext) && !build::IsValidCppExt(ext) {
 			self.pushErr(decl.Token, log::InvalidCppExt, ext)
@@ -338,7 +338,7 @@ impl symBuilder {
 		ret true
 	}
 
-	fn buildCppHeaderImport(mut self, mut decl: &ast::Use): &ImportInfo {
+	fn buildCppHeaderImport(mut *self, mut decl: &ast::Use): &ImportInfo {
 		mut path := decl.Path.Kind[1 : len(decl.Path.Kind)-1] // remove quotes
 
 		if !build::IsStdHeaderPath(path) {
@@ -486,13 +486,13 @@ impl symBuilder {
 		ret imp
 	}
 
-	fn findUseDecl(mut self, pkg: &ImportInfo): &ImportInfo {
+	fn findUseDecl(mut *self, pkg: &ImportInfo): &ImportInfo {
 		// Find package by path to detect cpp header imports.
 		// Ignore implicit imports, see developer reference (6).
 		ret self.table.SelectPackage(fn|spkg| !isImplicitImport(spkg) && unsafe { pkg.Path == spkg.Path })
 	}
 
-	fn checkDuplicateUseDecl(mut self, mut pkg: &ImportInfo): (ok: bool) {
+	fn checkDuplicateUseDecl(mut *self, mut pkg: &ImportInfo): (ok: bool) {
 		mut lpkg := self.findUseDecl(pkg)
 		if lpkg == nil {
 			ret true
@@ -580,7 +580,7 @@ impl symBuilder {
 	//	- decl: relevant use declaration.
 	//	- mod: module that imports relevant package.
 	//	- path: path of package that importing.
-	fn checkPackageAccessibility(mut self, decl: &ast::Use, mod: str, path: str) {
+	fn checkPackageAccessibility(mut *self, decl: &ast::Use, mod: str, path: str) {
 		if self.importer.GetModPath() == mod {
 			ret
 		}
@@ -685,7 +685,7 @@ impl symBuilder {
 		}
 	}
 
-	fn appendNode(mut self, mut node: ast::Node) {
+	fn appendNode(mut *self, mut node: ast::Node) {
 		match type node.Data {
 		| &ast::Impl:
 			self.table.Impls = append(self.table.Impls, buildImpl(node.Data.(&ast::Impl)))
@@ -732,13 +732,13 @@ impl symBuilder {
 		}
 	}
 
-	fn appendNodes(mut self) {
+	fn appendNodes(mut *self) {
 		for (_, mut node) in self.ast.Nodes {
 			self.appendNode(node)
 		}
 	}
 
-	fn pushDirectivePass(mut self, mut d: &ast::Directive) {
+	fn pushDirectivePass(mut *self, mut d: &ast::Directive) {
 		if len(d.Args) == 0 {
 			self.pushErr(d.Tag, log::MissingExpr)
 			ret
@@ -759,7 +759,7 @@ impl symBuilder {
 		})
 	}
 
-	fn appendTopDirectives(mut self) {
+	fn appendTopDirectives(mut *self) {
 		for (_, mut d) in self.ast.TopDirectives {
 			match d.Tag.Kind {
 			| directive::Pass:

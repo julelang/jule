@@ -233,21 +233,21 @@ impl Int {
 	}
 
 	// Returns x(self) + y.
-	fn Add(self, y: Int): Int {
+	fn Add(*self, y: Int): Int {
 		mut z := Int{}
 		addI(&z, *self, y)
 		ret z
 	}
 
 	// Returns x(self) - y.
-	fn Sub(self, y: Int): Int {
+	fn Sub(*self, y: Int): Int {
 		mut z := Int{}
 		subI(&z, *self, y)
 		ret z
 	}
 
 	// Returns x(self) * y.
-	fn Mul(self, y: Int): Int {
+	fn Mul(*self, y: Int): Int {
 		mut z := Int{}
 		// x * y == x * y
 		// x * (-y) == -(x * y)
@@ -264,7 +264,7 @@ impl Int {
 
 	// Returns square root |√x(self)|.
 	// Panics if number is negative.
-	fn Sqrt(self): Int {
+	fn Sqrt(*self): Int {
 		if self.neg {
 			panic("math/big: Int.Sqrt: square root of negative number")
 		}
@@ -284,7 +284,7 @@ impl Int {
 	//
 	// (See Daan Leijen, “Division and Modulus for Computer Scientists”.)
 	// See [DivMod] for Euclidean division and modulus (unlike Jule).
-	fn QuoRem(self, y: Int): (q: Int, r: Int) {
+	fn QuoRem(*self, y: Int): (q: Int, r: Int) {
 		quoRemI(&q, &r, *self, y)
 		ret
 	}
@@ -292,7 +292,7 @@ impl Int {
 	// Returns the quotient x(self)/y for y != 0.
 	// If y == 0, a division-by-zero run-time panic occurs.
 	// Implements truncated division (like Jule); see [Int.QuoRem] for more details.
-	fn Quo(self, y: Int): (q: Int) {
+	fn Quo(*self, y: Int): (q: Int) {
 		quoI(&q, *self, y)
 		ret
 	}
@@ -300,7 +300,7 @@ impl Int {
 	// Returns the quotient x(self)/y for y != 0.
 	// If y == 0, a division-by-zero runtime panic occurs.
 	// Implements Euclidean division; see [Int.DivMod] for more details.
-	fn Div(self, y: Int): Int {
+	fn Div(*self, y: Int): Int {
 		mut z := Int{}
 		divI(&z, *self, y)
 		ret z
@@ -309,7 +309,7 @@ impl Int {
 	// Returns the modulus x(self)%y for y != 0.
 	// If y == 0, a division-by-zero run-time panic occurs.
 	// Implements Euclidean modulus (unlike Jule); see [Int.DivMod] for more details.
-	fn Mod(self, y: Int): Int {
+	fn Mod(*self, y: Int): Int {
 		mut r := Int{}
 		modI(&r, *self, y)
 		ret r
@@ -329,7 +329,7 @@ impl Int {
 	// Systems (TOPLAS), 14(2):127-144, New York, NY, USA, 4/1992.
 	// ACM press.)
 	// See [Int.QuoRem] for T-division and modulus (like Jule).
-	fn DivMod(self, y: Int): (q: Int, m: Int) {
+	fn DivMod(*self, y: Int): (q: Int, m: Int) {
 		mut y0 := y // save y
 		if aliasW(self.abs, y.abs) {
 			y0.abs = cloneW(y.abs)
@@ -348,54 +348,54 @@ impl Int {
 	}
 
 	// Returns x(self) << y.
-	fn Lsh(self, y: uint): Int {
+	fn Lsh(*self, y: uint): Int {
 		mut z := self.z(cloneW(self.abs))
 		lshI(&z, y)
 		ret z
 	}
 
 	// Returns x(self) >> y.
-	fn Rsh(self, y: uint): Int {
+	fn Rsh(*self, y: uint): Int {
 		mut z := self.z(cloneW(self.abs))
 		rshI(&z, y)
 		ret z
 	}
 
 	// Returns x | y.
-	fn Or(self, y: Int): Int {
+	fn Or(*self, y: Int): Int {
 		mut z := self.z(cloneW(self.abs))
 		orI(&z, *self, y)
 		ret z
 	}
 
 	// Returns x & y.
-	fn And(self, y: Int): Int {
+	fn And(*self, y: Int): Int {
 		mut z := self.z(cloneW(self.abs))
 		andI(&z, *self, y)
 		ret z
 	}
 
 	// Returns x ^ y.
-	fn Xor(self, y: Int): Int {
+	fn Xor(*self, y: Int): Int {
 		mut z := self.z(cloneW(self.abs))
 		xorI(&z, *self, y)
 		ret z
 	}
 
 	// Sets self by z.
-	fn set(mut self, mut z: Int) {
+	fn set(mut *self, mut z: Int) {
 		self.abs, self.neg = z.abs, z.neg
 	}
 
 	// Returns new copy based self, copy will be use the abs as representation.
-	fn z(self, mut abs: []Word): Int {
+	fn z(*self, mut abs: []Word): Int {
 		ret Int{
 			abs: abs,
 			neg: self.neg,
 		}
 	}
 
-	fn exp(self, y: Int, mut m: Int, slow: bool): Int {
+	fn exp(*self, y: Int, mut m: Int, slow: bool): Int {
 		// See Knuth, volume 2, section 4.6.3.
 		mut xWords := self.abs
 		mut z := self.z(nil)
@@ -430,12 +430,12 @@ impl Int {
 	//
 	// Modular exponentiation of inputs of a particular size is not a
 	// cryptographically constant-time operation.
-	fn ExpMod(self, y: Int, m: Int): Int {
+	fn ExpMod(*self, y: Int, m: Int): Int {
 		ret self.exp(y, unsafe { *(&m) }, false)
 	}
 
 	// Calls the [Int.ExpMod] method with zero mod.
-	fn Exp(self, y: Int): Int {
+	fn Exp(*self, y: Int): Int {
 		ret self.ExpMod(y, intZero)
 	}
 
@@ -448,7 +448,7 @@ impl Int {
 	// Design and Implementation of Symbolic Computation Systems, pp 45-58.
 	// The cosequences are updated according to Algorithm 10.45 from
 	// Cohen et al. "Handbook of Elliptic and Hyperelliptic Curve Cryptography" pp 192.
-	fn lehmerGCD(self, mut &x: *Int, mut &y: *Int, mut b: Int): Int {
+	fn lehmerGCD(*self, mut &x: *Int, mut &y: *Int, mut b: Int): Int {
 		mut a := *self
 		mut A := Int{}
 		mut B := Int{}
@@ -581,7 +581,7 @@ impl Int {
 	// If a == 0 and b != 0, GCD returns |b|, x = 0, y = sign(b) * 1.
 	//
 	// If a != 0 and b == 0, GCD returns |a|, x = sign(a) * 1, y = 0.
-	fn GCD(self, mut &x: *Int, mut &y: *Int, b: Int): Int {
+	fn GCD(*self, mut &x: *Int, mut &y: *Int, b: Int): Int {
 		mut a := *self // gain mutability for self thanks to interior mutability
 		if len(self.abs) == 0 || len(b.abs) == 0 {
 			mut z := Int{}
@@ -619,7 +619,7 @@ impl Int {
 	// If g and n are not relatively prime, g has no multiplicative
 	// inverse in the ring ℤ/nℤ.  In this case, z is unchanged and the return value
 	// is zero. If n == 0, a division-by-zero run-time panic occurs.
-	fn ModInverse(self, mut n: Int): Int {
+	fn ModInverse(*self, mut n: Int): Int {
 		mut g := self.z(cloneW(self.abs))
 		// GCD expects parameters a and b to be > 0.
 		if n.neg {
@@ -659,7 +659,7 @@ impl Int {
 	//
 	// It is not suitable for judging primes that an adversary may
 	// have crafted to fool the test.
-	fn ProbablyPrime(self, n: int): bool {
+	fn ProbablyPrime(*self, n: int): bool {
 		// Note regarding the doc comment above:
 		// It would be more precise to say that the Baillie-PSW test uses the
 		// extra strong Lucas test as its Lucas test, but since no one knows
@@ -716,12 +716,12 @@ impl Int {
 	}
 
 	// Returns the number of consecutive least significant zero bits of |self|.
-	fn TrailingZeroBits(self): uint {
+	fn TrailingZeroBits(*self): uint {
 		ret trailingZeroBitsW(self.abs)
 	}
 
 	// Returns the length of the absolute value of int in bits. The bit length of 0 is 0.
-	fn BitLen(self): int {
+	fn BitLen(*self): int {
 		// This function is may used in cryptographic operations. It must not leak
 		// anything but the Int's sign and bit size through side-channels. Any
 		// changes must be reviewed by a security expert.
@@ -730,7 +730,7 @@ impl Int {
 
 	// Returns the value of the i'th bit of integer. That is, it
 	// returns (x>>i)&1. The bit index i must be >= 0.
-	fn Bit(self, i: int): uint {
+	fn Bit(*self, i: int): uint {
 		if i < 0 {
 			panic("math/big: Int.Bit: negative bit index")
 		}
@@ -750,14 +750,14 @@ impl Int {
 	}
 
 	// Returns absolute value of x(self).
-	fn Abs(self): Int {
+	fn Abs(*self): Int {
 		mut r := *self
 		r.neg = false
 		ret r
 	}
 
 	// Returns ^x(self).
-	fn Not(self): Int {
+	fn Not(*self): Int {
 		mut z := self.z(cloneW(self.abs))
 		if self.neg {
 			// ^(-x) == ^(^(x-1)) == x-1
@@ -772,19 +772,19 @@ impl Int {
 	}
 
 	// Returns -x(self).
-	fn Neg(self): Int {
+	fn Neg(*self): Int {
 		mut r := *self
 		r.neg = len(r.abs) > 0 && !r.neg // 0 has no sign
 		ret r
 	}
 
 	// Reports whether x(self) is odd.
-	fn Odd(self): bool {
+	fn Odd(*self): bool {
 		ret len(self.abs) == 0 || self.abs[0]&1 == 1
 	}
 
 	// Reports whether x(self) is even.
-	fn Even(self): bool {
+	fn Even(*self): bool {
 		ret len(self.abs) > 0 && self.abs[0]&1 == 0
 	}
 
@@ -792,7 +792,7 @@ impl Int {
 	//	Sign() = -1 if x < 0
 	//	Sign() = 0 if x == 0
 	//	Sign() = +1 if x > 0
-	fn Sign(self): int {
+	fn Sign(*self): int {
 		// This function is may used in cryptographic operations. It must not leak
 		// anything but the Int's sign and bit size through side-channels. Any
 		// changes must be reviewed by a security expert.
@@ -807,7 +807,7 @@ impl Int {
 
 	// Returns the i64 representation of x(self).
 	// If x cannot be represented in an i64, the result is undefined.
-	fn I64(self): i64 {
+	fn I64(*self): i64 {
 		mut v := i64(low64W(self.abs))
 		if self.neg {
 			v = -v
@@ -817,12 +817,12 @@ impl Int {
 
 	// Returns the u64 representation of x(self).
 	// If x cannot be represented in a u64, the result is undefined.
-	fn U64(self): u64 {
+	fn U64(*self): u64 {
 		ret low64W(self.abs)
 	}
 
 	// Reports whether x(self) can be represented as an i64.
-	fn IsI64(self): bool {
+	fn IsI64(*self): bool {
 		if len(self.abs) <= 64/_W {
 			w := i64(low64W(self.abs))
 			ret w >= 0 || self.neg && w == -w
@@ -831,12 +831,12 @@ impl Int {
 	}
 
 	// Reports whether x(self) can be represented as a u64.
-	fn IsU64(self): bool {
+	fn IsU64(*self): bool {
 		ret !self.neg && len(self.abs) <= 64/_W
 	}
 
 	// Returns string representation of x(self) in decimal format.
-	fn Str(self): str {
+	fn Str(*self): str {
 		ret self.Format(10)
 	}
 
@@ -845,7 +845,7 @@ impl Int {
 	// lower-case letters 'a' to 'z' for digit values 10 to 35, and
 	// the upper-case letters 'A' to 'Z' for digit values 36 to 61.
 	// No prefix (such as "0x") is added to the string.
-	fn Format(self, b: int): str {
+	fn Format(*self, b: int): str {
 		ret unsafe::StrFromBytes(itoaW(self.abs, self.neg, b))
 	}
 
@@ -853,7 +853,7 @@ impl Int {
 	// Returns +1 if x > y
 	// Returns 0 if x == y
 	// Returns -1 if x < y
-	fn Cmp(self, y: Int): (r: int) {
+	fn Cmp(*self, y: Int): (r: int) {
 		// x cmp y == x cmp y
 		// x cmp (-y) == x
 		// (-x) cmp y == y
@@ -876,11 +876,11 @@ impl Int {
 	// Returns +1 if |x| > |y|
 	// Returns 0 if |x| == |y|
 	// Returns -1 if |x| < |y|
-	fn CmpAbs(self, y: Int): int { ret cmpW(self.abs, y.abs) }
+	fn CmpAbs(*self, y: Int): int { ret cmpW(self.abs, y.abs) }
 
 	// Returns the f64 value nearest x(self),
 	// and an indication of any rounding that occurred.
-	fn F64(self): (f64, Accuracy) {
+	fn F64(*self): (f64, Accuracy) {
 		n := bitLenW(self.abs) // NB: still uses slow crypto impl!
 		if n == 0 {
 			ret 0.0, Exact

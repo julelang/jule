@@ -21,7 +21,7 @@ struct UnsupportedTypeError {
 }
 
 impl UnsupportedTypeError {
-	fn Str(self): str {
+	fn Str(*self): str {
 		ret "json: unsupported type: " + self.Type
 	}
 }
@@ -33,7 +33,7 @@ struct UnsupportedValueError {
 }
 
 impl UnsupportedValueError {
-	fn Str(self): str {
+	fn Str(*self): str {
 		ret "json: unsupported value: " + self.Value
 	}
 }
@@ -46,7 +46,7 @@ struct EncodeError {
 }
 
 impl EncodeError {
-	fn Str(self): str {
+	fn Str(*self): str {
 		ret "json: error calling " +
 			self.sourceFunc + " for type " +
 			self.Type + ": " + runtime::toStr(self.Err)
@@ -88,11 +88,11 @@ struct jsonEncoder {
 }
 
 impl jsonEncoder {
-	fn encodeNil(mut self) {
+	fn encodeNil(mut *self) {
 		self.buf.writeStr("null")
 	}
 
-	fn encodeBool(mut self, b: bool) {
+	fn encodeBool(mut *self, b: bool) {
 		if b {
 			self.buf.writeStr("true")
 		} else {
@@ -100,19 +100,19 @@ impl jsonEncoder {
 		}
 	}
 
-	fn encodeInt(mut self, x: i64) {
+	fn encodeInt(mut *self, x: i64) {
 		mut b := self.buf.availableBuffer()
 		b = conv::AppendInt(b, x, 10)
 		self.buf.write(b)
 	}
 
-	fn encodeUint(mut self, x: u64) {
+	fn encodeUint(mut *self, x: u64) {
 		mut b := self.buf.availableBuffer()
 		b = conv::AppendUint(b, x, 10)
 		self.buf.write(b)
 	}
 
-	fn encodeFloat(mut self, f: f64, bits: int)! {
+	fn encodeFloat(mut *self, f: f64, bits: int)! {
 		if math::IsNaN(f) || math::IsInf(f, 0) {
 			error(&UnsupportedValueError{conv::FormatFloat(f, 'g', -1, bits)})
 		}
@@ -138,7 +138,7 @@ impl jsonEncoder {
 		self.buf.write(bb.Slice1(0))
 	}
 
-	fn encodeStr(mut self, s: str) {
+	fn encodeStr(mut *self, s: str) {
 		ss := ubuf::Ubuf{}
 		ss.SetData(unsafe::StrBytes(s))
 		self.buf.writeByte('"')
@@ -214,14 +214,14 @@ impl jsonEncoder {
 		self.buf.writeByte('"')
 	}
 
-	fn encodeByteSlice(mut self, s: []byte) {
+	fn encodeByteSlice(mut *self, s: []byte) {
 		const Padding = true
 		self.buf.writeByte('"')
 		self.buf.write(base64::Encode(s, Padding))
 		self.buf.writeByte('"')
 	}
 
-	fn encodeStruct[T, Flag](mut self, t: T)! {
+	fn encodeStruct[T, Flag](mut *self, t: T)! {
 		const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeIndent)
 		const match {
 		| useIndent:
@@ -263,7 +263,7 @@ impl jsonEncoder {
 		}
 	}
 
-	fn encodeMap[T, Flag](mut self, t: T)! {
+	fn encodeMap[T, Flag](mut *self, t: T)! {
 		const tt = comptime::TypeOf(T)
 		const keyT = tt.Key()
 		match keyT.Kind() {
@@ -323,7 +323,7 @@ impl jsonEncoder {
 		self.buf.writeByte('}')
 	}
 
-	fn encodeArray[T, Flag](mut self, t: T)! {
+	fn encodeArray[T, Flag](mut *self, t: T)! {
 		const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeIndent)
 		const match {
 		| useIndent:
@@ -357,7 +357,7 @@ impl jsonEncoder {
 	// Checks nil case for slices, then forwards to the [encodeArray] method.
 	// Also uses base64-encoding algorithm for the []byte type.
 	// Non-nil slices and arrays should have same outputs.
-	fn encodeSlice[T, Flag](mut self, t: T)! {
+	fn encodeSlice[T, Flag](mut *self, t: T)! {
 		if t == nil {
 			self.buf.writeStr("[]")
 			ret
@@ -370,7 +370,7 @@ impl jsonEncoder {
 		}
 	}
 
-	fn encodePlain[T, Flag](mut self, t: T)! {
+	fn encodePlain[T, Flag](mut *self, t: T)! {
 		const tt = comptime::TypeOf(T)
 		const match {
 		| tt.Strict() || tt.Kind() == comptime::Struct:
@@ -447,7 +447,7 @@ impl jsonEncoder {
 		}
 	}
 
-	fn encode[T, Flag](mut self, t: T)! {
+	fn encode[T, Flag](mut *self, t: T)! {
 		// Handle bind types here to avoid compile-time error messages for types.
 		// The [encodePlain] should be compile-time safe for type T.
 		// Prevent any compilation errors from being triggered.

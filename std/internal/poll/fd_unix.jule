@@ -34,11 +34,11 @@ struct FD {
 }
 
 impl FD {
-	fn Init(mut self)! {}
+	fn Init(mut *self)! {}
 
 	// Writes bytes to the file descriptor and returns written byte count.
 	// The number of bytes written can never exceed the length of the buf.
-	fn Write(mut self, buf: []byte)!: (n: int) {
+	fn Write(mut *self, buf: []byte)!: (n: int) {
 		// File and console descriptors, also socket descriptors, can use the Write function.
 		// But other kinds are not supported. For socket descriptors, correct use case
 		// will be equivalent to send syscall.
@@ -74,7 +74,7 @@ impl FD {
 
 	// Like Write, but wraps sendto syscall.
 	// General for V4 and V6. Unsafe variant.
-	fn WriteV(mut self, buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
+	fn WriteV(mut *self, buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
 		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
 		}
@@ -99,7 +99,7 @@ impl FD {
 	// If the buf is larger than the number of bytes that can be read,
 	// the buffer will not cause an overflow. Offset will be shifted
 	// by the number of bytes read.
-	fn Read(mut self, mut buf: []byte)!: (n: int) {
+	fn Read(mut *self, mut buf: []byte)!: (n: int) {
 		// File and console descriptors, also socket descriptors, can use the Read function.
 		// But other kinds are not supported. For socket descriptors, correct use case
 		// will be equivalent to recv syscall.
@@ -119,7 +119,7 @@ impl FD {
 
 	// Like Read, but wraps recvfrom syscall.
 	// General for V4 and V6. Unsafe variant.
-	fn ReadV(mut self, mut buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
+	fn ReadV(mut *self, mut buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
 		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
 		}
@@ -141,17 +141,17 @@ impl FD {
 	// Sets offset to next Read/Write operation and returns the new offset.
 	// whence: 0 (Seek.Set) means, relative to the whence of the file, 1 (Seek.Cur)
 	// means relative to the current offset, and 2 (Seek.End) means relative to end.
-	fn Seek(mut self, offset: i64, whence: int)!: (pos: i64) {
+	fn Seek(mut *self, offset: i64, whence: int)!: (pos: i64) {
 		ret sys::Seek(int(self.File), offset, whence) else { error(error) }
 	}
 
 	// Wraps sys::Ftruncate.
-	fn Ftruncate(mut self, size: i64)! {
+	fn Ftruncate(mut *self, size: i64)! {
 		sys::Ftruncate(int(self.File), size) else { error(error) }
 	}
 
 	// Closes file descriptor.
-	fn Close(mut self)! {
+	fn Close(mut *self)! {
 		// All kinds are supports the Close function.
 		sys::Close(int(self.File)) else { error(error) }
 	}

@@ -118,7 +118,7 @@ impl float {
 	}
 
 	// debugging support
-	fn validate(self) {
+	fn validate(*self) {
 		if !debugFloat {
 			// avoid performance bugs
 			panic("validate called but debugFloat is not set")
@@ -129,7 +129,7 @@ impl float {
 		}
 	}
 
-	fn validate0(self): str {
+	fn validate0(*self): str {
 		if self.form != finite {
 			ret ""
 		}
@@ -147,7 +147,7 @@ impl float {
 		ret ""
 	}
 
-	fn setExpAndRound(mut self, exp: i64, sbit: uint) {
+	fn setExpAndRound(mut *self, exp: i64, sbit: uint) {
 		if exp < minExp {
 			// underflow
 			self.acc = makeAcc(self.neg)
@@ -175,7 +175,7 @@ impl float {
 	// CAUTION: The rounding modes [ToNegativeInf], [ToPositiveInf] are affected by the
 	// sign of z. For correct rounding, the sign of z must be set correctly before
 	// calling round.
-	fn round(mut self, mut sbit: uint) {
+	fn round(mut *self, mut sbit: uint) {
 		if debugFloat {
 			self.validate()
 		}
@@ -285,7 +285,7 @@ impl float {
 	}
 
 	// Returns [Float] with the (possibly rounded) value |x(self)| (the absolute value of x).
-	fn Abs(self): float {
+	fn Abs(*self): float {
 		let mut z: float
 		z.Set(*self)
 		z.neg = false
@@ -293,7 +293,7 @@ impl float {
 	}
 
 	// Returns [Float] with the (possibly rounded) value of x(self) with its sign negated.
-	fn Neg(self): float {
+	fn Neg(*self): float {
 		let mut z: float
 		z.Set(*self)
 		z.neg = !z.neg
@@ -302,19 +302,19 @@ impl float {
 
 	// Returns the mantissa precision of x(self) in bits.
 	// The result may be 0 for |x| == 0 and |x| == Inf.
-	fn Prec(self): uint {
+	fn Prec(*self): uint {
 		ret uint(self.prec)
 	}
 
 	// Returns the rounding mode of x(self).
-	fn Mode(self): roundingMode {
+	fn Mode(*self): roundingMode {
 		ret self.mode
 	}
 
 	// Returns the accuracy of x(self) produced by the most recent
 	// operation, unless explicitly documented otherwise by that
 	// operation.
-	fn Acc(self): Accuracy {
+	fn Acc(*self): Accuracy {
 		ret self.acc
 	}
 
@@ -323,7 +323,7 @@ impl float {
 	// cannot be represented in prec bits without loss of precision.
 	// SetPrec(0) maps all finite values to ±0; infinite values remain unchanged.
 	// If prec > [MaxPrec], it is set to [MaxPrec].
-	fn SetPrec(mut self, mut prec: uint) {
+	fn SetPrec(mut *self, mut prec: uint) {
 		self.acc = Exact // optimistically assume no rounding is needed
 
 		// special case
@@ -352,7 +352,7 @@ impl float {
 	// Sets z(self)'s rounding mode to mode.
 	// z remains unchanged otherwise.
 	// z.SetMode(z.Mode()) is a cheap way to set z's accuracy to [Exact].
-	fn SetMode(mut self, mode: roundingMode) {
+	fn SetMode(mut *self, mode: roundingMode) {
 		self.mode = mode
 		self.acc = Exact
 	}
@@ -360,7 +360,7 @@ impl float {
 	// Returns the minimum precision required to represent x(self) exactly
 	// (i.e., the smallest prec before x.SetPrec(prec) would start rounding x).
 	// The result is 0 for |x| == 0 and |x| == Inf.
-	fn MinPrec(self): uint {
+	fn MinPrec(*self): uint {
 		if self.form != finite {
 			ret 0
 		}
@@ -371,7 +371,7 @@ impl float {
 	//   - -1 if x < 0;
 	//   - 0 if x is ±0;
 	//   - +1 if x > 0.
-	fn Sign(self): int {
+	fn Sign(*self): int {
 		if debugFloat {
 			self.validate()
 		}
@@ -387,7 +387,7 @@ impl float {
 	// Returns -1, 0, or +1, depending on whether
 	// |x(self)| < |y|, |x| == |y|, or |x| > |y|.
 	// x and y must have a non-empty mantissa and valid exponent.
-	fn ucmp(self, y: float): int {
+	fn ucmp(*self, y: float): int {
 		if debugFloat {
 			validateBinaryOperands(*self, y)
 		}
@@ -432,7 +432,7 @@ impl float {
 	//	 0 if x == 0 (signed or unsigned)
 	//	+1 if 0 < x < +Inf
 	//	+2 if x == +Inf
-	fn ord(self): int {
+	fn ord(*self): int {
 		let mut m: int
 		match self.form {
 		| finite:
@@ -452,7 +452,7 @@ impl float {
 	//   - -1 if x < y;
 	//   - 0 if x == y (incl. -0 == 0, -Inf == -Inf, and +Inf == +Inf);
 	//   - +1 if x > y.
-	fn Cmp(self, y: float): int {
+	fn Cmp(*self, y: float): int {
 		if debugFloat {
 			self.validate()
 			y.validate()
@@ -482,7 +482,7 @@ impl float {
 	// Sets z(self) to the (possibly rounded) value of x.
 	// If z's precision is 0, it is changed to the larger of x.BitLen()
 	// or 64 (and rounding will have no effect).
-	fn SetInt(mut self, x: Int) {
+	fn SetInt(mut *self, x: Int) {
 		// TODO: can be more efficient if self.prec > 0
 		// but small compared to the size of x, or if there
 		// are many trailing 0's.
@@ -511,7 +511,7 @@ impl float {
 	// Rounding is performed according to z's precision and rounding
 	// mode; and z's accuracy reports the result error relative to the
 	// exact (not rounded) result.
-	fn Set(mut self, x: float) {
+	fn Set(mut *self, x: float) {
 		if debugFloat {
 			x.validate()
 		}
@@ -534,7 +534,7 @@ impl float {
 	// is (0, [Below]) or (-0, [Above]), respectively, depending on the sign of x.
 	// If x is too large to be represented by a f64 (|x| > [f64.Max]),
 	// the result is (+Inf, [Above]) or (-Inf, [Below]), depending on the sign of x.
-	fn F64(self): (f64, Accuracy) {
+	fn F64(*self): (f64, Accuracy) {
 		if debugFloat {
 			self.validate()
 		}
@@ -654,7 +654,7 @@ impl float {
 	// is (0, [Below]) or (-0, [Above]), respectively, depending on the sign of x.
 	// If x is too large to be represented by a f32 (|x| > [math.MaxFloat32]),
 	// the result is (+Inf, [Above]) or (-Inf, [Below]), depending on the sign of x.
-	fn F32(self): (f32, Accuracy) {
+	fn F32(*self): (f32, Accuracy) {
 		if debugFloat {
 			self.validate()
 		}

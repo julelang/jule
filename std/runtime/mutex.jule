@@ -18,7 +18,7 @@ struct fmutex {
 }
 
 impl fmutex {
-	fn lock(self) {
+	fn lock(*self) {
 		mut waitstart := i64(0)
 		for {
 			if self.tryLock() {
@@ -38,14 +38,14 @@ impl fmutex {
 		}
 	}
 
-	fn unlock(self) {
+	fn unlock(*self) {
 		new := atomic::Add(&self.state, -1, atomic::AcqRel)
 		if new != 0 {
 			panic("runtime: mutex: unlock of unlocked mutex")
 		}
 	}
 
-	fn tryLock(self): bool {
+	fn tryLock(*self): bool {
 		ret atomic::CompareAndSwap(&self.state, 0, 1, atomic::SeqCst)
 	}
 }

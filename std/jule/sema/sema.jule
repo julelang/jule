@@ -286,7 +286,7 @@ struct commonSemaMeta {
 }
 
 impl commonSemaMeta {
-	fn pushComptimeTypeInfo(mut self, mut t: &Type): &comptimeTypeInfo {
+	fn pushComptimeTypeInfo(mut *self, mut t: &Type): &comptimeTypeInfo {
 		for (_, mut t2) in self.comptimeTypeInfos {
 			if t2.base.Equal(t) {
 				ret t2
@@ -323,7 +323,7 @@ impl Lookup for sema {
 	//
 	// Lookups:
 	//	- Current file's imported packages.
-	fn SelectPackage(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
+	fn SelectPackage(mut *self, selector: fn(&ImportInfo): bool): &ImportInfo {
 		ret self.file.SelectPackage(selector)
 	}
 
@@ -333,7 +333,7 @@ impl Lookup for sema {
 	// Lookups:
 	//	- Package file's symbol table.
 	//	- Current file's public denifes of imported packages.
-	fn FindVar(mut self, name: str, _bind: bool): &Var {
+	fn FindVar(mut *self, name: str, _bind: bool): &Var {
 		// Lookup package files.
 		mut v := findVarInPackage(self.files, name, _bind)
 		if v != nil {
@@ -348,7 +348,7 @@ impl Lookup for sema {
 	// Lookups:
 	//	- Package file's symbol table.
 	//	- Current file's public denifes of imported packages.
-	fn FindTypeAlias(mut self, name: str, _bind: bool): &TypeAlias {
+	fn FindTypeAlias(mut *self, name: str, _bind: bool): &TypeAlias {
 		// Lookup package files.
 		mut ta := findTypeAliasInPackage(self.files, name, _bind)
 		if ta != nil {
@@ -363,7 +363,7 @@ impl Lookup for sema {
 	// Lookups:
 	//	- Package file's symbol table.
 	//	- Current file's public denifes of imported packages.
-	fn FindStruct(mut self, name: str, _bind: bool): &Struct {
+	fn FindStruct(mut *self, name: str, _bind: bool): &Struct {
 		// Lookup package files.
 		mut s := findStructInPackage(self.files, name, _bind)
 		if s != nil {
@@ -378,7 +378,7 @@ impl Lookup for sema {
 	// Lookups:
 	//	- Package file's symbol table.
 	//	- Current file's public denifes of imported packages.
-	fn FindFunc(mut self, name: str, _bind: bool): &Func {
+	fn FindFunc(mut *self, name: str, _bind: bool): &Func {
 		// Lookup package files.
 		mut f := findFuncInPackage(self.files, name, _bind)
 		if f != nil {
@@ -393,7 +393,7 @@ impl Lookup for sema {
 	// Lookups:
 	//	- Package file's symbol table.
 	//	- Current file's public denifes of imported packages.
-	fn FindTrait(mut self, name: str): &Trait {
+	fn FindTrait(mut *self, name: str): &Trait {
 		// Lookup package files.
 		mut t := findTraitInPackage(self.files, name)
 		if t != nil {
@@ -408,7 +408,7 @@ impl Lookup for sema {
 	// Lookups:
 	//	- Package file's symbol table.
 	//	- Current file's public denifes of imported packages.
-	fn FindEnum(mut self, name: str): &Enum {
+	fn FindEnum(mut *self, name: str): &Enum {
 		// Lookup package files.
 		mut e := findEnumInPackage(self.files, name)
 		if e != nil {
@@ -423,7 +423,7 @@ impl Lookup for sema {
 	// Lookups:
 	//	- Package file's symbol table.
 	//	- Current file's public denifes of imported packages.
-	fn FindTypeEnum(mut self, name: str): &TypeEnum {
+	fn FindTypeEnum(mut *self, name: str): &TypeEnum {
 		// Lookup package files.
 		mut e := findTypeEnumInPackage(self.files, name)
 		if e != nil {
@@ -435,16 +435,16 @@ impl Lookup for sema {
 
 impl sema {
 	// Reports whether flags has given flag.
-	fn isFlag(self, flags: int): bool { ret self.flags&flags == flags }
+	fn isFlag(*self, flags: int): bool { ret self.flags&flags == flags }
 
-	fn getCurrentFile(mut self): &SymTab { ret self.file }
-	fn setCurrentFile(mut self, mut f: &SymTab) { self.file = f }
+	fn getCurrentFile(mut *self): &SymTab { ret self.file }
+	fn setCurrentFile(mut *self, mut f: &SymTab) { self.file = f }
 
-	fn pushErr(mut self, token: &token::Token, fmt: str, args: ...any) {
+	fn pushErr(mut *self, token: &token::Token, fmt: str, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, true, fmt, args...))
 	}
 
-	fn pushErrorFromLitError(mut self, t: &token::Token, err: lit::Error) {
+	fn pushErrorFromLitError(mut *self, t: &token::Token, err: lit::Error) {
 		self.errors = append(self.errors, log::Log{
 			Kind: log::Error,
 			Row: t.Row,
@@ -455,20 +455,20 @@ impl sema {
 		})
 	}
 
-	fn pushErrorsFromLitErrors(mut self, t: &token::Token, errors: []lit::Error) {
+	fn pushErrorsFromLitErrors(mut *self, t: &token::Token, errors: []lit::Error) {
 		for _, err in errors {
 			self.pushErrorFromLitError(t, err)
 		}
 	}
 
 	// Push suggestion to last log.
-	fn pushSuggestion(mut self, fmt: str, args: ...any) {
+	fn pushSuggestion(mut *self, fmt: str, args: ...any) {
 		unsafe { pushSuggestion(&self.errors[len(self.errors)-1], fmt, args...) }
 	}
 
 	// Reports whether define is accessible in the current package.
 	// The public and token parameters belongs to define which is accessed.
-	fn isAccessibleDefine(self, public: bool, token: &token::Token): bool {
+	fn isAccessibleDefine(*self, public: bool, token: &token::Token): bool {
 		if public || token.File == nil {
 			// public or built-in
 			ret true
@@ -491,7 +491,7 @@ impl sema {
 	// Reports this identifier duplicated in package's global scope.
 	// The "self" parameter represents address of exception identifier.
 	// If founded identifier address equals to self, will be skipped.
-	fn isDuplicatedName(self, itself: uintptr, name: str, _bind: bool): bool {
+	fn isDuplicatedName(*self, itself: uintptr, name: str, _bind: bool): bool {
 		for _, f in self.files {
 			if f.isDuplicatedName(itself, name, _bind) {
 				ret true
@@ -509,7 +509,7 @@ impl sema {
 		dc.check()
 	}
 
-	fn checkGenericQuantity(mut self, required: int, given: int, token: &token::Token): (ok: bool) {
+	fn checkGenericQuantity(mut *self, required: int, given: int, token: &token::Token): (ok: bool) {
 		match {
 		| required == 0 && given > 0:
 			self.pushErr(token, log::NotHasGenerics)
@@ -528,7 +528,7 @@ impl sema {
 		}
 	}
 
-	fn getImportDef(self, name: str, mut imp: &ImportInfo): any {
+	fn getImportDef(*self, name: str, mut imp: &ImportInfo): any {
 		if findPackageBuiltinDef(imp.LinkPath, name) != nil {
 			ret true
 		}
@@ -543,7 +543,7 @@ impl sema {
 		ret nil
 	}
 
-	fn isUseAliasDuplication(mut self, imp: &ImportInfo): bool {
+	fn isUseAliasDuplication(mut *self, imp: &ImportInfo): bool {
 		for (_, mut imp2) in self.file.Imports {
 			if imp == imp2 {
 				break
@@ -555,7 +555,7 @@ impl sema {
 		ret false
 	}
 
-	fn checkAutoAlias(mut self, mut imp: &ImportInfo): bool {
+	fn checkAutoAlias(mut *self, mut imp: &ImportInfo): bool {
 		if imp.LinkPath == "std/unsafe" {
 			// the "std/unsafe" package is able to use the "unsafe" keyword as alias
 			ret true
@@ -573,7 +573,7 @@ impl sema {
 		ret valid
 	}
 
-	fn checkImport(mut self, mut imp: &ImportInfo): bool {
+	fn checkImport(mut *self, mut imp: &ImportInfo): bool {
 		if imp.Bind {
 			ret true
 		}
@@ -599,7 +599,7 @@ impl sema {
 		ret true
 	}
 
-	fn checkImports(mut self) {
+	fn checkImports(mut *self) {
 		for (_, mut file) in self.files {
 			self.setCurrentFile(file)
 			for (_, mut imp) in self.file.Imports {
@@ -881,7 +881,7 @@ impl sema {
 		ret false
 	}
 
-	fn pushCompatibilityError(mut self, mut dest: &Type, mut src: &Value,
+	fn pushCompatibilityError(mut *self, mut dest: &Type, mut src: &Value,
 		mut errorToken: &token::Token) {
 		if src.untyped && src.IsConst() {
 			match {
@@ -1148,7 +1148,7 @@ impl sema {
 	// It will not check mutability risk of the internal mutable data or etc.
 	// It will check interior mutability risk of the new copy.
 	// Assumes the assigned memory is mutable.
-	fn isMutRiskyStruct(self, s: &StructIns): bool {
+	fn isMutRiskyStruct(*self, s: &StructIns): bool {
 		for _, f in s.Fields {
 			// Inerior mutability enables to copy internal mutable data with safety.
 			// If field is interior mutable and their kind is mutable,
@@ -1353,7 +1353,7 @@ impl sema {
 		ret true
 	}
 
-	fn checkEnumItemsDup(mut self, items: []&Var) {
+	fn checkEnumItemsDup(mut *self, items: []&Var) {
 		for _, item in items {
 			// The last item is nil.
 			// See developer reference (14).
@@ -1459,7 +1459,7 @@ impl sema {
 		ret true
 	}
 
-	fn checkDeclGenerics(mut self, generics: []&ast::Generic): (ok: bool) {
+	fn checkDeclGenerics(mut *self, generics: []&ast::Generic): (ok: bool) {
 		ok = true
 		for i, g in generics {
 			if jule::IsBlank(g.Name) {
@@ -1486,7 +1486,7 @@ impl sema {
 		ret
 	}
 
-	fn checkFuncDeclParamsDup(mut self, f: &Func): (ok: bool) {
+	fn checkFuncDeclParamsDup(mut *self, f: &Func): (ok: bool) {
 		ok = true
 	check:
 		for i, p in f.Params {
@@ -1523,7 +1523,7 @@ impl sema {
 		ret
 	}
 
-	fn checkFuncDeclResultDup(mut self, mut f: &Func): (ok: bool) {
+	fn checkFuncDeclResultDup(mut *self, mut f: &Func): (ok: bool) {
 		ok = true
 		if f.IsVoid() {
 			ret
@@ -1768,7 +1768,7 @@ impl sema {
 		ret true
 	}
 
-	fn checkTraitImplMethods(mut self, mut base: &Trait, ipl: &Impl): (ok: bool) {
+	fn checkTraitImplMethods(mut *self, mut base: &Trait, ipl: &Impl): (ok: bool) {
 		ok = true
 		for _, f in ipl.Methods {
 			if base.FindMethod(f.Name) == nil {
@@ -2132,7 +2132,7 @@ impl sema {
 		ret self.checkFuncDeclsBy(self.file.Funcs)
 	}
 
-	fn pushCycleError(self, st1: str, st2: str, mut &message: *strings::Builder) {
+	fn pushCycleError(*self, st1: str, st2: str, mut &message: *strings::Builder) {
 		const Padding = 7
 		refersTo := log::Logf(log::RefersTo, st1, st2)
 		m := message.Str()
@@ -2178,7 +2178,7 @@ impl sema {
 		}
 	}
 
-	fn checkDataForTypeInference(mut self, v: &Value, errToken: &token::Token): bool {
+	fn checkDataForTypeInference(mut *self, v: &Value, errToken: &token::Token): bool {
 		match {
 		| v.IsNil():
 			self.pushErr(errToken, log::NilForTypeInference)
@@ -2684,7 +2684,7 @@ impl sema {
 		}
 	}
 
-	fn checkRets(mut self, mut f: &FuncIns) {
+	fn checkRets(mut *self, mut f: &FuncIns) {
 		if f.Decl.IsVoid() {
 			ret
 		}
@@ -2697,7 +2697,7 @@ impl sema {
 
 	// Checks scope of the function f.
 	// The function environment must be filled.
-	fn checkFuncInsSc(mut self, mut f: &FuncIns, mut sc: &scopeChecker) {
+	fn checkFuncInsSc(mut *self, mut f: &FuncIns, mut sc: &scopeChecker) {
 		if len(f.env.vars) > 0 {
 			sc.table.Vars = f.env.vars[:len(f.env.vars):len(f.env.vars)]
 		}
@@ -2751,7 +2751,7 @@ impl sema {
 		}
 	}
 
-	fn checkTestFunc(mut self, mut f: &FuncIns) {
+	fn checkTestFunc(mut *self, mut f: &FuncIns) {
 		if f.Decl.Public {
 			self.pushErr(f.Decl.Token, log::PubTestFunc)
 			self.pushSuggestion(log::RemovePubModifier)
@@ -3033,7 +3033,7 @@ impl missingRetChecker {
 		}
 	}
 
-	fn checkConditional(self, mut c: &Conditional): (ok: bool) {
+	fn checkConditional(*self, mut c: &Conditional): (ok: bool) {
 		// To collect all break statements, check the all scopes.
 		ok = true
 		for (_, mut elif) in c.Elifs {
@@ -3055,7 +3055,7 @@ impl missingRetChecker {
 		ret
 	}
 
-	fn checkMatch(self, mut m: &Match): (ok: bool) {
+	fn checkMatch(*self, mut m: &Match): (ok: bool) {
 		// To collect all break and fall statements, check the all scopes.
 		ok = true
 		addr := uintptr(m)
@@ -3090,7 +3090,7 @@ impl missingRetChecker {
 	}
 
 	// Reports we have infinite iteration.
-	fn checkInfinite(self, it: uintptr, mut s: &Scope): bool {
+	fn checkInfinite(*self, it: uintptr, mut s: &Scope): bool {
 		mut lead := self.lead
 		hard := self.hard
 
@@ -3167,7 +3167,7 @@ impl missingRetChecker {
 
 	// Checks the scope, starts from i.
 	// Reports whether return statement or infinite loop found.
-	fn checkScope(self, mut s: &Scope, i: int): bool {
+	fn checkScope(*self, mut s: &Scope, i: int): bool {
 		if s == nil {
 			ret false
 		}
@@ -3422,7 +3422,7 @@ impl missingRetChecker {
 
 	// Like checkScope, but it pays attention to the hard register.
 	// checkScope is intended for internal use.
-	fn check(self, mut s: &Scope): bool {
+	fn check(*self, mut s: &Scope): bool {
 		ret self.checkScope(s, 0) && self.hard
 	}
 }

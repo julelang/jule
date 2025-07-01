@@ -42,7 +42,7 @@ impl RWMutex {
 	// It should not be used for recursive read locking; a blocked Lock
 	// call excludes new readers from acquiring the lock. See the
 	// documentation on the [RWMutex] type.
-	fn RLock(self) {
+	fn RLock(*self) {
 		if self.readerCount.Add(1, atomic::SeqCst) < 0 {
 			// A writer is pending, wait for it.
 			runtime::semacquire(&self.readerSem, false, runtime::semaMutex)
@@ -54,7 +54,7 @@ impl RWMutex {
 	// Note that while correct uses of TryRLock do exist, they are rare,
 	// and use of TryRLock is often a sign of a deeper problem
 	// in a particular use of mutexes.
-	fn TryRLock(self): bool {
+	fn TryRLock(*self): bool {
 		for {
 			c := self.readerCount.Load(atomic::SeqCst)
 			if c < 0 {
@@ -70,7 +70,7 @@ impl RWMutex {
 	// it does not affect other simultaneous readers.
 	// It is a run-time error if it is not locked for reading
 	// on entry to RUnlock.
-	fn RUnlock(self) {
+	fn RUnlock(*self) {
 		r := self.readerCount.Add(-1, atomic::SeqCst)
 		if r < 0 {
 			// Outlined slow-path to allow the fast-path to be inlined
@@ -78,7 +78,7 @@ impl RWMutex {
 		}
 	}
 
-	fn rUnlockSlow(self, r: i32) {
+	fn rUnlockSlow(*self, r: i32) {
 		if r+1 == 0 || r+1 == -rwmutexMaxReaders {
 			panic("std/sync: RUnlock of unlocked RWMutex")
 		}
@@ -92,7 +92,7 @@ impl RWMutex {
 	// Locks for writing.
 	// If the lock is already locked for reading or writing,
 	// Lock blocks until the lock is available.
-	fn Lock(self) {
+	fn Lock(*self) {
 		// First, resolve competition with other writers.
 		self.w.Lock()
 		// Announce to readers there is a pending writer.
@@ -108,7 +108,7 @@ impl RWMutex {
 	// Note that while correct uses of TryLock do exist, they are rare,
 	// and use of TryLock is often a sign of a deeper problem
 	// in a particular use of mutexes.
-	fn TryLock(self): bool {
+	fn TryLock(*self): bool {
 		if !self.w.TryLock() {
 			ret false
 		}
@@ -125,7 +125,7 @@ impl RWMutex {
 	// As with Mutexes, a locked [RWMutex] is not associated with a particular
 	// thread. One thread may [RWMutex.RLock] ([RWMutex.Lock]) a RWMutex and then
 	// arrange for another thread to [RWMutex.RUnlock] ([RWMutex.Unlock]) it.
-	fn Unlock(self) {
+	fn Unlock(*self) {
 		// Announce to readers there is no active writer.
 		r := self.readerCount.Add(rwmutexMaxReaders, atomic::SeqCst)
 		if r >= rwmutexMaxReaders {
@@ -150,6 +150,6 @@ impl RWMutex {
 type rlocker: &RWMutex
 
 impl Locker for rlocker {
-	fn Lock(self) { (&RWMutex)(*self).RLock() }
-	fn Unlock(self) { (&RWMutex)(*self).RUnlock() }
+	fn Lock(*self) { (&RWMutex)(*self).RLock() }
+	fn Unlock(*self) { (&RWMutex)(*self).RUnlock() }
 }

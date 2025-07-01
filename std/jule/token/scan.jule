@@ -87,7 +87,7 @@ impl Scanner {
 	}
 
 	// Pushes new error log to logs.
-	fn pushErr(mut self, i: int, fmt: str, args: ...any) {
+	fn pushErr(mut *self, i: int, fmt: str, args: ...any) {
 		self.Logs = append(self.Logs, log::Log{
 			Kind: log::Error,
 			Row: self.row,
@@ -98,13 +98,13 @@ impl Scanner {
 	}
 
 	// Adds new line.
-	fn addLine(mut self) {
+	fn addLine(mut *self) {
 		self.row++
 		self.col = 0
 	}
 
 	// Returns the next rune without advance scanning.
-	fn peek(mut self): rune {
+	fn peek(mut *self): rune {
 		if self.rdOffset >= self.buf.Len() {
 			ret eof
 		}
@@ -117,7 +117,7 @@ impl Scanner {
 	}
 
 	// Returns the next rune without advance scanning.
-	fn peek2(mut self): (rune, int) {
+	fn peek2(mut *self): (rune, int) {
 		if self.rdOffset >= self.buf.Len() {
 			ret eof, 0
 		}
@@ -133,7 +133,7 @@ impl Scanner {
 	// self.r < 0 means end-of-file.
 	//
 	// For optimization, there is some overlap between this method and self.scanName.
-	fn next(mut self) {
+	fn next(mut *self) {
 		if self.rdOffset >= self.buf.Len() {
 			if self.r == '\n' {
 				self.addLine()
@@ -164,13 +164,13 @@ impl Scanner {
 		self.r = r
 	}
 
-	fn skipWhitespace(mut self) {
+	fn skipWhitespace(mut *self) {
 		for self.r == ' ' || self.r == '\t' || self.r == '\n' || self.r == '\r' {
 			self.next()
 		}
 	}
 
-	fn scanLineComment(mut self, mut token: &Token) {
+	fn scanLineComment(mut *self, mut token: &Token) {
 		offs := self.offset - 1 // leading '/' consumed
 		token.ID = COMMENT
 		for {
@@ -182,7 +182,7 @@ impl Scanner {
 		}
 	}
 
-	fn scanRangeComment(mut self, mut token: &Token) {
+	fn scanRangeComment(mut *self, mut token: &Token) {
 		offs := self.offset - 1 // leading '/' consumed
 		for {
 			self.next()
@@ -207,7 +207,7 @@ impl Scanner {
 	//
 	// Be careful when making changes to this function: it is optimized and affects
 	// scanning performance significantly.
-	fn scanName(mut self, mut token: &Token): bool {
+	fn scanName(mut *self, mut token: &Token): bool {
 		offs := self.offset
 
 		// Optimize for the common case of an ASCII identifier.
@@ -262,7 +262,7 @@ impl Scanner {
 	// in *invalid, if *invalid < 0.
 	// digits returns a bitset describing whether the sequence contained
 	// digits (bit 0 is set), or separators '_' (bit 1 is set).
-	fn digits(mut self, base: int, mut &invalid: *int): (digsep: int) {
+	fn digits(mut *self, base: int, mut &invalid: *int): (digsep: int) {
 		if base <= 10 {
 			max := rune('0' + base)
 			for isDecimal(self.r) || self.r == '_' {
@@ -288,7 +288,7 @@ impl Scanner {
 		ret
 	}
 
-	fn scanNumber(mut self, mut token: &Token) {
+	fn scanNumber(mut *self, mut token: &Token) {
 		offs := self.offset
 		mut base := 10        // number base
 		mut prefix := rune(0) // one of 0 (decimal), '0' (0-octal), 'x', 'o', or 'b'
@@ -378,7 +378,7 @@ impl Scanner {
 	// escaped quote. In case of a syntax error, it stops at the offending
 	// character (without consuming it) and returns false. Otherwise
 	// it returns true.
-	fn scanEscape(mut self, quote: rune): bool {
+	fn scanEscape(mut *self, quote: rune): bool {
 		offs := self.offset
 
 		let mut n: int
@@ -434,7 +434,7 @@ impl Scanner {
 		ret true
 	}
 
-	fn scanRune(mut self, mut token: &Token) {
+	fn scanRune(mut *self, mut token: &Token) {
 		// '\'' opening already consumed
 		offs := self.offset - 1
 
@@ -473,7 +473,7 @@ impl Scanner {
 		}
 	}
 
-	fn scanStr(mut self, mut token: &Token) {
+	fn scanStr(mut *self, mut token: &Token) {
 		// '"' opening already consumed
 		offs := self.offset - 1
 
@@ -501,7 +501,7 @@ impl Scanner {
 		}
 	}
 
-	fn scanRawStr(mut self, mut token: &Token) {
+	fn scanRawStr(mut *self, mut token: &Token) {
 		// '`' opening already consumed
 		offs := self.offset - 1
 
@@ -536,7 +536,7 @@ impl Scanner {
 
 	// Scans and returns new token, reports if EOF.
 	// If and error appeared, returns nil token and not-EOF.
-	fn Scan(mut self): (token: &Token, EOF: bool) {
+	fn Scan(mut *self): (token: &Token, EOF: bool) {
 		self.skipWhitespace()
 		if self.r == eof {
 			ret nil, true

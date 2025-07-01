@@ -20,14 +20,14 @@ impl ExprInspector {
 		ret new(ExprInspector)
 	}
 
-	fn args(mut self, mut args: []sema::Expr) {
+	fn args(mut *self, mut args: []sema::Expr) {
 		for i in args {
 			// Should be guaranteed that model points to the original memory.
 			self.inspect(unsafe { &(*(&args[i])) })
 		}
 	}
 
-	fn args1(mut self, mut args: []&sema::Value) {
+	fn args1(mut *self, mut args: []&sema::Value) {
 		for i in args {
 			if args[i] == nil {
 				// We may have nil data with no error.
@@ -43,11 +43,11 @@ impl ExprInspector {
 	// It's unsafe because this expression is may not be in ordinary order.
 	// Internal configurations may change and unexpected behavior may occur.
 	// Be careful when using.
-	unsafe fn InspectStep(mut self, mut &m: *sema::Expr) {
+	unsafe fn InspectStep(mut *self, mut &m: *sema::Expr) {
 		self.inspect(m)
 	}
 
-	fn inspect(mut self, mut &m: *sema::Expr) {
+	fn inspect(mut *self, mut &m: *sema::Expr) {
 		self.SkipChild = false
 		self.handler(m)
 		if self.SkipChild {
@@ -201,7 +201,7 @@ impl ExprInspector {
 	// Inspect expression model.
 	// Resets [SkipChild] to default.
 	// Inspector guarantees the parameter m will always point to original model.
-	fn Inspect(mut self, mut &m: *sema::Expr, f: fn(mut &m: *sema::Expr)) {
+	fn Inspect(mut *self, mut &m: *sema::Expr, f: fn(mut &m: *sema::Expr)) {
 		self.handler = f
 		self.inspect(m)
 	}
