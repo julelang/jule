@@ -16,15 +16,11 @@ use "std/slices"
 use "std/strings"
 use "std/unicode/utf8"
 
-fn isValidModelForRef(mut m: Expr, mut &mutable: *bool): bool {
+fn isValidModelForRef(mut m: Expr): bool {
 	for {
 		match type m {
 		| &Var:
 			// We found a variable, so the expression based on a variable.
-			// Report true.
-			// Also update the mutability according to the variable.
-			// See the sema.checkRefValidityForInitExpr function for details.
-			*mutable = m.(&Var).Mutable
 			ret true
 		| &StructSubIdentExpr:
 			mut model := m.(&StructSubIdentExpr)
@@ -1116,25 +1112,14 @@ impl sema {
 			// Since reference pointers are use raw-pointers, initialize expression must be unary.
 			// For a quick return, check whether the expression is unary.
 			// The isValidModelForRef function checks expression more deeply.
-			//
-			// In addition to compatibility analysis, it will update the mutability
-			// of the value, if needed. Because getting raw-pointer to any memory
-			// will always result with mutable raw-pointer. This is needed for Unsafe Jule.
-			// Usually used to break immutability. But we are in Safe Jule, even in unsafe scope.
-			// Reference pointers must be safe all the time. So we must check
-			// mutability of the source memory to make sure we point to mutable memory.
-			// If reference pointer is mutable and points to an immutable memory,
-			// compler must complain. Therefore, isValidModelForRef will update
-			// mutability of the value according to the source memory.
 			mut unary, _ := v.Model.(&UnaryExpr)
-			if unary == nil || !isValidModelForRef(unary.Expr.Model, &v.Mutable) {
+			if unary == nil || !isValidModelForRef(unary.Expr.Model) {
 				self.pushErr(errorToken, log::RefAssignNonVar)
 				ret false
 			}
 		}
 
 		// Check mutability for the reference pointer.
-		// Mutability will be updated according to base memory, if necessary.
 		if leftMut && !v.Mutable {
 			self.pushErr(errorToken, log::MutRefPointsImmut)
 			ret false
@@ -2358,7 +2343,11 @@ impl sema {
 		}
 
 		// Do not unwrap untyped literals, type analysis will check overflows.
-		v.ValueSym.Value = eval.evalExpr(v.ValueSym.Expr, evalDefault|evalExceptional)
+		mut evalFlags := evalDefault|evalExceptional
+		if v.Reference {
+			evalFlags |= evalRefptr
+		}
+		v.ValueSym.Value = eval.evalExpr(v.ValueSym.Expr, evalFlags)
 		ret true
 	}
 

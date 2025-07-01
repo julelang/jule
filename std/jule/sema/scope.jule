@@ -1155,7 +1155,7 @@ impl scopeChecker {
 		_ = checkAssign(self.s, v, nil, a.Op)
 
 		if v.Type.Ptr() != nil {
-			if isRef(v) != nil {
+			if isRef(v) {
 				self.s.pushErr(a.Op, "postfix operator are not supported by the reference pointer type @", v.Type.Str())
 				ret
 			} else {
@@ -1237,6 +1237,8 @@ impl scopeChecker {
 		}
 		if l == nil {
 			evalFlags |= evalUnwrapUntyped
+		} else if isRef(l) {
+			evalFlags |= evalRefptr
 		}
 		mut r := eval.evalExpr(a.Y, evalFlags)
 		if r == nil {
@@ -1277,7 +1279,7 @@ impl scopeChecker {
 
 		if a.Op.ID == token::ASSIGN {
 			const firstAssignToDest = false // this is not the first assignment to the variable
-			reference := isRef(l) != nil
+			reference := isRef(l)
 			if self.s.checkAssignType(reference, firstAssignToDest, l.Type, r, a.Op, self.getOwnerRefers()) {
 				rm.Model = r.Model
 				lm.Model = l.Model
@@ -1416,6 +1418,9 @@ impl scopeChecker {
 				if jule::IsBlank(a.X[*_i].Name) {
 					flags |= evalPhysicalMem | evalUnwrapUntyped
 				}
+				if a.X[*_i].Reference {
+					flags |= evalRefptr
+				}
 				mut v := eval.evalExpr(expr, flags)
 				if v != nil {
 					*_parts = append(*_parts, exprPart{v, expr})
@@ -1429,7 +1434,11 @@ impl scopeChecker {
 			// It is mutability safe even if map stored in immutable memory and have mutable type value.
 			// Because mutability will be checked by assignment analysis.
 			updateMut(0)
-			right = eval.evalExpr(a.Y, evalDefault|evalPhysicalMem|evalUnwrapUntyped|evalExceptional)
+			mut evalFlags := evalDefault|evalPhysicalMem|evalUnwrapUntyped|evalExceptional
+			if a.X[0].Reference {
+				evalFlags |= evalRefptr
+			}
+			right = eval.evalExpr(a.Y, evalFlags)
 			if right == nil {
 				ok = false
 				ret
@@ -1545,8 +1554,8 @@ impl scopeChecker {
 				if !a.Decl {
 					goto eval
 				}
-				// If variable is reference and mutable, this is exactly a new identifier.
-				if lexpr.Mutable && lexpr.Reference {
+				// If variable is reference or mutable, this is exactly a new identifier.
+				if lexpr.Mutable || lexpr.Reference {
 					goto end
 				}
 				_, ok = lexpr.X.Data.(&ast::NameExpr)

@@ -96,6 +96,7 @@ const (
 	evalPhysicalMem   = 1 << iota // Checks whether the value is sutaible for physical memory.
 	evalUnwrapUntyped             // Unwraps untyped literal value to physical memory with default type.
 	evalExceptional               // Allows calling exceptional functions.
+	evalRefptr                    // Eval for reference pointer memory.
 )
 
 struct eval {
@@ -731,8 +732,9 @@ impl eval {
 		ret self.evalDef(def, name.Token)
 	}
 
-	fn evalUnary(mut &self, mut u: &ast::UnaryExpr): &Value {
+	fn evalUnary(mut &self, mut u: &ast::UnaryExpr, evalRefptr: bool): &Value {
 		mut unary := unaryEval.new(self)
+		unary.evalRefptr = evalRefptr
 		ret unary.eval(u)
 	}
 
@@ -944,7 +946,7 @@ impl eval {
 		self.checkIntegerIndexByData(index, i.Token)
 		v.Lvalue = true
 
-		if isRef(v) != nil {
+		if isRef(v) {
 			self.pushErr(i.Token, "index is not supported by reference type @", v.Type.Str())
 			self.pushSuggestion("try deference the reference pointer like: *x")
 			ret
@@ -2905,7 +2907,7 @@ impl eval {
 			if ptr.IsUnsafe() {
 				break
 			}
-			if isRef(v) == nil && !self.isUnsafe() {
+			if !isRef(v) && !self.isUnsafe() {
 				self.pushErr(si.Name, log::UnsafeBehaviorAtOutOfUnsafeScope)
 				self.pushSuggestion(log::WriteYourCodeInUnsafeJule)
 			}
@@ -3331,7 +3333,7 @@ impl eval {
 			if u.IsUnsafePtr() {
 				ret self.evalType(expr)
 			}
-			ret self.evalUnary(u)
+			ret self.evalUnary(u, false)
 		|:
 			ret self.evalExprData(expr.Data)
 		}
@@ -3340,7 +3342,21 @@ impl eval {
 	// Returns value data of evaluated expression.
 	// Returns nil if error occurs.
 	fn eval1(mut &self, mut expr: &ast::Expr, flags: int): &Value {
-		mut v := self.evalExprPlain(expr)
+		let mut v: &Value
+		// If refptr eval mode enabled, check for unary expression.
+		// Because destination memory is reference pointer.
+		// It can take only raw-pointer, so unary.
+		// Check this special case for this mode.
+		if flags&evalRefptr == evalRefptr {
+			mut unary, _ := expr.Data.(&ast::UnaryExpr)
+			if unary != nil {
+				v = self.evalUnary(unary, true)
+				goto AfterEval
+			}
+		}
+		// Use ordinary expression eval.
+		v = self.evalExprPlain(expr)
+	AfterEval:
 		if v == nil || v.Type == nil {
 			ret nil
 		}
@@ -3438,6 +3454,8 @@ struct unaryEval {
 	e: &eval
 	v: &Value
 	u: &ast::UnaryExpr
+
+	evalRefptr: bool
 }
 
 impl unaryEval {
@@ -3737,7 +3755,7 @@ impl unaryEval {
 	}
 
 	fn star(mut *self) {
-		isRef := isRef(self.v) != nil
+		isRef := isRef(self.v)
 		self.v.Model = &UnaryExpr{
 			Expr: new(Value, *self.v),
 			Op: self.u.Op,
@@ -3756,7 +3774,6 @@ impl unaryEval {
 				ret
 			}
 			self.v.Type = t.Value
-			self.v.Mutable = true
 		| self.v.Type.Sptr() != nil:
 			self.v.Type = self.v.Type.Sptr().Value
 		|:
@@ -3770,8 +3787,12 @@ impl unaryEval {
 	}
 
 	fn amper(mut *self) {
-		// Gettin raw-pointer returns mutable pointer by default.
+		// Getting raw-pointer returns mutable pointer by default.
+		// But if we are eval for refptr memory, use the value's mutability.
 		mut mutable := true
+		if self.evalRefptr {
+			mutable = self.v.Mutable
+		}
 
 		match type self.v.Model {
 		| &StructLitExpr:
@@ -3780,11 +3801,6 @@ impl unaryEval {
 		|:
 			match {
 			| canGetPtr(self.v):
-				// If expression is based on a reference variable,
-				// use the mutability of the variable.
-				ref := deepIsRef(self.v)
-				mutable = mutable && (ref == nil || ref.Mutable)
-
 				self.v.Type = &Type{
 					Kind: &Ptr{Value: self.v.Type},
 				}
@@ -4125,7 +4141,7 @@ impl binaryEval {
 	}
 
 	fn evalPtr(mut *self): &Value {
-		if isRef(self.l) != nil {
+		if isRef(self.l) {
 			match self.op.ID {
 			| token::EQL | token::NEQ:
 				if !self.checkTypeCompatibility() {
@@ -5372,27 +5388,30 @@ fn getUntypedCmpScore(k: str): int {
 	ret -1
 }
 
-// Reports whether the value is reference based.
-// Returns variable if it is reference, otherwise nil.
-fn isRef(mut v: &Value): &Var {
+fn _isRef(mut v: &Value): (isRef: bool, mutable: bool) {
 	mut variable, _ := v.Model.(&Var)
 	if variable != nil && variable.Reference {
-		ret variable
+		ret true, variable.Mutable
 	}
-	ret nil
+	ret false, false
 }
 
 // Reports whether the value is reference based.
-// Returns variable if it is reference, otherwise nil.
+fn isRef(mut v: &Value): bool {
+	isRef, _ := _isRef(v)
+	ret isRef
+}
+
+// Reports whether the value is reference based and reference memory is mutable.
 // Works like isRef, but checks deeply.
-fn deepIsRef(mut v: &Value): &Var {
-	mut ref := isRef(v)
-	if ref != nil {
-		ret ref
+fn deepIsRef(mut v: &Value): (isRef: bool, mutable: bool) {
+	isRef, mutable = _isRef(v)
+	if isRef {
+		ret
 	}
 	mut unary, _ := v.Model.(&UnaryExpr)
 	if unary == nil || unary.Op.ID != token::MUL {
-		ret nil
+		ret false, false
 	}
 	ret deepIsRef(unary.Expr)
 }
