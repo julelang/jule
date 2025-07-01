@@ -163,20 +163,24 @@ fn updateParamVars(mut &dest: *[]&Var, mut f: &FuncIns): (n: int) {
 				Variadic: false,
 				Kind: f.Owner,
 			}
-			if p.Decl.IsRef() {
-				v.Name = v.Name[1:] // Remove reference sign.
+			match {
+			| p.Decl.IsSmartptr():
+				v.Name = v.Name[1:] // Remove smartptr sign.
 				v.TypeSym.Type.Kind = &Sptr{
 					Value: &Type{
 						Kind: f.Owner,
 					},
 				}
-			} else {
+			| p.Decl.IsRefptr():
+				v.Name = v.Name[1:] // Remove refptr sign.
 				v.Reference = true
 				v.TypeSym.Type.Kind = &Ptr{
 					Value: &Type{
 						Kind: f.Owner,
 					},
 				}
+			|:
+				panic("unreachable")
 			}
 		| p.Decl.Variadic:
 			v.TypeSym.Type = &Type{
@@ -1048,7 +1052,8 @@ impl sema {
 		if p.Type != nil {
 			ret
 		}
-		if p.Decl.IsRef() {
+		match {
+		| p.Decl.IsSmartptr():
 			p.Type = &Type{
 				Kind: &Sptr{
 					Value: &Type{
@@ -1056,8 +1061,16 @@ impl sema {
 					},
 				},
 			}
-		} else {
-			p.Type = &Type{Kind: f.Owner}
+		| p.Decl.IsRefptr():
+			p.Type = &Type{
+				Kind: &Ptr{
+					Value: &Type{
+						Kind: f.Owner,
+					},
+				},
+			}
+		|:
+			// no-op: first parameter is not a receiver
 		}
 	}
 

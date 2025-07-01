@@ -529,21 +529,29 @@ impl parser {
 		mut name := strings::Builder{}
 		name.Grow(5) // enough for the maximum length
 
-		if tokens[0].ID == token::AND {
+		match tokens[0].ID {
+		| token::AND:
 			name.WriteStr("&")!
-			if len(tokens) == 1 {
-				self.pushErr(tokens[0], log::InvalidSyntax)
-				ret nil
-			}
-			tokens = tokens[1:]
+		| token::MUL:
+			name.WriteStr("*")!
+		| token::SELF:
+			param.Token = tokens[0] // avoid nil error because of nil token
+			self.pushErr(tokens[0], "expected * or & before self receiver")
+			ret param
+		|:
+			ret nil
 		}
-
-		if tokens[0].ID == token::SELF {
-			name.WriteStr("self")!
-			param.Token = tokens[0]
-			if len(tokens) != 1 {
-				self.pushErr(tokens[1], log::InvalidSyntax)
-			}
+		if len(tokens) == 1 {
+			self.pushErr(tokens[0], log::InvalidSyntax)
+			ret nil
+		}
+		if tokens[1].ID != token::SELF {
+			ret nil
+		}
+		name.WriteStr("self")!
+		param.Token = tokens[1]
+		if len(tokens) != 2 {
+			self.pushErr(tokens[1], log::InvalidSyntax)
 		}
 
 		param.Name = name.Str()
@@ -672,7 +680,7 @@ impl parser {
 		let mut params: []&ast::Param = nil
 		if method && len(parts) > 0 {
 			mut param := self.buildSelfParam(parts[0])
-			if param != nil && param.IsSelf() {
+			if param != nil {
 				params = append(params, param)
 				parts = parts[1:]
 			}

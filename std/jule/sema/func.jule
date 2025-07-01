@@ -32,12 +32,17 @@ impl Param {
 
 	// Reports whether parameter is self (receiver) parameter.
 	fn IsSelf(self): bool {
-		ret self.Name == "&self" || self.Name == "self"
+		ret self.Name == "&self" || self.Name == "*self"
 	}
 
-	// Reports whether self (receiver) parameter is reference.
-	fn IsRef(self): bool {
-		ret self.Name != "" && self.Name[0] == '&'
+	// Reports whether self (receiver) parameter is smart pointer.
+	fn IsSmartptr(self): bool {
+		ret len(self.Name) > 0 && self.Name[0] == '&'
+	}
+
+	// Reports whether self (receiver) parameter is reference pointer.
+	fn IsRefptr(self): bool {
+		ret len(self.Name) > 0 && self.Name[0] == '*'
 	}
 }
 
@@ -200,8 +205,13 @@ impl ParamIns {
 		}
 
 		if self.Decl.IsSelf() {
-			if self.Decl.IsRef() {
+			match {
+			| self.Decl.IsSmartptr():
 				s.WriteByte('&')!
+			| self.Decl.IsRefptr():
+				s.WriteByte('*')!
+			|:
+				panic("unreachable")
 			}
 			s.WriteStr("self")!
 			ret s.Str()
@@ -278,7 +288,7 @@ impl FuncIns {
 				if !p2.Decl.IsSelf() {
 					ret false
 				}
-				if p1.Decl.IsRef() != p2.Decl.IsRef() {
+				if p1.Decl.IsSmartptr() != p2.Decl.IsSmartptr() {
 					ret false
 				}
 				if responsive {
