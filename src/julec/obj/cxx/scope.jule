@@ -46,7 +46,7 @@ struct scopeCoder {
 }
 
 impl scopeCoder {
-	fn new(mut &oc: &ObjectCoder): &scopeCoder {
+	fn new(mut oc: &ObjectCoder): &scopeCoder {
 		ret &scopeCoder{
 			oc: oc,
 		}
@@ -60,26 +60,15 @@ impl scopeCoder {
 		mut ref := false
 		if opt::Copy && isCopyOptimizable(it.Expr, true) {
 			ref = true
-			match type it.Expr.Model {
-			| &sema::Var:
-				v := it.Expr.Model.(&sema::Var)
-				if v.Reference {
-					self.oc.ec.model(it.Expr.Model)
-					break
-				}
-				fall
-			|:
-				self.oc.write("&(")
-				self.oc.ec.model(it.Expr.Model)
-				self.oc.write(")")
-			}
+			self.oc.write("&(")
+			self.oc.ec.model(it.Expr.Model)
+			self.oc.write(")")
 		} else {
 			self.oc.ec.possibleRefExpr(it.Expr.Model)
 		}
 		self.oc.write(";\n")
 		mut sb := strings::Builder{}
-		sb.Grow(1 << 6)
-		identCoder.iterNext(sb, uintptr(it))
+		identCoder.iterNext(&sb, uintptr(it))
 		next := sb.Str()
 		self.oc.write(next)
 		self.oc.write(":;\n")
@@ -126,7 +115,7 @@ impl scopeCoder {
 
 		// Close scope.
 		self.oc.indent()
-		identCoder.iterEnd(self.oc.Buf, uintptr(it))
+		identCoder.iterEnd(&self.oc.Buf, uintptr(it))
 		self.oc.write(":;\n")
 		self.oc.doneIndent()
 		self.oc.indent()
@@ -134,33 +123,23 @@ impl scopeCoder {
 	}
 
 	// Common head object-code for iterations of all kind.
-	fn iterHead(mut &self, mut &it: &sema::RangeIter, mut &ref: bool, begin: str) {
+	fn iterHead(mut &self, mut it: &sema::RangeIter, mut &ref: *bool, begin: str) {
 		self.oc.write("{\n")
 		self.oc.addIndent()
 		self.oc.indent()
 		self.oc.write("auto expr = ")
 		if opt::Copy && isCopyOptimizable(it.Expr, true) {
-			ref = true
-			match type it.Expr.Model {
-			| &sema::Var:
-				v := it.Expr.Model.(&sema::Var)
-				if v.Reference {
-					self.oc.ec.model(it.Expr.Model)
-					break
-				}
-				fall
-			|:
-				self.oc.write("&(")
-				self.oc.ec.model(it.Expr.Model)
-				self.oc.write(")")
-			}
+			*ref = true
+			self.oc.write("&(")
+			self.oc.ec.model(it.Expr.Model)
+			self.oc.write(")")
 		} else {
 			self.oc.ec.possibleRefExpr(it.Expr.Model)
 		}
 		self.oc.write(";\n")
 		self.oc.indent()
 		self.oc.write("auto it = expr")
-		if ref {
+		if *ref {
 			self.oc.write("->")
 		} else {
 			self.oc.write(".")
@@ -168,7 +147,7 @@ impl scopeCoder {
 		self.oc.write("begin();\n")
 		self.oc.indent()
 		self.oc.write("auto expr_end = expr")
-		if ref {
+		if *ref {
 			self.oc.write("->")
 		} else {
 			self.oc.write(".")
@@ -183,17 +162,16 @@ impl scopeCoder {
 		self.oc.indent()
 	}
 
-	fn rangeIndexIter(mut &self, mut &it: &sema::RangeIter) {
+	fn rangeIndexIter(mut &self, mut it: &sema::RangeIter) {
 		mut sb := strings::Builder{}
-		sb.Grow(1 << 6)
-		identCoder.iterBegin(sb, uintptr(it))
+		identCoder.iterBegin(&sb, uintptr(it))
 		begin := sb.Str()
 		sb.Clear()
-		identCoder.iterNext(sb, uintptr(it))
+		identCoder.iterNext(&sb, uintptr(it))
 		next := sb.Str()
 
 		mut ref := false
-		self.iterHead(it, ref, begin)
+		self.iterHead(it, &ref, begin)
 		if it.KeyA != nil {
 			self.oc.varInitExpr(it.KeyA, fn|| {
 				if ref {
@@ -206,10 +184,34 @@ impl scopeCoder {
 			self.oc.indent()
 		}
 		if it.KeyB != nil {
-			it.KeyB.Reference = opt::Copy && isIterCopyOptimizable(it.Expr, it.KeyB)
+			copyOptimizable := opt::Copy && isIterCopyOptimizable(it.Expr, it.KeyB)
+			if copyOptimizable {
+				it.KeyB.TypeSym.Type = &sema::Type{
+					Kind: &sema::Ptr{
+						Value: it.KeyB.TypeSym.Type,
+					},
+				}
+				mut keyBIdent := strings::Builder{}
+				keyBIdent.WriteStr("(*")!
+				identCoder.var(&keyBIdent, it.KeyB)
+				keyBIdent.WriteByte(')')!
+				name := keyBIdent.Str()
+				i := len(self.oc.ec.varPrefixes)
+				self.oc.ec.varPrefixes = append(self.oc.ec.varPrefixes, fn|v| {
+					if v == it.KeyB {
+						self.oc.write(name)
+						ret true
+					}
+					ret false
+				})
+				defer {
+					// Remove the prefix for optimized output for the KeyB.
+					self.oc.ec.varPrefixes = append(self.oc.ec.varPrefixes[:i], self.oc.ec.varPrefixes[i+1:]...)
+				}
+			}
 			self.oc.varInitExpr(it.KeyB, fn|| {
 				unsafe {
-					if it.KeyB.Reference {
+					if copyOptimizable {
 						self.oc.write("it")
 					} else {
 						self.oc.write("*it")
@@ -228,7 +230,7 @@ impl scopeCoder {
 		self.oc.write("++it;\n")
 		self.oc.indent()
 		if it.KeyA != nil {
-			identCoder.var(self.oc.Buf, it.KeyA)
+			identCoder.var(&self.oc.Buf, it.KeyA)
 			self.oc.write("++;\n")
 			self.oc.indent()
 		}
@@ -242,7 +244,7 @@ impl scopeCoder {
 		self.oc.write("}\n")
 
 		self.oc.indent()
-		identCoder.iterEnd(self.oc.Buf, uintptr(it))
+		identCoder.iterEnd(&self.oc.Buf, uintptr(it))
 		self.oc.write(":;\n")
 
 		// Close scope.
@@ -251,13 +253,12 @@ impl scopeCoder {
 		self.oc.write("}")
 	}
 
-	fn rangeHashmapIter(mut &self, mut &it: &sema::RangeIter) {
+	fn rangeHashmapIter(mut &self, mut it: &sema::RangeIter) {
 		mut sb := strings::Builder{}
-		sb.Grow(1 << 6)
-		identCoder.iterBegin(sb, uintptr(it))
+		identCoder.iterBegin(&sb, uintptr(it))
 		begin := sb.Str()
 		sb.Clear()
-		identCoder.iterNext(sb, uintptr(it))
+		identCoder.iterNext(&sb, uintptr(it))
 		next := sb.Str()
 
 		mut _map := it.Expr.Type.Map()
@@ -278,9 +279,9 @@ impl scopeCoder {
 		self.oc.write("{\n")
 		self.oc.addIndent()
 		self.oc.indent()
-		self.oc.tc.structureIns(self.oc.Buf, iterator)
+		self.oc.tc.structureIns(&self.oc.Buf, iterator)
 		self.oc.write(" it = ")
-		identCoder.funcIns(self.oc.Buf, f)
+		identCoder.funcIns(&self.oc.Buf, f)
 		self.oc.write("(")
 		self.oc.ec.possibleRefExpr(it.Expr.Model)
 		self.oc.write(");\n")
@@ -288,11 +289,11 @@ impl scopeCoder {
 		self.oc.write(begin)
 		self.oc.write(":;\n")
 		self.oc.indent()
-		self.oc.tc.funcInsResult(self.oc.Buf, nextCall)
+		self.oc.tc.funcInsResult(&self.oc.Buf, nextCall)
 		self.oc.write(" ")
 		self.oc.write(resultName)
 		self.oc.write(" = ")
-		identCoder.funcIns(self.oc.Buf, nextCall)
+		identCoder.funcIns(&self.oc.Buf, nextCall)
 		self.oc.write("(&it);\n")
 		self.oc.indent()
 		self.oc.write("if (")
@@ -326,7 +327,7 @@ impl scopeCoder {
 		self.oc.write("}\n")
 
 		self.oc.indent()
-		identCoder.iterEnd(self.oc.Buf, uintptr(it))
+		identCoder.iterEnd(&self.oc.Buf, uintptr(it))
 		self.oc.write(":;\n")
 
 		// Close scope.
@@ -335,13 +336,12 @@ impl scopeCoder {
 		self.oc.write("}")
 	}
 
-	fn strRuneIter(mut &self, mut &it: opt::StrRuneIter, utf8: bool) {
+	fn strRuneIter(mut &self, mut it: opt::StrRuneIter, utf8: bool) {
 		mut sb := strings::Builder{}
-		sb.Grow(1 << 6)
-		identCoder.iterBegin(sb, uintptr(it.Base))
+		identCoder.iterBegin(&sb, uintptr(it.Base))
 		begin := sb.Str()
 		sb.Clear()
-		identCoder.iterNext(sb, uintptr(it.Base))
+		identCoder.iterNext(&sb, uintptr(it.Base))
 		next := sb.Str()
 
 		self.oc.write("{\n")
@@ -352,19 +352,9 @@ impl scopeCoder {
 		self.oc.write("auto expr = ")
 		if opt::Copy && isCopyOptimizable(it.Expr, true) {
 			ref = true
-			match type it.Expr.Model {
-			| &sema::Var:
-				v := it.Expr.Model.(&sema::Var)
-				if v.Reference {
-					self.oc.ec.model(it.Expr.Model)
-					break
-				}
-				fall
-			|:
-				self.oc.write("&(")
-				self.oc.ec.model(it.Expr.Model)
-				self.oc.write(")")
-			}
+			self.oc.write("&(")
+			self.oc.ec.model(it.Expr.Model)
+			self.oc.write(")")
 		} else {
 			self.oc.ec.possibleRefExpr(it.Expr.Model)
 		}
@@ -410,7 +400,7 @@ impl scopeCoder {
 		self.oc.write("__jule_runeStep(it, end - it, ")
 		if it.Base.KeyB != nil {
 			self.oc.write("&")
-			identCoder.var(self.oc.Buf, it.Base.KeyB)
+			identCoder.var(&self.oc.Buf, it.Base.KeyB)
 		} else {
 			self.oc.write("nullptr")
 		}
@@ -429,7 +419,7 @@ impl scopeCoder {
 		self.oc.write("it += len;\n")
 		self.oc.indent()
 		if it.Base.KeyA != nil {
-			identCoder.var(self.oc.Buf, it.Base.KeyA)
+			identCoder.var(&self.oc.Buf, it.Base.KeyA)
 			if utf8 {
 				self.oc.write(" += len;\n")
 			} else {
@@ -447,7 +437,7 @@ impl scopeCoder {
 		self.oc.write("}\n")
 
 		self.oc.indent()
-		identCoder.iterEnd(self.oc.Buf, uintptr(it.Base))
+		identCoder.iterEnd(&self.oc.Buf, uintptr(it.Base))
 		self.oc.write(":;\n")
 
 		// Close scope.
@@ -493,12 +483,12 @@ impl scopeCoder {
 		self.oc.doneIndent()
 		self.oc.write("\n")
 		self.oc.indent()
-		identCoder.iterNext(self.oc.Buf, uintptr(it))
+		identCoder.iterNext(&self.oc.Buf, uintptr(it))
 		self.oc.write(":;\n")
 		self.oc.indent()
 		self.oc.write("}\n")
 		self.oc.indent()
-		identCoder.iterEnd(self.oc.Buf, uintptr(it))
+		identCoder.iterEnd(&self.oc.Buf, uintptr(it))
 		self.oc.write(":;")
 	}
 
@@ -532,12 +522,12 @@ impl scopeCoder {
 		self.oc.doneIndent()
 		self.oc.indent()
 
-		identCoder.iterNext(self.oc.Buf, uintptr(it))
+		identCoder.iterNext(&self.oc.Buf, uintptr(it))
 		self.oc.write(":;\n")
 		self.oc.indent()
 		self.oc.write("}\n")
 		self.oc.indent()
-		identCoder.iterEnd(self.oc.Buf, uintptr(it))
+		identCoder.iterEnd(&self.oc.Buf, uintptr(it))
 		self.oc.write(":;")
 	}
 
@@ -559,17 +549,17 @@ impl scopeCoder {
 
 	fn continueStmt(mut &self, c: &sema::Continue) {
 		self.oc.write("goto ")
-		identCoder.iterNext(self.oc.Buf, c.It)
+		identCoder.iterNext(&self.oc.Buf, c.It)
 	}
 
 	fn label(mut &self, l: &sema::Label) {
-		identCoder.label(self.oc.Buf, uintptr(l))
+		identCoder.label(&self.oc.Buf, uintptr(l))
 		self.oc.write(":")
 	}
 
 	fn gotoStmt(mut &self, gt: &sema::Goto) {
 		self.oc.write("goto ")
-		identCoder.label(self.oc.Buf, uintptr(gt.Label))
+		identCoder.label(&self.oc.Buf, uintptr(gt.Label))
 	}
 
 	fn tryMapSet(mut &self, mut m: sema::Expr): (ok: bool) {
@@ -587,7 +577,7 @@ impl scopeCoder {
 		const Static = false
 		mut f := ins.FindMethod("set", Static).Instances[0]
 		self.oc.write("(*")
-		identCoder.funcIns(self.oc.Buf, f)
+		identCoder.funcIns(&self.oc.Buf, f)
 		self.oc.write("((")
 		self.oc.ec.possibleRefExpr(iem.Expr.Model)
 		self.oc.write(").ptr(")
@@ -612,7 +602,7 @@ impl scopeCoder {
 		self.oc.write(p.Op)
 	}
 
-	fn assignLeft(mut &self, mut &model: sema::Expr) {
+	fn assignLeft(mut &self, mut model: sema::Expr) {
 		ok := self.tryMapSet(model)
 		if !ok {
 			self.oc.ec.possibleRefExpr(model)
@@ -680,7 +670,7 @@ impl scopeCoder {
 		self.oc.ec.possibleRefExpr(a.Right.Model)
 	}
 
-	fn mapLookupAssign(mut &self, mut &a: &sema::MultiAssign) {
+	fn mapLookupAssign(mut &self, mut a: &sema::MultiAssign) {
 		// map lookup right expression always should be indexing
 		mut iem := a.Right.(&sema::IndexingExpr)
 		mut _map := iem.Expr.Type.Map()
@@ -689,7 +679,7 @@ impl scopeCoder {
 		const Static = false
 		mut f := ins.FindMethod("lookup", Static).Instances[0]
 
-		identCoder.funcIns(self.oc.Buf, f)
+		identCoder.funcIns(&self.oc.Buf, f)
 		self.oc.write("(")
 		self.assignLeft(iem.Expr.Model)
 		self.oc.write(", ")
@@ -712,7 +702,7 @@ impl scopeCoder {
 		self.oc.write(")")
 	}
 
-	fn multiAssignTuple(mut &self, mut &a: &sema::MultiAssign) {
+	fn multiAssignTuple(mut &self, mut a: &sema::MultiAssign) {
 		self.oc.write("({\n")
 		self.oc.addIndent()
 
@@ -738,10 +728,10 @@ impl scopeCoder {
 						if v == dv {
 							// variable is declaring now
 							// takes pointer from the lvalue tuple data
-							identCoder.var(self.oc.Buf, v)
-							self.oc.write(" = &(")
+							identCoder.var(&self.oc.Buf, v)
+							self.oc.write(" = ")
 							self.oc.ec.possibleRefExpr(r.Model)
-							self.oc.write(");\n")
+							self.oc.write(";\n")
 							a.Left[i] = nil // Ignore handling for following statements.
 							continue Values
 						}
@@ -751,9 +741,9 @@ impl scopeCoder {
 					// it just takes assignment to the pointing data
 					// not takes pointer of the lvalue data
 				}
-				self.oc.tc.kind(self.oc.Buf, l.Type)
+				self.oc.tc.kind(&self.oc.Buf, l.Type)
 				self.oc.write(" ")
-				identCoder.toOut(self.oc.Buf, assignArgName, uintptr(i))
+				identCoder.toOut(&self.oc.Buf, assignArgName, uintptr(i))
 				self.oc.write(" = ")
 			}
 			self.oc.ec.possibleRefExpr(r.Model)
@@ -767,7 +757,7 @@ impl scopeCoder {
 			self.oc.indent()
 			self.assignLeft(l.Model)
 			self.oc.write(" = ")
-			identCoder.toOut(self.oc.Buf, assignArgName, uintptr(i))
+			identCoder.toOut(&self.oc.Buf, assignArgName, uintptr(i))
 			self.oc.write(";\n")
 		}
 
@@ -804,7 +794,7 @@ impl scopeCoder {
 			self.oc.write(" = " + typeTrait + "(")
 			self.oc.ec.possibleRefExpr(r)
 			self.oc.write(", (" + typeTrait + "::Type*)&")
-			identCoder.traitDecl(self.oc.Buf, t)
+			identCoder.traitDecl(&self.oc.Buf, t)
 			self.oc.write("_mptr_data")
 			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(t, rt)))
 			self.oc.write(")")
@@ -812,13 +802,13 @@ impl scopeCoder {
 		self.oc.write(";")
 	}
 
-	fn multiAssignFunc(mut &self, mut &a: &sema::MultiAssign) {
+	fn multiAssignFunc(mut &self, mut a: &sema::MultiAssign) {
 		self.oc.write("{\n")
 		self.oc.addIndent()
 		self.oc.indent()
 
 		mut fc := a.Right.(&sema::FuncCallExpr)
-		self.oc.tc.rc.codeMut1(self.oc.Buf, fc.Func.Result)
+		self.oc.tc.rc.codeMut1(&self.oc.Buf, fc.Func.Result)
 		if fc.Func.Decl != nil && fc.Func.Decl.Exceptional {
 			let mut dest = useExprMemory{
 				DestType: nil, // Should not be required in this case.
@@ -888,7 +878,7 @@ impl scopeCoder {
 	fn typeAssertionAssign(mut &self, mut a: &sema::MultiAssign) {
 		mut ce := a.Right.(&sema::TypeAssertionExpr)
 		mut f := obj::FindFuncGenericInstance(meta::Program.Runtime.DynAssertAssign, ce.Expr.Type, ce.Type)
-		identCoder.funcIns(self.oc.Buf, f)
+		identCoder.funcIns(&self.oc.Buf, f)
 		self.oc.write("(")
 		self.assignLeft(ce.Expr.Model)
 		self.oc.write(", ")
@@ -958,7 +948,7 @@ impl scopeCoder {
 		}
 	}
 
-	fn case(mut &self, mut m: &sema::Match, mut &l: sema::OperandExpr, mut c: &sema::Case) {
+	fn case(mut &self, mut m: &sema::Match, mut l: sema::OperandExpr, mut c: &sema::Case) {
 		if len(c.Exprs) != 0 && !m.Comptime {
 			if len(m.Cases) > 0 && m.Cases[0] == c {
 				self.oc.write("if (")
@@ -972,14 +962,14 @@ impl scopeCoder {
 						Model: expr.Model,
 						Type: expr.Type,
 					}
-					self.oc.ec._unsafeBinary(self.oc.Buf, l, r, token::EQL, "==")
+					self.oc.ec._unsafeBinary(&self.oc.Buf, l, r, token::EQL, "==")
 				|:
 					self.oc.write(matchExpr)
 					mut tk := expr.Type
 					if m.Expr.Type.Trait() != nil { // Trait type.
 						t := m.Expr.Type.Trait()
 						self.oc.write(".type == (" + typeTrait + "::Type*)&")
-						identCoder.traitDecl(self.oc.Buf, t)
+						identCoder.traitDecl(&self.oc.Buf, t)
 						self.oc.write("_mptr_data")
 						self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Expr.Type.Trait(), expr.Type)))
 					} else { // Any type.
@@ -1003,7 +993,7 @@ impl scopeCoder {
 
 		self.oc.write("{\n")
 		self.oc.indent()
-		identCoder.caseBegin(self.oc.Buf, uintptr(c))
+		identCoder.caseBegin(&self.oc.Buf, uintptr(c))
 		self.oc.write(":;\n")
 		if len(c.Scope.Stmts) > 0 {
 			self.oc.indent()
@@ -1034,7 +1024,7 @@ impl scopeCoder {
 		if !m.Comptime {
 			l.Type = m.Expr.Type
 			if m.Expr.IsConst() {
-				matchExprS := writeAndReadFromBuf(self.oc.Buf,
+				matchExprS := writeAndReadFromBuf(&self.oc.Buf,
 					fn|| self.oc.ec.possibleRefExpr(m.Expr.Model))
 				mut matchExpr := compExpr(matchExprS)
 				l.Model = unsafe { *(*sema::Expr)(&matchExpr) }
@@ -1070,7 +1060,7 @@ impl scopeCoder {
 
 		self.oc.write("\n")
 		self.oc.indent()
-		identCoder.matchEnd(self.oc.Buf, uintptr(m))
+		identCoder.matchEnd(&self.oc.Buf, uintptr(m))
 		self.oc.write(":;")
 		self.oc.write("\n")
 
@@ -1084,7 +1074,7 @@ impl scopeCoder {
 		if len(slct.Cases) == 0 {
 			// Empty select.
 			if slct.Default == nil {
-				identCoder.funcIns(self.oc.Buf, meta::Program.Runtime.ChanSelect)
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.ChanSelect)
 				self.oc.write("(nullptr, 0, 0, false);")
 			} else {
 				// Just the default case.
@@ -1106,8 +1096,7 @@ impl scopeCoder {
 		mut hchan := ""
 		{
 			mut sbuf := strings::Builder{}
-			sbuf.Grow(40)
-			self.oc.tc.structure(sbuf, meta::Program.Runtime.Hchan)
+			self.oc.tc.structure(&sbuf, meta::Program.Runtime.Hchan)
 			hchan = sbuf.Str()
 		}
 
@@ -1115,18 +1104,18 @@ impl scopeCoder {
 		// Create array for channels. This implementation will not check
 		// the channel count, but probably total count of channel will not
 		// cause overflow by size.
-		self.oc.tc.asSptr(self.oc.Buf, unsafe::StrBytes(hchan))
+		self.oc.tc.asSptr(&self.oc.Buf, unsafe::StrBytes(hchan))
 		self.oc.write(" __jule_chans[] = {")
 		// Most common use case, assume 1 chan-recv/chan-send per case.
 		// In the end, len(chans) equals to total count of chans.
 		// All elements, matched by index which returned by the select algorithm.
 		// So chans[i] always the matched case, if exist.
 		mut chans := make([]chanCase, 0, len(slct.Cases))
-		mut &_chans := chans // Used by closure, unsafely.
+		mut &_chans := &chans // Used by closure, unsafely.
 		obj::IterCaseExprs(slct.Cases, fn|mut c, mut val| {
 			mut cr, _ := val.Model.(&sema::ChanRecv)
 			if cr != nil {
-				unsafe { _chans = append(_chans, chanCase{c, val}) }
+				unsafe { *_chans = append(*_chans, chanCase{c, val}) }
 				self.oc.ec.possibleRefExpr(cr.Expr.Model)
 				self.oc.write(".as<")
 				self.oc.write(hchan)
@@ -1137,7 +1126,7 @@ impl scopeCoder {
 		obj::IterCaseExprs(slct.Cases, fn|mut c, mut val| {
 			mut cs, _ := val.Model.(&sema::ChanSend)
 			if cs != nil {
-				unsafe { _chans = append(_chans, chanCase{c, val}) }
+				unsafe { *_chans = append(*_chans, chanCase{c, val}) }
 				self.oc.ec.possibleRefExpr(cs.Chan.Model)
 				self.oc.write(".as<")
 				self.oc.write(hchan)
@@ -1148,7 +1137,7 @@ impl scopeCoder {
 		self.oc.indent()
 		self.oc.write(typeInt)
 		self.oc.write(" __offset = ")
-		identCoder.funcIns(self.oc.Buf, meta::Program.Runtime.ChanSelect)
+		identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.ChanSelect)
 		self.oc.write("(__jule_chans, ")
 		self.oc.write(conv::Itoa(len(chans)))
 		self.oc.write(", ")
@@ -1166,7 +1155,7 @@ impl scopeCoder {
 		self.oc.write("switch (__offset) {\n")
 
 		// Generate cases, match them, and execute.
-		genCase := fn(i: int, mut &c: chanCase) {
+		genCase := fn(i: int, mut c: chanCase) {
 			// We have to convert hchan to pchan.
 			// So use custom built-in expression for that.
 			mut sb := strings::Builder{}
@@ -1178,7 +1167,7 @@ impl scopeCoder {
 			| &sema::ChanRecv:
 				mut cr := c.Value.Model.(&sema::ChanRecv)
 				mut pchan := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, cr.Expr.Type.Chan().Value)
-				self.oc.tc.structureIns(sb, pchan)
+				self.oc.tc.structureIns(&sb, pchan)
 				sb.WriteStr(">()")!
 				model := any(sb.Str())
 				cr.Expr.Model = unsafe { *(*sema::Expr)(&model) }
@@ -1186,7 +1175,7 @@ impl scopeCoder {
 			| &sema::ChanSend:
 				mut cs := c.Value.Model.(&sema::ChanSend)
 				mut pchan := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, cs.Chan.Type.Chan().Value)
-				self.oc.tc.structureIns(sb, pchan)
+				self.oc.tc.structureIns(&sb, pchan)
 				sb.WriteStr(">()")!
 				model := any(sb.Str())
 				cs.Chan.Model = unsafe { *(*sema::Expr)(&model) }
@@ -1226,7 +1215,7 @@ impl scopeCoder {
 		}
 
 		self.oc.indent()
-		identCoder.matchEnd(self.oc.Buf, uintptr(slct))
+		identCoder.matchEnd(&self.oc.Buf, uintptr(slct))
 		self.oc.write(":;\n")
 
 		// Closing inner.
@@ -1236,18 +1225,18 @@ impl scopeCoder {
 
 	fn fallStmt(mut &self, f: &sema::Fall) {
 		self.oc.write("goto ")
-		identCoder.caseBegin(self.oc.Buf, f.DestCase)
+		identCoder.caseBegin(&self.oc.Buf, f.DestCase)
 	}
 
 	fn breakStmt(mut &self, b: &sema::Break) {
 		self.oc.write("goto ")
 		match {
 		| b.It != 0:
-			identCoder.iterEnd(self.oc.Buf, b.It)
+			identCoder.iterEnd(&self.oc.Buf, b.It)
 		| b.Match != 0:
-			identCoder.matchEnd(self.oc.Buf, b.Match)
+			identCoder.matchEnd(&self.oc.Buf, b.Match)
 		| b.Select != 0:
-			identCoder.matchEnd(self.oc.Buf, b.Select)
+			identCoder.matchEnd(&self.oc.Buf, b.Select)
 		|:
 			panic("unreachable")
 		}
@@ -1377,7 +1366,7 @@ impl scopeCoder {
 				self.oc.addIndent()
 				self.oc.indent()
 				self.oc.write("jule::Exceptional<")
-				self.oc.tc.kind(self.oc.Buf, r.Func.Result)
+				self.oc.tc.kind(&self.oc.Buf, r.Func.Result)
 				self.oc.write("> result;\n")
 				self.oc.indent()
 				self.oc.write("result.result = ")
@@ -1397,7 +1386,7 @@ impl scopeCoder {
 				self.oc.addIndent()
 				self.oc.indent()
 				if hasDefer {
-					self.oc.tc.kind(self.oc.Buf, r.Func.Result)
+					self.oc.tc.kind(&self.oc.Buf, r.Func.Result)
 					self.oc.write(" __result = ")
 				} else {
 					self.oc.write("return ")
@@ -1428,7 +1417,7 @@ impl scopeCoder {
 			self.oc.addIndent()
 			self.oc.indent()
 
-			self.oc.tc.kind(self.oc.Buf, r.Func.Result)
+			self.oc.tc.kind(&self.oc.Buf, r.Func.Result)
 			self.oc.write(" " + resultName)
 			if shouldInitialized(r.Func.Result) {
 				self.oc.write(" = ")
@@ -1449,7 +1438,7 @@ impl scopeCoder {
 		}
 		if r.Func.Decl.Exceptional {
 			self.oc.write("return jule::Exceptional<")
-			self.oc.tc.rc.codeMut1(self.oc.Buf, r.Func.Result)
+			self.oc.tc.rc.codeMut1(&self.oc.Buf, r.Func.Result)
 			self.oc.write(">{.result=" + resultName + "};")
 		} else {
 			self.oc.write("return " + resultName + ";")
@@ -1572,7 +1561,7 @@ impl scopeCoder {
 		}
 	}
 
-	fn scopeStmts(mut &self, mut &s: &sema::Scope) {
+	fn scopeStmts(mut &self, mut s: &sema::Scope) {
 		for (_, mut st) in s.Stmts {
 			self.oc.indent()
 			self.st(st)
@@ -1590,12 +1579,12 @@ impl scopeCoder {
 		self.oc.write("}")
 	}
 
-	fn commonFuncScope(mut &self, mut &f: &sema::FuncIns) {
+	fn commonFuncScope(mut &self, mut f: &sema::FuncIns) {
 		if !f.Decl.IsVoid() {
 			mut tup := f.Result.Tuple()
 			if tup != nil {
 				self.oc.indent()
-				self.oc.tc.rc.tuple(self.oc.Buf, tup)
+				self.oc.tc.rc.tuple(&self.oc.Buf, tup)
 				self.oc.write(" " + resultName + ";\n")
 				for (i, mut t) in tup.Types {
 					if shouldInitialized(t) {
@@ -1611,7 +1600,7 @@ impl scopeCoder {
 				// Non-tuple single return type with identifier.
 				// Use [resultName] as identifier.
 				self.oc.indent()
-				self.oc.tc.kind(self.oc.Buf, f.Result)
+				self.oc.tc.kind(&self.oc.Buf, f.Result)
 				self.oc.write(" " + resultName)
 				if shouldInitialized(f.Result) {
 					self.oc.write(" = ")
@@ -1717,7 +1706,7 @@ impl scopeCoder {
 	}
 }
 
-fn isCopyOptimizable(&v: &sema::Value, iter: bool): bool {
+fn isCopyOptimizable(v: &sema::Value, iter: bool): bool {
 	// Return false if value is not lvalue or iter && mutable.
 	// If the value is not lvalue, we have to copy it.
 	// If the value is mutable and optimized for iteration, we cannot optimize it.
@@ -1730,18 +1719,18 @@ fn isCopyOptimizable(&v: &sema::Value, iter: bool): bool {
 	ret !slicing
 }
 
-fn isIterCopyOptimizable(&val: &sema::Value, &v: &sema::Var): bool {
+fn isIterCopyOptimizable(val: &sema::Value, v: &sema::Var): bool {
 	if !val.Lvalue && !val.Type.Mutable() {
 		ret true
 	}
 	ret !v.Mutable && !val.Mutable
 }
 
-fn captureVarHandling(mut &oc: &ObjectCoder, mut &m: &sema::AnonFuncExpr, mut &v: &sema::Var): bool {
+fn captureVarHandling(mut oc: &ObjectCoder, mut m: &sema::AnonFuncExpr, mut v: &sema::Var): bool {
 	for _, cv in m.Captured {
 		if cv == v {
 			oc.write(closureCtxIdent + "->")
-			identCoder.anonFuncVar(oc.Buf, v)
+			identCoder.anonFuncVar(&oc.Buf, v)
 			ret true
 		}
 	}

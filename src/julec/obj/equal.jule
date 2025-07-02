@@ -11,7 +11,7 @@ struct anyData {
 }
 
 // Returns data pointer address in uintptr of Expr.
-fn TypeData(&m: sema::Expr): uintptr {
+fn TypeData(m: sema::Expr): uintptr {
 	ret uintptr(unsafe { (*anyData)(&m).typePtr })
 }
 
@@ -81,13 +81,10 @@ fn EqualModels(mut l: sema::Expr, mut r: sema::Expr): bool {
 			if rv.Reference {
 				ret EqualModels(lv.ValueSym.Value.Model, rv.ValueSym.Value.Model)
 			}
-			ret EqualModels(lv.ValueSym.Value.Model, r)
+			ret EqualModels(lv.ValueSym.Value.Model, rv)
 		}
-		// rv.Reference = true
-		if lv.Reference {
-			ret EqualModels(lv.ValueSym.Value.Model, rv.ValueSym.Value.Model)
-		}
-		ret EqualModels(l, rv.ValueSym.Value.Model)
+		// lv is not reference, and rv is reference.
+		ret EqualModels(lv, rv.ValueSym.Value.Model)
 	| &sema::StructSubIdentExpr:
 		mut li := l.(&sema::StructSubIdentExpr)
 		mut ri := r.(&sema::StructSubIdentExpr)

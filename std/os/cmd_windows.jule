@@ -64,7 +64,7 @@ struct cmdAttrs {
 }
 
 impl Cmd {
-	fn spawn(self, path: str, stdin: &File, stdout: &File, stderr: &File)! {
+	fn spawn(*self, path: str, stdin: &File, stdout: &File, stderr: &File)! {
 		utf16path := integ::UTF16FromStr(path)
 		argv := integ::UTF16FromStr(makeCmdLine(self.args()))
 
@@ -123,7 +123,7 @@ impl Cmd {
 		sys::CloseHandle(pi.hThread) else { error(error) }
 	}
 
-	fn kill(self)! {
+	fn kill(*self)! {
 		if unsafe { cpp.TerminateProcess(cpp.HANDLE(self.attrs.hProcess), 0) } {
 			sys::CloseHandle(sys::Handle(self.attrs.hProcess)) else { error(error) }
 			self.attrs.hProcess = 0
@@ -132,7 +132,7 @@ impl Cmd {
 		error(sys::GetLastErrno())
 	}
 
-	fn wait(self)!: int {
+	fn wait(*self)!: int {
 		unsafe { cpp.WaitForSingleObject(cpp.HANDLE(self.attrs.hProcess), cpp.INFINITE) }
 		mut exitCode := unsafe { integ::LongLong(0) }
 		unsafe {
@@ -145,7 +145,7 @@ impl Cmd {
 }
 
 // Escapes the string s, as per escapeArg, appends the result to s.
-fn appendEscapeArg(mut &s: strings::Builder, arg: str) {
+fn appendEscapeArg(mut &s: *strings::Builder, arg: str) {
 	if len(arg) == 0 {
 		s.WriteStr(`""`)!
 		ret
@@ -213,7 +213,7 @@ fn makeCmdLine(args: []str): str {
 		if s.Len() > 0 {
 			s.WriteByte(' ')!
 		}
-		appendEscapeArg(s, arg)
+		appendEscapeArg(&s, arg)
 	}
 	ret s.Str()
 }

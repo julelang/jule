@@ -19,20 +19,20 @@ struct cmdAttrs {
 	pid: int
 }
 
-fn cmdsetenv(mut &envv: []str)! {
-	for j, env in envv {
+fn cmdsetenv(mut &envv: *[]str)! {
+	for j, env in *envv {
 		i := byteslite::IndexByteStr(env, '=')
 		if i == -1 {
 			error(sys::Errno(sys::EINVAL))
 		}
 		if len(env)-i == 1 {
-			envv[j] = env[:i] + "=\x00"
+			(*envv)[j] = env[:i] + "=\x00"
 		}
 	}
 }
 
 impl Cmd {
-	fn spawn(self, path: str, stdin: &File, stdout: &File, stderr: &File)! {
+	fn spawn(*self, path: str, stdin: &File, stdout: &File, stderr: &File)! {
 		// Setup all environment data.
 		args := self.args()
 		mut env := self.env() else { error(error) }
@@ -62,7 +62,7 @@ impl Cmd {
 				}
 			}
 
-			cmdsetenv(env) else {
+			cmdsetenv(&env) else {
 				writeErrAndExit(error.(sys::Errno))
 			}
 
@@ -99,7 +99,7 @@ impl Cmd {
 		}
 	}
 
-	fn kill(self)! {
+	fn kill(*self)! {
 		sys::Kill(self.attrs.pid, 1) else {
 			self.attrs.pid = invalidPid
 			error(error)
@@ -107,11 +107,11 @@ impl Cmd {
 		self.attrs.pid = invalidPid
 	}
 
-	fn wait(self)!: int {
+	fn wait(*self)!: int {
 		pid := self.attrs.pid
 		stat := ignoringEINTR2(fn()!: i32 {
 			mut stat := i32(0)
-			sys::Waitpid(pid, stat, 0) else { error(error) }
+			sys::Waitpid(pid, &stat, 0) else { error(error) }
 			ret stat
 		}) else { error(error) }
 		self.attrs.pid = invalidPid

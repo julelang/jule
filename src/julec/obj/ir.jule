@@ -71,16 +71,16 @@ impl IR {
 }
 
 impl IR {
-	fn appendStructs(self, mut &p: &sema::Package, mut &buffer: []&sema::Struct) {
+	fn appendStructs(*self, mut p: &sema::Package, mut &buffer: *[]&sema::Struct) {
 		for (_, mut f) in p.Files {
 			for (_, mut s) in f.Structs {
 				if !s.Bind {
-					buffer = append(buffer, s)
+					*buffer = append(*buffer, s)
 				}
 			}
 			for (_, mut ta) in f.TypeAliases {
 				if !ta.Bind && ta.Strict {
-					buffer = append(buffer, ta.TypeSym.Type.Kind.(&sema::StructIns).Decl)
+					*buffer = append(*buffer, ta.TypeSym.Type.Kind.(&sema::StructIns).Decl)
 				}
 			}
 		}
@@ -89,22 +89,22 @@ impl IR {
 	// Returns all structures of main package and used packages.
 	// Ignores binded declarations, but appends strict type alias structures also.
 	// Appends used packages first, then the main package.
-	fn GetAllStructures(mut self): []&sema::Struct {
+	fn GetAllStructures(mut *self): []&sema::Struct {
 		let mut buffer: []&sema::Struct = nil
 		for (_, mut u) in self.Used {
 			if !u.Bind {
-				self.appendStructs(u.Package, buffer)
+				self.appendStructs(u.Package, &buffer)
 			}
 		}
-		self.appendStructs(self.Main, buffer)
+		self.appendStructs(self.Main, &buffer)
 		ret buffer
 	}
 
-	fn appendGlobals(self, mut &p: &sema::Package, mut &buffer: []&sema::Var) {
+	fn appendGlobals(*self, mut p: &sema::Package, mut &buffer: *[]&sema::Var) {
 		for (_, mut f) in p.Files {
 			for (_, mut v) in f.Vars {
 				if v.Token != nil && !v.Bind && !v.Constant {
-					buffer = append(buffer, v)
+					*buffer = append(*buffer, v)
 				}
 			}
 		}
@@ -114,7 +114,7 @@ impl IR {
 	// Ignores binded declarations and constants.
 	// If orderDefs is true, orders defines of each package.
 	// Appends used packages first, then the main package.
-	fn GetAllGlobals(mut self, orderDefs: bool): []&sema::Var {
+	fn GetAllGlobals(mut *self, orderDefs: bool): []&sema::Var {
 		// For ordering, all variables should be easy to predict.
 		// They must only have dependency from their own package or used packages.
 		// So, appending globals by used (should be deeply ordered already,
@@ -127,14 +127,14 @@ impl IR {
 		mut n := len(buffer)
 		for (_, mut u) in self.Used {
 			if !u.Bind {
-				self.appendGlobals(u.Package, buffer)
+				self.appendGlobals(u.Package, &buffer)
 				if orderDefs {
 					order(buffer[n:], true)
 				}
 				n = len(buffer)
 			}
 		}
-		self.appendGlobals(self.Main, buffer)
+		self.appendGlobals(self.Main, &buffer)
 		if orderDefs {
 			order(buffer[n:], true)
 		}
@@ -142,7 +142,7 @@ impl IR {
 	}
 
 	// Order defines at update ordered field of instance.
-	fn Order(mut self) {
+	fn Order(mut *self) {
 		// Get globals with internal ordering enabled.
 		// See the GetAllGlobals for the ordering details.
 		self.Ordered.Globals = self.GetAllGlobals(true)
@@ -159,30 +159,30 @@ impl IR {
 	}
 }
 
-fn pushPasses(mut &p: &sema::Package, mut &passes: []str) {
+fn pushPasses(mut p: &sema::Package, mut &passes: *[]str) {
 	for (_, mut f) in p.Files {
 	push:
 		for _, pass in f.Passes {
 			if pass.Text == "" {
 				continue
 			}
-			for _, cpass in passes {
+			for _, cpass in *passes {
 				if cpass == pass.Text {
 					continue push
 				}
 			}
-			passes = append(passes, pass.Text)
+			*passes = append(*passes, pass.Text)
 		}
 	}
 }
 
-fn getAllUniquePasses(mut &pkg: &sema::Package, mut uses: []&sema::ImportInfo): []str {
+fn getAllUniquePasses(mut pkg: &sema::Package, mut uses: []&sema::ImportInfo): []str {
 	let mut passes: []str = nil
 
-	pushPasses(pkg, passes)
+	pushPasses(pkg, &passes)
 	for (_, mut u) in uses {
 		if !u.Bind {
-			pushPasses(u.Package, passes)
+			pushPasses(u.Package, &passes)
 		}
 	}
 
@@ -215,7 +215,7 @@ fn buildCompileInfo(): importer::CompileInfo {
 }
 
 // See "std/jule" developer reference (8).
-fn pushRuntimeToAST(mut &f: &ast::AST) {
+fn pushRuntimeToAST(mut f: &ast::AST) {
 	mut decl := &ast::Use{
 		Token: nil, // Nil token is a flag for implicit declaration.
 		Path: &token::Token{

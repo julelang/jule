@@ -37,7 +37,7 @@ fn init() {
 	env::Compiler = "clang"
 }
 
-fn openOutput(&path: str): &os::File {
+fn openOutput(path: str): &os::File {
 	dir := filepath::Dir(path)
 
 	os::Stat(dir) else {
@@ -196,7 +196,7 @@ fn pushCompCmdGcc(mut args: []str): []str {
 }
 
 // Generate compile command for backend-compiler.
-fn genCompileCmd(sourcePath: str, &ir: &obj::IR): (compiler: str, args: []str) {
+fn genCompileCmd(sourcePath: str, ir: &obj::IR): (compiler: str, args: []str) {
 	compiler = env::CompilerPath
 
 	match env::Compiler {
@@ -241,7 +241,7 @@ fn getCompilePath(): str {
 	ret filepath::Join(OutDir, OutName)
 }
 
-fn applyTargetIndependentOptimizations(mut &ir: &obj::IR) {
+fn applyTargetIndependentOptimizations(mut ir: &obj::IR) {
 	mut opt := opt::Optimizer.New(ir)
 	opt.Optimize()
 }
@@ -284,7 +284,7 @@ fn checkTargetPair(os: str, arch: str) {
 	handle::Throw("invalid target: " + os + "-" + arch)
 }
 
-fn checkTargetFlag(&target: str) {
+fn checkTargetFlag(target: str) {
 	if target == "" {
 		handle::Throw("missing option value: --target")
 	}
@@ -314,7 +314,7 @@ fn checkTargetFlag(&target: str) {
 	types::UpdateTarget()
 }
 
-fn checkOptFlag(&opt: str) {
+fn checkOptFlag(opt: str) {
 	if opt == "" {
 		handle::Throw("missing option value: --opt")
 	}
@@ -342,7 +342,7 @@ fn checkCppStdFlag() {
 	}
 }
 
-fn checkFlags(&args: []str): []str {
+fn checkFlags(&args: *[]str): []str {
 	mut opt := "L0"
 	mut target := "native-native"
 
@@ -380,7 +380,7 @@ fn checkFlags(&args: []str): []str {
 	fs.AddVar[bool](unsafe { (&bool)(&opt::StdStrings) }, "opt-std-strings", 0, "Special optimizations for the std/strings package")
 	fs.AddVar[bool](unsafe { (&bool)(&opt::StdMathCmplx) }, "opt-std-math-cmplx", 0, "Special optimizations for the std/math/cmplx package")
 
-	mut content := fs.Parse(args) else {
+	mut content := fs.Parse(*args) else {
 		handle::Throw(error.(str))
 		use nil // Avoid error.
 	}
@@ -393,17 +393,17 @@ fn checkFlags(&args: []str): []str {
 	ret content
 }
 
-fn setupSemaFlags(mut &flags: int) {
+fn setupSemaFlags(mut &flags: *int) {
 	if env::Shadowing {
-		flags |= sema::Shadowing
+		*flags |= sema::Shadowing
 	}
 }
 
-fn buildIr(&args: []str): &obj::IR {
+fn buildIr(&args: *[]str): &obj::IR {
 	content := checkFlags(args)
 
 	mut semaFlags := sema::Default
-	setupSemaFlags(semaFlags)
+	setupSemaFlags(&semaFlags)
 
 	if len(content) == 0 {
 		handle::Throw(log::Logf(log::MissingCompilePath))
@@ -431,7 +431,7 @@ fn buildIr(&args: []str): &obj::IR {
 	}
 
 	if logs != nil {
-		handle::Logger.PrintLogs(logs)
+		handle::Logger.PrintLogs(&logs)
 		handle::Throw("")
 	}
 
@@ -439,11 +439,11 @@ fn buildIr(&args: []str): &obj::IR {
 }
 
 // Process compile command by "ARGS" global.
-fn compileCommand(mut &args: []str) {
-	args = args[1:] // Remove program path.
-	if args[0] == "test" {
+fn compileCommand(mut &args: *[]str) {
+	*args = (*args)[1:] // Remove program path.
+	if (*args)[0] == "test" {
 		env::Test = true
-		args = args[1:]
+		*args = (*args)[1:]
 	}
 	mut ir := buildIr(args)
 

@@ -22,28 +22,28 @@ impl io::StrWriter for Builder {}
 impl Builder {
 	// Writes bytes to buffer.
 	// Never throws an exceptional.
-	fn Write(mut self, b: []byte)!: (n: int) {
+	fn Write(mut *self, b: []byte)!: (n: int) {
 		self.buf = append(self.buf, b...)
 		ret len(b)
 	}
 
 	// Writes bytes to buffer.
 	// Never throws an exceptional.
-	fn WriteStr(mut self, s: str)!: (n: int) {
+	fn WriteStr(mut *self, s: str)!: (n: int) {
 		self.buf = append(self.buf, s...)
 		ret len(s)
 	}
 
 	// Writes byte to buffer.
 	// Never throws an exceptional.
-	fn WriteByte(mut self, b: byte)! {
+	fn WriteByte(mut *self, b: byte)! {
 		self.buf = append(self.buf, b)
 	}
 
 	// Writes rune into buffer.
 	// Returns written byte count.
 	// Never throws an exceptional.
-	fn WriteRune(mut self, r: rune)!: (n: int) {
+	fn WriteRune(mut *self, r: rune)!: (n: int) {
 		if r < utf8::RuneSelf { // ASCII, fast way.
 			self.buf = append(self.buf, byte(r))
 			ret 1
@@ -56,7 +56,7 @@ impl Builder {
 
 	// Copies the buffer to a new, larger buffer so that there are at least n
 	// bytes of capacity beyond len(self.buf).
-	fn grow(mut self, n: int) {
+	fn grow(mut *self, n: int) {
 		mut buf := make([]byte, len(self.buf), 2*cap(self.buf)+n)
 		copy(buf, self.buf)
 		self.buf = buf
@@ -65,7 +65,7 @@ impl Builder {
 	// Grows b's capacity, if necessary, to guarantee space for
 	// another n bytes. After Grow(n), at least n bytes can be written to b
 	// without another allocation. If n is negative, panics.
-	fn Grow(mut self, n: int) {
+	fn Grow(mut *self, n: int) {
 		if n < 0 {
 			panic("std/strings: Builder.Grow: negative count")
 		}
@@ -75,33 +75,33 @@ impl Builder {
 	}
 
 	// Returns buffer as string. Will not reset the underlying content.
-	fn Str(self): str {
+	fn Str(*self): str {
 		ret unsafe::StrFromBytes(self.buf)
 	}
 
 	// Clears buffer.
 	// After calling this function, write calls will allocate new buffer.
-	fn Clear(mut self) {
+	fn Clear(mut *self) {
 		self.buf = nil
 	}
 
 	// Returns length of buffer.
-	fn Len(self): int {
+	fn Len(*self): int {
 		ret len(self.buf)
 	}
 
 	// Returns capacity of buffer.
-	fn Cap(self): int {
+	fn Cap(*self): int {
 		ret cap(self.buf)
 	}
 
 	// Returns mutable buffer for low-level interactions.
-	unsafe fn Buf(mut self): []byte {
+	unsafe fn Buf(mut *self): []byte {
 		ret self.buf
 	}
 
 	// Sets mutable internal buffer for low-level interactions.
-	unsafe fn SetBuf(mut self, mut buf: []byte) {
+	unsafe fn SetBuf(mut *self, mut buf: []byte) {
 		self.buf = buf
 	}
 }

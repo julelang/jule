@@ -43,19 +43,19 @@ struct importer {
 }
 
 impl sema::Importer for importer {
-	fn SetModPath(mut self, path: str) {
+	fn SetModPath(mut *self, path: str) {
 		self.mod = path
 	}
 
-	fn GetModPath(self): str {
+	fn GetModPath(*self): str {
 		ret self.mod
 	}
 
-	fn ModById(self, id: int): str {
+	fn ModById(*self, id: int): str {
 		ret self.mods[id]
 	}
 
-	fn GetImport(mut self, path: str): &sema::ImportInfo {
+	fn GetImport(mut *self, path: str): &sema::ImportInfo {
 		for (_, mut p) in self.pkgs {
 			// avoid case sensitivity for fair comparison
 			if strings::EqualFold(p.Path, path) {
@@ -65,7 +65,7 @@ impl sema::Importer for importer {
 		ret nil
 	}
 
-	fn ImportPackage(mut self, path: str, updateMod: bool): ([]&ast::AST, []log::Log) {
+	fn ImportPackage(mut *self, path: str, updateMod: bool): ([]&ast::AST, []log::Log) {
 		mut dirents := os::ReadDir(path) else {
 			ret nil, [flatCompilerErr("cannot read package directory: " + path)]
 		}
@@ -122,7 +122,7 @@ impl sema::Importer for importer {
 		ret asts, nil
 	}
 
-	fn Imported(mut self, mut imp: &sema::ImportInfo) {
+	fn Imported(mut *self, mut imp: &sema::ImportInfo) {
 		// Already imported?
 		for _, p in self.pkgs {
 			// avoid case sensitivity for fair comparison
@@ -149,14 +149,14 @@ impl sema::Importer for importer {
 	// Implements the [sema::Importer.AllPackages] function.
 	// The return value is mutable reference to the internal buffer.
 	// You should be care about using that copy.
-	fn AllPackages(mut self): []&sema::ImportInfo {
+	fn AllPackages(mut *self): []&sema::ImportInfo {
 		ret self.pkgs
 	}
 }
 
 impl importer {
 	// Reports whether file passes build directives.
-	fn isPassBuildDirectives(mut self, mut &file: &ast::AST): (bool, []log::Log) {
+	fn isPassBuildDirectives(mut *self, mut file: &ast::AST): (bool, []log::Log) {
 		for (_, mut td) in file.TopDirectives {
 			if td.Tag.Kind != directive::Build {
 				continue
@@ -181,6 +181,6 @@ impl importer {
 fn New(info: CompileInfo): sema::Importer {
 	mut imp := new(importer)
 	imp.mods = [build::PathStdlib()]
-	initVars(imp.vars, info)
+	initVars(&imp.vars, info)
 	ret imp
 }

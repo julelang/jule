@@ -9,9 +9,9 @@ use "std/strings"
 use "std/unicode/utf8"
 use "std/unsafe"
 
-fn findFormatPrefix(&bytes: []byte, mut i: int): int {
-	for i < len(bytes) {
-		r, size := utf8::DecodeRune(bytes[i:])
+fn findFormatPrefix(&bytes: *[]byte, mut i: int): int {
+	for i < len(*bytes) {
+		r, size := utf8::DecodeRune((*bytes)[i:])
 		if r == '{' {
 			ret i
 		}
@@ -25,19 +25,19 @@ fn findFormatPrefix(&bytes: []byte, mut i: int): int {
 // points to start brace at beginning.
 // i is points to position of last brace and +1 offset in the end.
 // Returns nil slice if there is no match.
-fn getFormatRange(mut &i: int, mut &bytes: []byte): []byte {
-	start := i
+fn getFormatRange(mut &i: *int, mut &bytes: *[]byte): []byte {
+	start := *i
 	mut braces := 0
-	for i < len(bytes) {
-		r, size := utf8::DecodeRune(bytes[i:])
-		i += size
+	for *i < len(*bytes) {
+		r, size := utf8::DecodeRune((*bytes)[*i:])
+		*i += size
 		match r {
 		| '{':
 			braces++
 		| '}':
 			braces--
 			if braces == 0 {
-				ret bytes[start:i]
+				ret (*bytes)[start:*i]
 			}
 		}
 	}
@@ -45,7 +45,7 @@ fn getFormatRange(mut &i: int, mut &bytes: []byte): []byte {
 }
 
 // Formats arg by default format and appends to buf.
-fn formatByDefault(mut &buf: strings::Builder, &arg: any) {
+fn formatByDefault(mut &buf: *strings::Builder, arg: any) {
 	if arg == nil {
 		buf.WriteStr("<nil>")!
 		ret
@@ -91,30 +91,30 @@ fn formatByDefault(mut &buf: strings::Builder, &arg: any) {
 	}
 }
 
-fn applyFormatByDefault(mut &buf: strings::Builder, mut &j: int, args: ...any) {
-	arg := args[j]
-	j++
+fn applyFormatByDefault(mut &buf: *strings::Builder, mut &j: *int, args: ...any) {
+	arg := args[*j]
+	*j++
 	formatByDefault(buf, arg)
 }
 
 // Returns result of formatting.
 // Parameter j is the position of argument list.
-fn applyFormat(mut &fmt: []byte, mut &buf: strings::Builder, mut &j: int, args: ...any) {
+fn applyFormat(mut &fmt: *[]byte, mut &buf: *strings::Builder, mut &j: *int, args: ...any) {
 	// {}
-	if len(fmt) == 2 {
+	if len(*fmt) == 2 {
 		applyFormatByDefault(buf, j, args...)
 		ret
 	}
 	// {{}} = {}
-	if len(fmt) == 4 &&
-		fmt[0] == '{' &&
-		fmt[1] == '{' &&
-		fmt[2] == '}' &&
-		fmt[3] == '}' {
+	if len(*fmt) == 4 &&
+		(*fmt)[0] == '{' &&
+		(*fmt)[1] == '{' &&
+		(*fmt)[2] == '}' &&
+		(*fmt)[3] == '}' {
 		buf.WriteStr("{}")!
 		ret
 	}
-	buf.Write(fmt)!
+	buf.Write(*fmt)!
 }
 
 // See the [Sprintf] function for main documentation. This is a low level internal API.
@@ -125,7 +125,7 @@ fn bprintf(fmt: str, args: ...any): []byte {
 	if len(args) == 0 {
 		ret fmtBytes
 	}
-	mut i := findFormatPrefix(fmtBytes, 0)
+	mut i := findFormatPrefix(&fmtBytes, 0)
 	if i == -1 {
 		ret fmtBytes
 	}
@@ -133,13 +133,13 @@ fn bprintf(fmt: str, args: ...any): []byte {
 	mut last := 0
 	mut buf := strings::Builder{}
 	buf.Grow(len(fmt))
-	for i != -1; i = findFormatPrefix(fmtBytes, i) {
+	for i != -1; i = findFormatPrefix(&fmtBytes, i) {
 		buf.Write(fmtBytes[last:i])!
-		mut format := getFormatRange(i, fmtBytes)
+		mut format := getFormatRange(&i, &fmtBytes)
 		if format == nil {
 			continue
 		}
-		applyFormat(format, buf, j, args...)
+		applyFormat(&format, &buf, &j, args...)
 		if j >= len(args) {
 			buf.Write(fmtBytes[i:])!
 			last = len(fmtBytes)

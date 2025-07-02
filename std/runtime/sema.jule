@@ -29,7 +29,7 @@ struct semaRoot {
 }
 
 impl semaRoot {
-	fn queue(mut self, &sema: u32, mut sl: &semaLeaf, lifo: bool) {
+	fn queue(mut *self, mut &sema: *u32, mut sl: &semaLeaf, lifo: bool) {
 		// The leaf may already used and some fields may be modified.
 		// For example, a dequeued leaf may cannot acquaire sema and
 		// enqueued again. So, data of old record may cause errors.
@@ -43,7 +43,7 @@ impl semaRoot {
 		if t != nil {
 			for {
 				// Already have sema in list.
-				if t.sema == &sema {
+				if uintptr(t.sema) == uintptr(sema) {
 					if lifo {
 						// Add sl to head of the wait list.
 						sl.next = t.tree
@@ -71,12 +71,12 @@ impl semaRoot {
 		// Add new semaNode for sema since it is not exist in the list.
 		if otru != nil {
 			// Found a node in open to reuse state, so use it.
-			otru.sema = &sema
+			otru.sema = sema
 			otru.tree = sl
 			ret
 		}
 		mut sn := new(semaNode)
-		sn.sema = &sema
+		sn.sema = sema
 		sn.tree = sl
 		if self.tree == nil {
 			// Head is nil, so sl will be.
@@ -88,11 +88,11 @@ impl semaRoot {
 		}
 	}
 
-	fn dequeue(mut self, &sema: u32): &semaLeaf {
+	fn dequeue(mut *self, &sema: *u32): &semaLeaf {
 		mut t := self.tree
 		for t != nil; t = t.next {
 			// Already have sema in list.
-			if t.sema == &sema {
+			if uintptr(t.sema) == uintptr(sema) {
 				if t.tree == nil {
 					break
 				}
@@ -122,11 +122,11 @@ struct semTable {
 let mut semtable: [semTabSize]semTable = []
 
 // Returns sema space collection for the sema from semtable.
-fn semtable_rootFor(&sema: u32): &semaRoot {
-	ret unsafe { (&semaRoot)(&semtable[(uintptr(&sema)>>3)%semTabSize].root) }
+fn semtable_rootFor(&sema: *u32): &semaRoot {
+	ret unsafe { (&semaRoot)(&semtable[(uintptr(sema)>>3)%semTabSize].root) }
 }
 
-fn cansemacquire(mut &sema: u32): bool {
+fn cansemacquire(mut &sema: *u32): bool {
 	for {
 		v := atomic::Load(sema, atomic::SeqCst)
 		if v == 0 {
@@ -139,7 +139,7 @@ fn cansemacquire(mut &sema: u32): bool {
 }
 
 // Puts the current thread into a waiting state and unlocks the lock.
-fn semapark(&lock: fmutex, &sema: u32, &deq: bool, opt: u32) {
+fn semapark(&lock: *fmutex, &sema: *u32, &deq: *bool, opt: u32) {
 	mut reason := u32(reasonNA | reasonStrict)
 	if opt&semaWaitGroup == semaWaitGroup {
 		reason |= reasonWaitGroup
@@ -148,8 +148,8 @@ fn semapark(&lock: fmutex, &sema: u32, &deq: bool, opt: u32) {
 		reason |= reasonMutex
 	}
 	lock.unlock()
-	for !deq {
-		yield(uintptr(&sema), reason)
+	for !*deq {
+		yield(uintptr(sema), reason)
 		reason &= ^reasonStrict
 	}
 }
@@ -165,7 +165,7 @@ const (
 // library and should not be used directly.
 // If lifo is true, queue waiter at the head of wait queue.
 // wg reports whether the semacqure called by a waitgroup.
-fn semacquire(mut &sema: u32, lifo: bool, opt: u32) {
+fn semacquire(mut &sema: *u32, lifo: bool, opt: u32) {
 	// Easy case.
 	if cansemacquire(sema) {
 		ret
@@ -182,17 +182,17 @@ fn semacquire(mut &sema: u32, lifo: bool, opt: u32) {
 	for {
 		root.lock.lock()
 		// Add ourselves to nwait to disable "easy case" in semrelease.
-		atomic::Add(root.nwait, 1, atomic::SeqCst)
+		atomic::Add(&root.nwait, 1, atomic::SeqCst)
 		// Check cansemacquire to avoid missed wakeup.
 		if cansemacquire(sema) {
-			atomic::Add(root.nwait, ^u32(0), atomic::SeqCst)
+			atomic::Add(&root.nwait, ^u32(0), atomic::SeqCst)
 			root.lock.unlock()
 			break
 		}
 		// Any semrelease after the cansemacquire knows we're waiting
 		// (we set nwait above), so go to sleep.
 		root.queue(sema, sl, lifo)
-		semapark(root.lock, sema, sl.deq, opt)
+		semapark(&root.lock, sema, &sl.deq, opt)
 		// Try to acquire semaphore before enqueue again.
 		if cansemacquire(sema) {
 			break
@@ -205,20 +205,20 @@ fn semacquire(mut &sema: u32, lifo: bool, opt: u32) {
 // It is intended as a simple wakeup primitive for use by the synchronization
 // library and should not be used directly.
 // If handoff is true, tries to pass count directly to the first waiter.
-fn semrelease(mut &sema: u32, handoff: bool) {
+fn semrelease(mut &sema: *u32, handoff: bool) {
 	mut root := semtable_rootFor(sema)
 	atomic::Add(sema, 1, atomic::SeqCst)
 
 	// Easy case: no waiters?
 	// This check must happen after the atomicAdd, to avoid a missed wakeup
 	// (see loop in semacquire).
-	if atomic::Load(root.nwait, atomic::SeqCst) == 0 {
+	if atomic::Load(&root.nwait, atomic::SeqCst) == 0 {
 		ret
 	}
 
 	// Harder case: search for a waiter and wake it.
 	root.lock.lock()
-	if atomic::Load(root.nwait, atomic::SeqCst) == 0 {
+	if atomic::Load(&root.nwait, atomic::SeqCst) == 0 {
 		// The count is already consumed by another thread,
 		// so no need to wake up another thread.
 		root.lock.unlock()
@@ -227,7 +227,7 @@ fn semrelease(mut &sema: u32, handoff: bool) {
 
 	mut sl := root.dequeue(sema)
 	if sl != nil {
-		atomic::Add(root.nwait, ^u32(0), atomic::SeqCst)
+		atomic::Add(&root.nwait, ^u32(0), atomic::SeqCst)
 	}
 	root.lock.unlock()
 	// If handoff is true, immediately yield the CPU with no analysis.
@@ -265,13 +265,13 @@ struct notifyList {
 }
 
 // Adds new notify ticked to list l and returns the ticket number.
-fn notifyListAdd(mut &l: notifyList): u32 {
-	ret atomic::Add(l.wait, 1, atomic::SeqCst) - 1
+fn notifyListAdd(mut &l: *notifyList): u32 {
+	ret atomic::Add(&l.wait, 1, atomic::SeqCst) - 1
 }
 
 // Waits for a notification. If one has been sent since
 // notifyListAdd was called, it returns immediately. Otherwise, it blocks.
-fn notifyListWait(mut &l: notifyList, t: u32) {
+fn notifyListWait(mut &l: *notifyList, t: u32) {
 	mut reason := u32(reasonCond | reasonStrict)
 	for {
 		l.lock.lock()
@@ -286,37 +286,37 @@ fn notifyListWait(mut &l: notifyList, t: u32) {
 }
 
 // Notifies one entry in the list.
-fn notifyListNotifyOne(mut &l: notifyList) {
+fn notifyListNotifyOne(mut &l: *notifyList) {
 	// Fast-path: if there are no new waiters since the last notification
 	// we don't need to acquire the lock at all.
-	if atomic::Load(l.wait, atomic::SeqCst) == atomic::Load(l.notify, atomic::SeqCst) {
+	if atomic::Load(&l.wait, atomic::SeqCst) == atomic::Load(&l.notify, atomic::SeqCst) {
 		ret
 	}
 
 	l.lock.lock()
 	// Re-check under the lock if we need to do anything.
 	t := l.notify
-	if t == atomic::Load(l.wait, atomic::SeqCst) {
+	if t == atomic::Load(&l.wait, atomic::SeqCst) {
 		l.lock.unlock()
 		ret
 	}
 
 	// Update the next notify ticket number.
-	atomic::Add(l.notify, t+1, atomic::SeqCst)
+	atomic::Add(&l.notify, t+1, atomic::SeqCst)
 
 	l.lock.unlock()
 }
 
 // Notifies all entries in the list.
-fn notifyListNotifyAll(mut &l: notifyList) {
+fn notifyListNotifyAll(mut &l: *notifyList) {
 	l.lock.lock()
 
 	// Update the next ticket to be notified. We can set it to the current
 	// value of wait because any previous waiters are already in the list
 	// or will notice that they have already been notified when trying to
 	// add themselves to the list.
-	wait := atomic::Load(l.wait, atomic::SeqCst)
-	atomic::Store(l.notify, wait, atomic::SeqCst)
+	wait := atomic::Load(&l.wait, atomic::SeqCst)
+	atomic::Store(&l.notify, wait, atomic::SeqCst)
 
 	l.lock.unlock()
 }

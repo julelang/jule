@@ -152,7 +152,7 @@ struct decimal {
 
 impl decimal {
 	// Assign v.
-	fn Assign(mut self, mut v: u64) {
+	fn Assign(mut *self, mut v: u64) {
 		let mut buf: [24]byte
 
 		// Write reversed decimal in buf.
@@ -177,7 +177,7 @@ impl decimal {
 	}
 
 	// Binary shift left (k > 0) or right (k < 0).
-	fn Shift(mut self, mut k: int) {
+	fn Shift(mut *self, mut k: int) {
 		match {
 		| self.nd == 0:
 			// nothing to do: a == 0
@@ -197,7 +197,7 @@ impl decimal {
 	}
 
 	// Round a down to nd digits (or fewer).
-	fn RoundDown(mut self, nd: int) {
+	fn RoundDown(mut *self, nd: int) {
 		if nd < 0 || nd >= self.nd {
 			ret
 		}
@@ -206,7 +206,7 @@ impl decimal {
 	}
 
 	// Round a up to nd digits (or fewer).
-	fn RoundUp(mut self, nd: int) {
+	fn RoundUp(mut *self, nd: int) {
 		if nd < 0 || nd >= self.nd {
 			ret
 		}
@@ -233,7 +233,7 @@ impl decimal {
 	// If nd is zero, it means we're rounding
 	// just to the left of the digits, as in
 	// 0.09 -> 0.1.
-	fn Round(mut self, nd: int) {
+	fn Round(mut *self, nd: int) {
 		if nd < 0 || nd >= self.nd {
 			ret
 		}
@@ -246,7 +246,7 @@ impl decimal {
 
 	// Extract integer part, rounded appropriately.
 	// No guarantees about overflow.
-	fn RoundedInteger(mut self): u64 {
+	fn RoundedInteger(mut *self): u64 {
 		if self.dp > 20 {
 			ret 0xFFFFFFFFFFFFFFFF
 		}
@@ -264,7 +264,7 @@ impl decimal {
 		ret n
 	}
 
-	fn Str(self): str {
+	fn Str(*self): str {
 		mut n := 10 + self.nd
 		if self.dp > 0 {
 			n += self.dp
@@ -311,7 +311,7 @@ fn digitZero(mut dst: []byte): int {
 // Trailing zeros from number.
 // (They are meaningless; the decimal point is tracked
 // independent of the number of digits.)
-fn trim(mut &a: decimal) {
+fn trim(mut &a: *decimal) {
 	for a.nd > 0 && a.d[a.nd-1] == '0' {
 		a.nd--
 	}
@@ -321,7 +321,7 @@ fn trim(mut &a: decimal) {
 }
 
 // Binary shift right (/ 2) by k bits.  k <= maxShift to avoid overflow.
-fn rightShift(mut &a: decimal, k: uint) {
+fn rightShift(mut &a: *decimal, k: uint) {
 	mut r := 0 // read pointer
 	mut w := 0 // write pointer
 
@@ -375,7 +375,7 @@ fn rightShift(mut &a: decimal, k: uint) {
 }
 
 // Is the leading prefix of b lexicographically less than s?
-fn prefixIsLessThan(b: [800]byte, end: int, &s: str): bool {
+fn prefixIsLessThan(b: [800]byte, end: int, s: str): bool {
 	mut i := 0
 	for i < len(s); i++ {
 		if i >= end {
@@ -389,7 +389,7 @@ fn prefixIsLessThan(b: [800]byte, end: int, &s: str): bool {
 }
 
 // Binary shift left (* 2) by k bits.  k <= maxShift to avoid overflow.
-fn leftShift(mut &a: decimal, k: uint) {
+fn leftShift(mut &a: *decimal, k: uint) {
 	mut delta := leftCheats[k].delta
 	if prefixIsLessThan(a.d, a.nd, unsafe { *(&leftCheats[k].cutoff) }) {
 		delta--
@@ -436,7 +436,7 @@ fn leftShift(mut &a: decimal, k: uint) {
 }
 
 // If we chop a at nd digits, should we round up?
-fn shouldRoundUp(&a: decimal, nd: int): bool {
+fn shouldRoundUp(&a: *decimal, nd: int): bool {
 	if nd < 0 || nd >= a.nd {
 		ret false
 	}

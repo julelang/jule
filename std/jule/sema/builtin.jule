@@ -15,16 +15,16 @@ use "std/jule/types"
 //	e: Caller owner Eval instance.
 //	fc: Function call expression.
 //	d: Data instance for evaluated expression of function.
-type builtinCaller = fn(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Value
+type builtinCaller = fn(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value
 
 // Initialized by the init function.
 let mut builtinFuncs = map[str]&FuncIns{}
 
-fn findBuiltinFunc(&name: str): &FuncIns {
+fn findBuiltinFunc(name: str): &FuncIns {
 	ret builtinFuncs[name]
 }
 
-fn primTypeAlias(name: str, mut &k: &Type): &TypeAlias {
+fn primTypeAlias(name: str, mut k: &Type): &TypeAlias {
 	ret &TypeAlias{
 		Name: name,
 		Public: true,
@@ -93,7 +93,7 @@ let mut builtinVars = map[str]&Var{
 	},
 }
 
-fn findBuiltinVar(&name: str): &Var {
+fn findBuiltinVar(name: str): &Var {
 	ret builtinVars[name]
 }
 
@@ -122,7 +122,7 @@ fn findBuiltinTypeAlias(name: str): &TypeAlias {
 	ret builtinTypeAliases[name]
 }
 
-fn findBuiltinDef(&name: str): any {
+fn findBuiltinDef(name: str): any {
 	mut v := findBuiltinVar(name)
 	if v != nil {
 		ret v
@@ -141,7 +141,7 @@ fn findBuiltinDef(&name: str): any {
 // Initialized by the init function.
 let mut builtinFuncsStdMem = map[str]&FuncIns{}
 
-fn findBuiltinDefStdMem(&name: str): any {
+fn findBuiltinDefStdMem(name: str): any {
 	mut r, ok := builtinFuncsStdMem[name]
 	if ok {
 		ret r
@@ -152,7 +152,7 @@ fn findBuiltinDefStdMem(&name: str): any {
 // Initialized by the init function.
 let mut builtinFuncsStdComptime = map[str]&FuncIns{}
 
-fn findBuiltinDefStdComptime(&name: str): any {
+fn findBuiltinDefStdComptime(name: str): any {
 	mut r, ok := builtinFuncsStdComptime[name]
 	if ok {
 		ret r
@@ -163,7 +163,7 @@ fn findBuiltinDefStdComptime(&name: str): any {
 // Initialized by the init function.
 let mut builtinFuncsStdInteg = map[str]&FuncIns{}
 
-fn findBuiltinDefStdJuleIntegrated(&name: str): any {
+fn findBuiltinDefStdJuleIntegrated(name: str): any {
 	match name {
 	| "Emit":
 		mut funcEmit := builtinFuncsStdInteg[name]
@@ -182,7 +182,7 @@ fn findBuiltinDefStdJuleIntegrated(&name: str): any {
 // Initialized by the init function.
 let mut builtinFuncsStdSys = map[str]&FuncIns{}
 
-fn findBuiltinDefStdSys(&name: str): any {
+fn findBuiltinDefStdSys(name: str): any {
 	match name {
 	| "Addrcall":
 		mut funcAddrcall := builtinFuncsStdSys[name]
@@ -198,7 +198,7 @@ fn findBuiltinDefStdSys(&name: str): any {
 	}
 }
 
-fn findPackageBuiltinDef(&linkPath: str, &name: str): any {
+fn findPackageBuiltinDef(linkPath: str, name: str): any {
 	match linkPath {
 	| "std/comptime":
 		ret findBuiltinDefStdComptime(name)
@@ -213,7 +213,7 @@ fn findPackageBuiltinDef(&linkPath: str, &name: str): any {
 	}
 }
 
-fn builtinCallerError(mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+fn builtinCallerError(mut e: &eval, mut fc: &ast::CallExpr): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, log::MissingExprFor, "err")
 		ret nil
@@ -243,7 +243,7 @@ fn builtinCallerError(mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
 	ret v
 }
 
-fn builtinCallerPrint(mut &e: &eval, mut &fc: &ast::CallExpr, mut &_: &Value): &Value {
+fn builtinCallerPrint(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, log::MissingExprFor, "v")
 		ret nil
@@ -279,7 +279,7 @@ fn builtinCallerPrint(mut &e: &eval, mut &fc: &ast::CallExpr, mut &_: &Value): &
 	ret v
 }
 
-fn builtinCallerPrintln(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Value {
+fn builtinCallerPrintln(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value {
 	v = builtinCallerPrint(e, fc, v)
 	if v == nil {
 		ret nil
@@ -291,7 +291,7 @@ fn builtinCallerPrintln(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value):
 	ret v
 }
 
-fn builtinCallerNew(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Value {
+fn builtinCallerNew(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, log::MissingExprFor, "type")
 		ret nil
@@ -329,9 +329,10 @@ fn builtinCallerNew(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Va
 		if init != nil {
 			mut token := fc.Args[1].Token
 			const Reference = false
+			const FirstAssignToDest = false
 			e.s.checkValidityForInitExpr(
 				e.target.mutable, Reference, t.Type, init, token)
-			_ = e.s.checkAssignType(false, t.Type, init, token, e.getOwnerRefers())
+			_ = e.s.checkAssignType(Reference, FirstAssignToDest, t.Type, init, token, e.getOwnerRefers())
 
 			v.Model = &BuiltinNewCallExpr{
 				Type: t.Type,
@@ -347,7 +348,7 @@ fn builtinCallerNew(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Va
 	ret v
 }
 
-fn builtinCallerPanic(mut &e: &eval, mut &fc: &ast::CallExpr, mut &_: &Value): &Value {
+fn builtinCallerPanic(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, log::MissingExprFor, "message")
 		ret nil
@@ -373,7 +374,7 @@ fn builtinCallerPanic(mut &e: &eval, mut &fc: &ast::CallExpr, mut &_: &Value): &
 	ret v
 }
 
-fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Value {
+fn builtinCallerMake(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value {
 	if len(fc.Args) == 0 {
 		// All types of the make function, takes at least an argument.
 		// So if function called like make(), push an error and return immediately.
@@ -457,7 +458,7 @@ fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &V
 	}
 }
 
-fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Value {
+fn builtinCallerAppend(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value {
 	if len(fc.Args) < 2 {
 		if len(fc.Args) == 1 {
 			e.pushErr(fc.Token, log::MissingExprFor, "values")
@@ -479,13 +480,14 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): 
 		ret nil
 	}
 
-	const reference = false // Element parameter is not reference.
-	const mutable = true    // Element parameter is mutable.
+	const reference = false         // Element parameter is not reference.
+	const firstAssignToDest = false // Element parameter is not reference, so this info will not be used.
+	const mutable = true            // Element parameter is mutable.
 
 	if e.s.checkValidityForInitExpr(mutable, reference, t.Type, t, firstArg.Token) {
 		// Check type if validity is good.
 		// Helps to reduce error logs and duplicated logs.
-		_ = e.s.checkAssignType(reference, t.Type, t, firstArg.Token, e.getOwnerRefers())
+		_ = e.s.checkAssignType(reference, firstAssignToDest, t.Type, t, firstArg.Token, e.getOwnerRefers())
 	}
 
 	mut prefix := e.prefix
@@ -519,11 +521,11 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): 
 					// Add instance to relevant runtime function for slice type if not exist.
 					mut f := runtimeFindFunc(e.s.meta.runtime, "memappend").instanceForce()
 					f.Generics = append(f.Generics, &InsGeneric{Type: t.Type}, &InsGeneric{Type: primStr})
-					ok, _ := e.s.checkGenericFunc(f, fc.Token)
+					ok, _ := e.s.checkGenericFunc(&f, fc.Token)
 					if !ok {
 						panic("sema: memappend evaluation failed, this is an implementation mistake")
 					}
-					e.pushReference[&FuncIns](f)
+					e.pushReference(f)
 				}
 
 				ret v
@@ -539,11 +541,11 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): 
 			// Add instance to relevant runtime function for slice type if not exist.
 			mut f := runtimeFindFunc(e.s.meta.runtime, "memappend").instanceForce()
 			f.Generics = append(f.Generics, &InsGeneric{Type: t.Type}, &InsGeneric{Type: e1.Type})
-			ok, _ := e.s.checkGenericFunc(f, fc.Token)
+			ok, _ := e.s.checkGenericFunc(&f, fc.Token)
 			if !ok {
 				panic("sema: memappend evaluation failed, this is an implementation mistake")
 			}
-			e.pushReference[&FuncIns](f)
+			e.pushReference(f)
 		}
 		// Source should use the same type with destination.
 		// So, to make e1 unvariadic, use type of the destination.
@@ -566,7 +568,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): 
 			e1.Type.Variadic = true
 			// Check type if validity is good.
 			// Helps to reduce error logs and duplicated logs.
-			_ = e.s.checkAssignType(reference, s.Value, e1, secondArg.Token, e.getOwnerRefers())
+			_ = e.s.checkAssignType(reference, firstAssignToDest, s.Value, e1, secondArg.Token, e.getOwnerRefers())
 		} else {
 			e1.Type.Variadic = true
 		}
@@ -590,7 +592,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): 
 		if e.s.checkValidityForInitExpr(mutable, reference, s.Value, e1, arg.Token) {
 			// Check type if validity is good.
 			// Helps to reduce error logs and duplicated logs.
-			_ = e.s.checkAssignType(reference, s.Value, e1, arg.Token, e.getOwnerRefers())
+			_ = e.s.checkAssignType(reference, firstAssignToDest, s.Value, e1, arg.Token, e.getOwnerRefers())
 		}
 		slice.Elems = append(slice.Elems, e1)
 	}
@@ -611,17 +613,17 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): 
 		// Add instance to relevant runtime function for slice type if not exist.
 		mut f := runtimeFindFunc(e.s.meta.runtime, "memappend").instanceForce()
 		f.Generics = append(f.Generics, &InsGeneric{Type: t.Type}, &InsGeneric{Type: srcType})
-		ok, _ := e.s.checkGenericFunc(f, fc.Token)
+		ok, _ := e.s.checkGenericFunc(&f, fc.Token)
 		if !ok {
 			panic("sema: memappend evaluation failed, this is an implementation mistake")
 		}
-		e.pushReference[&FuncIns](f)
+		e.pushReference(f)
 	}
 
 	ret v
 }
 
-fn callerCopySlice(mut &dest: &Value, mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Value {
+fn callerCopySlice(mut dest: &Value, mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value {
 	if !dest.Mutable {
 		e.pushErr(fc.Args[0].Token, log::MutOperationOnImmut)
 	} else {
@@ -662,11 +664,11 @@ fn callerCopySlice(mut &dest: &Value, mut &e: &eval, mut &fc: &ast::CallExpr, mu
 		// Add instance to relevant runtime function for slice type if not exist.
 		mut f := runtimeFindFunc(e.s.meta.runtime, "memcopy").instanceForce()
 		f.Generics = append(f.Generics, &InsGeneric{Type: dest.Type}, &InsGeneric{Type: src.Type})
-		ok, _ := e.s.checkGenericFunc(f, fc.Token)
+		ok, _ := e.s.checkGenericFunc(&f, fc.Token)
 		if !ok {
 			panic("sema: memcopy evaluation failed, this is an implementation mistake")
 		}
-		e.pushReference[&FuncIns](f)
+		e.pushReference(f)
 	}
 
 	v.untyped = false
@@ -679,7 +681,7 @@ fn callerCopySlice(mut &dest: &Value, mut &e: &eval, mut &fc: &ast::CallExpr, mu
 	ret v
 }
 
-fn builtinCallerCopy(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Value {
+fn builtinCallerCopy(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value {
 	if len(fc.Args) < 2 {
 		if len(fc.Args) == 1 {
 			e.pushErr(fc.Token, log::MissingExprFor, "src")
@@ -704,7 +706,7 @@ fn builtinCallerCopy(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &V
 	}
 }
 
-fn callerLenSlice(mut &expr: &Value, mut &v: &Value): &Value {
+fn callerLenSlice(mut expr: &Value, mut v: &Value): &Value {
 	v.untyped = false
 	v.Constant = nil
 	v.Type = lenKind()
@@ -714,7 +716,7 @@ fn callerLenSlice(mut &expr: &Value, mut &v: &Value): &Value {
 	ret v
 }
 
-fn callerLenMap(mut &expr: &Value, mut &v: &Value): &Value {
+fn callerLenMap(mut expr: &Value, mut v: &Value): &Value {
 	v.untyped = false
 	v.Constant = nil
 	v.Type = lenKind()
@@ -724,7 +726,7 @@ fn callerLenMap(mut &expr: &Value, mut &v: &Value): &Value {
 	ret v
 }
 
-fn callerLenArray(mut &expr: &Value, mut &v: &Value): &Value {
+fn callerLenArray(mut expr: &Value, mut v: &Value): &Value {
 	v.untyped = false
 	v.Type = lenKind()
 	v.Constant = constant::Const.NewI64(i64(expr.Type.Array().N))
@@ -732,7 +734,7 @@ fn callerLenArray(mut &expr: &Value, mut &v: &Value): &Value {
 	ret v
 }
 
-fn callerLenStr(mut &expr: &Value, mut &v: &Value): &Value {
+fn callerLenStr(mut expr: &Value, mut v: &Value): &Value {
 	v.untyped = false
 	v.Constant = nil
 	v.Type = lenKind()
@@ -747,7 +749,7 @@ fn callerLenStr(mut &expr: &Value, mut &v: &Value): &Value {
 	ret v
 }
 
-fn callerLenComptime(mut &v: &Value, n: int): &Value {
+fn callerLenComptime(mut v: &Value, n: int): &Value {
 	v.untyped = false
 	v.Type = lenKind()
 	v.Constant = constant::Const.NewI64(i64(n))
@@ -755,7 +757,7 @@ fn callerLenComptime(mut &v: &Value, n: int): &Value {
 	ret v
 }
 
-fn builtinCallerLen(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Value {
+fn builtinCallerLen(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, log::MissingExprFor, "obj")
 		ret nil
@@ -795,7 +797,7 @@ fn builtinCallerLen(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Va
 	}
 }
 
-fn callerCapSlice(mut &expr: &Value, mut &v: &Value): &Value {
+fn callerCapSlice(mut expr: &Value, mut v: &Value): &Value {
 	v.untyped = false
 	v.Constant = nil
 	v.Type = lenKind()
@@ -805,7 +807,7 @@ fn callerCapSlice(mut &expr: &Value, mut &v: &Value): &Value {
 	ret v
 }
 
-fn builtinCallerCap(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Value {
+fn builtinCallerCap(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, log::MissingExprFor, "obj")
 		ret nil
@@ -828,7 +830,7 @@ fn builtinCallerCap(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Va
 	}
 }
 
-fn callerDeleteMap(mut &e: &eval, mut &fc: &ast::CallExpr, mut &expr: &Value, mut &v: &Value): &Value {
+fn callerDeleteMap(mut e: &eval, mut fc: &ast::CallExpr, mut expr: &Value, mut v: &Value): &Value {
 	if !expr.Mutable {
 		e.pushErr(fc.Args[0].Token, log::MutOperationOnImmut)
 	}
@@ -846,8 +848,9 @@ fn callerDeleteMap(mut &e: &eval, mut &fc: &ast::CallExpr, mut &expr: &Value, mu
 			ret nil
 		|:
 			const Reference = false
+			const FirstAssignToDest = false
 			mut keyType := expr.Type.Map().Key
-			if !e.s.checkAssignType(Reference, keyType, key, fc.Args[1].Token, e.getOwnerRefers()) {
+			if !e.s.checkAssignType(Reference, FirstAssignToDest, keyType, key, fc.Args[1].Token, e.getOwnerRefers()) {
 				ret nil
 			}
 		}
@@ -857,7 +860,7 @@ fn callerDeleteMap(mut &e: &eval, mut &fc: &ast::CallExpr, mut &expr: &Value, mu
 	ret v
 }
 
-fn builtinCallerDelete(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Value {
+fn builtinCallerDelete(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, log::MissingExprFor, "map")
 		ret nil
@@ -880,7 +883,7 @@ fn builtinCallerDelete(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): 
 	}
 }
 
-fn builtinCallerClose(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Value {
+fn builtinCallerClose(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, log::MissingExprFor, "c")
 		ret nil
@@ -912,7 +915,7 @@ fn builtinCallerClose(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &
 	}
 }
 
-fn builtinCallerStdComptimeTypeOf(mut &e: &eval, mut &fc: &ast::CallExpr, mut &_: &Value): &Value {
+fn builtinCallerStdComptimeTypeOf(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, log::MissingExprFor, "type|expr")
 		ret nil
@@ -952,7 +955,7 @@ fn builtinCallerStdComptimeTypeOf(mut &e: &eval, mut &fc: &ast::CallExpr, mut &_
 	ret buildComptimeTypeInfoData(e.s, v.Type)
 }
 
-fn builtinCallerStdComptimeValueOf(mut &e: &eval, mut &fc: &ast::CallExpr, mut &_: &Value): &Value {
+fn builtinCallerStdComptimeValueOf(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, log::MissingExprFor, "expr")
 		ret nil
@@ -976,7 +979,7 @@ fn builtinCallerStdComptimeValueOf(mut &e: &eval, mut &fc: &ast::CallExpr, mut &
 	ret buildComptimeValue(v)
 }
 
-fn builtinCallerStdComptimeLine(mut &e: &eval, mut &fc: &ast::CallExpr, mut &_: &Value): &Value {
+fn builtinCallerStdComptimeLine(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	if len(fc.Args) > 0 {
 		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "Line")
 	}
@@ -988,7 +991,7 @@ fn builtinCallerStdComptimeLine(mut &e: &eval, mut &fc: &ast::CallExpr, mut &_: 
 	}
 }
 
-fn builtinCallerStdComptimeFile(mut &e: &eval, mut &fc: &ast::CallExpr, mut &_: &Value): &Value {
+fn builtinCallerStdComptimeFile(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	if len(fc.Args) > 0 {
 		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "File")
 	}
@@ -1001,7 +1004,7 @@ fn builtinCallerStdComptimeFile(mut &e: &eval, mut &fc: &ast::CallExpr, mut &_: 
 	}
 }
 
-fn builtinCallerStdComptimeFiles(mut &e: &eval, mut &fc: &ast::CallExpr, mut &_: &Value): &Value {
+fn builtinCallerStdComptimeFiles(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	if len(fc.Args) > 0 {
 		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "Files")
 	}
@@ -1014,7 +1017,7 @@ fn builtinCallerStdComptimeFiles(mut &e: &eval, mut &fc: &ast::CallExpr, mut &_:
 	}
 }
 
-fn builtinCallerStdComptimeTypeAlias(mut &e: &eval, mut &fc: &ast::CallExpr, mut &_: &Value): &Value {
+fn builtinCallerStdComptimeTypeAlias(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	if len(fc.Args) > 2 {
 		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "TypeAlias")
 		ret nil
@@ -1069,7 +1072,7 @@ fn builtinCallerStdComptimeTypeAlias(mut &e: &eval, mut &fc: &ast::CallExpr, mut
 	ret buildVoidValue()
 }
 
-fn builtinCallerStdMemSizeOf(mut &e: &eval, mut &fc: &ast::CallExpr, mut &_: &Value): &Value {
+fn builtinCallerStdMemSizeOf(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	mut result := &Value{
 		Type: primUint,
 	}
@@ -1094,7 +1097,7 @@ fn builtinCallerStdMemSizeOf(mut &e: &eval, mut &fc: &ast::CallExpr, mut &_: &Va
 	ret result
 }
 
-fn builtinCallerStdMemAlignOf(mut &e: &eval, mut &fc: &ast::CallExpr, mut &_: &Value): &Value {
+fn builtinCallerStdMemAlignOf(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	mut result := &Value{
 		Type: primUint,
 	}
@@ -1119,7 +1122,7 @@ fn builtinCallerStdMemAlignOf(mut &e: &eval, mut &fc: &ast::CallExpr, mut &_: &V
 	ret result
 }
 
-fn builtinCallerStdJuleIntegratedEmit(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Value {
+fn builtinCallerStdJuleIntegratedEmit(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value {
 	if !e.isUnsafe() {
 		e.pushErr(fc.Token, log::UnsafeBehaviorAtOutOfUnsafeScope)
 		e.pushSuggestion(log::WriteYourCodeInUnsafeJule)
@@ -1175,7 +1178,7 @@ fn builtinCallerStdJuleIntegratedEmit(mut &e: &eval, mut &fc: &ast::CallExpr, mu
 	ret r
 }
 
-fn builtinCallerStdSysAddrcall(mut &e: &eval, mut &fc: &ast::CallExpr, mut &v: &Value): &Value {
+fn builtinCallerStdSysAddrcall(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, log::MissingExprFor, "func")
 		ret nil

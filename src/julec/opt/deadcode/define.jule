@@ -24,13 +24,13 @@ struct ObjectDeadCode {
 }
 
 impl ObjectDeadCode {
-	fn new(mut &ir: &obj::IR): &ObjectDeadCode {
+	fn new(mut ir: &obj::IR): &ObjectDeadCode {
 		ret &ObjectDeadCode{
 			ir: ir,
 		}
 	}
 
-	fn isLive[T](mut &self, &t: T): bool {
+	fn isLive[T](mut &self, t: T): bool {
 		let mut live: []T = nil
 		const match type T {
 		| &sema::FuncIns:
@@ -63,7 +63,7 @@ impl ObjectDeadCode {
 		}
 	}
 
-	fn pushStructAsLive(mut &self, mut &s: &sema::StructIns) {
+	fn pushStructAsLive(mut &self, mut s: &sema::StructIns) {
 		if self.isLive[&sema::StructIns](s) {
 			ret
 		}
@@ -107,7 +107,7 @@ impl ObjectDeadCode {
 		}
 	}
 
-	fn setReferencesAsLive(mut &self, mut &rs: &sema::ReferenceStack) {
+	fn setReferencesAsLive(mut &self, mut rs: &sema::ReferenceStack) {
 		if rs == nil {
 			ret
 		}
@@ -157,7 +157,7 @@ impl ObjectDeadCode {
 		}
 	}
 
-	fn inits(mut &self, mut &pkg: &sema::Package) {
+	fn inits(mut &self, mut pkg: &sema::Package) {
 		for (_, mut file) in pkg.Files {
 			for (_, mut f) in file.Funcs {
 				if f.Name == jule::InitFunc {
@@ -171,7 +171,7 @@ impl ObjectDeadCode {
 		}
 	}
 
-	fn collectLivePackage(mut &self, mut &pkg: &sema::Package) {
+	fn collectLivePackage(mut &self, mut pkg: &sema::Package) {
 		// Collect live references based on initializer functions.
 		self.inits(pkg)
 
@@ -234,6 +234,8 @@ impl ObjectDeadCode {
 		self.setReferencesAsLive(meta::Program.Runtime.Init.Refers)
 		self.pushLive[&sema::FuncIns](meta::Program.Runtime.CloseThread)
 		self.setReferencesAsLive(meta::Program.Runtime.CloseThread.Refers)
+		self.pushLive[&sema::FuncIns](meta::Program.Runtime.CheckNilRef)
+		self.setReferencesAsLive(meta::Program.Runtime.CheckNilRef.Refers)
 
 		for (_, mut used) in self.ir.Used {
 			if !used.Bind {
@@ -278,22 +280,22 @@ impl ObjectDeadCode {
 		}
 	}
 
-	fn removeDeadGlobals(mut &self, mut &vars: []&sema::Var) {
+	fn removeDeadGlobals(mut &self, mut &vars: *[]&sema::Var) {
 		mut i := 0
-		for i < len(vars) {
-			v := vars[i]
+		for i < len(*vars) {
+			v := (*vars)[i]
 			if self.isLive[&sema::Var](v) {
 				i++
 				continue
 			}
-			vars = append(vars[:i], vars[i+1:]...)
+			*vars = append((*vars)[:i], (*vars)[i+1:]...)
 		}
 	}
 
-	fn removeDeadFuncs(mut &self, mut &funcs: []&sema::Func) {
+	fn removeDeadFuncs(mut &self, mut &funcs: *[]&sema::Func) {
 		mut i := 0
-		for i < len(funcs) {
-			mut f := funcs[i]
+		for i < len(*funcs) {
+			mut f := (*funcs)[i]
 			mut j := 0
 			for j < len(f.Instances) {
 				ins := f.Instances[j]
@@ -304,21 +306,21 @@ impl ObjectDeadCode {
 				f.Instances = append(f.Instances[:j], f.Instances[j+1:]...)
 			}
 			if len(f.Instances) == 0 {
-				funcs = append(funcs[:i], funcs[i+1:]...)
+				*funcs = append((*funcs)[:i], (*funcs)[i+1:]...)
 				continue
 			}
 			i++
 		}
 	}
 
-	fn removeDeadStructs(mut &self, mut &structs: []&sema::Struct) {
+	fn removeDeadStructs(mut &self, mut &structs: *[]&sema::Struct) {
 		mut i := 0
-		for i < len(structs) {
-			mut s := structs[i]
+		for i < len(*structs) {
+			mut s := (*structs)[i]
 			mut j := 0
 			for j < len(s.Instances) {
 				mut ins := s.Instances[j]
-				self.removeDeadFuncs(ins.Methods)
+				self.removeDeadFuncs(&ins.Methods)
 				if len(ins.Methods) != 0 || self.isLive[&sema::StructIns](ins) {
 					j++
 					continue
@@ -326,19 +328,19 @@ impl ObjectDeadCode {
 				s.Instances = append(s.Instances[:j], s.Instances[j+1:]...)
 			}
 			if len(s.Instances) == 0 {
-				structs = append(structs[:i], structs[i+1:]...)
+				*structs = append((*structs)[:i], (*structs)[i+1:]...)
 				continue
 			}
 			i++
 		}
 	}
 
-	fn removeDeadTraits(mut &self, mut &traits: []&sema::Trait) {
+	fn removeDeadTraits(mut &self, mut &traits: *[]&sema::Trait) {
 		mut i := 0
-		for i < len(traits) {
-			mut t := traits[i]
+		for i < len(*traits) {
+			mut t := (*traits)[i]
 			if !self.isLive[&sema::Trait](t) {
-				traits = append(traits[:i], traits[i+1:]...)
+				*traits = append((*traits)[:i], (*traits)[i+1:]...)
 				continue
 			}
 			mut j := 0
@@ -354,16 +356,16 @@ impl ObjectDeadCode {
 		}
 	}
 
-	fn removeDeadStrictTypeAliases(mut &self, mut &aliases: []&sema::TypeAlias) {
+	fn removeDeadStrictTypeAliases(mut &self, mut &aliases: *[]&sema::TypeAlias) {
 		mut i := 0
-		for i < len(aliases) {
-			mut ta := aliases[i]
+		for i < len(*aliases) {
+			mut ta := (*aliases)[i]
 			if ta.Strict {
 				mut s := ta.TypeSym.Type.Kind.(&sema::StructIns).Decl
 				mut j := 0
 				for j < len(s.Instances) {
 					mut ins := s.Instances[j]
-					self.removeDeadFuncs(ins.Methods)
+					self.removeDeadFuncs(&ins.Methods)
 					if len(ins.Methods) != 0 || self.isLive[&sema::StructIns](ins) {
 						j++
 						continue
@@ -371,7 +373,7 @@ impl ObjectDeadCode {
 					s.Instances = append(s.Instances[:j], s.Instances[j+1:]...)
 				}
 				if len(s.Instances) == 0 {
-					aliases = append(aliases[:i], aliases[i+1:]...)
+					*aliases = append((*aliases)[:i], (*aliases)[i+1:]...)
 					continue
 				}
 			}
@@ -379,15 +381,15 @@ impl ObjectDeadCode {
 		}
 	}
 
-	fn removeDeadsFile(mut &self, mut &file: &sema::SymTab) {
-		self.removeDeadFuncs(file.Funcs)
-		self.removeDeadStructs(file.Structs)
-		self.removeDeadTraits(file.Traits)
-		self.removeDeadGlobals(file.Vars)
-		self.removeDeadStrictTypeAliases(file.TypeAliases)
+	fn removeDeadsFile(mut &self, mut file: &sema::SymTab) {
+		self.removeDeadFuncs(&file.Funcs)
+		self.removeDeadStructs(&file.Structs)
+		self.removeDeadTraits(&file.Traits)
+		self.removeDeadGlobals(&file.Vars)
+		self.removeDeadStrictTypeAliases(&file.TypeAliases)
 	}
 
-	fn removeDeadsPackage(mut &self, mut &pkg: &sema::Package) {
+	fn removeDeadsPackage(mut &self, mut pkg: &sema::Package) {
 		for (_, mut file) in pkg.Files {
 			self.removeDeadsFile(file)
 		}
@@ -408,7 +410,7 @@ impl ObjectDeadCode {
 	}
 }
 
-fn EliminateDefines(mut &ir: &obj::IR) {
+fn EliminateDefines(mut ir: &obj::IR) {
 	mut ocd := ObjectDeadCode.new(ir)
 	ocd.elimanate()
 }

@@ -14,10 +14,10 @@ use "std/jule/types"
 // All comptime-structure methods starts with underscore (_).
 
 trait comptimeRangeKind {
-	fn index(mut self, mut &v: &Value, i: int)
-	fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var)
-	fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var)
-	fn len(self): int
+	fn index(mut *self, mut v: &Value, i: int)
+	fn ready(mut *self, mut keyA: &Var, mut keyB: &Var)
+	fn step(mut *self, i: int, mut keyA: &Var, mut keyB: &Var)
+	fn len(*self): int
 }
 
 // Compile-time ranges.
@@ -26,7 +26,7 @@ struct comptimeRange {
 }
 
 impl Kind for comptimeRange {
-	fn Str(self): str { ret "comptimeRange" }
+	fn Str(*self): str { ret "comptimeRange" }
 	fn Equal(&self, other: &Type): bool { ret false }
 }
 
@@ -36,12 +36,12 @@ struct comptimeStructField {
 }
 
 impl Kind for comptimeStructField {
-	fn Str(self): str { ret "comptimeStructField" }
+	fn Str(*self): str { ret "comptimeStructField" }
 	fn Equal(&self, other: &Type): bool { ret false }
 }
 
 impl comptimeStructField {
-	fn _Decl(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Decl(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Decl")
 			ret nil
@@ -53,7 +53,7 @@ impl comptimeStructField {
 		}
 	}
 
-	fn _Type(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Type(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Type")
 			ret nil
@@ -61,7 +61,7 @@ impl comptimeStructField {
 		ret buildComptimeTypeInfoData(e.s, self.field.Type)
 	}
 
-	fn subIdent(mut &self, &name: str): &Value {
+	fn subIdent(mut &self, name: str): &Value {
 		match name {
 		| "Decl":
 			mut method := &FuncIns{
@@ -85,12 +85,12 @@ struct comptimeStructFields {
 }
 
 impl Kind for comptimeStructFields {
-	fn Str(self): str { ret "comptimeStructFields" }
+	fn Str(*self): str { ret "comptimeStructFields" }
 	fn Equal(&self, other: &Type): bool { ret false }
 }
 
 impl comptimeRangeKind for comptimeStructFields {
-	fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+	fn ready(mut *self, mut keyA: &Var, mut keyB: &Var) {
 		if keyA != nil {
 			keyA.Constant = true
 			keyA.ValueSym = &ValueSym{
@@ -111,7 +111,7 @@ impl comptimeRangeKind for comptimeStructFields {
 		}
 	}
 
-	fn index(mut self, mut &v: &Value, i: int) {
+	fn index(mut *self, mut v: &Value, i: int) {
 		v.Decl = false
 		v.untyped = false
 		v.Constant = nil
@@ -122,7 +122,7 @@ impl comptimeRangeKind for comptimeStructFields {
 		}
 	}
 
-	fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+	fn step(mut *self, i: int, mut keyA: &Var, mut keyB: &Var) {
 		if keyA != nil {
 			// Kind should be assigned by caller.
 			keyA.ValueSym.Value.Constant = constant::Const.NewI64(i64(i))
@@ -134,7 +134,7 @@ impl comptimeRangeKind for comptimeStructFields {
 		}
 	}
 
-	fn len(self): int {
+	fn len(*self): int {
 		ret len(self.fields)
 	}
 }
@@ -145,12 +145,12 @@ struct comptimeStatic {
 }
 
 impl Kind for comptimeStatic {
-	fn Str(self): str { ret "comptimeStatic" }
+	fn Str(*self): str { ret "comptimeStatic" }
 	fn Equal(&self, other: &Type): bool { ret false }
 }
 
 impl comptimeStatic {
-	fn _Decl(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Decl(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Decl")
 			ret nil
@@ -162,7 +162,7 @@ impl comptimeStatic {
 		}
 	}
 
-	fn _Type(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Type(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Type")
 			ret nil
@@ -170,7 +170,7 @@ impl comptimeStatic {
 		ret buildComptimeTypeInfoData(e.s, self.field.TypeSym.Type)
 	}
 
-	fn subIdent(mut &self, &name: str): &Value {
+	fn subIdent(mut &self, name: str): &Value {
 		match name {
 		| "Decl":
 			mut method := &FuncIns{
@@ -194,12 +194,12 @@ struct comptimeStatics {
 }
 
 impl Kind for comptimeStatics {
-	fn Str(self): str { ret "comptimeStatics" }
+	fn Str(*self): str { ret "comptimeStatics" }
 	fn Equal(&self, other: &Type): bool { ret false }
 }
 
 impl comptimeRangeKind for comptimeStatics {
-	fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+	fn ready(mut *self, mut keyA: &Var, mut keyB: &Var) {
 		if keyA != nil {
 			keyA.Constant = true
 			keyA.ValueSym = &ValueSym{
@@ -220,7 +220,7 @@ impl comptimeRangeKind for comptimeStatics {
 		}
 	}
 
-	fn index(mut self, mut &v: &Value, i: int) {
+	fn index(mut *self, mut v: &Value, i: int) {
 		v.Decl = false
 		v.untyped = false
 		v.Constant = nil
@@ -231,7 +231,7 @@ impl comptimeRangeKind for comptimeStatics {
 		}
 	}
 
-	fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+	fn step(mut *self, i: int, mut keyA: &Var, mut keyB: &Var) {
 		if keyA != nil {
 			// Kind should be assigned by caller.
 			keyA.ValueSym.Value.Constant = constant::Const.NewI64(i64(i))
@@ -243,7 +243,7 @@ impl comptimeRangeKind for comptimeStatics {
 		}
 	}
 
-	fn len(self): int {
+	fn len(*self): int {
 		ret len(self.fields)
 	}
 }
@@ -254,12 +254,12 @@ struct comptimeEnumField {
 }
 
 impl Kind for comptimeEnumField {
-	fn Str(self): str { ret "comptimeEnumField" }
+	fn Str(*self): str { ret "comptimeEnumField" }
 	fn Equal(&self, other: &Type): bool { ret false }
 }
 
 impl comptimeEnumField {
-	fn _Decl(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Decl(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Decl")
 			ret nil
@@ -271,7 +271,7 @@ impl comptimeEnumField {
 		}
 	}
 
-	fn subIdent(mut &self, &name: str): &Value {
+	fn subIdent(mut &self, name: str): &Value {
 		match name {
 		| "Decl":
 			mut method := &FuncIns{
@@ -290,12 +290,12 @@ struct comptimeEnumFields {
 }
 
 impl Kind for comptimeEnumFields {
-	fn Str(self): str { ret "comptimeEnumFields" }
+	fn Str(*self): str { ret "comptimeEnumFields" }
 	fn Equal(&self, other: &Type): bool { ret false }
 }
 
 impl comptimeRangeKind for comptimeEnumFields {
-	fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+	fn ready(mut *self, mut keyA: &Var, mut keyB: &Var) {
 		if keyA != nil {
 			keyA.Constant = true
 			keyA.ValueSym = &ValueSym{
@@ -316,7 +316,7 @@ impl comptimeRangeKind for comptimeEnumFields {
 		}
 	}
 
-	fn index(mut self, mut &v: &Value, i: int) {
+	fn index(mut *self, mut v: &Value, i: int) {
 		v.Decl = false
 		v.untyped = false
 		v.Constant = nil
@@ -327,7 +327,7 @@ impl comptimeRangeKind for comptimeEnumFields {
 		}
 	}
 
-	fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+	fn step(mut *self, i: int, mut keyA: &Var, mut keyB: &Var) {
 		if keyA != nil {
 			// Kind should be assigned by caller.
 			keyA.ValueSym.Value.Constant = constant::Const.NewI64(i64(i))
@@ -339,7 +339,7 @@ impl comptimeRangeKind for comptimeEnumFields {
 		}
 	}
 
-	fn len(self): int {
+	fn len(*self): int {
 		ret len(self.fields)
 	}
 }
@@ -350,12 +350,12 @@ struct comptimeParam {
 }
 
 impl Kind for comptimeParam {
-	fn Str(self): str { ret "comptimeParam" }
+	fn Str(*self): str { ret "comptimeParam" }
 	fn Equal(&self, other: &Type): bool { ret false }
 }
 
 impl comptimeParam {
-	fn _Decl(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Decl(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Decl")
 			ret nil
@@ -367,7 +367,7 @@ impl comptimeParam {
 		}
 	}
 
-	fn _Type(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Type(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Type")
 			ret nil
@@ -375,7 +375,7 @@ impl comptimeParam {
 		ret buildComptimeTypeInfoData(e.s, self.param.Type)
 	}
 
-	fn _Recv(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Recv(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Recv")
 			ret nil
@@ -389,7 +389,7 @@ impl comptimeParam {
 		}
 	}
 
-	fn subIdent(mut &self, &name: str): &Value {
+	fn subIdent(mut &self, name: str): &Value {
 		match name {
 		| "Decl":
 			mut method := &FuncIns{
@@ -418,12 +418,12 @@ struct comptimeParams {
 }
 
 impl Kind for comptimeParams {
-	fn Str(self): str { ret "comptimeParams" }
+	fn Str(*self): str { ret "comptimeParams" }
 	fn Equal(&self, other: &Type): bool { ret false }
 }
 
 impl comptimeRangeKind for comptimeParams {
-	fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+	fn ready(mut *self, mut keyA: &Var, mut keyB: &Var) {
 		if keyA != nil {
 			keyA.Constant = true
 			keyA.ValueSym = &ValueSym{
@@ -444,7 +444,7 @@ impl comptimeRangeKind for comptimeParams {
 		}
 	}
 
-	fn index(mut self, mut &v: &Value, i: int) {
+	fn index(mut *self, mut v: &Value, i: int) {
 		v.Decl = false
 		v.untyped = false
 		v.Constant = nil
@@ -455,7 +455,7 @@ impl comptimeRangeKind for comptimeParams {
 		}
 	}
 
-	fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+	fn step(mut *self, i: int, mut keyA: &Var, mut keyB: &Var) {
 		if keyA != nil {
 			// Kind should be assigned by caller.
 			keyA.ValueSym.Value.Constant = constant::Const.NewI64(i64(i))
@@ -467,7 +467,7 @@ impl comptimeRangeKind for comptimeParams {
 		}
 	}
 
-	fn len(self): int {
+	fn len(*self): int {
 		ret len(self.params)
 	}
 }
@@ -478,12 +478,12 @@ struct comptimeTypeInfos {
 }
 
 impl Kind for comptimeTypeInfos {
-	fn Str(self): str { ret "comptimeTypeInfos" }
+	fn Str(*self): str { ret "comptimeTypeInfos" }
 	fn Equal(&self, other: &Type): bool { ret false }
 }
 
 impl comptimeRangeKind for comptimeTypeInfos {
-	fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+	fn ready(mut *self, mut keyA: &Var, mut keyB: &Var) {
 		if keyA != nil {
 			keyA.Constant = true
 			keyA.ValueSym = &ValueSym{
@@ -504,7 +504,7 @@ impl comptimeRangeKind for comptimeTypeInfos {
 		}
 	}
 
-	fn index(mut self, mut &v: &Value, i: int) {
+	fn index(mut *self, mut v: &Value, i: int) {
 		v.Decl = false
 		v.untyped = false
 		v.Constant = nil
@@ -513,7 +513,7 @@ impl comptimeRangeKind for comptimeTypeInfos {
 		}
 	}
 
-	fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+	fn step(mut *self, i: int, mut keyA: &Var, mut keyB: &Var) {
 		if keyA != nil {
 			// Kind should be assigned by caller.
 			keyA.ValueSym.Value.Constant = constant::Const.NewI64(i64(i))
@@ -525,7 +525,7 @@ impl comptimeRangeKind for comptimeTypeInfos {
 		}
 	}
 
-	fn len(self): int {
+	fn len(*self): int {
 		ret len(self.types)
 	}
 }
@@ -536,12 +536,12 @@ struct comptimeTypeInfo {
 }
 
 impl Kind for comptimeTypeInfo {
-	fn Str(self): str { ret "comptimeTypeInfo[" + self.base.Str() + "]" }
+	fn Str(*self): str { ret "comptimeTypeInfo[" + self.base.Str() + "]" }
 	fn Equal(&self, other: &Type): bool { ret false }
 }
 
 impl comptimeTypeInfo {
-	fn _Hash(&self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Hash(&self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Hash")
 			ret nil
@@ -556,7 +556,7 @@ impl comptimeTypeInfo {
 		}
 	}
 
-	fn _Decl(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Decl(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Decl")
 			ret nil
@@ -593,7 +593,7 @@ impl comptimeTypeInfo {
 		}
 	}
 
-	fn _Str(&self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Str(&self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Str")
 			ret nil
@@ -607,7 +607,7 @@ impl comptimeTypeInfo {
 		}
 	}
 
-	fn _Kind(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Kind(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Kind")
 			ret nil
@@ -692,7 +692,7 @@ impl comptimeTypeInfo {
 		}
 	}
 
-	fn _Bits(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Bits(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Bits")
 			ret nil
@@ -716,7 +716,7 @@ impl comptimeTypeInfo {
 		}
 	}
 
-	fn _Value(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Value(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Value")
 			ret nil
@@ -757,7 +757,7 @@ impl comptimeTypeInfo {
 		ret nil
 	}
 
-	fn _Size(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Size(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Size")
 			ret nil
@@ -776,7 +776,7 @@ impl comptimeTypeInfo {
 		}
 	}
 
-	fn _Key(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Key(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Key")
 			ret nil
@@ -789,7 +789,7 @@ impl comptimeTypeInfo {
 		ret buildComptimeTypeInfoData(e.s, m.Key)
 	}
 
-	fn _Fields(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Fields(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Fields")
 			ret nil
@@ -818,7 +818,7 @@ impl comptimeTypeInfo {
 		ret nil
 	}
 
-	fn _Bind(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Bind(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Bind")
 			ret nil
@@ -832,7 +832,7 @@ impl comptimeTypeInfo {
 		}
 	}
 
-	fn _Ordered(&self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Ordered(&self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Ordered")
 			ret nil
@@ -846,7 +846,7 @@ impl comptimeTypeInfo {
 		}
 	}
 
-	fn _Comparable(&self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Comparable(&self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Comparable")
 			ret nil
@@ -860,7 +860,7 @@ impl comptimeTypeInfo {
 		}
 	}
 
-	fn _Mutable(&self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Mutable(&self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Mutable")
 			ret nil
@@ -874,7 +874,7 @@ impl comptimeTypeInfo {
 		}
 	}
 
-	fn _Types(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Types(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Types")
 			ret nil
@@ -897,7 +897,7 @@ impl comptimeTypeInfo {
 		}
 	}
 
-	fn _CanNil(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _CanNil(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "CanNil")
 			ret nil
@@ -911,7 +911,7 @@ impl comptimeTypeInfo {
 		}
 	}
 
-	fn _GC(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _GC(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "GC")
 			ret nil
@@ -925,7 +925,7 @@ impl comptimeTypeInfo {
 		}
 	}
 
-	fn _Result(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Result(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Result")
 			ret nil
@@ -941,7 +941,7 @@ impl comptimeTypeInfo {
 		ret buildComptimeTypeInfoData(e.s, f.Result)
 	}
 
-	fn _Params(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Params(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Params")
 			ret nil
@@ -958,7 +958,7 @@ impl comptimeTypeInfo {
 		}
 	}
 
-	fn _Strict(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Strict(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Strict")
 			ret nil
@@ -973,7 +973,7 @@ impl comptimeTypeInfo {
 		}
 	}
 
-	fn _Source(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Source(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Source")
 			ret nil
@@ -987,7 +987,7 @@ impl comptimeTypeInfo {
 		ret buildComptimeTypeInfoData(e.s, s.Source)
 	}
 
-	fn _ActualSource(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _ActualSource(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "ActualSource")
 			ret nil
@@ -1002,7 +1002,7 @@ impl comptimeTypeInfo {
 		ret buildComptimeTypeInfoData(e.s, t)
 	}
 
-	fn subIdent(mut &self, &name: str): &Value {
+	fn subIdent(mut &self, name: str): &Value {
 		match name {
 		| "Hash":
 			mut method := &FuncIns{
@@ -1121,12 +1121,12 @@ struct comptimeValue {
 }
 
 impl Kind for comptimeValue {
-	fn Str(self): str { ret "comptimeValue" }
+	fn Str(*self): str { ret "comptimeValue" }
 	fn Equal(&self, other: &Type): bool { ret false }
 }
 
 impl comptimeValue {
-	fn _Unwrap(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Unwrap(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Unwrap")
 			ret nil
@@ -1134,7 +1134,7 @@ impl comptimeValue {
 		ret self.v
 	}
 
-	fn _Type(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Type(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Type")
 			ret nil
@@ -1142,7 +1142,7 @@ impl comptimeValue {
 		ret buildComptimeTypeInfoData(e.s, self.v.Type)
 	}
 
-	fn _Lvalue(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Lvalue(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Lvalue")
 			ret nil
@@ -1156,7 +1156,7 @@ impl comptimeValue {
 		}
 	}
 
-	fn _Mutable(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Mutable(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Mutable")
 			ret nil
@@ -1170,7 +1170,7 @@ impl comptimeValue {
 		}
 	}
 
-	fn _Const(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Const(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Const")
 			ret nil
@@ -1184,7 +1184,7 @@ impl comptimeValue {
 		}
 	}
 
-	fn _Field(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Field(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 1 {
 			e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "Field")
 			ret nil
@@ -1219,7 +1219,7 @@ impl comptimeValue {
 		ret buildComptimeValue(v)
 	}
 
-	fn _FieldByIndex(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _FieldByIndex(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 1 {
 			e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "FieldByIndex")
 			ret nil
@@ -1254,7 +1254,7 @@ impl comptimeValue {
 		ret buildComptimeValue(v)
 	}
 
-	fn _Method(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Method(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 1 {
 			e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "Method")
 			ret nil
@@ -1301,7 +1301,7 @@ impl comptimeValue {
 		ret buildComptimeValue(v)
 	}
 
-	fn subIdent(mut &self, &name: str): &Value {
+	fn subIdent(mut &self, name: str): &Value {
 		match name {
 		| "Unwrap":
 			mut method := &FuncIns{
@@ -1355,12 +1355,12 @@ struct comptimeFiles {
 }
 
 impl Kind for comptimeFiles {
-	fn Str(self): str { ret "comptimeFiles" }
+	fn Str(*self): str { ret "comptimeFiles" }
 	fn Equal(&self, other: &Type): bool { ret false }
 }
 
 impl comptimeRangeKind for comptimeFiles {
-	fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+	fn ready(mut *self, mut keyA: &Var, mut keyB: &Var) {
 		if keyA != nil {
 			keyA.Constant = true
 			keyA.ValueSym = &ValueSym{
@@ -1381,7 +1381,7 @@ impl comptimeRangeKind for comptimeFiles {
 		}
 	}
 
-	fn index(mut self, mut &v: &Value, i: int) {
+	fn index(mut *self, mut v: &Value, i: int) {
 		v.Decl = false
 		v.untyped = false
 		v.Constant = nil
@@ -1392,7 +1392,7 @@ impl comptimeRangeKind for comptimeFiles {
 		}
 	}
 
-	fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+	fn step(mut *self, i: int, mut keyA: &Var, mut keyB: &Var) {
 		if keyA != nil {
 			// Kind should be assigned by caller.
 			keyA.ValueSym.Value.Constant = constant::Const.NewI64(i64(i))
@@ -1404,7 +1404,7 @@ impl comptimeRangeKind for comptimeFiles {
 		}
 	}
 
-	fn len(self): int {
+	fn len(*self): int {
 		ret len(self.files)
 	}
 }
@@ -1415,12 +1415,12 @@ struct comptimeFile {
 }
 
 impl Kind for comptimeFile {
-	fn Str(self): str { ret "comptimeFile" }
+	fn Str(*self): str { ret "comptimeFile" }
 	fn Equal(&self, other: &Type): bool { ret false }
 }
 
 impl comptimeFile {
-	fn _Path(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Path(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Path")
 			ret nil
@@ -1434,7 +1434,7 @@ impl comptimeFile {
 		}
 	}
 
-	fn _Name(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Name(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Name")
 			ret nil
@@ -1448,7 +1448,7 @@ impl comptimeFile {
 		}
 	}
 
-	fn _Dir(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Dir(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Dir")
 			ret nil
@@ -1462,7 +1462,7 @@ impl comptimeFile {
 		}
 	}
 
-	fn subIdent(mut &self, &name: str): &Value {
+	fn subIdent(mut &self, name: str): &Value {
 		match name {
 		| "Path":
 			mut method := &FuncIns{
@@ -1491,12 +1491,12 @@ struct comptimeDecls {
 }
 
 impl Kind for comptimeDecls {
-	fn Str(self): str { ret "comptimeDecls" }
+	fn Str(*self): str { ret "comptimeDecls" }
 	fn Equal(&self, other: &Type): bool { ret false }
 }
 
 impl comptimeRangeKind for comptimeDecls {
-	fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+	fn ready(mut *self, mut keyA: &Var, mut keyB: &Var) {
 		if keyA != nil {
 			keyA.Constant = true
 			keyA.ValueSym = &ValueSym{
@@ -1517,7 +1517,7 @@ impl comptimeRangeKind for comptimeDecls {
 		}
 	}
 
-	fn index(mut self, mut &v: &Value, i: int) {
+	fn index(mut *self, mut v: &Value, i: int) {
 		v.Decl = false
 		v.untyped = false
 		v.Constant = nil
@@ -1526,7 +1526,7 @@ impl comptimeRangeKind for comptimeDecls {
 		}
 	}
 
-	fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+	fn step(mut *self, i: int, mut keyA: &Var, mut keyB: &Var) {
 		if keyA != nil {
 			// Kind should be assigned by caller.
 			keyA.ValueSym.Value.Constant = constant::Const.NewI64(i64(i))
@@ -1538,7 +1538,7 @@ impl comptimeRangeKind for comptimeDecls {
 		}
 	}
 
-	fn len(self): int {
+	fn len(*self): int {
 		ret len(self.decls)
 	}
 }
@@ -1563,12 +1563,12 @@ struct comptimeDecl {
 }
 
 impl Kind for comptimeDecl {
-	fn Str(self): str { ret "comptimeDecl" }
+	fn Str(*self): str { ret "comptimeDecl" }
 	fn Equal(&self, other: &Type): bool { ret false }
 }
 
 impl comptimeDecl {
-	fn declAsStr(self): str {
+	fn declAsStr(*self): str {
 		match type self.decl {
 		| &Struct:
 			ret "<struct>"
@@ -1597,7 +1597,7 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _Name(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Name(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Name")
 			ret nil
@@ -1634,7 +1634,7 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _Public(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Public(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Public")
 			ret nil
@@ -1677,7 +1677,7 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _Bind(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Bind(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Bind")
 			ret nil
@@ -1716,7 +1716,7 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _Exceptional(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Exceptional(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Exceptional")
 			ret nil
@@ -1738,7 +1738,7 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _Mutable(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Mutable(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Mutable")
 			ret nil
@@ -1776,7 +1776,7 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _Variadic(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Variadic(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Variadic")
 			ret nil
@@ -1807,7 +1807,7 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _Reference(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Reference(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Reference")
 			ret nil
@@ -1844,7 +1844,7 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _Params(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Params(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Params")
 			ret nil
@@ -1878,7 +1878,7 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _Fields(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Fields(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Fields")
 			ret nil
@@ -1918,7 +1918,7 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _Methods(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Methods(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Methods")
 			ret nil
@@ -1958,7 +1958,7 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _Tags(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Tags(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, log::ArgumentOverflow, "Tags")
 			ret nil
@@ -1979,7 +1979,7 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _Tag(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _Tag(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 1 {
 			e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "Tag")
 			ret nil
@@ -2014,7 +2014,7 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _IsTag(mut &self, mut &e: &eval, mut &fc: &ast::CallExpr): &Value {
+	fn _IsTag(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 1 {
 			e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "IsTag")
 			ret nil
@@ -2049,7 +2049,7 @@ impl comptimeDecl {
 		}
 	}
 
-	fn subIdent(mut &self, &name: str): &Value {
+	fn subIdent(mut &self, name: str): &Value {
 		match name {
 		| "Name":
 			mut method := &FuncIns{
@@ -2127,7 +2127,7 @@ struct comptimeSliceRange {
 }
 
 impl comptimeRangeKind for comptimeSliceRange {
-	fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+	fn ready(mut *self, mut keyA: &Var, mut keyB: &Var) {
 		if keyA != nil {
 			keyA.Constant = true
 			keyA.ValueSym = &ValueSym{
@@ -2146,11 +2146,11 @@ impl comptimeRangeKind for comptimeSliceRange {
 		}
 	}
 
-	fn index(mut self, mut &v: &Value, i: int) {
+	fn index(mut *self, mut v: &Value, i: int) {
 		panic("sema: index method of comptimeSliceRange should not be used")
 	}
 
-	fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+	fn step(mut *self, i: int, mut keyA: &Var, mut keyB: &Var) {
 		if keyA != nil {
 			// Kind should be assigned by caller.
 			keyA.ValueSym.Value.Constant = constant::Const.NewI64(i64(i))
@@ -2162,12 +2162,12 @@ impl comptimeRangeKind for comptimeSliceRange {
 		}
 	}
 
-	fn len(self): int {
+	fn len(*self): int {
 		ret len(self.s.Elems)
 	}
 }
 
-fn buildAsComptimeMethodData(mut &f: &FuncIns): &Value {
+fn buildAsComptimeMethodData(mut f: &FuncIns): &Value {
 	ret &Value{
 		Type: &Type{
 			Kind: f,
@@ -2175,11 +2175,11 @@ fn buildAsComptimeMethodData(mut &f: &FuncIns): &Value {
 	}
 }
 
-fn findComptimePackage(mut &s: &sema): &ImportInfo {
+fn findComptimePackage(mut s: &sema): &ImportInfo {
 	ret s.SelectPackage(fn|pkg| pkg.LinkPath == "std/comptime")
 }
 
-fn buildComptimeTypeInfoData(mut &s: &sema, mut &t: &Type): &Value {
+fn buildComptimeTypeInfoData(mut s: &sema, mut t: &Type): &Value {
 	ret &Value{
 		Type: &Type{
 			Kind: s.meta.pushComptimeTypeInfo(t),
@@ -2187,7 +2187,7 @@ fn buildComptimeTypeInfoData(mut &s: &sema, mut &t: &Type): &Value {
 	}
 }
 
-fn buildComptimeValue(mut &v: &Value): &Value {
+fn buildComptimeValue(mut v: &Value): &Value {
 	ret &Value{
 		Type: &Type{
 			Kind: &comptimeValue{

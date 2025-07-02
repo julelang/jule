@@ -134,12 +134,12 @@ fn WriteFile(path: str, data: []byte, perm: FileMode)! {
 impl File {
 	// Writes bytes to handle and returns written byte count.
 	// The number of bytes written can never exceed the length of the buf.
-	fn Write(mut self, buf: []byte)!: (n: int) {
+	fn Write(mut *self, buf: []byte)!: (n: int) {
 		ret self.fd.Write(buf) else { error(error) }
 	}
 
 	// Like Write, but writes the contents of string s rather than a slice of bytes.
-	fn WriteStr(mut self, s: str)!: (n: int) {
+	fn WriteStr(mut *self, s: str)!: (n: int) {
 		ret self.Write(unsafe::StrBytes(s)) else { error(error) }
 	}
 
@@ -148,32 +148,32 @@ impl File {
 	// If the buf is larger than the number of bytes that can be read,
 	// the buffer will not cause an overflow. Offset will be shifted
 	// by the number of bytes read.
-	fn Read(mut self, mut buf: []byte)!: (n: int) {
+	fn Read(mut *self, mut buf: []byte)!: (n: int) {
 		ret self.fd.Read(buf) else { error(error) }
 	}
 
 	// Sets offset to next Read/Write operation and returns the new offset.
 	// whence: 0 (io::SeekStart) means, relative to the whence of the file, 1 (io::SeekCurrent)
 	// means relative to the current offset, and 2 (io::SeekEnd) means relative to end.
-	fn Seek(mut self, offset: i64, whence: int)!: i64 {
+	fn Seek(mut *self, offset: i64, whence: int)!: i64 {
 		ret self.fd.Seek(offset, whence) else { error(error) }
 	}
 
 	// Commits the current contents of the file to stable storage.
 	// Typically, this means flushing the file system's in-memory copy
 	// of recently written data to disk.
-	fn Sync(mut self)! {
+	fn Sync(mut *self)! {
 		self.fd.Fsync() else { error(error) }
 	}
 
 	// Changes the size of the file.
 	// It does not change the I/O offset.
-	fn Truncate(mut self, size: i64)! {
+	fn Truncate(mut *self, size: i64)! {
 		self.fd.Ftruncate(size) else { error(error) }
 	}
 
 	// Closes file handle.
-	fn Close(mut self)! {
+	fn Close(mut *self)! {
 		self.fd.Close() else { error(error) }
 	}
 }

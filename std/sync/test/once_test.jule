@@ -9,8 +9,8 @@ use "std/testing"
 type one: int
 
 impl one {
-	fn Increment(mut self) {
-		self++
+	fn Increment(mut *self) {
+		*self++
 	}
 }
 
@@ -19,7 +19,7 @@ fn run(t: &testing::T, once: &sync::Once, mut o: &one, mut c: &int) {
 	if *o != 1 {
 		t.Errorf("once failed inside run: {} is not 1", *o)
 	}
-	atomic::Add(*c, 1, atomic::SeqCst)
+	atomic::Add(&(*c), 1, atomic::SeqCst)
 }
 
 #test
@@ -32,7 +32,7 @@ fn testOnce(t: &testing::T) {
 	for i < N; i++ {
 		co run(t, once, o, c)
 	}
-	for atomic::Load(*c, atomic::SeqCst) != N {
+	for atomic::Load(&(*c), atomic::SeqCst) != N {
 	}
 	if *o != 1 {
 		t.Errorf("once failed outside run: {} is not 1", *o)

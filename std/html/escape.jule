@@ -49,7 +49,7 @@ let replacementTable: [...]rune = [
 // Reads an entity like "&lt;" from b[src:] and writes the
 // corresponding "<" to b[dst:], returning the incremented dst and src cursors.
 // Precondition: b[src] == '&' && dst <= src.
-fn unescapeEntity(mut b: []byte, dst: int, src: int, &entity: map[str]rune, &entity2: map[str][2]rune): (dst1: int, src1: int) {
+fn unescapeEntity(mut b: []byte, dst: int, src: int, &entity: *map[str]rune, &entity2: *map[str][2]rune): (dst1: int, src1: int) {
 	const attribute = false
 
 	// http://www.whatwg.org/specs/web-apps/current-work/multipage/tokenization.html#consume-a-character-reference
@@ -138,11 +138,11 @@ fn unescapeEntity(mut b: []byte, dst: int, src: int, &entity: map[str]rune, &ent
 	} else if attribute && entityName[len(entityName)-1] != ';' && len(s) > i && s[i] == '=' {
 		// No-op.
 	} else {
-		mut x := entity[str(entityName)]
+		mut x := (*entity)[str(entityName)]
 		if x != 0 {
 			ret dst + utf8::EncodeRune(b[dst:], x), src + i
 		} else {
-			y := entity2[str(entityName)]
+			y := (*entity2)[str(entityName)]
 			if y[0] != 0 {
 				dst1 = dst + utf8::EncodeRune(b[dst:], y[0])
 				ret dst1 + utf8::EncodeRune(b[dst1:], y[1]), src + i
@@ -153,7 +153,7 @@ fn unescapeEntity(mut b: []byte, dst: int, src: int, &entity: map[str]rune, &ent
 				}
 				mut j := maxLen
 				for j > 1; j-- {
-					x = entity[str(entityName[:j])]
+					x = (*entity)[str(entityName[:j])]
 					if x != 0 {
 						ret dst + utf8::EncodeRune(b[dst:], x), src + j + 1
 					}
@@ -193,7 +193,7 @@ fn UnescapeStr(s: str): str {
 		ret s
 	}
 	mut b := []byte(s)
-	mut dst, mut src := unescapeEntity(b, i, i, entity, entity2)
+	mut dst, mut src := unescapeEntity(b, i, i, &entity, &entity2)
 	for len(s[src:]) > 0 {
 		if s[src] == '&' {
 			i = 0
@@ -208,7 +208,7 @@ fn UnescapeStr(s: str): str {
 		if i > 0 {
 			copy(b[dst:], s[src:src+i])
 		}
-		dst, src = unescapeEntity(b, dst+i, src+i, entity, entity2)
+		dst, src = unescapeEntity(b, dst+i, src+i, &entity, &entity2)
 	}
 	ret unsafe::StrFromBytes(b[:dst])
 }

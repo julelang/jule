@@ -45,7 +45,7 @@ enum sortedHint {
 }
 
 // Sorts data[a:b] using insertion sort.
-fn insertionSort[E: ordered](mut &data: []E, a: int, b: int) {
+fn insertionSort[E: ordered](mut data: []E, a: int, b: int) {
 	mut i := a + 1
 	for i < b; i++ {
 		mut j := i
@@ -57,7 +57,7 @@ fn insertionSort[E: ordered](mut &data: []E, a: int, b: int) {
 
 // Implements the heap property on data[lo:hi].
 // first is an offset into the array where the root of the heap lies.
-fn siftDown[E: ordered](mut &data: []E, lo: int, hi: int, first: int) {
+fn siftDown[E: ordered](mut data: []E, lo: int, hi: int, first: int) {
 	mut root := lo
 	for {
 		mut child := 2*root + 1
@@ -75,7 +75,7 @@ fn siftDown[E: ordered](mut &data: []E, lo: int, hi: int, first: int) {
 	}
 }
 
-fn heapSort[E: ordered](mut &data: []E, a: int, b: int) {
+fn heapSort[E: ordered](mut data: []E, a: int, b: int) {
 	first := a
 	lo := 0
 	hi := b - a
@@ -96,7 +96,7 @@ fn heapSort[E: ordered](mut &data: []E, a: int, b: int) {
 
 // breakPatternsOrdered scatters some elements around in an attempt to break some patterns
 // that might cause imbalanced partitions in quicksort.
-fn breakPatterns[E: ordered](mut &data: []E, a: int, b: int) {
+fn breakPatterns[E: ordered](mut data: []E, a: int, b: int) {
 	length := b - a
 	if length >= 8 {
 		mut random := xorshift(length)
@@ -104,7 +104,7 @@ fn breakPatterns[E: ordered](mut &data: []E, a: int, b: int) {
 
 		mut idx := a + (length/4)*2 - 1
 		for idx <= a+(length/4)*2+1; idx++ {
-			mut other := int(uint(xorshiftNext(random)) & (modulus - 1))
+			mut other := int(uint(xorshiftNext(&random)) & (modulus - 1))
 			if other >= length {
 				other -= length
 			}
@@ -114,16 +114,16 @@ fn breakPatterns[E: ordered](mut &data: []E, a: int, b: int) {
 }
 
 // Returns x,y where data[x] <= data[y], where x,y=a,b or x,y=b,a.
-fn order2O[E: ordered](data: []E, a: int, b: int, mut &swaps: int): (int, int) {
+fn order2O[E: ordered](data: []E, a: int, b: int, mut &swaps: *int): (int, int) {
 	if cmp::Less(data[b], data[a]) {
-		swaps++
+		*swaps++
 		ret b, a
 	}
 	ret a, b
 }
 
 // Returns x where data[x] is the median of data[a],data[b],data[c], where x is a, b, or c.
-fn median[E: ordered](data: []E, mut a: int, mut b: int, mut c: int, mut &swaps: int): int {
+fn median[E: ordered](data: []E, mut a: int, mut b: int, mut c: int, mut &swaps: *int): int {
 	a, b = order2O(data, a, b, swaps)
 	b, c = order2O(data, b, c, swaps)
 	a, b = order2O(data, a, b, swaps)
@@ -131,7 +131,7 @@ fn median[E: ordered](data: []E, mut a: int, mut b: int, mut c: int, mut &swaps:
 }
 
 // Finds the median of data[a - 1], data[a], data[a + 1] and stores the index into a.
-fn medianAdjacent[E: ordered](data: []E, a: int, mut &swaps: int): int {
+fn medianAdjacent[E: ordered](data: []E, a: int, mut &swaps: *int): int {
 	ret median(data, a-1, a, a+1, swaps)
 }
 
@@ -140,7 +140,7 @@ fn medianAdjacent[E: ordered](data: []E, a: int, mut &swaps: int): int {
 // [0,8): chooses a static pivot.
 // [8,shortestNinther): uses the simple median-of-three method.
 // [shortestNinther,∞): uses the Tukey ninther method.
-fn choosePivot[E: ordered](mut &data: []E, a: int, b: int): (pivot: int, hint: sortedHint) {
+fn choosePivot[E: ordered](mut data: []E, a: int, b: int): (pivot: int, hint: sortedHint) {
 	const shortestNinther = 50
 	const maxSwaps = 4 * 3
 
@@ -154,12 +154,12 @@ fn choosePivot[E: ordered](mut &data: []E, a: int, b: int): (pivot: int, hint: s
 	if l >= 8 {
 		if l >= shortestNinther {
 			// Tukey ninther method, the idea came from Rust's implementation.
-			i = medianAdjacent(data, i, swaps)
-			j = medianAdjacent(data, j, swaps)
-			k = medianAdjacent(data, k, swaps)
+			i = medianAdjacent(data, i, &swaps)
+			j = medianAdjacent(data, j, &swaps)
+			k = medianAdjacent(data, k, &swaps)
 		}
 		// Find the median among i, j, k and stores it into j.
-		j = median(data, i, j, k, swaps)
+		j = median(data, i, j, k, &swaps)
 	}
 
 	match swaps {
@@ -172,7 +172,7 @@ fn choosePivot[E: ordered](mut &data: []E, a: int, b: int): (pivot: int, hint: s
 	}
 }
 
-fn reverseRange[E: ordered](mut &data: []E, a: int, b: int) {
+fn reverseRange[E: ordered](mut data: []E, a: int, b: int) {
 	mut i := a
 	mut j := b - 1
 	for i < j {
@@ -183,7 +183,7 @@ fn reverseRange[E: ordered](mut &data: []E, a: int, b: int) {
 }
 
 // Partially sorts a slice, returns true if the slice is sorted at the end.
-fn partialInsertionSort[E: ordered](mut &data: []E, a: int, b: int): bool {
+fn partialInsertionSort[E: ordered](mut data: []E, a: int, b: int): bool {
 	const maxSteps = 5          // maximum number of adjacent out-of-order pairs that will get shifted
 	const shortestShifting = 50 // don't shift any elements on short arrays
 	mut i := a + 1
@@ -229,7 +229,7 @@ fn partialInsertionSort[E: ordered](mut &data: []E, a: int, b: int): bool {
 
 // Partitions data[a:b] into elements equal to data[pivot] followed by elements greater than data[pivot].
 // It assumed that data[a:b] does not contain elements smaller than the data[pivot].
-fn partitionEqual[E: ordered](mut &data: []E, a: int, b: int, pivot: int): (newpivot: int) {
+fn partitionEqual[E: ordered](mut data: []E, a: int, b: int, pivot: int): (newpivot: int) {
 	data[a], data[pivot] = data[pivot], data[a]
 	mut i, mut j := a+1, b-1 // i and j are inclusive of the elements remaining to be partitioned
 
@@ -254,7 +254,7 @@ fn partitionEqual[E: ordered](mut &data: []E, a: int, b: int, pivot: int): (newp
 // let p = data[pivot]
 // Moves elements in data[a:b] around, so that data[i]<p and data[j]>=p for i<newpivot and j>newpivot.
 // On return, data[newpivot] = p
-fn partition[E: ordered](mut &data: []E, a: int, b: int, pivot: int): (newpivot: int, alreadyPartitioned: bool) {
+fn partition[E: ordered](mut data: []E, a: int, b: int, pivot: int): (newpivot: int, alreadyPartitioned: bool) {
 	data[a], data[pivot] = data[pivot], data[a]
 	mut i, mut j := a+1, b-1 // i and j are inclusive of the elements remaining to be partitioned
 
@@ -296,7 +296,7 @@ fn partition[E: ordered](mut &data: []E, a: int, b: int, pivot: int): (newpivot:
 // C++ implementation: https://github.com/orlp/pdqsort
 // Rust implementation: https://docs.rs/pdqsort/latest/pdqsort/
 // limit is the number of allowed bad (very unbalanced) pivots before falling back to heapsort.
-fn pdqsort[E: ordered](mut &data: []E, mut a: int, mut b: int, mut limit: int) {
+fn pdqsort[E: ordered](mut data: []E, mut a: int, mut b: int, mut limit: int) {
 	const maxInsertion = 12
 
 	mut wasBalanced := true    // whether the last partitioning was reasonably balanced

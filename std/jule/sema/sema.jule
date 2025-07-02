@@ -16,41 +16,53 @@ use "std/slices"
 use "std/strings"
 use "std/unicode/utf8"
 
-fn isValidModelForRef(mut &m: Expr): bool {
-	match type m {
-	| &Var:
-		ret true
-	| &StructSubIdentExpr:
-		mut model := m.(&StructSubIdentExpr)
-		ret model.Field != nil && isValidModelForRef(model.Expr.Model)
-	| &UnaryExpr:
-		mut unary := m.(&UnaryExpr)
-		if unary.Op.ID != token::MUL {
-			ret false
-		}
-		// Return true because of raw pointer dereferencing is an Unsafe Jule feature.
-		if unary.Expr.Type.Ptr() != nil {
+fn isValidModelForRef(mut m: Expr): bool {
+	for {
+		match type m {
+		| &Var:
+			// We found a variable, so the expression based on a variable.
 			ret true
-		}
-		// Dereferencing should be smart pointer, otherwise return false.
-		if unary.Expr.Type.Sptr() == nil {
+		| &StructSubIdentExpr:
+			mut model := m.(&StructSubIdentExpr)
+			if model.Field == nil {
+				ret false
+			}
+			m = model.Expr.Model
+			continue
+		| &UnaryExpr:
+			mut unary := m.(&UnaryExpr)
+			if unary.Op.ID != token::MUL {
+				ret false
+			}
+			// Return true because of raw-pointer dereferencing is an Unsafe Jule feature.
+			if unary.Expr.Type.Ptr() != nil {
+				// No extra effor for the mutability.
+				// Unary eval algorithm will use mutable state of dereferenced
+				// reference pointers, so mutability will always be fine.
+				ret true
+			}
+			// Dereferencing should use smart-pointer, otherwise return false.
+			if unary.Expr.Type.Sptr() == nil {
+				ret false
+			}
+			m = unary.Expr.Model
+			continue
+		| &IndexingExpr:
+			mut index := m.(&IndexingExpr)
+			if index.Expr.Type.Array() == nil {
+				// allow only arrays, slice allocations will may be deallocated at runtime
+				// arrays always guaranteed to be have fixed size at runtime
+				ret false
+			}
+			m = index.Expr.Model
+			continue
+		|:
 			ret false
 		}
-		ret isValidModelForRef(unary.Expr.Model)
-	| &IndexingExpr:
-		mut indexing := m.(&IndexingExpr)
-		if indexing.Expr.Type.Array() == nil {
-			// allow only arrays, slice allocations will may be deallocated at runtime
-			// arrays always guaranteed to be have fixed size at runtime
-			ret false
-		}
-		ret isValidModelForRef(indexing.Expr.Model)
-	|:
-		ret false
 	}
 }
 
-fn compilerErr(&token: &token::Token, line: bool, fmt: str, args: ...any): log::Log {
+fn compilerErr(token: &token::Token, line: bool, fmt: str, args: ...any): log::Log {
 	mut log := log::Log{
 		Kind: log::Error,
 		Row: token.Row,
@@ -67,7 +79,7 @@ fn compilerErr(&token: &token::Token, line: bool, fmt: str, args: ...any): log::
 // Appends return variables to dest.
 // If variable is exist, updates it.
 // Assumes return variable part of dest is dest[i:].
-fn updateRetVars(mut &dest: []&Var, mut &f: &FuncIns, mut i: int) {
+fn updateRetVars(mut &dest: *[]&Var, mut f: &FuncIns, mut i: int) {
 	if f.Decl.IsVoid() || f.Result == nil || len(f.Decl.Result.Names) == 0 {
 		ret
 	}
@@ -84,8 +96,8 @@ fn updateRetVars(mut &dest: []&Var, mut &f: &FuncIns, mut i: int) {
 		// If variable is not exist in the dest, append it.
 		// Otherwise update it.
 		let mut v: &Var
-		if i < len(dest) {
-			v = dest[i]
+		if i < len(*dest) {
+			v = (*dest)[i]
 		} else {
 			v = &Var{
 				Used: true,
@@ -100,7 +112,7 @@ fn updateRetVars(mut &dest: []&Var, mut &f: &FuncIns, mut i: int) {
 				RetState: rst,
 				RetOrder: j,
 			}
-			dest = append(dest, v)
+			*dest = append(*dest, v)
 		}
 		v.TypeSym.Type = types[j]
 		i++
@@ -110,7 +122,7 @@ fn updateRetVars(mut &dest: []&Var, mut &f: &FuncIns, mut i: int) {
 // Appends parameter variables to dest.
 // If parameter is exist, updates it.
 // Returns count of parameter variables.
-fn updateParamVars(mut &dest: []&Var, mut &f: &FuncIns): (n: int) {
+fn updateParamVars(mut &dest: *[]&Var, mut f: &FuncIns): (n: int) {
 	if len(f.Params) == 0 {
 		ret
 	}
@@ -124,8 +136,8 @@ fn updateParamVars(mut &dest: []&Var, mut &f: &FuncIns): (n: int) {
 		// If variable is not exist in the dest, append it.
 		// Otherwise update it.
 		let mut v: &Var
-		if i < len(dest) {
-			v = dest[i]
+		if i < len(*dest) {
+			v = (*dest)[i]
 		} else {
 			v = &Var{
 				Checked: true,
@@ -138,7 +150,7 @@ fn updateParamVars(mut &dest: []&Var, mut &f: &FuncIns): (n: int) {
 				Scope: f.Scope,
 				ValueSym: new(ValueSym),
 			}
-			dest = append(dest, v)
+			*dest = append(*dest, v)
 		}
 
 		match {
@@ -147,15 +159,24 @@ fn updateParamVars(mut &dest: []&Var, mut &f: &FuncIns): (n: int) {
 				Variadic: false,
 				Kind: f.Owner,
 			}
-			v.Reference = !p.Decl.IsRef()
-
-			if p.Decl.IsRef() {
-				v.Name = v.Name[1:] // Remove reference sign.
+			match {
+			| p.Decl.IsSmartptr():
+				v.Name = v.Name[1:] // Remove smartptr sign.
 				v.TypeSym.Type.Kind = &Sptr{
 					Value: &Type{
 						Kind: f.Owner,
 					},
 				}
+			| p.Decl.IsRefptr():
+				v.Name = v.Name[1:] // Remove refptr sign.
+				v.Reference = true
+				v.TypeSym.Type.Kind = &Ptr{
+					Value: &Type{
+						Kind: f.Owner,
+					},
+				}
+			|:
+				panic("unreachable")
 			}
 		| p.Decl.Variadic:
 			v.TypeSym.Type = &Type{
@@ -175,7 +196,7 @@ fn updateParamVars(mut &dest: []&Var, mut &f: &FuncIns): (n: int) {
 
 // Builds type aliases for generic types of scope.
 // See developer reference (1), and (2).
-fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FuncIns) {
+fn appendGenericTypeAliases(mut &dest: *[]&TypeAlias, mut f: &FuncIns) {
 	mut size := len(f.Generics)
 	if f.Decl.Owner != nil {
 		size += len(f.Decl.Owner.Generics)
@@ -190,7 +211,7 @@ fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FuncIns) {
 			continue
 		}
 		mut decl := f.Decl.Generics[i]
-		dest = append(dest, &TypeAlias{
+		*dest = append(*dest, &TypeAlias{
 			Used: true,
 			Generic: true,
 			Scope: f.Decl.Scope,
@@ -204,7 +225,7 @@ fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FuncIns) {
 		mut owner := f.Owner
 		for (i, mut g) in owner.Generics {
 			mut decl := owner.Decl.Generics[i]
-			dest = append(dest, &TypeAlias{
+			*dest = append(*dest, &TypeAlias{
 				Used: true,
 				Generic: true,
 				Scope: f.Decl.Scope,
@@ -216,7 +237,7 @@ fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FuncIns) {
 	}
 }
 
-fn findFile(mut &files: []&SymTab, &handler: &token::FileSet): &SymTab {
+fn findFile(mut files: []&SymTab, handler: &token::FileSet): &SymTab {
 	for (_, mut fl) in files {
 		if fl.File == handler {
 			ret fl
@@ -261,7 +282,7 @@ struct commonSemaMeta {
 }
 
 impl commonSemaMeta {
-	fn pushComptimeTypeInfo(mut self, mut &t: &Type): &comptimeTypeInfo {
+	fn pushComptimeTypeInfo(mut *self, mut t: &Type): &comptimeTypeInfo {
 		for (_, mut t2) in self.comptimeTypeInfos {
 			if t2.base.Equal(t) {
 				ret t2
@@ -298,7 +319,7 @@ impl Lookup for sema {
 	//
 	// Lookups:
 	//	- Current file's imported packages.
-	fn SelectPackage(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
+	fn SelectPackage(mut *self, selector: fn(&ImportInfo): bool): &ImportInfo {
 		ret self.file.SelectPackage(selector)
 	}
 
@@ -308,7 +329,7 @@ impl Lookup for sema {
 	// Lookups:
 	//	- Package file's symbol table.
 	//	- Current file's public denifes of imported packages.
-	fn FindVar(mut self, name: str, _bind: bool): &Var {
+	fn FindVar(mut *self, name: str, _bind: bool): &Var {
 		// Lookup package files.
 		mut v := findVarInPackage(self.files, name, _bind)
 		if v != nil {
@@ -323,7 +344,7 @@ impl Lookup for sema {
 	// Lookups:
 	//	- Package file's symbol table.
 	//	- Current file's public denifes of imported packages.
-	fn FindTypeAlias(mut self, name: str, _bind: bool): &TypeAlias {
+	fn FindTypeAlias(mut *self, name: str, _bind: bool): &TypeAlias {
 		// Lookup package files.
 		mut ta := findTypeAliasInPackage(self.files, name, _bind)
 		if ta != nil {
@@ -338,7 +359,7 @@ impl Lookup for sema {
 	// Lookups:
 	//	- Package file's symbol table.
 	//	- Current file's public denifes of imported packages.
-	fn FindStruct(mut self, name: str, _bind: bool): &Struct {
+	fn FindStruct(mut *self, name: str, _bind: bool): &Struct {
 		// Lookup package files.
 		mut s := findStructInPackage(self.files, name, _bind)
 		if s != nil {
@@ -353,7 +374,7 @@ impl Lookup for sema {
 	// Lookups:
 	//	- Package file's symbol table.
 	//	- Current file's public denifes of imported packages.
-	fn FindFunc(mut self, name: str, _bind: bool): &Func {
+	fn FindFunc(mut *self, name: str, _bind: bool): &Func {
 		// Lookup package files.
 		mut f := findFuncInPackage(self.files, name, _bind)
 		if f != nil {
@@ -368,7 +389,7 @@ impl Lookup for sema {
 	// Lookups:
 	//	- Package file's symbol table.
 	//	- Current file's public denifes of imported packages.
-	fn FindTrait(mut self, name: str): &Trait {
+	fn FindTrait(mut *self, name: str): &Trait {
 		// Lookup package files.
 		mut t := findTraitInPackage(self.files, name)
 		if t != nil {
@@ -383,7 +404,7 @@ impl Lookup for sema {
 	// Lookups:
 	//	- Package file's symbol table.
 	//	- Current file's public denifes of imported packages.
-	fn FindEnum(mut self, name: str): &Enum {
+	fn FindEnum(mut *self, name: str): &Enum {
 		// Lookup package files.
 		mut e := findEnumInPackage(self.files, name)
 		if e != nil {
@@ -398,7 +419,7 @@ impl Lookup for sema {
 	// Lookups:
 	//	- Package file's symbol table.
 	//	- Current file's public denifes of imported packages.
-	fn FindTypeEnum(mut self, name: str): &TypeEnum {
+	fn FindTypeEnum(mut *self, name: str): &TypeEnum {
 		// Lookup package files.
 		mut e := findTypeEnumInPackage(self.files, name)
 		if e != nil {
@@ -410,16 +431,16 @@ impl Lookup for sema {
 
 impl sema {
 	// Reports whether flags has given flag.
-	fn isFlag(self, flags: int): bool { ret self.flags&flags == flags }
+	fn isFlag(*self, flags: int): bool { ret self.flags&flags == flags }
 
-	fn getCurrentFile(mut self): &SymTab { ret self.file }
-	fn setCurrentFile(mut self, mut f: &SymTab) { self.file = f }
+	fn getCurrentFile(mut *self): &SymTab { ret self.file }
+	fn setCurrentFile(mut *self, mut f: &SymTab) { self.file = f }
 
-	fn pushErr(mut self, token: &token::Token, fmt: str, args: ...any) {
+	fn pushErr(mut *self, token: &token::Token, fmt: str, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, true, fmt, args...))
 	}
 
-	fn pushErrorFromLitError(mut self, t: &token::Token, err: lit::Error) {
+	fn pushErrorFromLitError(mut *self, t: &token::Token, err: lit::Error) {
 		self.errors = append(self.errors, log::Log{
 			Kind: log::Error,
 			Row: t.Row,
@@ -430,20 +451,20 @@ impl sema {
 		})
 	}
 
-	fn pushErrorsFromLitErrors(mut self, t: &token::Token, errors: []lit::Error) {
+	fn pushErrorsFromLitErrors(mut *self, t: &token::Token, errors: []lit::Error) {
 		for _, err in errors {
 			self.pushErrorFromLitError(t, err)
 		}
 	}
 
 	// Push suggestion to last log.
-	fn pushSuggestion(mut self, fmt: str, args: ...any) {
+	fn pushSuggestion(mut *self, fmt: str, args: ...any) {
 		unsafe { pushSuggestion(&self.errors[len(self.errors)-1], fmt, args...) }
 	}
 
 	// Reports whether define is accessible in the current package.
 	// The public and token parameters belongs to define which is accessed.
-	fn isAccessibleDefine(self, public: bool, token: &token::Token): bool {
+	fn isAccessibleDefine(*self, public: bool, token: &token::Token): bool {
 		if public || token.File == nil {
 			// public or built-in
 			ret true
@@ -466,7 +487,7 @@ impl sema {
 	// Reports this identifier duplicated in package's global scope.
 	// The "self" parameter represents address of exception identifier.
 	// If founded identifier address equals to self, will be skipped.
-	fn isDuplicatedName(self, itself: uintptr, &name: str, _bind: bool): bool {
+	fn isDuplicatedName(*self, itself: uintptr, name: str, _bind: bool): bool {
 		for _, f in self.files {
 			if f.isDuplicatedName(itself, name, _bind) {
 				ret true
@@ -475,7 +496,7 @@ impl sema {
 		ret false
 	}
 
-	fn checkDirectives(mut &self, mut &d: []&ast::Directive, mut o: any) {
+	fn checkDirectives(mut &self, mut d: []&ast::Directive, mut o: any) {
 		mut dc := directiveChecker{
 			s: self,
 			d: unsafe { (&[]&ast::Directive)(&d) },
@@ -484,7 +505,7 @@ impl sema {
 		dc.check()
 	}
 
-	fn checkGenericQuantity(mut self, required: int, given: int, token: &token::Token): (ok: bool) {
+	fn checkGenericQuantity(mut *self, required: int, given: int, token: &token::Token): (ok: bool) {
 		match {
 		| required == 0 && given > 0:
 			self.pushErr(token, log::NotHasGenerics)
@@ -503,7 +524,7 @@ impl sema {
 		}
 	}
 
-	fn getImportDef(self, &name: str, mut &imp: &ImportInfo): any {
+	fn getImportDef(*self, name: str, mut imp: &ImportInfo): any {
 		if findPackageBuiltinDef(imp.LinkPath, name) != nil {
 			ret true
 		}
@@ -518,7 +539,7 @@ impl sema {
 		ret nil
 	}
 
-	fn isUseAliasDuplication(mut self, &imp: &ImportInfo): bool {
+	fn isUseAliasDuplication(mut *self, imp: &ImportInfo): bool {
 		for (_, mut imp2) in self.file.Imports {
 			if imp == imp2 {
 				break
@@ -530,7 +551,7 @@ impl sema {
 		ret false
 	}
 
-	fn checkAutoAlias(mut self, mut &imp: &ImportInfo): bool {
+	fn checkAutoAlias(mut *self, mut imp: &ImportInfo): bool {
 		if imp.LinkPath == "std/unsafe" {
 			// the "std/unsafe" package is able to use the "unsafe" keyword as alias
 			ret true
@@ -548,7 +569,7 @@ impl sema {
 		ret valid
 	}
 
-	fn checkImport(mut self, mut &imp: &ImportInfo): bool {
+	fn checkImport(mut *self, mut imp: &ImportInfo): bool {
 		if imp.Bind {
 			ret true
 		}
@@ -574,7 +595,7 @@ impl sema {
 		ret true
 	}
 
-	fn checkImports(mut self) {
+	fn checkImports(mut *self) {
 		for (_, mut file) in self.files {
 			self.setCurrentFile(file)
 			for (_, mut imp) in self.file.Imports {
@@ -673,7 +694,7 @@ impl sema {
 	}
 
 	// Builds type, builds result as kind and collects referred type aliases.
-	fn buildTypeWithRefers(mut &self, mut &t: &ast::Expr, mut l: Lookup,
+	fn buildTypeWithRefers(mut &self, mut t: &ast::Expr, mut l: Lookup,
 		mut generics: []&TypeAlias, mut referencer: &referencer): &Type {
 		ret self.typeChecker(l, generics, referencer).checkDecl(t)
 	}
@@ -681,7 +702,7 @@ impl sema {
 	// Checks TypeSYm, builds result as Type and collects referred type aliases.
 	// Skips already checked types.
 	// See also developer reference (9).
-	fn checkTypeSymWithRefers(mut &self, mut &t: &TypeSym, mut l: Lookup, mut referencer: &referencer): (ok: bool) {
+	fn checkTypeSymWithRefers(mut &self, mut t: &TypeSym, mut l: Lookup, mut referencer: &referencer): (ok: bool) {
 		mut ta := false // Referencer owner is type alias.
 		if t.checked() {
 			match type referencer.owner {
@@ -707,12 +728,12 @@ impl sema {
 
 	// Checks type and builds result as Type.
 	// Skips already checked types.
-	fn checkTypeSym(mut &self, mut &t: &TypeSym, mut l: Lookup): bool {
+	fn checkTypeSym(mut &self, mut t: &TypeSym, mut l: Lookup): bool {
 		ret self.checkTypeSymWithRefers(t, l, nil)
 	}
 
 	// Same as the checkTypeSym but takes referencer.
-	fn checkTypeSymRefers(mut &self, mut &t: &ast::Expr, mut l: Lookup, mut refers: &ReferenceStack): &Type {
+	fn checkTypeSymRefers(mut &self, mut t: &ast::Expr, mut l: Lookup, mut refers: &ReferenceStack): &Type {
 		mut tc := &typeChecker{
 			s: self,
 			rootLookup: l,
@@ -724,7 +745,7 @@ impl sema {
 
 	// Builds type with type aliases for generics.
 	// Returns nil if error occur or failed.
-	fn buildTypeWithGenerics(mut &self, mut &t: &ast::Expr,
+	fn buildTypeWithGenerics(mut &self, mut t: &ast::Expr,
 		mut generics: []&TypeAlias, mut refers: &ReferenceStack): &Type {
 		mut tc := &typeChecker{
 			s: self,
@@ -737,12 +758,12 @@ impl sema {
 	}
 
 	// Same as self.buildTypeWithGenerics but not uses any generics.
-	fn buildType(mut &self, mut &t: &ast::Expr): &Type {
+	fn buildType(mut &self, mut t: &ast::Expr): &Type {
 		ret self.buildTypeWithGenerics(t, nil, nil)
 	}
 
 	// Select type with name selection.
-	fn selectType(mut &self, mut &t: &ast::Expr): &Type {
+	fn selectType(mut &self, mut t: &ast::Expr): &Type {
 		mut tc := &typeChecker{
 			s: self,
 			rootLookup: self,
@@ -779,15 +800,21 @@ impl sema {
 	}
 
 	// Do not checks mutability.
-	fn checkAssignType(mut &self, destIsRef: bool, mut &dest: &Type,
-		mut &v: &Value, mut errorToken: &token::Token, mut refers: &ReferenceStack): bool {
+	fn checkAssignType(mut &self, destIsRef: bool, firstAssignToDest: bool, mut dest: &Type,
+		mut v: &Value, mut errorToken: &token::Token, mut refers: &ReferenceStack): bool {
 		if v.Decl {
 			self.pushErr(errorToken, log::InvalidExpr)
 			ret false
 		}
+
 		if destIsRef {
-			if !dest.Equal(v.Type) {
-				self.pushErr(errorToken, log::IncompatibleTypes, dest.Str(), v.Type.Str())
+			if firstAssignToDest {
+				if !v.IsNil() && !dest.Equal(v.Type) {
+					self.pushErr(errorToken, log::IncompatibleTypes, dest.Str(), v.Type.Str())
+					ret false
+				}
+			} else if !v.IsNil() {
+				self.pushErr(errorToken, "reference pointer type @ can only assign to nil", dest.Str())
 				ret false
 			}
 		} else {
@@ -822,7 +849,7 @@ impl sema {
 		ret true
 	}
 
-	fn _checkTypeCompatibility(mut &self, mut &dest: &Type, mut &src: &Type,
+	fn _checkTypeCompatibility(mut &self, mut dest: &Type, mut src: &Type,
 		mut errorToken: &token::Token, flags: int): bool {
 		if src == nil {
 			ret false
@@ -841,8 +868,8 @@ impl sema {
 		ret tcc.check()
 	}
 
-	fn checkTypeCompatibility(mut &self, mut &dest: &Type,
-		mut &src: &Type, mut &errorToken: &token::Token, flags: int): bool {
+	fn checkTypeCompatibility(mut &self, mut dest: &Type,
+		mut src: &Type, mut errorToken: &token::Token, flags: int): bool {
 		if self._checkTypeCompatibility(dest, src, errorToken, flags) {
 			ret true
 		}
@@ -850,8 +877,8 @@ impl sema {
 		ret false
 	}
 
-	fn pushCompatibilityError(mut self, mut &dest: &Type, mut &src: &Value,
-		mut &errorToken: &token::Token) {
+	fn pushCompatibilityError(mut *self, mut dest: &Type, mut src: &Value,
+		mut errorToken: &token::Token) {
 		if src.untyped && src.IsConst() {
 			match {
 			| src.Constant.IsInt():
@@ -865,8 +892,8 @@ impl sema {
 		self.pushErr(errorToken, log::IncompatibleTypes, dest.Str(), src.Type.Str())
 	}
 
-	fn checkTypeCompatibility1(mut &self, mut &dest: &Type, mut &src: &Value,
-		mut &errorToken: &token::Token, flags: int): bool {
+	fn checkTypeCompatibility1(mut &self, mut dest: &Type, mut src: &Value,
+		mut errorToken: &token::Token, flags: int): bool {
 		if self._checkTypeCompatibility(dest, src.Type, errorToken, flags) {
 			ret true
 		}
@@ -880,21 +907,21 @@ impl sema {
 	// Useful:
 	//	- For non-generic type parsed string type kinds.
 	//	- For checking non-generic types.
-	fn buildNonGenericType(mut &self, mut &ast: &ast::Expr,
-		mut useGenerics: []&TypeAlias, mut &ignoreGenerics: []&ast::Generic, mut &ignored: []&Type, mut &recheckNeed: []recheckableType): &Type {
+	fn buildNonGenericType(mut &self, mut ast: &ast::Expr,
+		mut useGenerics: []&TypeAlias, mut ignoreGenerics: []&ast::Generic, mut &ignored: *[]&Type, mut &recheckNeed: *[]recheckableType): &Type {
 		mut tc := &typeChecker{
 			s: self,
 			rootLookup: self,
 			lookup: self,
 			useGenerics: useGenerics,
 			ignoreGenerics: ignoreGenerics,
-			ignoredGenerics: &ignored,
-			recheckNeed: &recheckNeed,
+			ignoredGenerics: ignored,
+			recheckNeed: recheckNeed,
 		}
 		ret tc.checkDecl(ast)
 	}
 
-	fn buildFuncNonGenericTypes(mut &self, mut f: &FuncIns, mut &ignored: []&Type, mut &recheckNeed: []recheckableType): (ok: bool) {
+	fn buildFuncNonGenericTypes(mut &self, mut f: &FuncIns, mut &ignored: *[]&Type, mut &recheckNeed: *[]recheckableType): (ok: bool) {
 		// Check with funcEnvironment, we need to generics of owner, if any.
 		// If owner generics are ignored, we cannot resolve them with type inference.
 		// Resolve owner generics in time, only ignore generics of the function.
@@ -914,7 +941,7 @@ impl sema {
 		})
 	}
 
-	fn getTraitCheckFuncKind(mut &self, mut &f: &Func): &FuncIns {
+	fn getTraitCheckFuncKind(mut &self, mut f: &Func): &FuncIns {
 		if len(f.Instances) == 1 {
 			ret f.Instances[0]
 		}
@@ -943,7 +970,7 @@ impl sema {
 		ret ins
 	}
 
-	fn checkConstraintsFunc(mut &self, mut &f: &FuncIns, mut &et: &token::Token, mut exist: &FuncIns): bool {
+	fn checkConstraintsFunc(mut &self, mut f: &FuncIns, mut et: &token::Token, mut exist: &FuncIns): bool {
 		mut cc := self.constraintChecker()
 		cc.et = et
 		cc.fi = f
@@ -957,7 +984,7 @@ impl sema {
 		ret cc.check()
 	}
 
-	fn checkConstraintsStruct(mut &self, mut &s: &StructIns, mut &et: &token::Token, mut exist: &StructIns): bool {
+	fn checkConstraintsStruct(mut &self, mut s: &StructIns, mut et: &token::Token, mut exist: &StructIns): bool {
 		mut cc := self.constraintChecker()
 		cc.et = et
 		cc.si = s
@@ -974,7 +1001,7 @@ impl sema {
 	// Calls algo in the function's native environment.
 	// Errors will be handled.
 	// Returns result of algo.
-	fn basicFuncEnvironment(mut &self, mut &f: &FuncIns, algo: fn(mut &sema: &sema): bool): bool {
+	fn basicFuncEnvironment(mut &self, mut f: &FuncIns, algo: fn(mut sema: &sema): bool): bool {
 		f.fillEnviron(false)
 
 		if f.env.file != nil {
@@ -994,13 +1021,16 @@ impl sema {
 	}
 
 	// Calls basicFuncEnvironment internally but handles generics.
-	fn funcEnvironment(mut &self, mut f: &FuncIns, algo: fn(mut &sema: &sema, mut &generics: []&TypeAlias): bool): bool {
+	fn funcEnvironment(mut &self, mut f: &FuncIns, algo: fn(mut sema: &sema, mut generics: []&TypeAlias): bool): bool {
 		// Needs to f.environ(), but the basicFuncEnviron will handle it.
 		ret self.basicFuncEnvironment(f, fn|mut sema| algo(f.env.sema, f.env.generics))
 	}
 
-	fn checkFuncParamKind(mut &self, mut &p: &ParamIns) {
+	fn checkFuncParamKind(mut &self, mut p: &ParamIns) {
 		p.Type.Variadic = p.Decl.Variadic
+		if p.Decl.Reference {
+			checkTypeForRef(self, p.Type, p.Decl.Token)
+		}
 	}
 
 	// Reload type of function's self (receiver) parameter.
@@ -1018,7 +1048,8 @@ impl sema {
 		if p.Type != nil {
 			ret
 		}
-		if p.Decl.IsRef() {
+		match {
+		| p.Decl.IsSmartptr():
 			p.Type = &Type{
 				Kind: &Sptr{
 					Value: &Type{
@@ -1026,8 +1057,16 @@ impl sema {
 					},
 				},
 			}
-		} else {
-			p.Type = &Type{Kind: f.Owner}
+		| p.Decl.IsRefptr():
+			p.Type = &Type{
+				Kind: &Ptr{
+					Value: &Type{
+						Kind: f.Owner,
+					},
+				},
+			}
+		|:
+			// no-op: first parameter is not a receiver
 		}
 	}
 
@@ -1057,15 +1096,35 @@ impl sema {
 		})
 	}
 
-	fn checkRefValidityForInitExpr(mut &self, leftMut: bool, mut &v: &Value, mut &errorToken: &token::Token): bool {
-		if !isValidModelForRef(v.Model) {
-			self.pushErr(errorToken, log::RefAssignNonVar)
-			ret false
+	fn checkRefValidityForInitExpr(mut &self, leftMut: bool, mut v: &Value, mut errorToken: &token::Token): bool {
+		// If value is nil-literal, there is nothing to do.
+		// Report true, passed nil pointer to the reference.
+		if v.IsNil() {
+			ret true
 		}
+
+		_v, _ := v.Model.(&Var)
+		if _v != nil && v.Reference {
+			// No extra effort needed.
+			// We point to another reference pointer.
+		} else {
+			// Check if the expression model is suitable to initialize a reference pointer.
+			// Since reference pointers are use raw-pointers, initialize expression must be unary.
+			// For a quick return, check whether the expression is unary.
+			// The isValidModelForRef function checks expression more deeply.
+			mut unary, _ := v.Model.(&UnaryExpr)
+			if unary == nil || !isValidModelForRef(unary.Expr.Model) {
+				self.pushErr(errorToken, log::RefAssignNonVar)
+				ret false
+			}
+		}
+
+		// Check mutability for the reference pointer.
 		if leftMut && !v.Mutable {
 			self.pushErr(errorToken, log::MutRefPointsImmut)
 			ret false
 		}
+
 		ret true
 	}
 
@@ -1074,7 +1133,7 @@ impl sema {
 	// It will not check mutability risk of the internal mutable data or etc.
 	// It will check interior mutability risk of the new copy.
 	// Assumes the assigned memory is mutable.
-	fn isMutRiskyStruct(self, &s: &StructIns): bool {
+	fn isMutRiskyStruct(*self, s: &StructIns): bool {
 		for _, f in s.Fields {
 			// Inerior mutability enables to copy internal mutable data with safety.
 			// If field is interior mutable and their kind is mutable,
@@ -1102,8 +1161,19 @@ impl sema {
 	}
 
 	fn checkValidityForInitExpr(mut &self, leftMut: bool, leftRef: bool,
-		&leftKind: &Type, mut &v: &Value, mut &errorToken: &token::Token): bool {
-		if leftMut && !v.Mutable {
+		leftKind: &Type, mut v: &Value, mut errorToken: &token::Token): bool {
+		// Check value for reference pointers if value will be assigned to a reference pointer.
+		// The checkRefValidityForInitExpr will update mutability of the value, if necessary.
+		// See documentation of the checkRefValidityForInitExpr function.
+		if leftRef {
+			if !self.checkRefValidityForInitExpr(leftMut, v, errorToken) {
+				ret false
+			}
+		} else if leftMut && !v.Mutable {
+			// This case is an "else if", because if the destination memory
+			// is a reference pointer, the checkRefValidityForInitExpr function
+			// will check the mutability.
+
 			// Check classical assignment mutability.
 			if v.Type.Mutable() || v.Type.Variadic {
 				self.pushErr(errorToken, log::AssignNonMutToMut, v.Type.Str())
@@ -1116,11 +1186,6 @@ impl sema {
 				ret false
 			}
 		}
-		if leftRef {
-			if !self.checkRefValidityForInitExpr(leftMut, v, errorToken) {
-				ret false
-			}
-		}
 		mut atc := &assignTypeChecker{
 			s: self,
 			v: v,
@@ -1129,7 +1194,7 @@ impl sema {
 		ret atc.checkValidity()
 	}
 
-	fn checkTypeAliasDeclKind(mut &self, mut &ta: &TypeAlias, mut prev: &referencer, mut l: Lookup): (ok: bool) {
+	fn checkTypeAliasDeclKind(mut &self, mut ta: &TypeAlias, mut prev: &referencer, mut l: Lookup): (ok: bool) {
 		mut old := self.file
 		defer {
 			self.setCurrentFile(old)
@@ -1158,7 +1223,7 @@ impl sema {
 		ret
 	}
 
-	fn checkTypeAliasDecl(mut &self, mut &ta: &TypeAlias, mut prev: &referencer, mut l: Lookup): (ok: bool) {
+	fn checkTypeAliasDecl(mut &self, mut ta: &TypeAlias, mut prev: &referencer, mut l: Lookup): (ok: bool) {
 		if jule::IsBlank(ta.Name) {
 			self.pushErr(ta.Token, log::IgnoreIdent)
 		}
@@ -1188,7 +1253,7 @@ impl sema {
 	}
 
 	// Checks type alias declaration with duplicated identifiers.
-	fn checkTypeAliasDeclDup(mut &self, mut &ta: &TypeAlias) {
+	fn checkTypeAliasDeclDup(mut &self, mut ta: &TypeAlias) {
 		if self.isDuplicatedName(uintptr(ta), ta.Name, ta.Bind) {
 			self.pushErr(ta.Token, log::DuplicatedIdent, ta.Name)
 			self.pushSuggestion(log::RenameForAvoidDuplication)
@@ -1209,7 +1274,7 @@ impl sema {
 		ret true
 	}
 
-	fn checkTypeEnumItemType(mut &self, mut &e: &TypeEnum, mut &item: &TypeEnumItem): (ok: bool) {
+	fn checkTypeEnumItemType(mut &self, mut e: &TypeEnum, mut item: &TypeEnumItem): (ok: bool) {
 		mut old := self.file
 		defer {
 			self.setCurrentFile(old)
@@ -1231,7 +1296,7 @@ impl sema {
 		ret
 	}
 
-	fn checkTypeEnumDecl(mut &self, mut &e: &TypeEnum) {
+	fn checkTypeEnumDecl(mut &self, mut e: &TypeEnum) {
 		if jule::IsBlank(e.Name) {
 			self.pushErr(e.Token, log::IgnoreIdent)
 		} else if self.isDuplicatedName(uintptr(e), e.Name, false) {
@@ -1273,7 +1338,7 @@ impl sema {
 		ret true
 	}
 
-	fn checkEnumItemsDup(mut self, items: []&Var) {
+	fn checkEnumItemsDup(mut *self, items: []&Var) {
 		for _, item in items {
 			// The last item is nil.
 			// See developer reference (14).
@@ -1298,7 +1363,7 @@ impl sema {
 		}
 	}
 
-	fn precheckEnumDecl(mut &self, mut &e: &Enum) {
+	fn precheckEnumDecl(mut &self, mut e: &Enum) {
 		if jule::IsBlank(e.Name) {
 			self.pushErr(e.Token, log::IgnoreIdent)
 		} else if self.isDuplicatedName(uintptr(e), e.Name, false) {
@@ -1347,7 +1412,7 @@ impl sema {
 		}
 	}
 
-	fn checkEnumDecl(mut &self, mut &e: &Enum) {
+	fn checkEnumDecl(mut &self, mut e: &Enum) {
 		for (_, mut item) in e.Items {
 			// The last item is nil.
 			// See developer reference (14).
@@ -1379,7 +1444,7 @@ impl sema {
 		ret true
 	}
 
-	fn checkDeclGenerics(mut self, &generics: []&ast::Generic): (ok: bool) {
+	fn checkDeclGenerics(mut *self, generics: []&ast::Generic): (ok: bool) {
 		ok = true
 		for i, g in generics {
 			if jule::IsBlank(g.Name) {
@@ -1406,7 +1471,7 @@ impl sema {
 		ret
 	}
 
-	fn checkFuncDeclParamsDup(mut self, &f: &Func): (ok: bool) {
+	fn checkFuncDeclParamsDup(mut *self, f: &Func): (ok: bool) {
 		ok = true
 	check:
 		for i, p in f.Params {
@@ -1443,7 +1508,7 @@ impl sema {
 		ret
 	}
 
-	fn checkFuncDeclResultDup(mut self, mut &f: &Func): (ok: bool) {
+	fn checkFuncDeclResultDup(mut *self, mut f: &Func): (ok: bool) {
 		ok = true
 		if f.IsVoid() {
 			ret
@@ -1488,7 +1553,7 @@ impl sema {
 		ret
 	}
 
-	fn checkFuncVariadicParam(mut &self, mut &f: &Func): bool {
+	fn checkFuncVariadicParam(mut &self, mut f: &Func): bool {
 		if len(f.Params) == 0 {
 			ret false
 		}
@@ -1501,7 +1566,7 @@ impl sema {
 
 	// Checks generics, parameters and return type.
 	// Not checks scope, and other things.
-	fn checkFuncDeclPrototype(mut &self, mut &f: &Func) {
+	fn checkFuncDeclPrototype(mut &self, mut f: &Func) {
 		if f.Exceptional && f.Bind {
 			self.pushErr(f.Token, log::BindedExceptional)
 			ret
@@ -1528,7 +1593,7 @@ impl sema {
 		}
 	}
 
-	fn catchTraitInheritCycle(mut &self, t1: &Trait, mut t2: &Trait, mut &message: strings::Builder): (ok: bool) {
+	fn catchTraitInheritCycle(mut &self, t1: &Trait, mut t2: &Trait, mut &message: *strings::Builder): (ok: bool) {
 		ok = true
 		for (_, mut i) in t2.Inherits {
 			if i.Type == nil {
@@ -1547,7 +1612,7 @@ impl sema {
 		ret
 	}
 
-	fn _checkTraitDeclInherits(mut &self, mut &t: &Trait): (ok: bool) {
+	fn _checkTraitDeclInherits(mut &self, mut t: &Trait): (ok: bool) {
 		ok = true
 		for (i, mut it) in t.Inherits {
 			if !self.checkTypeSym(it, self) {
@@ -1576,11 +1641,11 @@ impl sema {
 			} else {
 				mut message := strings::Builder{}
 				message.Grow(1 << 6)
-				ok = ok && self.catchTraitInheritCycle(t, t2, message)
+				ok = ok && self.catchTraitInheritCycle(t, t2, &message)
 				if message.Len() > 0 {
 					mut errMsg := message.Str()
 					message.Clear()
-					self.pushCycleError(t.Name, t2.Name, message)
+					self.pushCycleError(t.Name, t2.Name, &message)
 					errMsg += message.Str()
 					self.pushErr(it.Decl.Token, log::IllegalCrossCycle, errMsg)
 				}
@@ -1589,7 +1654,7 @@ impl sema {
 		ret ok
 	}
 
-	fn checkTraitDeclInherits(mut &self, mut &t: &Trait) {
+	fn checkTraitDeclInherits(mut &self, mut t: &Trait) {
 		for (i, mut it) in t.Inherits {
 			mut t1 := it.Type.Trait()
 			for (j, mut it2) in t.Inherits {
@@ -1614,7 +1679,7 @@ impl sema {
 		}
 	}
 
-	fn checkTraitDeclMethod(mut &self, mut &f: &Func) {
+	fn checkTraitDeclMethod(mut &self, mut f: &Func) {
 		if jule::IsBlank(f.Name) {
 			self.pushErr(f.Token, log::IgnoreIdent)
 		} else if jule::IsAnon(f.Name) {
@@ -1628,7 +1693,7 @@ impl sema {
 		f.appendInstance(ins)
 	}
 
-	fn checkTraitDeclMethods(mut &self, mut &t: &Trait) {
+	fn checkTraitDeclMethods(mut &self, mut t: &Trait) {
 		for (i, mut f) in t.Methods {
 			self.checkTraitDeclMethod(f)
 
@@ -1664,7 +1729,7 @@ impl sema {
 		}
 	}
 
-	fn checkTraitDecl(mut &self, mut &t: &Trait) {
+	fn checkTraitDecl(mut &self, mut t: &Trait) {
 		if jule::IsBlank(t.Name) {
 			self.pushErr(t.Token, log::IgnoreIdent)
 		} else if self.isDuplicatedName(uintptr(t), t.Name, false) {
@@ -1688,7 +1753,7 @@ impl sema {
 		ret true
 	}
 
-	fn checkTraitImplMethods(mut self, mut &base: &Trait, &ipl: &Impl): (ok: bool) {
+	fn checkTraitImplMethods(mut *self, mut base: &Trait, ipl: &Impl): (ok: bool) {
 		ok = true
 		for _, f in ipl.Methods {
 			if base.FindMethod(f.Name) == nil {
@@ -1699,7 +1764,7 @@ impl sema {
 		ret
 	}
 
-	fn implToStruct(mut &self, mut &dest: &Struct, mut &ipl: &Impl): (ok: bool) {
+	fn implToStruct(mut &self, mut dest: &Struct, mut ipl: &Impl): (ok: bool) {
 		ok = true
 
 		// Methods.
@@ -1741,7 +1806,7 @@ impl sema {
 	}
 
 	// Implement trait to destination.
-	fn implTrait(mut &self, mut &decl: &Impl) {
+	fn implTrait(mut &self, mut decl: &Impl) {
 		mut baseT := self.selectType(decl.Base)
 		if baseT == nil {
 			ret
@@ -1780,7 +1845,7 @@ impl sema {
 		}
 	}
 
-	fn implStruct(mut &self, mut &decl: &Impl) {
+	fn implStruct(mut &self, mut decl: &Impl) {
 		mut destT := self.selectType(decl.Dest)
 		if destT == nil {
 			ret
@@ -1804,7 +1869,7 @@ impl sema {
 	}
 
 	// Implement implementation.
-	fn implImpl(mut &self, mut &decl: &Impl) {
+	fn implImpl(mut &self, mut decl: &Impl) {
 		match {
 		| decl.IsTraitImpl():
 			self.implTrait(decl)
@@ -1815,7 +1880,7 @@ impl sema {
 
 	// Checks variable declaration.
 	// Will not check duplicated identifiers.
-	fn checkVarDecl(mut &self, mut &decl: &Var, mut l: Lookup) {
+	fn checkVarDecl(mut &self, mut decl: &Var, mut l: Lookup) {
 		// If declaration is constant and have not a group, complain for initialize expression.
 		// Otherwise do not. Because it may be enumerated.
 		// It will be checked by the [checkVarValue] method.
@@ -1864,7 +1929,7 @@ impl sema {
 
 	// Checks variable declaration for global scope.
 	// Checks duplicated identifiers by Sema.
-	fn checkGlobalVarDecl(mut &self, mut &decl: &Var) {
+	fn checkGlobalVarDecl(mut &self, mut decl: &Var) {
 		if self.isDuplicatedName(uintptr(decl), decl.Name, decl.Bind) {
 			self.pushErr(decl.Token, log::DuplicatedIdent, decl.Name)
 			self.pushSuggestion(log::RenameForAvoidDuplication)
@@ -1892,7 +1957,7 @@ impl sema {
 		ret true
 	}
 
-	fn checkStructTraitImpl(mut &self, mut &strct: &Struct, mut &trt: &Trait): (ok: bool) {
+	fn checkStructTraitImpl(mut &self, mut strct: &Struct, mut trt: &Trait): (ok: bool) {
 		ok = true
 		for (_, mut tf) in trt.Methods {
 			mut exist := false
@@ -1913,7 +1978,7 @@ impl sema {
 		ret
 	}
 
-	fn checkStructImpls(mut &self, mut &s: &Struct): (ok: bool) {
+	fn checkStructImpls(mut &self, mut s: &Struct): (ok: bool) {
 		ok = true
 		for (_, mut trt) in s.Implements {
 			ok = self.checkStructTraitImpl(s, trt) && ok
@@ -1921,7 +1986,7 @@ impl sema {
 		ret ok
 	}
 
-	fn checkStructFields(mut &self, mut &st: &Struct): (ok: bool) {
+	fn checkStructFields(mut &self, mut st: &Struct): (ok: bool) {
 		ok = true
 		for (_, mut f) in st.Fields {
 			f.Owner = st
@@ -1942,7 +2007,7 @@ impl sema {
 		ret ok
 	}
 
-	fn checkStructFieldTags(mut &self, mut &s: &Struct): (ok: bool) {
+	fn checkStructFieldTags(mut &self, mut s: &Struct): (ok: bool) {
 		ok = true
 		mut tc := tagChecker{
 			s: self,
@@ -1956,7 +2021,7 @@ impl sema {
 		ret
 	}
 
-	fn checkStructDecl(mut &self, mut &s: &Struct) {
+	fn checkStructDecl(mut &self, mut s: &Struct) {
 		if jule::IsBlank(s.Name) {
 			self.pushErr(s.Token, log::IgnoreIdent)
 		} else if self.isDuplicatedName(uintptr(s), s.Name, s.Bind) {
@@ -2009,12 +2074,12 @@ impl sema {
 		ret true
 	}
 
-	fn checkAnonFuncDecl(mut &self, mut &f: &Func) {
+	fn checkAnonFuncDecl(mut &self, mut f: &Func) {
 		f.sema = self
 		self.checkFuncDeclPrototype(f)
 	}
 
-	fn checkFuncDecl(mut &self, mut &f: &Func) {
+	fn checkFuncDecl(mut &self, mut f: &Func) {
 		if jule::IsBlank(f.Name) {
 			self.pushErr(f.Token, log::IgnoreIdent)
 		} else if f.IsAnon() {
@@ -2036,7 +2101,7 @@ impl sema {
 		}
 	}
 
-	fn checkFuncDeclsBy(mut &self, mut &funcs: []&Func): bool {
+	fn checkFuncDeclsBy(mut &self, mut funcs: []&Func): bool {
 		for (_, mut f) in funcs {
 			self.checkFuncDecl(f)
 			// Break checking if error occurs.
@@ -2052,7 +2117,7 @@ impl sema {
 		ret self.checkFuncDeclsBy(self.file.Funcs)
 	}
 
-	fn pushCycleError(self, &st1: str, &st2: str, mut &message: strings::Builder) {
+	fn pushCycleError(*self, st1: str, st2: str, mut &message: *strings::Builder) {
 		const Padding = 7
 		refersTo := log::Logf(log::RefersTo, st1, st2)
 		m := message.Str()
@@ -2098,7 +2163,7 @@ impl sema {
 		}
 	}
 
-	fn checkDataForTypeInference(mut self, &v: &Value, &errToken: &token::Token): bool {
+	fn checkDataForTypeInference(mut *self, v: &Value, errToken: &token::Token): bool {
 		match {
 		| v.IsNil():
 			self.pushErr(errToken, log::NilForTypeInference)
@@ -2115,7 +2180,7 @@ impl sema {
 	}
 
 	// Checks value of variable.
-	fn checkVarValue(mut &self, mut &v: &Var) {
+	fn checkVarValue(mut &self, mut v: &Var) {
 		// Catch the exceptional function calls for initialization value if variable static.
 		// If variable is constant, no need for extra attention.
 		// An exceptional function cannot return a constant value.
@@ -2131,6 +2196,10 @@ impl sema {
 			// Build new TypeSym because auto-type symbols are nil.
 			v.TypeSym = &TypeSym{Type: v.ValueSym.Value.Type}
 
+			if v.Reference {
+				checkTypeForRef(self, v.TypeSym.Type, v.Token)
+			}
+
 			// Check value for unwrap and physical memory constraint.
 			if !v.Constant && v.ValueSym.Value.untyped {
 				_ = checkValue(v.ValueSym.Value, self, v.ValueSym.Expr.Token, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
@@ -2144,6 +2213,10 @@ impl sema {
 				v.ValueSym.Value,
 				v.ValueSym.Expr.Token)
 		} else {
+			if v.Reference {
+				checkTypeForRef(self, v.TypeSym.Type, v.Token)
+			}
+
 			// Set the size of the array if it is auto-sized.
 			mut arr := v.TypeSym.Type.Array()
 			if arr != nil {
@@ -2155,7 +2228,8 @@ impl sema {
 				}
 			}
 
-			if self.checkAssignType(v.Reference, v.TypeSym.Type, v.ValueSym.Value, v.ValueSym.Expr.Token, v.Refers) {
+			const FirstAssignToDest = true // The variable takes first assignment with the initializer value.
+			if self.checkAssignType(v.Reference, FirstAssignToDest, v.TypeSym.Type, v.ValueSym.Value, v.ValueSym.Expr.Token, v.Refers) {
 				self.checkValidityForInitExpr(
 					v.Mutable,
 					v.Reference,
@@ -2182,7 +2256,7 @@ impl sema {
 
 	// Evaluates value of variable if initialized.
 	// Reports if value-check needed.
-	fn evalVarValue(mut &self, mut &v: &Var, mut l: Lookup): (valCheck: bool) {
+	fn evalVarValue(mut &self, mut v: &Var, mut l: Lookup): (valCheck: bool) {
 		// Determine with v.Scope=nil condition because scope analysis may
 		// reserve group members with trailing nil members, which is a mark for
 		// enum declaration members. Therefore, make sure variable is not defined
@@ -2269,13 +2343,17 @@ impl sema {
 		}
 
 		// Do not unwrap untyped literals, type analysis will check overflows.
-		v.ValueSym.Value = eval.evalExpr(v.ValueSym.Expr, evalDefault|evalExceptional)
+		mut evalFlags := evalDefault | evalExceptional
+		if v.Reference {
+			evalFlags |= evalRefptr
+		}
+		v.ValueSym.Value = eval.evalExpr(v.ValueSym.Expr, evalFlags)
 		ret true
 	}
 
 	// Evaluateds value of variable and checks.
 	// Assumes the variable is global.
-	fn checkVar(mut &self, mut &v: &Var, mut l: Lookup) {
+	fn checkVar(mut &self, mut v: &Var, mut l: Lookup) {
 		if v.Checked {
 			ret
 		}
@@ -2302,7 +2380,7 @@ impl sema {
 	// Returns new FuncIns as ready-to-analysis.
 	// If function already has a instance, returns existing instance.
 	// Returns nil if have a problem.
-	fn readyToCheckFunc(mut &self, mut &s: &StructIns, mut &f: &Func): &FuncIns {
+	fn readyToCheckFunc(mut &self, mut s: &StructIns, mut f: &Func): &FuncIns {
 		mut ins := f.instance()
 		if len(f.Instances) != 0 {
 			ret ins
@@ -2316,8 +2394,8 @@ impl sema {
 		ret nil
 	}
 
-	fn recheckType(mut &self, mut t: recheckableType, mut &errorToken: &token::Token,
-		mut &refers: &ReferenceStack): (ok: bool) {
+	fn recheckType(mut &self, mut t: recheckableType, mut errorToken: &token::Token,
+		mut refers: &ReferenceStack): (ok: bool) {
 		mut tc := &typeChecker{
 			s: self,
 			rootLookup: self,
@@ -2330,63 +2408,67 @@ impl sema {
 	// Basically same as the checkGenericFunc,
 	// but checks the function with the recheck strategy.
 	// See developer reference (15).
-	fn checkGenericFuncRecheck(mut &self, mut &f: &FuncIns, mut &et: &token::Token,
+	fn checkGenericFuncRecheck(mut &self, mut &f: *&FuncIns, mut et: &token::Token,
 		mut recheckNeed: []recheckableType): (ok: bool, exist: bool) {
 		// If len(recheckNeed)>0, check the types before handling function.
 		if len(recheckNeed) > 0 {
 			ok = true
 			for (_, mut t) in recheckNeed {
-				ok = self.recheckType(t, et, f.Refers) && ok
+				ok = self.recheckType(t, et, (*f).Refers) && ok
 			}
 			if !ok {
 				ret false, false
 			}
 		}
-		mut existInstance := f.Decl.appendInstance(f)
+		mut existInstance := (*f).Decl.appendInstance(*f)
 		// If instance already exist with same generics, return immediately.
 		// This function should be already checked, or it will be.
 		if existInstance != nil {
 			// Set f to exist one.
-			f = existInstance
+			*f = existInstance
 			ret true, true
 		}
 		// We still need to check self parameter.
-		self.reloadSelf(f)
-		if !self.checkConstraintsFunc(f, et, existInstance) {
+		self.reloadSelf(*f)
+		// Check parameter types.
+		for (_, mut p) in (*f).Params {
+			self.checkFuncParamKind(p)
+		}
+		if !self.checkConstraintsFunc(*f, et, existInstance) {
 			ret false, false
 		}
 		// Check generic function instance instantly.
-		self.checkFuncInsCaller(f, et)
+		self.checkFuncInsCaller(*f, et)
 		ok = true
 		ret
 	}
 
 	// Checks new generics function instance.
 	// If instance is already exist, f will point to exist instantantiation.
-	fn checkGenericFunc(mut &self, mut &f: &FuncIns, mut &et: &token::Token): (ok: bool, exist: bool) {
-		mut existInstance := f.Decl.appendInstance(f)
+	fn checkGenericFunc(mut &self, mut &f: *&FuncIns, mut et: &token::Token): (ok: bool, exist: bool) {
+		mut existInstance := (*f).Decl.appendInstance(*f)
 		// If instance already exist with same generics, return immediately.
 		// This function should be already checked, or it will be.
 		if existInstance != nil {
 			// Set f to exist one.
-			f = existInstance
+			*f = existInstance
 			ret true, true
 		}
-		ok = self.reloadFuncInsTypes(f)
-		f.reloaded = true
+		ok = self.reloadFuncInsTypes(*f)
+		(*f).reloaded = true
 		if !ok {
 			ret false, false
 		}
-		if !self.checkConstraintsFunc(f, et, existInstance) {
+		if !self.checkConstraintsFunc(*f, et, existInstance) {
 			ret false, false
 		}
 		// Check generic function instance instantly.
-		self.checkFuncInsCaller(f, et)
+		self.checkFuncInsCaller(*f, et)
 		ok = true
 		ret
 	}
 
-	fn checkTypeMethod(mut &self, mut &f: &Func) {
+	fn checkTypeMethod(mut &self, mut f: &Func) {
 		for (_, mut ins) in f.Instances {
 			self.checkFuncIns(ins)
 		}
@@ -2395,7 +2477,7 @@ impl sema {
 	// Checks environment-dependent parts of structure instance.
 	// Which is contains fields and generic-type constraints.
 	// If generic instance will be check, errorToken should be passed.
-	fn checkStructEnv(mut &self, mut &s: &StructIns, mut prev: &referencer, mut errorToken: &token::Token): (ok: bool) {
+	fn checkStructEnv(mut &self, mut s: &StructIns, mut prev: &referencer, mut errorToken: &token::Token): (ok: bool) {
 		s.fillEnviron()
 
 		// If source is not nil, do not check.
@@ -2493,7 +2575,7 @@ impl sema {
 					}
 					mut f := decl.instanceForce()
 					f.Generics = append(f.Generics, &InsGeneric{Type: arr.Value})
-					ok, _ = self.checkGenericFunc(f, token)
+					ok, _ = self.checkGenericFunc(&f, token)
 					if !ok {
 						panic("sema: arrayCmp evaluation failed, this is an implementation mistake")
 					}
@@ -2522,13 +2604,13 @@ impl sema {
 		ret
 	}
 
-	fn checkStructIns(mut &self, mut &s: &StructIns) {
+	fn checkStructIns(mut &self, mut s: &StructIns) {
 		for (_, mut f) in s.Methods {
 			self.checkTypeMethod(f)
 		}
 	}
 
-	fn checkTypeStruct(mut &self, mut &s: &Struct) {
+	fn checkTypeStruct(mut &self, mut s: &Struct) {
 		if s.Bind {
 			ret
 		}
@@ -2562,7 +2644,7 @@ impl sema {
 		}
 	}
 
-	fn precheckStructType(mut &self, mut &s: &Struct) {
+	fn precheckStructType(mut &self, mut s: &Struct) {
 		if s.Bind {
 			ret
 		}
@@ -2591,7 +2673,7 @@ impl sema {
 		}
 	}
 
-	fn checkRets(mut self, mut &f: &FuncIns) {
+	fn checkRets(mut *self, mut f: &FuncIns) {
 		if f.Decl.IsVoid() {
 			ret
 		}
@@ -2604,7 +2686,7 @@ impl sema {
 
 	// Checks scope of the function f.
 	// The function environment must be filled.
-	fn checkFuncInsSc(mut self, mut &f: &FuncIns, mut &sc: &scopeChecker) {
+	fn checkFuncInsSc(mut *self, mut f: &FuncIns, mut sc: &scopeChecker) {
 		if len(f.env.vars) > 0 {
 			sc.table.Vars = f.env.vars[:len(f.env.vars):len(f.env.vars)]
 		}
@@ -2621,7 +2703,7 @@ impl sema {
 		}
 	}
 
-	fn checkFuncInsCaller(mut &self, mut &f: &FuncIns, mut caller: &token::Token) {
+	fn checkFuncInsCaller(mut &self, mut f: &FuncIns, mut caller: &token::Token) {
 		if f.Decl.Bind || f.checked {
 			ret
 		}
@@ -2645,11 +2727,11 @@ impl sema {
 		}
 	}
 
-	fn checkFuncIns(mut &self, mut &f: &FuncIns) {
+	fn checkFuncIns(mut &self, mut f: &FuncIns) {
 		self.checkFuncInsCaller(f, nil)
 	}
 
-	fn checkFunc(mut &self, mut &f: &Func) {
+	fn checkFunc(mut &self, mut f: &Func) {
 		if f.Bind {
 			ret
 		}
@@ -2658,7 +2740,7 @@ impl sema {
 		}
 	}
 
-	fn checkTestFunc(mut self, mut &f: &FuncIns) {
+	fn checkTestFunc(mut *self, mut f: &FuncIns) {
 		if f.Decl.Public {
 			self.pushErr(f.Decl.Token, log::PubTestFunc)
 			self.pushSuggestion(log::RemovePubModifier)
@@ -2691,7 +2773,7 @@ impl sema {
 		self.pushSuggestion(log::UseExpectedTestFuncDecl)
 	}
 
-	fn precheckFunc(mut &self, mut &f: &Func) {
+	fn precheckFunc(mut &self, mut f: &Func) {
 		if len(f.Generics) == 0 && len(f.Instances) == 0 {
 			mut ins := f.instanceForce()
 			f.Instances = append(f.Instances, ins)
@@ -2737,14 +2819,14 @@ impl sema {
 		for (_, mut file) in self.files {
 			for (_, mut v) in file.Vars {
 				cached = cached[:0]
-				let mut refCheck: fn(mut &cached: []&ReferenceStack, mut r: &ReferenceStack, owner: str): (cycle: bool)
-				&_refCheck := refCheck // For closure.
+				let mut refCheck: fn(mut &cached: *[]&ReferenceStack, mut r: &ReferenceStack, owner: str): (cycle: bool)
+				&_refCheck := &refCheck // For closure.
 				refCheck = fn|mut cached, mut r, owner| {
 					// We already checked/checking this reference stack.
-					if slices::Contains(cached, r) {
+					if slices::Contains(*cached, r) {
 						ret false
 					}
-					cached = append(cached, r)
+					*cached = append(*cached, r)
 					n := message.Len()
 					mut i := 0
 					for i < r.Len(); i++ {
@@ -2756,7 +2838,7 @@ impl sema {
 								break
 							}
 							pushIllegalCycleError(owner, s.Decl.Name) // Push trace.
-							if unsafe { _refCheck(cached, s.Refers, s.Decl.Name) } {
+							if unsafe { (*_refCheck)(cached, s.Refers, s.Decl.Name) } {
 								ret true
 							}
 						| &FuncIns:
@@ -2765,7 +2847,7 @@ impl sema {
 								break
 							}
 							pushIllegalCycleError(owner, f.Decl.Name) // Push trace.
-							if unsafe { _refCheck(cached, f.Refers, f.Decl.Name) } {
+							if unsafe { (*_refCheck)(cached, f.Refers, f.Decl.Name) } {
 								ret true
 							}
 						| &Var:
@@ -2774,7 +2856,7 @@ impl sema {
 							if v2 == v {
 								ret true
 							}
-							if unsafe { _refCheck(cached, v2.Refers, v2.Name) } {
+							if unsafe { (*_refCheck)(cached, v2.Refers, v2.Name) } {
 								ret true
 							}
 							// Global variable v needs to global variable v2 for initialization.
@@ -2787,7 +2869,7 @@ impl sema {
 					}
 					ret false
 				}
-				if refCheck(cached, v.Refers, v.Name) {
+				if refCheck(&cached, v.Refers, v.Name) {
 					self.pushErr(v.Token, log::IllegalCrossCycle, message.Str())
 					ret
 				}
@@ -2940,7 +3022,7 @@ impl missingRetChecker {
 		}
 	}
 
-	fn checkConditional(self, mut c: &Conditional): (ok: bool) {
+	fn checkConditional(*self, mut c: &Conditional): (ok: bool) {
 		// To collect all break statements, check the all scopes.
 		ok = true
 		for (_, mut elif) in c.Elifs {
@@ -2962,7 +3044,7 @@ impl missingRetChecker {
 		ret
 	}
 
-	fn checkMatch(self, mut m: &Match): (ok: bool) {
+	fn checkMatch(*self, mut m: &Match): (ok: bool) {
 		// To collect all break and fall statements, check the all scopes.
 		ok = true
 		addr := uintptr(m)
@@ -2997,7 +3079,7 @@ impl missingRetChecker {
 	}
 
 	// Reports we have infinite iteration.
-	fn checkInfinite(self, it: uintptr, mut s: &Scope): bool {
+	fn checkInfinite(*self, it: uintptr, mut s: &Scope): bool {
 		mut lead := self.lead
 		hard := self.hard
 
@@ -3074,7 +3156,7 @@ impl missingRetChecker {
 
 	// Checks the scope, starts from i.
 	// Reports whether return statement or infinite loop found.
-	fn checkScope(self, mut s: &Scope, i: int): bool {
+	fn checkScope(*self, mut s: &Scope, i: int): bool {
 		if s == nil {
 			ret false
 		}
@@ -3329,12 +3411,12 @@ impl missingRetChecker {
 
 	// Like checkScope, but it pays attention to the hard register.
 	// checkScope is intended for internal use.
-	fn check(self, mut s: &Scope): bool {
+	fn check(*self, mut s: &Scope): bool {
 		ret self.checkScope(s, 0) && self.hard
 	}
 }
 
-fn pushImplemented(mut t: &Trait, mut &d: &Struct) {
+fn pushImplemented(mut t: &Trait, mut d: &Struct) {
 push:
 	match {
 	| len(t.Implemented) > 0:
@@ -3352,7 +3434,7 @@ push:
 	}
 }
 
-fn pushImplements(mut &s: &Struct, mut t: &Trait) {
+fn pushImplements(mut s: &Struct, mut t: &Trait) {
 push:
 	match {
 	| len(s.Implements) > 0:
@@ -3370,28 +3452,28 @@ push:
 	}
 }
 
-fn pushRuntimeToStr(mut &s: &sema, mut &t: &Type, mut &token: &token::Token,
+fn pushRuntimeToStr(mut s: &sema, mut t: &Type, mut token: &token::Token,
 	mut refers: &ReferenceStack) {
 	if s.meta.runtime == nil || t.IsNil() || refers == nil {
 		ret
 	}
 	mut f := runtimeFindFunc(s.meta.runtime, "toStr").instanceForce()
 	f.Generics = append(f.Generics, &InsGeneric{Type: t})
-	ok, _ := s.checkGenericFunc(f, token)
+	ok, _ := s.checkGenericFunc(&f, token)
 	if !ok {
 		panic("sema: toStr evaluation failed, this is an implementation mistake")
 	}
 	refers.Push(f)
 }
 
-fn pushRuntimeMaphash(mut &s: &sema, mut &t: &Type, mut &token: &token::Token,
+fn pushRuntimeMaphash(mut s: &sema, mut t: &Type, mut token: &token::Token,
 	mut refers: &ReferenceStack) {
 	if s.meta.runtime == nil || t.IsNil() || refers == nil {
 		ret
 	}
 	mut f := runtimeFindFunc(s.meta.runtime, "maphash").instanceForce()
 	f.Generics = append(f.Generics, &InsGeneric{Type: t})
-	ok, _ := s.checkGenericFunc(f, token)
+	ok, _ := s.checkGenericFunc(&f, token)
 	if !ok {
 		panic("sema: maphash evaluation failed, this is an implementation mistake")
 	}
@@ -3449,7 +3531,7 @@ fn checkTypeEnumRefCycle(mut s: &sema, mut e: &TypeEnum, mut item: &TypeEnumItem
 		message.WriteByte('\n')!
 	}
 	mut checkCycles := (fn(mut e2: &TypeEnum): bool)(nil)
-	&_checkCycles := checkCycles // For closure.
+	&_checkCycles := &checkCycles // For closure.
 	checkCycles = fn|mut e2| {
 		n := message.Len()
 		for (_, mut item2) in e2.Items {
@@ -3461,7 +3543,7 @@ fn checkTypeEnumRefCycle(mut s: &sema, mut e: &TypeEnum, mut item: &TypeEnumItem
 				continue
 			}
 			pushIllegalCycleError(e2.Name, ie.Name)
-			if ie == e || unsafe { !_checkCycles(ie) } {
+			if ie == e || unsafe { !(*_checkCycles)(ie) } {
 				ret false
 			}
 		}

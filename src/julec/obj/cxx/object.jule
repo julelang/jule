@@ -140,7 +140,7 @@ struct ObjectCoder {
 }
 
 impl ObjectCoder {
-	fn New(mut &ir: &obj::IR, mut info: SerializationInfo): &ObjectCoder {
+	fn New(mut ir: &obj::IR, mut info: SerializationInfo): &ObjectCoder {
 		mut oc := &ObjectCoder{
 			mode: _OBJC_DEFAULT,
 			ir: ir,
@@ -177,7 +177,7 @@ impl ObjectCoder {
 		self.Buf.Write(self.indentBuffer)!
 	}
 
-	fn findAnyType(mut &self, mut &t: &sema::Type): int {
+	fn findAnyType(mut &self, mut t: &sema::Type): int {
 		for (i, mut at) in self.anyTypeMap {
 			if at.Equal(t) {
 				ret i
@@ -208,7 +208,7 @@ impl ObjectCoder {
 
 		// setup thread data
 		self.coSpawnObj.WriteByte(indentKind)!
-		writeThreadType(self.coSpawnObj)
+		writeThreadType(&self.coSpawnObj)
 		self.coSpawnObj.WriteStr(" *")!
 		self.coSpawnObj.WriteStr(coSpawnThreadData)!
 		self.coSpawnObj.WriteByte(';')!
@@ -216,7 +216,7 @@ impl ObjectCoder {
 
 		// setup func data
 		self.coSpawnObj.WriteByte(indentKind)!
-		self.tc.func(self.coSpawnObj, f)
+		self.tc.func(&self.coSpawnObj, f)
 		self.coSpawnObj.WriteByte(' ')!
 		self.coSpawnObj.WriteStr(coSpawnArgDataFunc)!
 		self.coSpawnObj.WriteByte(';')!
@@ -225,7 +225,7 @@ impl ObjectCoder {
 		// setup argument data
 		for (j, mut p) in f.Params {
 			self.coSpawnObj.WriteByte(indentKind)!
-			self.tc.kind(self.coSpawnObj, p.Type)
+			self.tc.kind(&self.coSpawnObj, p.Type)
 			self.coSpawnObj.WriteByte(' ')!
 			self.coSpawnObj.WriteStr(coSpawnArgDataParam)!
 			self.coSpawnObj.WriteStr(conv::Itoa(j))!
@@ -280,7 +280,7 @@ impl ObjectCoder {
 		self.coSpawnObj.WriteStr(");\n")!
 
 		self.coSpawnObj.WriteByte(indentKind)!
-		identCoder.funcIns(self.coSpawnObj, meta::Program.Runtime.CloseThread)
+		identCoder.funcIns(&self.coSpawnObj, meta::Program.Runtime.CloseThread)
 		self.coSpawnObj.WriteStr("(")!
 		self.coSpawnObj.WriteStr(argData)!
 		self.coSpawnObj.WriteStr("->")!
@@ -321,23 +321,23 @@ impl ObjectCoder {
 		// at machine code level.
 		match {
 		| t.Sptr() != nil:
-			self.tc.kind(self.deallocObj, t.Sptr().Value)
+			self.tc.kind(&self.deallocObj, t.Sptr().Value)
 		| t.Map() != nil:
 			mp := t.Map()
 			mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Value)
-			self.tc.structureIns(self.deallocObj, mps)
+			self.tc.structureIns(&self.deallocObj, mps)
 		| t.Chan() != nil:
 			ch := t.Chan()
 			mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
-			self.tc.structureIns(self.deallocObj, chs)
+			self.tc.structureIns(&self.deallocObj, chs)
 		|:
-			self.tc.kind(self.deallocObj, t)
+			self.tc.kind(&self.deallocObj, t)
 		}
 		self.deallocObj.WriteStr(">().dealloc(); }\n")!
 		ret i
 	}
 
-	fn pushAnonFunc(mut &self, mut &m: &sema::AnonFuncExpr): (name: str) {
+	fn pushAnonFunc(mut &self, mut m: &sema::AnonFuncExpr): (name: str) {
 		self.meta.concurrent = self.meta.concurrent || m.Func.CalledCo
 
 		closure := obj::IsClosure(m)
@@ -351,12 +351,9 @@ impl ObjectCoder {
 			self.anonObj.WriteStr(anonFuncCtxSuffix + "{\n")!
 			for (_, mut v) in m.Captured {
 				self.anonObj.WriteByte(indentKind)! // 1x indent
-				self.tc.kind(self.anonObj, v.TypeSym.Type)
+				self.tc.kind(&self.anonObj, v.TypeSym.Type)
 				self.anonObj.WriteByte(' ')!
-				if v.Reference {
-					self.anonObj.WriteByte('*')!
-				}
-				identCoder.anonFuncVar(self.anonObj, v)
+				identCoder.anonFuncVar(&self.anonObj, v)
 				self.anonObj.WriteStr(";\n")!
 			}
 			self.anonObj.WriteStr("};\n")!
@@ -418,18 +415,18 @@ impl ObjectCoder {
 					self.anyObj.WriteStr(`__jule_panicStr(__jule_strBytePtr((jule::U8*)"runtime: type data have not string conversion data but used at runtime", 70)); }` + "\n")!
 				} else {
 					self.anyObj.WriteStr("return ")!
-					identCoder.funcIns(self.anyObj, f)
+					identCoder.funcIns(&self.anyObj, f)
 					self.anyObj.WriteStr("(")!
 					// If type is a smart pointer, we have to point to element.
 					// See memory model of dynamic types.
 					if sptr != nil {
-						self.tc.kind(self.anyObj, t)
+						self.tc.kind(&self.anyObj, t)
 						self.anyObj.WriteStr("::make(reinterpret_cast<")!
-						self.tc.kind(self.anyObj, sptr.Value)
+						self.tc.kind(&self.anyObj, sptr.Value)
 						self.anyObj.WriteStr("*>(alloc), nullptr)); }\n")!
 					} else {
 						self.anyObj.WriteStr("*reinterpret_cast<")!
-						self.tc.kind(self.anyObj, t)
+						self.tc.kind(&self.anyObj, t)
 						self.anyObj.WriteStr("*>(alloc)); }\n")!
 					}
 				}
@@ -454,9 +451,9 @@ impl ObjectCoder {
 			// comparison function.
 			self.anyObj.WriteStr(typeBool + " " + anyTypeIdent)!
 			self.anyObj.WriteStr(si)!
-			self.anyObj.WriteStr("_compare(const " + typeAny + " &any, const void *type, const ")!
-			self.tc.kind(self.anyObj, t)
-			self.anyObj.WriteStr(" &other) { return any.type == type && __jule_ptrEqual(any.data.alloc, other.alloc); }\n")!
+			self.anyObj.WriteStr("_compare(" + typeAny + " &any, void *type, ")!
+			self.tc.kind(&self.anyObj, t)
+			self.anyObj.WriteStr(" other) { return any.type == type && __jule_ptrEqual(any.data.alloc, other.alloc); }\n")!
 		| t.Map() != nil:
 			// Consider map as a smart pointer.
 			// But it supports content-based string conversion unlike channels.
@@ -476,7 +473,7 @@ impl ObjectCoder {
 				self.anyObj.WriteStr(typeU8)!
 				self.anyObj.WriteStr(`*)"runtime: comparing uncomparable type " "`)!
 				mut n := self.anyObj.Len()
-				cstrBytes(self.anyObj, t.Str())
+				cstrBytes(&self.anyObj, t.Str())
 				n = self.anyObj.Len() - n
 				n += 37 // offset of message prefix
 				self.anyObj.WriteStr("\", ")!
@@ -498,11 +495,11 @@ impl ObjectCoder {
 				self.anyObj.WriteStr(`__jule_panicStr(__jule_strBytePtr((jule::U8*)"runtime: type data have not string conversion data but used at runtime", 70)); }` + "\n")!
 			} else {
 				self.anyObj.WriteStr("return ")!
-				identCoder.funcIns(self.anyObj, f)
+				identCoder.funcIns(&self.anyObj, f)
 				self.anyObj.WriteStr("(")!
-				self.tc.kind(self.anyObj, t)
+				self.tc.kind(&self.anyObj, t)
 				self.anyObj.WriteStr("::make((")!
-				self.tc.structureIns(self.anyObj, mps)
+				self.tc.structureIns(&self.anyObj, mps)
 				self.anyObj.WriteStr("*)alloc, nullptr)); }\n")!
 			}
 
@@ -521,13 +518,12 @@ impl ObjectCoder {
 			// comparison function.
 			self.anyObj.WriteStr(typeBool + " " + anyTypeIdent)!
 			self.anyObj.WriteStr(si)!
-			self.anyObj.WriteStr("_compare(const " + typeAny + " &any, const void *type, const ")!
-			self.tc.kind(self.anyObj, t)
-			self.anyObj.WriteStr(" &other) { return any.type == type && __jule_ptrEqual(any.data.alloc, other.alloc); }\n")!
+			self.anyObj.WriteStr("_compare(" + typeAny + " &any, void *type, ")!
+			self.tc.kind(&self.anyObj, t)
+			self.anyObj.WriteStr(" other) { return any.type == type && __jule_ptrEqual(any.data.alloc, other.alloc); }\n")!
 		|:
 			mut kindB := strings::Builder{}
-			kindB.Grow(40)
-			self.tc.kind(kindB, t)
+			self.tc.kind(&kindB, t)
 			kind := kindB.Str()
 
 			// Deallocator function.
@@ -546,7 +542,7 @@ impl ObjectCoder {
 					self.anyObj.WriteStr(typeUintptr + " " + anyTypeIdent)!
 					self.anyObj.WriteStr(si)!
 					self.anyObj.WriteStr("_hash(jule::Ptr<jule::Uintptr> *ptr, jule::Uintptr seed) noexcept { return ")!
-					identCoder.funcIns(self.anyObj, f)
+					identCoder.funcIns(&self.anyObj, f)
 					self.anyObj.WriteStr("(*reinterpret_cast<")!
 					self.anyObj.WriteStr(kind)!
 					self.anyObj.WriteStr("*>(ptr->alloc), seed); }\n")!
@@ -568,14 +564,14 @@ impl ObjectCoder {
 			self.anyObj.WriteStr("_eq(void *alloc, void *other) noexcept { ")!
 			if comparable {
 				self.anyObj.WriteStr("return ")!
-				self.ec._unsafeBinaryNoDynamic(self.anyObj, lmodel, rmodel, t, t, token::EQL, "==")
+				self.ec._unsafeBinaryNoDynamic(&self.anyObj, lmodel, rmodel, t, t, token::EQL, "==")
 				self.anyObj.WriteStr("; }\n")!
 			} else {
 				self.anyObj.WriteStr(`__jule_panic((`)!
 				self.anyObj.WriteStr(typeU8)!
 				self.anyObj.WriteStr(`*)"runtime: comparing uncomparable type " "`)!
 				mut n := self.anyObj.Len()
-				cstrBytes(self.anyObj, t.Str())
+				cstrBytes(&self.anyObj, t.Str())
 				n = self.anyObj.Len() - n
 				n += 37 // offset of message prefix
 				self.anyObj.WriteStr("\", ")!
@@ -597,7 +593,7 @@ impl ObjectCoder {
 				self.anyObj.WriteStr(`__jule_panicStr(__jule_strBytePtr((jule::U8*)"runtime: type data have not string conversion data but used at runtime", 70)); }` + "\n")!
 			} else {
 				self.anyObj.WriteStr("return ")!
-				identCoder.funcIns(self.anyObj, f)
+				identCoder.funcIns(&self.anyObj, f)
 				self.anyObj.WriteStr("(*reinterpret_cast<")!
 				self.anyObj.WriteStr(kind)!
 				self.anyObj.WriteStr("*>(alloc)); }\n")!
@@ -625,14 +621,14 @@ impl ObjectCoder {
 			// comparison function.
 			self.anyObj.WriteStr(typeBool + " " + anyTypeIdent)!
 			self.anyObj.WriteStr(si)!
-			self.anyObj.WriteStr("_compare(const " + typeAny + " &any, const void *type, const ")!
-			self.tc.kind(self.anyObj, t)
-			self.anyObj.WriteStr(" &other) { return any.type == type && any.type->eq(any.data.alloc, (void*)&other); }\n")!
+			self.anyObj.WriteStr("_compare(" + typeAny + " &any, void *type, ")!
+			self.tc.kind(&self.anyObj, t)
+			self.anyObj.WriteStr(" other) { return any.type == type && any.type->eq(any.data.alloc, (void*)&other); }\n")!
 		}
 		ret i
 	}
 
-	fn pushResultIns(mut &self, mut &f: &sema::FuncIns) {
+	fn pushResultIns(mut &self, mut f: &sema::FuncIns) {
 		s := str(self.tc.rc.code(f.Result))
 		_, ok := self.resultMap[s]
 		if ok {
@@ -647,7 +643,7 @@ impl ObjectCoder {
 		self.resultDecls.WriteStr(" {\n")!
 		for (i, mut t) in f.Result.Tuple().Types {
 			self.resultDecls.WriteByte(indentKind)!
-			self.tc.kind(self.resultDecls, t)
+			self.tc.kind(&self.resultDecls, t)
 			self.resultDecls.WriteByte(' ')!
 			self.resultDecls.WriteStr(resultArgName)!
 			self.resultDecls.WriteStr(conv::Itoa(i))!
@@ -656,7 +652,7 @@ impl ObjectCoder {
 		self.resultDecls.WriteStr("};\n")!
 	}
 
-	fn pushResult(mut &self, mut &f: &sema::Func) {
+	fn pushResult(mut &self, mut f: &sema::Func) {
 		if f.IsVoid() || len(f.Result.Names) <= 1 {
 			ret
 		}
@@ -696,11 +692,9 @@ impl ObjectCoder {
 		self.anonObj.WriteStr("(const void *" + data + ") noexcept { ")!
 
 		mut t1Ident := strings::Builder{}
-		t1Ident.Grow(1 << 4)
 		mut t2Ident := strings::Builder{}
-		t2Ident.Grow(1 << 4)
-		identCoder.traitDecl(t1Ident, t1)
-		identCoder.traitDecl(t2Ident, t2)
+		identCoder.traitDecl(&t1Ident, t1)
+		identCoder.traitDecl(&t2Ident, t2)
 
 		for (_, mut s1) in t1.Implemented {
 			for _, s2 in t2.Implemented {
@@ -733,14 +727,14 @@ impl ObjectCoder {
 			}
 		}
 		self.anonObj.WriteStr("__jule_panicStr(")!
-		strLit(self.anonObj, "trait casting failed because of an implementation mistake, this is a JuleC bug", "78")
+		strLit(&self.anonObj, "trait casting failed because of an implementation mistake, this is a JuleC bug", "78")
 		self.anonObj.WriteStr("); return nullptr; }\n")!
 	}
 
 	// Writes location information of token as cstr bytes.
 	// Returns count of written bytes.
-	fn locInfo(mut &self, &t: &token::Token): (n: int) {
-		&loc := t.File.Path
+	fn locInfo(mut &self, t: &token::Token): (n: int) {
+		loc := t.File.Path
 
 		// Normalize path if production compilation enabled.
 		if env::Production {
@@ -750,20 +744,20 @@ impl ObjectCoder {
 				// Just keeps "std/" prefix.
 				path := loc[len(filepath::Dir(build::PathStdlib()))+1:]
 				n = len(path)
-				cstrBytes(self.Buf, path)
+				cstrBytes(&self.Buf, path)
 			| strings::HasPrefix(loc, self.ir.Root):
 				// Remove absolute path prefix of root package.
 				// Just keeps "[PackageDirectory]/" prefix.
 				path := loc[len(filepath::Dir(self.ir.Root))+1:]
 				n = len(path)
-				cstrBytes(self.Buf, path)
+				cstrBytes(&self.Buf, path)
 			|:
 				n = len(loc)
-				cstrBytes(self.Buf, loc)
+				cstrBytes(&self.Buf, loc)
 			}
 		} else {
 			n = len(loc)
-			cstrBytes(self.Buf, loc)
+			cstrBytes(&self.Buf, loc)
 		}
 		self.write(":")
 		n++
@@ -839,7 +833,7 @@ impl ObjectCoder {
 		}
 	}
 
-	fn prepareStructure(mut self, mut &s: &sema::Struct) {
+	fn prepareStructure(mut *self, mut s: &sema::Struct) {
 		for (_, mut ins) in s.Instances {
 			for (_, mut m) in ins.Methods {
 				if m.Static {
@@ -848,11 +842,7 @@ impl ObjectCoder {
 				for (_, mut mins) in m.Instances {
 					mut p := mins.Params[0]
 					mut kind := strings::Builder{}
-					kind.Grow(40)
-					self.tc.kind(kind, p.Type)
-					if !p.Decl.IsRef() {
-						kind.WriteStr("*")!
-					}
+					self.tc.kind(&kind, p.Type)
 					p.Type = &sema::Type{
 						Kind: &customType{
 							kind: kind.Str(),
@@ -871,10 +861,10 @@ impl ObjectCoder {
 		}
 	}
 
-	fn structurePlainDecl(mut &self, mut &s: &sema::Struct) {
+	fn structurePlainDecl(mut &self, mut s: &sema::Struct) {
 		for (_, mut ins) in s.Instances {
 			self.write("struct ")
-			identCoder.structureIns(self.Buf, ins)
+			identCoder.structureIns(&self.Buf, ins)
 			self.write(";\n")
 		}
 	}
@@ -887,14 +877,14 @@ impl ObjectCoder {
 		}
 	}
 
-	fn fieldDecl(mut &self, mut &f: &sema::FieldIns) {
-		self.tc.kind(self.Buf, f.Type)
+	fn fieldDecl(mut &self, mut f: &sema::FieldIns) {
+		self.tc.kind(&self.Buf, f.Type)
 		self.write(" ")
-		identCoder.field(self.Buf, f.Decl)
+		identCoder.field(&self.Buf, f.Decl)
 		self.write(";")
 	}
 
-	fn structureOperatorEq(mut &self, name: str, mut &s: &sema::StructIns, decl: bool) {
+	fn structureOperatorEq(mut &self, name: str, mut s: &sema::StructIns, decl: bool) {
 		if !s.Comparable {
 			ret
 		}
@@ -945,10 +935,10 @@ impl ObjectCoder {
 			self.indent()
 
 			mut fName := strings::Builder{}
-			identCoder.field(fName, f.Decl)
+			identCoder.field(&fName, f.Decl)
 			lmodel += fName.Str()
 			rmodel += fName.Str()
-			self.ec._unsafeBinaryNoDynamic(self.Buf, lmodel, rmodel, f.Type, f.Type, token::EQL, "==")
+			self.ec._unsafeBinaryNoDynamic(&self.Buf, lmodel, rmodel, f.Type, f.Type, token::EQL, "==")
 			lmodel = lmodel[:len(lmodel)-fName.Len()]
 			rmodel = rmodel[:len(rmodel)-fName.Len()]
 		}
@@ -962,19 +952,18 @@ impl ObjectCoder {
 		self.write("}\n\n")
 	}
 
-	fn structureOperators(mut &self, mut &s: &sema::StructIns, decl: bool) {
+	fn structureOperators(mut &self, mut s: &sema::StructIns, decl: bool) {
 		mut sb := strings::Builder{}
-		sb.Grow(40)
-		identCoder.structureIns(sb, s)
+		identCoder.structureIns(&sb, s)
 		ident := sb.Str()
 
 		// Binary.
 		self.structureOperatorEq(ident, s, decl)
 	}
 
-	fn structureInsDecl(mut &self, mut &s: &sema::StructIns) {
+	fn structureInsDecl(mut &self, mut s: &sema::StructIns) {
 		self.write("struct ")
-		identCoder.structureIns(self.Buf, s)
+		identCoder.structureIns(&self.Buf, s)
 		self.write(" {\n")
 
 		self.addIndent()
@@ -992,7 +981,7 @@ impl ObjectCoder {
 		self.structureOperators(s, DeclOnly)
 	}
 
-	fn structureDecl(mut &self, mut &s: &sema::Struct) {
+	fn structureDecl(mut &self, mut s: &sema::Struct) {
 		for (_, mut ins) in s.Instances {
 			self.structureInsDecl(ins)
 		}
@@ -1007,7 +996,7 @@ impl ObjectCoder {
 		}
 	}
 
-	fn structureMethodDecls1(mut &self, mut &s: &sema::Struct) {
+	fn structureMethodDecls1(mut &self, mut s: &sema::Struct) {
 		for (_, mut ins) in s.Instances {
 			for (_, mut m) in ins.Methods {
 				self.pushResult(m)
@@ -1027,7 +1016,7 @@ impl ObjectCoder {
 	// The identifier parameter means this function is anon, mostly.
 	// But this parameter not only for anonymous functions.
 	// It also useable as custom identifiers for functions.
-	fn funcHead(mut &self, mut &buf: strings::Builder, mut &f: &sema::FuncIns, ptr: bool, name: str) {
+	fn funcHead(mut &self, mut &buf: *strings::Builder, mut f: &sema::FuncIns, ptr: bool, name: str) {
 		if !ptr && opt::Inline && !f.Decl.IsEntryPoint() {
 			buf.WriteStr("inline ")!
 		}
@@ -1046,21 +1035,21 @@ impl ObjectCoder {
 		}
 	}
 
-	fn funcDeclIns(mut &self, mut &f: &sema::FuncIns, ptr: bool) {
+	fn funcDeclIns(mut &self, mut f: &sema::FuncIns, ptr: bool) {
 		self.meta.concurrent = self.meta.concurrent || f.CalledCo
 		self.indent()
-		self.funcHead(self.Buf, f, ptr, "")
-		self.paramsIns(self.Buf, f)
+		self.funcHead(&self.Buf, f, ptr, "")
+		self.paramsIns(&self.Buf, f)
 		self.write(";\n")
 	}
 
-	fn funcDecl(mut &self, mut &f: &sema::Func, ptr: bool) {
+	fn funcDecl(mut &self, mut f: &sema::Func, ptr: bool) {
 		for (_, mut c) in f.Instances {
 			self.funcDeclIns(c, ptr)
 		}
 	}
 
-	fn funcDeclTrait(mut &self, mut &f: &sema::Func) {
+	fn funcDeclTrait(mut &self, mut f: &sema::Func) {
 		for (_, mut c) in f.Instances {
 			mut k := c.Params[0].Type
 			c.Params[0].Type = generalGCPtr
@@ -1082,7 +1071,7 @@ impl ObjectCoder {
 		})
 	}
 
-	fn traitDataTypeMethods(mut &self, mut &hash: &traitHash) {
+	fn traitDataTypeMethods(mut &self, mut hash: &traitHash) {
 		for (_, mut m) in hash.methods {
 			mut ins := m.Instances[0]
 			for (i, mut ip) in ins.Params[1:] {
@@ -1100,7 +1089,7 @@ impl ObjectCoder {
 	fn traitDataTypes(mut &self) {
 		for (_, mut hash) in self.traitMap {
 			self.write("struct ")
-			identCoder.traitDecl(self.Buf, hash.traitDecl)
+			identCoder.traitDecl(&self.Buf, hash.traitDecl)
 			self.write("MptrData {\n")
 			self.addIndent()
 
@@ -1125,13 +1114,13 @@ impl ObjectCoder {
 		}
 	}
 
-	fn paramIns(mut &self, mut &buf: strings::Builder, mut &p: &sema::ParamIns) {
+	fn paramIns(mut &self, mut &buf: *strings::Builder, mut p: &sema::ParamIns) {
 		self.tc.paramIns(buf, p)
 		buf.WriteByte(' ')!
 		identCoder.param(buf, p.Decl)
 	}
 
-	fn paramsIns(mut &self, mut &buf: strings::Builder, mut &f: &sema::FuncIns) {
+	fn paramsIns(mut &self, mut &buf: *strings::Builder, mut f: &sema::FuncIns) {
 		if !f.AsAnon && len(f.Params) == 0 {
 			buf.WriteStr("(void)")!
 			ret
@@ -1152,17 +1141,14 @@ impl ObjectCoder {
 		buf.WriteByte(')')!
 	}
 
-	fn varInitExpr(mut &self, mut &v: &sema::Var, init: fn()) {
+	fn varInitExpr(mut &self, mut v: &sema::Var, init: fn()) {
 		if v.Static {
 			self.write("static ")
 		}
 
-		self.tc.kind(self.Buf, v.TypeSym.Type)
+		self.tc.kind(&self.Buf, v.TypeSym.Type)
 		self.write(" ")
-		if v.Reference {
-			self.write("*")
-		}
-		identCoder.var(self.Buf, v)
+		identCoder.var(&self.Buf, v)
 		if init != nil {
 			self.write(" = ")
 			init()
@@ -1181,7 +1167,7 @@ impl ObjectCoder {
 				OpKind: "=",
 			})
 		} else {
-			identCoder.var(self.Buf, v)
+			identCoder.var(&self.Buf, v)
 			self.write(" = ")
 			self.ec.possibleRefExpr(v.ValueSym.Value.Model)
 			self.write(";")
@@ -1194,36 +1180,16 @@ impl ObjectCoder {
 		}
 		if v.ValueSym != nil && v.ValueSym.Expr != nil {
 			if v.ValueSym.Value.Model != nil {
-				if v.Reference {
-					self.varInitExpr(v, fn|| {
-						// If value is variable, check whether it is a reference.
-						// Because references implemented as raw pointers.
-						// So, do not take address of them, use directly them.
-						vv, var := v.ValueSym.Value.Model.(&sema::Var)
-						if var && vv.Reference {
-							self.ec.model(v.ValueSym.Value.Model)
-						} else {
-							self.write("&(")
-							self.ec.model(v.ValueSym.Value.Model)
-							self.write(")")
-						}
-					})
+				if v.Static {
+					self.varInitExpr(v, fn|| self.ec.possibleRefExpr(v.ValueSym.Value.Model))
 				} else {
-					if v.Static {
-						self.varInitExpr(v, fn|| self.ec.possibleRefExpr(v.ValueSym.Value.Model))
-					} else {
-						self.varInitExpr(v, nil)
-						self.write(" ")
-						self.commonVarInit(v)
-					}
+					self.varInitExpr(v, nil)
+					self.write(" ")
+					self.commonVarInit(v)
 				}
 				ret
 			}
 			self.varInitExpr(v, nil)
-			ret
-		}
-		if v.Reference {
-			self.varInitExpr(v, fn|| self.write("nullptr"))
 			ret
 		}
 		if shouldInitialized(v.TypeSym.Type) {
@@ -1233,15 +1199,15 @@ impl ObjectCoder {
 		self.varInitExpr(v, nil)
 	}
 
-	fn anonFuncInsDecl(mut &self, mut &m: &sema::AnonFuncExpr, name: str) {
-		self.funcHead(self.anonObj, m.Func, false, name)
-		self.paramsIns(self.anonObj, m.Func)
+	fn anonFuncInsDecl(mut &self, mut m: &sema::AnonFuncExpr, name: str) {
+		self.funcHead(&self.anonObj, m.Func, false, name)
+		self.paramsIns(&self.anonObj, m.Func)
 		self.anonObj.WriteByte(';')!
 	}
 
-	fn anonFuncIns(mut &self, mut &m: &sema::AnonFuncExpr, name: str) {
-		self.funcHead(self.Buf, m.Func, false, name)
-		self.paramsIns(self.Buf, m.Func)
+	fn anonFuncIns(mut &self, mut m: &sema::AnonFuncExpr, name: str) {
+		self.funcHead(&self.Buf, m.Func, false, name)
+		self.paramsIns(&self.Buf, m.Func)
 		self.write(" ")
 		self.sc.anonFuncScope(m, name)
 		if m.Func.Scope != nil {
@@ -1250,8 +1216,8 @@ impl ObjectCoder {
 	}
 
 	fn funcIns(mut &self, mut f: &sema::FuncIns, name: str) {
-		self.funcHead(self.Buf, f, false, name)
-		self.paramsIns(self.Buf, f)
+		self.funcHead(&self.Buf, f, false, name)
+		self.paramsIns(&self.Buf, f)
 		self.write(" ")
 		self.sc.funcScope(f)
 		if f.Scope != nil {
@@ -1259,13 +1225,13 @@ impl ObjectCoder {
 		}
 	}
 
-	fn func(mut &self, mut &f: &sema::Func) {
+	fn func(mut &self, mut f: &sema::Func) {
 		for (_, mut ins) in f.Instances {
 			self.funcIns(ins, "")
 		}
 	}
 
-	fn funcTrait(mut &self, &s: &sema::StructIns, mut &f: &sema::FuncIns) {
+	fn funcTrait(mut &self, s: &sema::StructIns, mut f: &sema::FuncIns) {
 		f.Scope = nil
 
 		mut nname := strings::Builder{}
@@ -1281,7 +1247,7 @@ impl ObjectCoder {
 		f.Params[0].Type = k
 	}
 
-	fn findTraitMetMap(mut &self, mut &m: &sema::Func): (&sema::FuncIns, bool) {
+	fn findTraitMetMap(mut &self, mut m: &sema::Func): (&sema::FuncIns, bool) {
 		mut mins := m.Instances[0]
 		for (mut f, _) in self.traitMetMap {
 			if f.Decl.Public == m.Public &&
@@ -1295,7 +1261,7 @@ impl ObjectCoder {
 
 	// See memory handling of traits to understand trait type handling.
 	// https://manual.jule.dev/memory/memory-model#traits
-	fn traitWrapper(mut &self, mut &t: &sema::Trait, mut &m: &sema::Func) {
+	fn traitWrapper(mut &self, mut t: &sema::Trait, mut m: &sema::Func) {
 	impls:
 		for (_, mut imp) in t.Implemented {
 			mut mepf, exist := self.findTraitMetMap(m)
@@ -1327,9 +1293,9 @@ impl ObjectCoder {
 				if m.Exceptional || !m.IsVoid() {
 					self.write("return ")
 				}
-				identCoder.func(self.Buf, sm)
+				identCoder.func(&self.Buf, sm)
 				self.write("(")
-				mut ptr := !m.Params[0].IsRef()
+				mut ptr := !m.Params[0].IsSmartptr()
 				// Structure uses source type. Handle it.
 				if ins.Source != nil {
 					// Use the actual type for the allocation handling.
@@ -1346,21 +1312,21 @@ impl ObjectCoder {
 					//	Then pass address of the temporary variable to receiver.
 					if ptr && act.Sptr() != nil {
 						self.write("((jule::Ptr<")
-						self.tc.kind(self.Buf, act.Sptr().Value)
+						self.tc.kind(&self.Buf, act.Sptr().Value)
 						self.write(">*)&_self_)")
 						ptr = false // Avoid ".alloc" suffix. We have a pointer already.
 					} else if ptr && act.Map() != nil {
 						self.write("((jule::Ptr<")
 						mp := act.Map()
 						mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Value)
-						self.tc.structureIns(self.Buf, mps)
+						self.tc.structureIns(&self.Buf, mps)
 						self.write(">*)&_self_)")
 						ptr = false // Avoid ".alloc" suffix. We have a pointer already.
 					} else if ptr && act.Chan() != nil {
 						self.write("((jule::Ptr<")
 						ch := act.Chan()
 						mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
-						self.tc.structureIns(self.Buf, chs)
+						self.tc.structureIns(&self.Buf, chs)
 						self.write(">*)&_self_)")
 						ptr = false // Avoid ".alloc" suffix. We have a pointer already.
 					} else {
@@ -1368,13 +1334,13 @@ impl ObjectCoder {
 						// By Jule Memory Model, trait uses base smart pointer
 						// of the allocation. So cast to full type directly.
 						self.write("_self_.as<")
-						self.tc.kind(self.Buf, act)
+						self.tc.kind(&self.Buf, act)
 						self.write(">()")
 					}
 				} else {
 					// Structure is plain. Use the type directly.
 					self.write("_self_.as<")
-					self.tc.structureIns(self.Buf, ins)
+					self.tc.structureIns(&self.Buf, ins)
 					self.write(">()")
 				}
 				if ptr {
@@ -1382,7 +1348,7 @@ impl ObjectCoder {
 				}
 				for _, mp in m.Params[1:] {
 					self.write(", ")
-					identCoder.param(self.Buf, mp)
+					identCoder.param(&self.Buf, mp)
 				}
 				self.write(");\n}\n")
 				self.doneIndent()
@@ -1402,11 +1368,11 @@ impl ObjectCoder {
 	}
 
 	// Generates wrapper methods object code for the implemented structure.
-	fn traitDataMethods(mut &self, mut &hash: &traitHash, s: &sema::StructIns) {
+	fn traitDataMethods(mut &self, mut hash: &traitHash, s: &sema::StructIns) {
 		for (_, mut m) in hash.methods {
 			self.indent()
 			self.write(".")
-			identCoder.func(self.Buf, m)
+			identCoder.func(&self.Buf, m)
 			self.write("=__jule_trait_method_")
 			mepf, exist := self.findTraitMetMap(m)
 			if !exist {
@@ -1423,9 +1389,9 @@ impl ObjectCoder {
 	//
 	// See memory handling of traits to understand trait type handling.
 	// https://manual.jule.dev/memory/memory-model#traits
-	fn traitDataForHash(mut &self, mut &hash: &traitHash, i: int, mut &s: &sema::StructIns) {
+	fn traitDataForHash(mut &self, mut hash: &traitHash, i: int, mut s: &sema::StructIns) {
 		mut name := strings::Builder{}
-		identCoder.traitDecl(name, hash.traitDecl)
+		identCoder.traitDecl(&name, hash.traitDecl)
 		// For: Type.
 		{
 			mut j := self.pushAnyType(&sema::Type{Kind: s})
@@ -1505,9 +1471,9 @@ impl ObjectCoder {
 			if jule::IsBlank(v.Name) {
 				continue
 			}
-			self.tc.kind(self.Buf, v.TypeSym.Type)
+			self.tc.kind(&self.Buf, v.TypeSym.Type)
 			self.write(" ")
-			identCoder.var(self.Buf, v)
+			identCoder.var(&self.Buf, v)
 			self.write(";\n")
 		}
 	}
@@ -1531,14 +1497,14 @@ impl ObjectCoder {
 		self.globalDecls()
 	}
 
-	fn structureMethods(mut &self, mut &s: &sema::StructIns) {
+	fn structureMethods(mut &self, mut s: &sema::StructIns) {
 		for (_, mut f) in s.Methods {
 			self.func(f)
 			self.write("\n\n")
 		}
 	}
 
-	fn structureIns(mut &self, mut &s: &sema::StructIns) {
+	fn structureIns(mut &self, mut s: &sema::StructIns) {
 		if s.Source == nil {
 			// source type will implement
 			const DeclOnly = false
@@ -1547,7 +1513,7 @@ impl ObjectCoder {
 		self.structureMethods(s)
 	}
 
-	fn structure(mut &self, mut &s: &sema::Struct) {
+	fn structure(mut &self, mut s: &sema::Struct) {
 		for (_, mut ins) in s.Instances {
 			self.structureIns(ins)
 			self.write("\n\n")
@@ -1586,12 +1552,12 @@ impl ObjectCoder {
 		})
 	}
 
-	fn pushInit(mut &self, mut &pkg: &sema::Package) {
+	fn pushInit(mut &self, mut pkg: &sema::Package) {
 		obj::IterFiles(pkg, fn|mut file| {
 			for (_, mut f) in file.Funcs {
 				if f.Name == jule::InitFunc {
 					self.indent()
-					identCoder.func(self.Buf, f)
+					identCoder.func(&self.Buf, f)
 					self.write("();\n")
 				}
 			}
@@ -1656,7 +1622,7 @@ impl ObjectCoder {
 	__jule_envp = reinterpret_cast<jule::U8**>(envp);
 
 	`)
-		identCoder.funcIns(self.Buf, meta::Program.Runtime.Init)
+		identCoder.funcIns(&self.Buf, meta::Program.Runtime.Init)
 		self.write("();\n\n")
 		self.initGlobals()
 		self.write(`
@@ -1666,7 +1632,7 @@ impl ObjectCoder {
 		if env::Test {
 			self.write("test_point();")
 		} else {
-			identCoder.func(self.Buf, meta::Program.EntryPoint)
+			identCoder.func(&self.Buf, meta::Program.EntryPoint)
 			self.write("();")
 		}
 
@@ -1681,33 +1647,33 @@ impl ObjectCoder {
 		// Implement RC functions.
 		self.implementRC()
 
-		self.insertBuf(self.resultDecls, self.headPos)
+		self.insertBuf(&self.resultDecls, self.headPos)
 		self.wrapPos += self.resultDecls.Len()
 		self.declPos += self.resultDecls.Len()
 
-		self.insertBuf(self.resultProto, self.plainPos)
+		self.insertBuf(&self.resultProto, self.plainPos)
 		self.headPos += self.resultProto.Len()
 		self.wrapPos += self.resultProto.Len()
 		self.declPos += self.resultProto.Len()
 
-		self.insertBuf(self.deallocObj, self.wrapPos)
+		self.insertBuf(&self.deallocObj, self.wrapPos)
 		self.wrapPos += self.deallocObj.Len()
 		self.declPos += self.deallocObj.Len()
 
-		self.insertBuf(self.anyObj, self.wrapPos)
+		self.insertBuf(&self.anyObj, self.wrapPos)
 		self.wrapPos += self.deallocObj.Len()
 		self.declPos += self.anyObj.Len()
 
-		self.insertBuf(self.anonObj, self.declPos)
+		self.insertBuf(&self.anonObj, self.declPos)
 		self.declPos += self.anonObj.Len()
 
-		self.insertBuf(self.coSpawnObj, self.declPos)
+		self.insertBuf(&self.coSpawnObj, self.declPos)
 		self.declPos += self.coSpawnObj.Len()
 
 		self.doneIndent()
 	}
 
-	fn buildTraitHash(mut &self, mut &t: &sema::Trait) {
+	fn buildTraitHash(mut &self, mut t: &sema::Trait) {
 		mut hash := &traitHash{
 			traitDecl: t,
 			methods: make([]&sema::Func, 0, len(t.Methods)),
@@ -1737,7 +1703,7 @@ impl ObjectCoder {
 		})
 	}
 
-	fn insertBuf(mut &self, mut &buf: strings::Builder, pos: int) {
+	fn insertBuf(mut &self, mut &buf: *strings::Builder, pos: int) {
 		if buf.Len() > 0 {
 			mut ibuf := unsafe { self.Buf.Buf() }
 			ibuf = slices::Insert(ibuf, pos, unsafe { buf.Buf()... })
@@ -1801,7 +1767,7 @@ fn concatAllParts(parts: ...&token::Token): []byte {
 
 // Writes thread data type for Jule's runtime thread handling.
 // See runtime::coSpawn function for documentation.
-fn writeThreadType(mut &b: strings::Builder) {
+fn writeThreadType(mut &b: *strings::Builder) {
 	match {
 	| dist::IsWindows(build::OS):
 		b.WriteStr("HANDLE")!

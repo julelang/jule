@@ -35,7 +35,7 @@ impl WaitGroup {
 	// creating the thread or other event to be waited for.
 	// If a [WaitGroup] is reused to wait for several independent sets of events,
 	// new Add calls must happen after all previous Wait calls have returned.
-	fn Add(mut self, delta: int) {
+	fn Add(mut *self, delta: int) {
 		state := self.state.Add(u64(delta)<<32, atomic::SeqCst)
 		v := i32(state >> 32)
 		mut w := u32(state)
@@ -59,15 +59,15 @@ impl WaitGroup {
 		// Reset waiters count to 0.
 		self.state.Store(0, atomic::SeqCst)
 		for w != 0; w-- {
-			runtime::semrelease(self.sema, false)
+			runtime::semrelease(&self.sema, false)
 		}
 	}
 
 	// Decrements the [WaitGroup] counter by one.
-	fn Done(mut self) { self.Add(-1) }
+	fn Done(mut *self) { self.Add(-1) }
 
 	// Blocks until the [WaitGroup] counter is zero.
-	fn Wait(mut self) {
+	fn Wait(mut *self) {
 		for {
 			state := self.state.Load(atomic::SeqCst)
 			v := i32(state >> 32)
@@ -77,7 +77,7 @@ impl WaitGroup {
 			}
 			// Increment waiters count.
 			if self.state.CompareAndSwap(state, state+1, atomic::SeqCst) {
-				runtime::semacquire(self.sema, false, runtime::semaWaitGroup)
+				runtime::semacquire(&self.sema, false, runtime::semaWaitGroup)
 				if self.state.Load(atomic::SeqCst) != 0 {
 					panic("std/sync: WaitGroup is reused before previous Wait has returned")
 				}

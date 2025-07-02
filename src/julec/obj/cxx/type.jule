@@ -20,7 +20,7 @@ struct customType {
 }
 
 impl sema::Kind for customType {
-	fn Str(self): str {
+	fn Str(*self): str {
 		ret self.kind
 	}
 
@@ -51,14 +51,14 @@ struct typeCoder {
 }
 
 impl typeCoder {
-	fn new(mut &oc: &ObjectCoder): &typeCoder {
+	fn new(mut oc: &ObjectCoder): &typeCoder {
 		mut tc := &typeCoder{oc: oc}
 		tc.rc = resultCoder.new(tc)
 		ret tc
 	}
 
 	// Writes given identifier as Jule type identifier.
-	fn toType(mut self, mut &buf: strings::Builder, mut id: str) {
+	fn toType(mut *self, mut &buf: *strings::Builder, mut id: str) {
 		if id != types::Uintptr {
 			id = types::RealKindOf(id)
 		}
@@ -72,12 +72,12 @@ impl typeCoder {
 	}
 
 	// Generates C++ code of Prim type.
-	fn prim(mut self, mut &buf: strings::Builder, p: &sema::Prim) {
+	fn prim(mut *self, mut &buf: *strings::Builder, p: &sema::Prim) {
 		self.toType(buf, p.Kind)
 	}
 
 	// Generates C++ code of Tuple type.
-	fn tuple(mut self, mut &buf: strings::Builder, mut t: &sema::Tuple) {
+	fn tuple(mut *self, mut &buf: *strings::Builder, mut t: &sema::Tuple) {
 		buf.WriteStr("std::tuple<")!
 		for (i, mut tk) in t.Types {
 			self.kind(buf, tk)
@@ -89,21 +89,21 @@ impl typeCoder {
 	}
 
 	// Generates C++ code of smart pointer type with element type.
-	fn asSptr(mut self, mut &buf: strings::Builder, valueTyp: []byte) {
+	fn asSptr(mut *self, mut &buf: *strings::Builder, valueTyp: []byte) {
 		buf.WriteStr(typePtr + "<")!
 		buf.Write(valueTyp)!
 		buf.WriteByte('>')!
 	}
 
 	// Generates C++ code of smart pointer type.
-	fn sptr(mut self, mut &buf: strings::Builder, mut sptr: &sema::Sptr) {
+	fn sptr(mut *self, mut &buf: *strings::Builder, mut sptr: &sema::Sptr) {
 		buf.WriteStr(typePtr + "<")!
 		self.kind(buf, sptr.Value)
 		buf.WriteByte('>')!
 	}
 
 	// Generates C++ code of Ptr type.
-	fn ptr(mut self, mut &buf: strings::Builder, mut p: &sema::Ptr) {
+	fn ptr(mut *self, mut &buf: *strings::Builder, mut p: &sema::Ptr) {
 		const CppPointerMask = "*"
 		if p.IsUnsafe() {
 			buf.WriteStr("void" + CppPointerMask)!
@@ -114,28 +114,28 @@ impl typeCoder {
 	}
 
 	// Generates C++ code of Enum type.
-	fn enumDecl(mut self, mut &buf: strings::Builder, mut e: &sema::Enum) {
+	fn enumDecl(mut *self, mut &buf: *strings::Builder, mut e: &sema::Enum) {
 		self.kind(buf, e.TypeSym.Type)
 	}
 
 	// Generates C++ code of TypeEnum type.
-	fn typeEnumDecl(mut self, mut &buf: strings::Builder, mut e: &sema::TypeEnum) {
+	fn typeEnumDecl(mut *self, mut &buf: *strings::Builder, mut e: &sema::TypeEnum) {
 		buf.WriteStr(typeAny)!
 	}
 
-	fn asSlice(mut self, mut &buf: strings::Builder, mut valueTyp: &sema::Type) {
+	fn asSlice(mut *self, mut &buf: *strings::Builder, mut valueTyp: &sema::Type) {
 		buf.WriteStr(typeSlice + "<")!
 		self.kind(buf, valueTyp)
 		buf.WriteByte('>')!
 	}
 
 	// Generates C++ code of Slice type.
-	fn slice(mut self, mut &buf: strings::Builder, mut s: &sema::Slice) {
+	fn slice(mut *self, mut &buf: *strings::Builder, mut s: &sema::Slice) {
 		self.asSlice(buf, s.Value)
 	}
 
 	// Generates C++ code of Map type.
-	fn mapType(mut self, mut &buf: strings::Builder, mut m: &sema::Map) {
+	fn mapType(mut *self, mut &buf: *strings::Builder, mut m: &sema::Map) {
 		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, m.Key, m.Value)
 		buf.WriteStr("jule::Ptr<")!
 		identCoder.structureIns(buf, ins)
@@ -143,12 +143,12 @@ impl typeCoder {
 	}
 
 	// Generates C++ code of Struct type.
-	fn structure(mut self, mut &buf: strings::Builder, s: &sema::Struct) {
+	fn structure(mut *self, mut &buf: *strings::Builder, s: &sema::Struct) {
 		identCoder.structure(buf, s)
 	}
 
 	// Generates C++ code of Struct instance type.
-	fn structureIns(mut self, mut &buf: strings::Builder, mut s: &sema::StructIns) {
+	fn structureIns(mut *self, mut &buf: *strings::Builder, mut s: &sema::StructIns) {
 		if !s.Decl.Bind {
 			if s.Source != nil {
 				self.kind(buf, s.Source)
@@ -176,7 +176,7 @@ impl typeCoder {
 	}
 
 	// Generates C++ code of Arr type.
-	fn array(mut self, mut &buf: strings::Builder, mut a: &sema::Array) {
+	fn array(mut *self, mut &buf: *strings::Builder, mut a: &sema::Array) {
 		buf.WriteStr(typeArray + "<")!
 		self.kind(buf, a.Value)
 		buf.WriteByte(',')!
@@ -185,7 +185,7 @@ impl typeCoder {
 	}
 
 	// Generates C++ prototype code of parameter.
-	fn param(mut self, mut &buf: strings::Builder, mut &p: &sema::Param) {
+	fn param(mut *self, mut &buf: *strings::Builder, mut p: &sema::Param) {
 		if p.Variadic {
 			buf.WriteStr(typeSlice + "<")!
 			self.kind(buf, p.TypeSym.Type)
@@ -193,13 +193,10 @@ impl typeCoder {
 		} else {
 			self.kind(buf, p.TypeSym.Type)
 		}
-		if p.Reference {
-			buf.WriteByte('*')!
-		}
 	}
 
 	// Generates C++ prototype code of parameter instance.
-	fn paramIns(mut self, mut &buf: strings::Builder, mut &p: &sema::ParamIns) {
+	fn paramIns(mut *self, mut &buf: *strings::Builder, mut p: &sema::ParamIns) {
 		if p.Decl.Variadic {
 			buf.WriteStr(typeSlice + "<")!
 			self.kind(buf, p.Type)
@@ -207,13 +204,10 @@ impl typeCoder {
 		} else {
 			self.kind(buf, p.Type)
 		}
-		if p.Decl.Reference {
-			buf.WriteByte('*')!
-		}
 	}
 
 	// Generates C++ code of function's result type.
-	fn funcResult(mut self, mut &buf: strings::Builder, mut &f: &sema::Func) {
+	fn funcResult(mut *self, mut &buf: *strings::Builder, mut f: &sema::Func) {
 		if f.IsVoid() {
 			if f.Exceptional {
 				buf.WriteStr("jule::VoidExceptional")!
@@ -231,7 +225,7 @@ impl typeCoder {
 	}
 
 	// Generates C++ code of function instance's result type.
-	fn funcInsResult(mut self, mut &s: strings::Builder, mut &f: &sema::FuncIns) {
+	fn funcInsResult(mut *self, mut &s: *strings::Builder, mut f: &sema::FuncIns) {
 		if f.Decl.IsVoid() {
 			if f.Decl.Exceptional {
 				s.WriteStr("jule::VoidExceptional")!
@@ -249,7 +243,7 @@ impl typeCoder {
 		self.rc.codeMut1(s, f.Result)
 	}
 
-	fn anonFunc(mut self, mut &buf: strings::Builder, mut f: &sema::FuncIns) {
+	fn anonFunc(mut *self, mut &buf: *strings::Builder, mut f: &sema::FuncIns) {
 		if f.Result != nil && f.Result.Tuple() != nil {
 			self.oc.pushResultIns(f)
 		}
@@ -270,13 +264,13 @@ impl typeCoder {
 	}
 
 	// Generates C++ code of function type.
-	fn func(mut self, mut &buf: strings::Builder, mut f: &sema::FuncIns) {
+	fn func(mut *self, mut &buf: *strings::Builder, mut f: &sema::FuncIns) {
 		buf.WriteStr(typeFunc + "<")!
 		self.anonFunc(buf, f)
 		buf.WriteByte('>')!
 	}
 
-	fn channel(mut self, mut &buf: strings::Builder, mut ch: &sema::Chan) {
+	fn channel(mut *self, mut &buf: *strings::Builder, mut ch: &sema::Chan) {
 		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
 		buf.WriteStr("jule::Ptr<")!
 		identCoder.structureIns(buf, ins)
@@ -284,7 +278,7 @@ impl typeCoder {
 	}
 
 	// Generates C++ code of type.
-	fn kind(mut self, mut &buf: strings::Builder, mut k: &sema::Type) {
+	fn kind(mut *self, mut &buf: *strings::Builder, mut k: &sema::Type) {
 		match {
 		| k.Struct() != nil:
 			self.structureIns(buf, k.Struct())
@@ -347,7 +341,6 @@ const (
 	resultPtr        = "p"
 	resultSptr       = "x"
 	resultArray      = "a"
-	resultReference  = "r"
 	resultFunc       = "f"
 	resultChan       = "c"
 	resultBindPrefix = "b"
@@ -358,43 +351,40 @@ struct resultCoder {
 }
 
 impl resultCoder {
-	fn new(mut &tc: &typeCoder): &resultCoder {
+	fn new(mut tc: &typeCoder): &resultCoder {
 		ret &resultCoder{tc: tc}
 	}
 
-	fn ptr(mut self, mut &s: strings::Builder, mut p: &sema::Ptr) {
+	fn ptr(mut *self, mut &s: *strings::Builder, mut p: &sema::Ptr) {
 		s.WriteStr(resultPtr)!
 		self.codeMut(s, p.Value)
 	}
 
-	fn sptr(mut self, mut &s: strings::Builder, mut p: &sema::Sptr) {
+	fn sptr(mut *self, mut &s: *strings::Builder, mut p: &sema::Sptr) {
 		s.WriteStr(resultSptr)!
 		self.codeMut(s, p.Value)
 	}
 
-	fn mapType(mut self, mut &s: strings::Builder, mut p: &sema::Map) {
+	fn mapType(mut *self, mut &s: *strings::Builder, mut p: &sema::Map) {
 		s.WriteStr(resultMap)!
 		self.codeMut(s, p.Key)
 		self.codeMut(s, p.Value)
 	}
 
-	fn slice(mut self, mut &s: strings::Builder, mut slc: &sema::Slice) {
+	fn slice(mut *self, mut &s: *strings::Builder, mut slc: &sema::Slice) {
 		s.WriteStr(resultSlice)!
 		self.codeMut(s, slc.Value)
 	}
 
-	fn array(mut self, mut &s: strings::Builder, mut arr: &sema::Array) {
+	fn array(mut *self, mut &s: *strings::Builder, mut arr: &sema::Array) {
 		s.WriteStr(resultArray)!
 		s.WriteStr(conv::FormatInt(i64(arr.N), 16))!
 		self.codeMut(s, arr.Value)
 	}
 
-	fn func(mut self, mut &s: strings::Builder, mut f: &sema::FuncIns) {
+	fn func(mut *self, mut &s: *strings::Builder, mut f: &sema::FuncIns) {
 		s.WriteStr(resultFunc)!
 		for (_, mut p) in f.Params {
-			if p.Decl.Reference {
-				s.WriteStr(resultReference)!
-			}
 			self.codeMut(s, p.Type)
 		}
 		if f.Result != nil {
@@ -402,19 +392,19 @@ impl resultCoder {
 		}
 	}
 
-	fn channel(mut self, mut &s: strings::Builder, mut ch: &sema::Chan) {
+	fn channel(mut *self, mut &s: *strings::Builder, mut ch: &sema::Chan) {
 		s.WriteStr(resultChan)!
 		self.codeMut(s, ch.Value)
 	}
 
-	fn tuple(mut self, mut &s: strings::Builder, mut tup: &sema::Tuple) {
+	fn tuple(mut *self, mut &s: *strings::Builder, mut tup: &sema::Tuple) {
 		for (_, mut t) in tup.Types {
 			s.WriteStr("__jule_tuple_")!
 			self.codeMut(s, t)
 		}
 	}
 
-	fn codeMut(mut self, mut &s: strings::Builder, mut &t: &sema::Type) {
+	fn codeMut(mut *self, mut &s: *strings::Builder, mut t: &sema::Type) {
 		if t.Bind() {
 			// TODO:
 			//	this method should be handle structures separately
@@ -463,7 +453,7 @@ impl resultCoder {
 		}
 	}
 
-	fn codeMut1(mut self, mut &s: strings::Builder, mut &t: &sema::Type) {
+	fn codeMut1(mut *self, mut &s: *strings::Builder, mut t: &sema::Type) {
 		mut tup := t.Tuple()
 		if tup != nil {
 			self.tuple(s, tup)
@@ -472,23 +462,23 @@ impl resultCoder {
 		}
 	}
 
-	fn code(mut self, mut &t: &sema::Type): []byte {
+	fn code(mut *self, mut t: &sema::Type): []byte {
 		mut s := strings::Builder{}
 		s.Grow(20)
-		self.codeMut(s, t)
+		self.codeMut(&s, t)
 		ret unsafe { s.Buf() }
 	}
 }
 
 // Reports whether type supports initialization.
-fn ableToInit(mut &t: &sema::Type): bool {
+fn ableToInit(mut t: &sema::Type): bool {
 	ret !t.Bind()
 }
 
 // Reports whether type should initialized.
 // If the type API implemented structure of something like that, initialization is redundant.
 // Let the constructor do it's job.
-fn shouldInitialized(mut &t: &sema::Type): bool {
+fn shouldInitialized(mut t: &sema::Type): bool {
 	if !ableToInit(t) {
 		ret false
 	}

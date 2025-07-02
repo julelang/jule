@@ -20,13 +20,13 @@ struct nils {
 impl nils {
 	// Appends variable with initial safety state.
 	// If variable is already exist, updates safety information.
-	fn pushVar(mut self, var: uintptr, safe: bool) {
+	fn pushVar(mut *self, var: uintptr, safe: bool) {
 		if !Access || var == invalidNil {
 			// Ignore it, because this optimizations within scope of the --opt-access flag.
 			ret
 		}
 		for i in self.vars {
-			mut &v := unsafe { *(&self.vars[i]) }
+			mut &v := unsafe { &(*(&self.vars[i])) }
 			if v.var == var {
 				v.safe = safe
 				ret
@@ -34,7 +34,7 @@ impl nils {
 		}
 		// Not exist, append new one.
 		for i in self.vars {
-			mut &v := unsafe { *(&self.vars[i]) }
+			mut &v := unsafe { &(*(&self.vars[i])) }
 			if v.var == invalidNil {
 				// Empty place, use here instead of append.
 				v.var = var
@@ -45,10 +45,10 @@ impl nils {
 		self.vars = append(self.vars, nilVar{var: var, safe: safe})
 	}
 
-	fn removeVar(mut self, var: uintptr): bool {
+	fn removeVar(mut *self, var: uintptr): bool {
 		if var != invalidNil {
 			for i in self.vars {
-				mut &v := unsafe { *(&self.vars[i]) }
+				mut &v := unsafe { &(*(&self.vars[i])) }
 				if v.var == var {
 					v.var = invalidNil
 					v.safe = false
@@ -60,7 +60,7 @@ impl nils {
 	}
 
 	// Reports whether variable is safe.
-	fn isSafe(mut self, var: uintptr): bool {
+	fn isSafe(mut *self, var: uintptr): bool {
 		if var != invalidNil {
 			for _, v in self.vars {
 				if v.var == var {
@@ -72,39 +72,59 @@ impl nils {
 	}
 }
 
-fn possibleNilRemove(mut &n: &nils, m: sema::Expr) {
+fn possibleNilRemove(mut n: &nils, mut m: sema::Expr) {
 	if n != nil {
 		_ = n.removeVar(getNilVar(m))
 	}
 }
 
-fn isGuaranteedNonNilExpr(mut &n: &nils, m: sema::Expr): bool {
+fn isGuaranteedNonNilExpr(mut n: &nils, mut m: sema::Expr): bool {
 	_, ok := m.(&sema::BuiltinNewCallExpr)
 	ret ok || n != nil && n.isSafe(getNilVar(m))
 }
 
-fn isNilValidType(mut t: &sema::Type): bool { ret t.Sptr() != nil }
+fn isNilValidType(mut t: &sema::Type): bool { ret t.Ptr() != nil || t.Sptr() != nil }
 
-fn getNilVar(m: sema::Expr): uintptr {
+fn getNilVar(mut m: sema::Expr): uintptr {
 	if !Access {
 		ret invalidBoundary
 	}
+
+Head:
+	// Special case: if expression is reference pointer, return it directly.
+	// Otherwise it might be dereferenced, investigate deeper.
+	mut v, _ := m.(&sema::Var)
+	if v != nil && v.Reference {
+		ret uintptr(v)
+	}
+
 	// Assume: x := new(&int)
 	// It will optimize the "*x" expressions, but not "*(*x)" expressions.
 	// Otherwise optimization mistakes may occur because optimizer is not have deep analysis for this.
-	match type m {
-	| &sema::Var:
-		v := m.(&sema::Var)
-		if !v.Reference || v.ValueSym == nil || v.ValueSym.Value == nil {
-			// Variable is not reference (or points to unknown such as parameters), return address of it.
-			ret uintptr(m.(&sema::Var))
+	for {
+		match type m {
+		| &sema::Var:
+			v = m.(&sema::Var)
+			if !v.Reference || v.ValueSym == nil || v.ValueSym.Value == nil {
+				// Variable is not reference (or points to unknown such as parameters), return address of it.
+				ret uintptr(m.(&sema::Var))
+			}
+			// Variable is reference, it should be initialized at source code.
+			// Investigate the initial expression for variable address.
+			mut uem := v.ValueSym.Value.Model.(&sema::UnaryExpr)
+			m = uem.Expr.Model
+			goto Head
+		| &sema::StructSubIdentExpr:
+			ret uintptr(m.(&sema::StructSubIdentExpr).Field)
+		| &sema::UnaryExpr:
+			mut uem := m.(&sema::UnaryExpr)
+			if uem.Op.ID == token::MUL { // Dereferencing.
+				m = uem.Expr.Model
+				continue
+			}
+			ret invalidBoundary
+		|:
+			ret invalidBoundary
 		}
-		// Variable is reference, it should be initialized at source code.
-		// Investigate the initial expression for variable address.
-		ret getNilVar(v.ValueSym.Value.Model)
-	| &sema::StructSubIdentExpr:
-		ret uintptr(m.(&sema::StructSubIdentExpr).Field)
-	|:
-		ret invalidBoundary
 	}
 }

@@ -126,7 +126,7 @@ fn itoaW(z: []Word, neg: bool, base: int): []byte {
 
 		// preserve z, create local copy for use by convertWords
 		mut q := []Word(nil)
-		setWW(q, z)
+		setWW(&q, z)
 
 		// convert q to string s in base b
 		convertWords(q, s, b, ndigits, bb, table)
@@ -183,7 +183,7 @@ fn convertWords(mut q: []Word, mut s: []byte, b: Word, ndigits: int, bb: Word, t
 			}
 
 			// split q into the two digit number (q'*bbb + r) to form independent subblocks
-			divW(q, r, q, table[index].bbb)
+			divW(&q, &r, q, table[index].bbb)
 
 			// convert subblocks and collect results in s[:h] and s[h:]
 			h := len(s) - table[index].ndigits
@@ -199,7 +199,7 @@ fn convertWords(mut q: []Word, mut s: []byte, b: Word, ndigits: int, bb: Word, t
 		// hard-coding for 10 here speeds this up by 1.25x (allows for / and % by constants)
 		for len(q) > 0 {
 			// extract least significant, base bb "digit"
-			r = divW2(q, q, bb)
+			r = divW2(&q, q, bb)
 			mut j := 0
 			for j < ndigits && i > 0; j++ {
 				i--
@@ -214,7 +214,7 @@ fn convertWords(mut q: []Word, mut s: []byte, b: Word, ndigits: int, bb: Word, t
 	} else {
 		for len(q) > 0 {
 			// extract least significant, base bb "digit"
-			r = divW2(q, q, bb)
+			r = divW2(&q, q, bb)
 			mut j := 0
 			for j < ndigits && i > 0; j++ {
 				i--
@@ -252,11 +252,11 @@ struct cacheBase10 {
 let mut cache10 = cacheBase10{}
 
 // Computes x**y
-fn expWVV(mut &z: []Word, x: Word, y: Word) {
+fn expWVV(mut &z: *[]Word, x: Word, y: Word) {
 	mut xw := []Word(nil)
-	setWV(xw, x)
+	setWV(&xw, x)
 	mut yw := []Word(nil)
-	setWV(yw, y)
+	setWV(&yw, y)
 	const Slow = false
 	expWW(z, xw, yw, nil, Slow)
 }
@@ -293,21 +293,21 @@ fn divisors(m: int, b: Word, ndigits: int, bb: Word): []divisor {
 			if table[i].ndigits == 0 {
 				if i == 0 {
 					mut z := []Word(nil)
-					expWVV(z, bb, Word(leafSize))
+					expWVV(&z, bb, Word(leafSize))
 					table[0].bbb = z
 					table[0].ndigits = ndigits * leafSize
 				} else {
 					mut z := []Word(nil)
-					sqrW(z, table[i-1].bbb)
+					sqrW(&z, table[i-1].bbb)
 					table[i].bbb = z
 					table[i].ndigits = 2 * table[i-1].ndigits
 				}
 
 				// optimization: exploit aggregated extra bits in macro blocks
 				larger = []Word(nil)
-				setWW(larger, table[i].bbb)
+				setWW(&larger, table[i].bbb)
 				for mulAddVWW(larger, larger, b, 0) == 0 {
-					setWW(unsafe { *(&table[i].bbb) }, larger)
+					setWW(unsafe { &(*(&table[i].bbb)) }, larger)
 					table[i].ndigits++
 				}
 
@@ -333,7 +333,7 @@ impl strScan {
 		ret strScan{s: s}
 	}
 
-	fn read(mut self): (b: byte, ended: bool) {
+	fn read(mut *self): (b: byte, ended: bool) {
 		ended = self.i >= len(self.s)
 		if ended {
 			ret
@@ -343,7 +343,7 @@ impl strScan {
 		ret
 	}
 
-	fn unread(mut self) {
+	fn unread(mut *self) {
 		self.i--
 	}
 }
@@ -395,7 +395,7 @@ impl strScan {
 //
 // Returns ConvError in integer form.
 // err = -1 if no error occurred.
-fn scanW(mut &r: strScan, base: int, mut fracOk: bool): (res: []Word, b: int, count: int, ok: bool) {
+fn scanW(mut &r: *strScan, base: int, mut fracOk: bool): (res: []Word, b: int, count: int, ok: bool) {
 	ok = true
 	// reject invalid bases
 	baseOk := base == 0 ||
@@ -500,7 +500,7 @@ fn scanW(mut &r: strScan, base: int, mut fracOk: bool): (res: []Word, b: int, co
 
 			// if di is "full", add it to the result
 			if i == n {
-				mulAddWW(res, res, bn, di)
+				mulAddWW(&res, res, bn, di)
 				di = 0
 				i = 0
 			}
@@ -524,7 +524,7 @@ fn scanW(mut &r: strScan, base: int, mut fracOk: bool): (res: []Word, b: int, co
 
 	// add remaining digits to result
 	if i > 0 {
-		mulAddWW(res, res, pow(b1, i), di)
+		mulAddWW(&res, res, pow(b1, i), di)
 	}
 	res = normW(res)
 
@@ -538,7 +538,7 @@ fn scanW(mut &r: strScan, base: int, mut fracOk: bool): (res: []Word, b: int, co
 
 fn fromStrW(s: str): []Word {
 	mut r := strScan.new(s)
-	mut x, _, _, ok := scanW(r, 0, false)
+	mut x, _, _, ok := scanW(&r, 0, false)
 	if !ok {
 		panic("std/math/big: fromStrW failed")
 	}

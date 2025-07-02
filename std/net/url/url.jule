@@ -69,22 +69,22 @@ struct Error {
 }
 
 impl Error {
-	fn Str(self): str { ret fmt::Sprintf("{} {}: {}", self.Op, self.URL, self.Err) }
+	fn Str(*self): str { ret fmt::Sprintf("{} {}: {}", self.Op, self.URL, self.Err) }
 }
 
 type EscapeError: str
 
 impl EscapeError {
-	fn Str(self): str {
-		ret "invalid URL escape " + conv::Quote(str(self))
+	fn Str(*self): str {
+		ret "invalid URL escape " + conv::Quote(str(*self))
 	}
 }
 
 type InvalidHostError: str
 
 impl InvalidHostError {
-	fn Str(self): str {
-		ret "invalid character " + conv::Quote(str(self)) + " in host name"
+	fn Str(*self): str {
+		ret "invalid character " + conv::Quote(str(*self)) + " in host name"
 	}
 }
 
@@ -449,17 +449,17 @@ struct UserInfo {
 
 impl UserInfo {
 	// Returns the username.
-	fn Username(self): str {
+	fn Username(*self): str {
 		ret self.username
 	}
 
 	// Returns the password in case it is set, and whether it is set.
-	fn Password(self): (str, bool) {
+	fn Password(*self): (str, bool) {
 		ret self.password, self.passwordSet
 	}
 
 	// Returns the encoded userinfo information in the standard form of "username[:password]".
-	fn Str(self): str {
+	fn Str(*self): str {
 		mut s := escape(self.username, encodingUserPassword)
 		if self.passwordSet {
 			s += ":" + escape(self.password, encodingUserPassword)
@@ -471,7 +471,7 @@ impl UserInfo {
 // Separates host and port. If the port is not valid, it returns
 // the entire input as host, and it doesn't check the validity of the host.
 // Unlike net::SplitHostPort, but per RFC 3986, it requires ports to be numeric.
-fn splitHostPort(&hostPort: str): (host: str, port: str) {
+fn splitHostPort(hostPort: str): (host: str, port: str) {
 	host = hostPort
 	colon := strings::LastIndexByte(host, ':')
 	if colon != -1 && validOptionalPort(host[colon:]) {
@@ -532,7 +532,7 @@ impl URL {
 	// Otherwise it ignores self.RawPath and computes an escaped form on its own.
 	// The [URL.Str] and [URL.RequestURI] methods use EscapedPath to construct their results.
 	// In general, code should call EscapedPath instead of reading self.RawPath directly.
-	fn EscapedPath(self): str {
+	fn EscapedPath(*self): str {
 		if self.RawPath != "" && validEncoded(self.RawPath, encodingPath) {
 			p := unescape(self.RawPath, encodingPath) else { goto skip }
 			if p == self.Path {
@@ -552,7 +552,7 @@ impl URL {
 	// Otherwise it ignores self.RawFragment and computes an escaped form on its own.
 	// The [URL.Str] method uses EscapedFragment to construct its result.
 	// In general, code should call EscapedFragment instead of reading self.RawFragment directly.
-	fn EscapedFragment(self): str {
+	fn EscapedFragment(*self): str {
 		if self.RawFragment != "" && validEncoded(self.RawFragment, encodingFragment) {
 			f := unescape(self.RawFragment, encodingFragment) else { goto skip }
 			if f == self.Fragment {
@@ -565,7 +565,7 @@ impl URL {
 
 	// Reports whether the [URL] is absolute.
 	// Absolute means that it has a non-empty scheme.
-	fn IsAbs(self): bool {
+	fn IsAbs(*self): bool {
 		ret self.Scheme != ""
 	}
 
@@ -574,7 +574,7 @@ impl URL {
 	// may be relative or absolute. It always returns a new [URL] instance,
 	// even if the returned URL is identical to either the base or reference.
 	// If ref is an absolute URL, then it ignores base and returns a copy of ref.
-	fn ResolveReference(mut self, mut ref: &URL): &URL {
+	fn ResolveReference(mut *self, mut ref: &URL): &URL {
 		mut url := new(URL, *ref)
 		if ref.Scheme == "" {
 			url.Scheme = self.Scheme
@@ -616,19 +616,19 @@ impl URL {
 	// Parses a [URL] in the context of the receiver. The provided URL
 	// may be relative or absolute. It returns nil, error on parse
 	// failure, otherwise its return value is the same as [URL.ResolveReference].
-	fn Parse(mut self, ref: str)!: &URL {
+	fn Parse(mut *self, ref: str)!: &URL {
 		mut refURL := Parse(ref) else { error(error) }
 		ret self.ResolveReference(refURL)
 	}
 
 	// Parses RawQuery and returns the corresponding values.
-	fn Query(self)!: Values {
+	fn Query(*self)!: Values {
 		ret ParseQuery(self.RawQuery) else { error(error) }
 	}
 
 	// Returns the encoded path?query or opaque?query
 	// string that would be used in an HTTP request for self.
-	fn RequestURI(self): str {
+	fn RequestURI(*self): str {
 		mut result := self.Opaque
 		if result == "" {
 			result = self.EscapedPath()
@@ -650,7 +650,7 @@ impl URL {
 	//
 	// If the result is enclosed in square brackets, as literal IPv6 addresses are,
 	// the square brackets are removed from the result.
-	fn Hostname(self): str {
+	fn Hostname(*self): str {
 		host, _ := splitHostPort(self.Host)
 		ret host
 	}
@@ -658,7 +658,7 @@ impl URL {
 	// Returns the port part of self.Host, without the leading colon.
 	//
 	// If self.Host doesn't contain a valid numeric port, returns an empty string.
-	fn Port(self): str {
+	fn Port(*self): str {
 		_, port := splitHostPort(self.Host)
 		ret port
 	}
@@ -666,7 +666,7 @@ impl URL {
 	// Returns a new [URL] with the provided path elements joined to
 	// any existing path and the resulting path cleaned of any ./ or ../ elements.
 	// Any sequences of multiple / characters will be reduced to a single /.
-	fn JoinPath(mut self, elem: ...str): &URL {
+	fn JoinPath(mut *self, elem: ...str): &URL {
 		unsafe { *(&elem) = append([self.EscapedPath()], elem...) }
 		mut p := ""
 		if !strings::HasPrefix(elem[0], "/") {
@@ -682,7 +682,7 @@ impl URL {
 		if strings::HasSuffix(elem[len(elem)-1], "/") && !strings::HasSuffix(p, "/") {
 			p += "/"
 		}
-		mut url := self
+		mut url := *self
 		url.setPath(p)!
 		ret new(URL, url)
 	}
@@ -708,7 +708,7 @@ impl URL {
 	//     the form host/path does not add its own /.
 	//   - if self.RawQuery is empty, ?query is omitted.
 	//   - if self.Fragment is empty, #fragment is omitted.
-	fn Str(self): str {
+	fn Str(*self): str {
 		mut n := len(self.Scheme)
 		if self.Opaque != "" {
 			n += len(self.Opaque)
@@ -783,11 +783,11 @@ impl URL {
 
 	// Like [URL.Str] but replaces any password with "xxxxx".
 	// Only the password in self.User is redacted.
-	fn Redacted(self): str {
+	fn Redacted(*self): str {
 		if self.User != nil {
 			_, has := self.User.Password()
 			if has {
-				mut url := unsafe { *(&self) } // Break immutability, no risk for reflective mutation.
+				mut &url := unsafe { &(*(*(&self))) } // Break immutability, no risk for reflective mutation.
 				url.User = UserPassword(self.User.Username(), "xxxxx")
 				ret url.Str()
 			}
@@ -802,7 +802,7 @@ impl URL {
 	//	setPath("/foo/bar")   will set Path="/foo/bar" and RawPath=""
 	//	setPath("/foo%2fbar") will set Path="/foo/bar" and RawPath="/foo%2fbar"
 	// It will return an error only if the provided path contains an invalid escaping.
-	fn setPath(mut self, p: str)! {
+	fn setPath(mut *self, p: str)! {
 		self.Path = unescape(p, encodingPath) else { error(error) }
 		escp := escape(self.Path, encodingPath)
 		if p == escp {
@@ -814,7 +814,7 @@ impl URL {
 	}
 
 	// Like setPath but for Fragment/RawFragment.
-	fn setFragment(mut self, f: str)! {
+	fn setFragment(mut *self, f: str)! {
 		self.Fragment = unescape(f, encodingFragment) else { error(error) }
 		escf := escape(self.Fragment, encodingFragment)
 		if f == escf {
@@ -1111,8 +1111,8 @@ impl Values {
 	// If there are no values associated with the key, returns
 	// the empty string. To access multiple values, use the map
 	// directly.
-	fn Get(self, key: str): str {
-		vs := self[key]
+	fn Get(*self, key: str): str {
+		vs := (*self)[key]
 		if len(vs) == 0 {
 			ret ""
 		}
@@ -1120,40 +1120,40 @@ impl Values {
 	}
 
 	// Sets the key to value. It replaces any existing values.
-	fn Set(mut self, key: str, value: str) {
-		self[key] = [value]
+	fn Set(mut *self, key: str, value: str) {
+		(*self)[key] = [value]
 	}
 
 	// Adds the value to key. It appends to any existing values associated with key.
-	fn Add(mut self, key: str, value: str) {
-		self[key] = append(self[key], value)
+	fn Add(mut *self, key: str, value: str) {
+		(*self)[key] = append((*self)[key], value)
 	}
 
 	// Deletes the values associated with key.
-	fn Del(mut self, key: str) {
-		delete(self, key)
+	fn Del(mut *self, key: str) {
+		delete(*self, key)
 	}
 
 	// Reports whether a given key is set.
-	fn Has(self, key: str): bool {
-		_, ok := self[key]
+	fn Has(*self, key: str): bool {
+		_, ok := (*self)[key]
 		ret ok
 	}
 
 	// Encodes the values into “URL encoded” form
 	// ("bar=baz&foo=quux") sorted by key.
-	fn Encode(self): str {
-		if len(self) == 0 {
+	fn Encode(*self): str {
+		if len(*self) == 0 {
 			ret ""
 		}
-		mut keys := make([]str, 0, len(self))
-		for k in self {
+		mut keys := make([]str, 0, len(*self))
+		for k in *self {
 			keys = append(keys, k)
 		}
 		slices::Sort(keys)
 		mut buf := strings::Builder{}
 		for _, k in keys {
-			vs := self[k]
+			vs := (*self)[k]
 			keyEscaped := QueryEscape(k)
 			for _, v in vs {
 				if buf.Len() > 0 {
@@ -1168,7 +1168,7 @@ impl Values {
 	}
 }
 
-fn parseQuery(mut &m: Values, mut query: str)! {
+fn parseQuery(mut m: Values, mut query: str)! {
 	for query != "" {
 		mut key := ""
 		key, query, _ = strings::Cut(query, "&")

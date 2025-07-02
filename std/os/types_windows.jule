@@ -33,13 +33,13 @@ const (
 //
 // See https://learn.microsoft.com/en-us/windows/win32/api/winnt/nf-winnt-isreparsetagnamesurrogate
 // and https://learn.microsoft.com/en-us/windows/win32/fileio/reparse-point-tags.
-fn win32FileAttributeDataIsReparseTagNameSurrogate(&d: sys::Win32FileAttributeData, &info: winstatInfo): bool {
+fn win32FileAttributeDataIsReparseTagNameSurrogate(d: sys::Win32FileAttributeData, info: winstatInfo): bool {
 	// True for IO_REPARSE_TAG_SYMLINK and IO_REPARSE_TAG_MOUNT_POINT.
 	ret d.FileAttributes&sys::FILE_ATTRIBUTE_REPARSE_POINT != 0 && info.reparseTag&0x20000000 != 0
 }
 
 // Returns FileMode from sys::Win32FileAttributeData d.
-fn modeFromWin32FileAttributeData(&d: sys::Win32FileAttributeData, &info: winstatInfo): (m: FileMode) {
+fn modeFromWin32FileAttributeData(d: sys::Win32FileAttributeData, info: winstatInfo): (m: FileMode) {
 	if d.FileAttributes&sys::FILE_ATTRIBUTE_READONLY != 0 {
 		m |= 0444
 	} else {
@@ -96,7 +96,7 @@ fn modeFromWin32FileAttributeData(&d: sys::Win32FileAttributeData, &info: winsta
 }
 
 // Copies all required information from sys::Win32FileAttributeData d into the newly created FileInfo.
-fn newFileStatFromWin32FileAttributeData(&d: sys::Win32FileAttributeData, &info: winstatInfo): (f: FileInfo) {
+fn newFileStatFromWin32FileAttributeData(d: sys::Win32FileAttributeData, info: winstatInfo): (f: FileInfo) {
 	f.size = i64(d.FileSizeHigh)<<32 + i64(d.FileSizeLow)
 	f.mode = modeFromWin32FileAttributeData(d, info)
 	f.modtime = time::Unix(0, d.LastWriteTime.Nanoseconds())
@@ -104,7 +104,7 @@ fn newFileStatFromWin32FileAttributeData(&d: sys::Win32FileAttributeData, &info:
 }
 
 // Copies all required information from sys::Win32FindData d into the newly created FileInfo.
-fn newFileStatFromWin32FindData(&d: sys::Win32FindData): (f: FileInfo) {
+fn newFileStatFromWin32FindData(d: sys::Win32FindData): (f: FileInfo) {
 	mut info := winstatInfo{}
 	if d.FileAttributes&sys::FILE_ATTRIBUTE_REPARSE_POINT != 0 {
 		// Per https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-win32_find_dataw:

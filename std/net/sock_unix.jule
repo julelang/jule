@@ -44,10 +44,8 @@ Select:
 	mut fd := sys::FdSet{}
 	fd.Zero()
 	fd.Set(handle)
-	mut emptyFD := sys::FdSet{}
-	emptyFD.Zero()
 	for {
-		res := sys::Select(handle+1, emptyFD, fd, emptyFD, tv) else {
+		res := sys::Select(handle+1, nil, &fd, nil, &tv) else {
 			if error != sys::EINTR {
 				error(error)
 			}
@@ -81,7 +79,7 @@ fn setSocketTimeout(handle: poll::NetHandle, scope: int, timeout: time::Duration
 
 fn accept(h: poll::NetHandle, addr: uintptr, addrlen: sys::Socklen)!: poll::NetHandle {
 	for {
-		ret sys::Accept(h, addr, addrlen) else {
+		ret sys::Accept(h, addr, &addrlen) else {
 			match error {
 			| sys::EINTR:
 				continue

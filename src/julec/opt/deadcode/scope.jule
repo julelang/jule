@@ -16,7 +16,7 @@ struct scopeDeadCode {
 }
 
 impl scopeDeadCode {
-	fn optimizeChild(mut &self, mut &s: &sema::Scope) {
+	fn optimizeChild(mut &self, mut s: &sema::Scope) {
 		mut sdc := &scopeDeadCode{
 			parent: self,
 			s: s,
@@ -26,7 +26,7 @@ impl scopeDeadCode {
 		unsafe { sdc.optimizeStmts() }
 	}
 
-	fn optimizeBodyChildExceptional(mut &self, mut &s: &sema::Scope) {
+	fn optimizeBodyChildExceptional(mut &self, mut s: &sema::Scope) {
 		mut sdc := &scopeDeadCode{
 			s: s,
 			labels: self.labels,
@@ -36,7 +36,7 @@ impl scopeDeadCode {
 		unsafe { sdc.optimizeStmts() }
 	}
 
-	fn optimizeBodyChild(mut &self, mut &s: &sema::Scope) {
+	fn optimizeBodyChild(mut &self, mut s: &sema::Scope) {
 		mut sdc := &scopeDeadCode{
 			s: s,
 			labels: self.labels,
@@ -45,12 +45,12 @@ impl scopeDeadCode {
 		unsafe { sdc.optimizeStmts() }
 	}
 
-	fn optimizeExpr(mut &self, mut &model: sema::Expr) {
+	fn optimizeExpr(mut &self, mut &model: *sema::Expr) {
 		edc := exprDeadCode.new(self)
 		edc.optimize(model)
 	}
 
-	fn eliminateFollowed(mut self) {
+	fn eliminateFollowed(mut *self) {
 		if len(*self.gotos) != 0 {
 			ret
 		}
@@ -90,12 +90,12 @@ impl scopeDeadCode {
 	}
 
 	fn optimizeRangeIter(mut &self, mut it: &sema::RangeIter) {
-		self.optimizeExpr(it.Expr.Model)
+		self.optimizeExpr(&it.Expr.Model)
 		self.optimizeBodyChild(it.Scope)
 	}
 
 	fn optimizeWhileIter(mut &self, mut it: &sema::WhileIter) {
-		self.optimizeExpr(it.Expr)
+		self.optimizeExpr(&it.Expr)
 		if it.Next != nil {
 			self.optimizeStmt(it.Next)
 		}
@@ -109,7 +109,7 @@ impl scopeDeadCode {
 	fn optimizeConditional(mut &self, mut c: &sema::Conditional) {
 		for (_, mut case) in c.Elifs {
 			if case != nil {
-				self.optimizeExpr(case.Expr)
+				self.optimizeExpr(&case.Expr)
 				self.optimizeBodyChild(case.Scope)
 			}
 		}
@@ -127,7 +127,7 @@ impl scopeDeadCode {
 	fn optimizeMatch(mut &self, mut m: &sema::Match) {
 		for (_, mut case) in m.Cases {
 			for (_, mut expr) in case.Exprs {
-				self.optimizeExpr(expr.Model)
+				self.optimizeExpr(&expr.Model)
 			}
 			self.optimizeBodyChild(case.Scope)
 		}
@@ -143,17 +143,17 @@ impl scopeDeadCode {
 	}
 
 	fn optimizeAssign(mut &self, mut assign: &sema::Assign) {
-		self.optimizeExpr(assign.Left.Model)
-		self.optimizeExpr(assign.Right.Model)
+		self.optimizeExpr(&assign.Left.Model)
+		self.optimizeExpr(&assign.Right.Model)
 	}
 
 	fn optimizeMultiAssign(mut &self, mut assign: &sema::MultiAssign) {
 		for (_, mut l) in assign.Left {
 			if l != nil {
-				self.optimizeExpr(l.Model)
+				self.optimizeExpr(&l.Model)
 			}
 		}
-		self.optimizeExpr(assign.Right)
+		self.optimizeExpr(&assign.Right)
 	}
 
 	fn optimizeStmt(mut &self, mut st: sema::Stmt) {
@@ -191,7 +191,7 @@ impl scopeDeadCode {
 				// Unreachable code.
 				self.eliminateFollowed()
 			|:
-				self.optimizeExpr(val.Model)
+				self.optimizeExpr(&val.Model)
 			}
 		| &sema::Ret:
 			// Remove followed statements of the return statement.
@@ -236,7 +236,7 @@ fn eliminateDeadCodeOfScope(mut s: &sema::Scope) {
 }
 
 // Eliminates dead scope elements of functions.
-fn eliminateScopeFunctions(mut &funcs: []&sema::Func) {
+fn eliminateScopeFunctions(mut funcs: []&sema::Func) {
 	for (_, mut func) in funcs {
 		for (_, mut ins) in func.Instances {
 			eliminateDeadCodeOfScope(ins.Scope)
@@ -245,7 +245,7 @@ fn eliminateScopeFunctions(mut &funcs: []&sema::Func) {
 }
 
 // Eliminates dead scope elements of struct methods.
-fn eliminateScopeStructMethods(mut &structs: []&sema::Struct) {
+fn eliminateScopeStructMethods(mut structs: []&sema::Struct) {
 	for (_, mut s) in structs {
 		for (_, mut ins) in s.Instances {
 			eliminateScopeFunctions(ins.Methods)
@@ -253,19 +253,19 @@ fn eliminateScopeStructMethods(mut &structs: []&sema::Struct) {
 	}
 }
 
-fn eliminateFunctionsScopePackage(mut &pkg: &sema::Package) {
+fn eliminateFunctionsScopePackage(mut pkg: &sema::Package) {
 	for (_, mut f) in pkg.Files {
 		eliminateScopeFunctions(f.Funcs)
 		eliminateScopeStructMethods(f.Structs)
 	}
 }
 
-fn eliminateScopePackage(mut &pkg: &sema::Package) {
+fn eliminateScopePackage(mut pkg: &sema::Package) {
 	eliminateFunctionsScopePackage(pkg)
 }
 
 // Eliminate dead scope codes.
-fn EliminateScopes(mut &ir: &obj::IR) {
+fn EliminateScopes(mut ir: &obj::IR) {
 	mut i := len(ir.Used) - 1
 	for i >= 0; i-- {
 		mut u := ir.Used[i]

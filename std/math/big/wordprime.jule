@@ -11,15 +11,15 @@ use "std/math/rand"
 // The number n is known to be non-zero.
 fn probablyPrimeMillerRabinW(n: []Word, reps: int, force2: bool): bool {
 	mut nm1 := []Word(nil)
-	subW(nm1, n, wordOne)
+	subW(&nm1, n, wordOne)
 
 	// determine q, k such that nm1 = q << k
 	k := trailingZeroBitsW(nm1)
 	mut q := []Word(nil)
-	rshW(q, nm1, k)
+	rshW(&q, nm1, k)
 
 	mut nm3 := []Word(nil)
-	subW(nm3, nm1, wordTwo)
+	subW(&nm3, nm1, wordTwo)
 
 	rand := rand::Rand.New(rand::NewSource(u64(n[0])))
 
@@ -32,19 +32,19 @@ fn probablyPrimeMillerRabinW(n: []Word, reps: int, force2: bool): bool {
 nextRandom:
 	for i < reps; i++ {
 		if i == reps-1 && force2 {
-			setWW(x, wordTwo)
+			setWW(&x, wordTwo)
 		} else {
-			randomW(x, rand, nm3, nm3Len)
-			addW(x, x, wordTwo)
+			randomW(&x, rand, nm3, nm3Len)
+			addW(&x, x, wordTwo)
 		}
-		expWW(y, x, q, n, false)
+		expWW(&y, x, q, n, false)
 		if cmpW(y, wordOne) == 0 || cmpW(y, nm1) == 0 {
 			continue
 		}
 		mut j := uint(1)
 		for j < k; j++ {
-			sqrW(y, y)
-			divW(quotient, y, y, n)
+			sqrW(&y, y)
+			divW(&quotient, &y, y, n)
 			if cmpW(y, nm1) == 0 {
 				continue nextRandom
 			}
@@ -128,8 +128,8 @@ fn probablyPrimeLucasW(mut n: []Word): bool {
 			// We'll never find (d/n) = -1 if n is a square.
 			// If n is a non-square we expect to find a d in just a few attempts on average.
 			// After 40 attempts, take a moment to check if n is indeed a square.
-			sqrtW(t1, n)
-			sqrtW(t1, t1)
+			sqrtW(&t1, n)
+			sqrtW(&t1, t1)
 			if cmpW(t1, n) == 0 {
 				ret false
 			}
@@ -149,12 +149,12 @@ fn probablyPrimeLucasW(mut n: []Word): bool {
 	//
 	// Arrange s = (n - Jacobi(Δ, n)) / 2^r = (n+1) / 2^r.
 	mut s := []Word(nil)
-	addW(s, n, wordOne)
+	addW(&s, n, wordOne)
 	r := int(trailingZeroBitsW(s))
-	rshW(s, s, uint(r))
+	rshW(&s, s, uint(r))
 
 	mut nm2 := []Word(nil)
-	subW(nm2, n, wordTwo) // n-2
+	subW(&nm2, n, wordTwo) // n-2
 
 	// We apply the "almost extra strong" test, which checks the above conditions
 	// except for U_s ≡ 0 mod n, which allows us to avoid computing any U_k values.
@@ -185,36 +185,36 @@ fn probablyPrimeLucasW(mut n: []Word): bool {
 	//
 	// We can therefore start with k=0 and build up to k=s in log₂(s) steps.
 	mut natP := []Word(nil)
-	setWV(natP, p)
+	setWV(&natP, p)
 	mut vk := []Word(nil)
-	setWV(vk, 2)
+	setWV(&vk, 2)
 	mut vk1 := []Word(nil)
-	setWV(vk1, p)
+	setWV(&vk1, p)
 	mut t2 := []Word(nil) // temp
 	mut i := int(bitLenW(s))
 	for i >= 0; i-- {
 		if bitW(s, uint(i)) != 0 {
 			// k' = 2k+1
 			// V(k') = V(2k+1) = V(k) V(k+1) - P.
-			mulW(t1, vk, vk1)
-			addW(t1, t1, n)
-			subW(t1, t1, natP)
-			divW(t2, vk, t1, n)
+			mulW(&t1, vk, vk1)
+			addW(&t1, t1, n)
+			subW(&t1, t1, natP)
+			divW(&t2, &vk, t1, n)
 			// V(k'+1) = V(2k+2) = V(k+1)² - 2.
-			sqrW(t1, vk1)
-			addW(t1, t1, nm2)
-			divW(t2, vk1, t1, n)
+			sqrW(&t1, vk1)
+			addW(&t1, t1, nm2)
+			divW(&t2, &vk1, t1, n)
 		} else {
 			// k' = 2k
 			// V(k'+1) = V(2k+1) = V(k) V(k+1) - P.
-			mulW(t1, vk, vk1)
-			addW(t1, t1, n)
-			subW(t1, t1, natP)
-			divW(t2, vk1, t1, n)
+			mulW(&t1, vk, vk1)
+			addW(&t1, t1, n)
+			subW(&t1, t1, natP)
+			divW(&t2, &vk1, t1, n)
 			// V(k') = V(2k) = V(k)² - 2
-			sqrW(t1, vk)
-			addW(t1, t1, nm2)
-			divW(t2, vk, t1, n)
+			sqrW(&t1, vk)
+			addW(&t1, t1, nm2)
+			divW(&t2, &vk, t1, n)
 		}
 	}
 
@@ -227,13 +227,13 @@ fn probablyPrimeLucasW(mut n: []Word): bool {
 		//
 		// Since we are checking for U(k) == 0 it suffices to check 2 V(k+1) == P V(k) mod n,
 		// or P V(k) - 2 V(k+1) == 0 mod n.
-		mulW(t1, vk, natP)
-		lshW(t2, vk1, 1)
+		mulW(&t1, vk, natP)
+		lshW(&t2, vk1, 1)
 		if cmpW(t1, t2) < 0 {
 			t1, t2 = t2, t1
 		}
-		subW(t1, t1, t2)
-		divW(t2, vk1, t1, n)
+		subW(&t1, t1, t2)
+		divW(&t2, &vk1, t1, n)
 		if len(vk1) == 0 {
 			ret true
 		}
@@ -252,9 +252,9 @@ fn probablyPrimeLucasW(mut n: []Word): bool {
 		}
 		// k' = 2k
 		// V(k') = V(2k) = V(k)² - 2
-		sqrW(t1, vk)
-		subW(t1, t1, wordTwo)
-		divW(t2, vk, t1, n)
+		sqrW(&t1, vk)
+		subW(&t1, t1, wordTwo)
+		divW(&t2, &vk, t1, n)
 	}
 	ret false
 }

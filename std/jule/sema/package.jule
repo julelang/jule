@@ -17,40 +17,40 @@ trait Importer {
 	// Set current module path.
 	// Path should be valid directory.
 	// Set to empty string if module is not exist.
-	fn SetModPath(mut self, path: str)
+	fn SetModPath(mut *self, path: str)
 
 	// Returns current module path.
 	// Path should be valid directory.
 	// Returns empty string if module is not exist.
-	fn GetModPath(self): str
+	fn GetModPath(*self): str
 
 	// Returns module path by identity.
-	fn ModById(self, id: int): str
+	fn ModById(*self, id: int): str
 
 	// Returns &ImportInfo by path.
 	// This function accepted as returns already imported and checked package.
 	// If returns not-nil value, will be used instead of ImportPackage
 	// if possible and package content is not checked by Sema.
-	fn GetImport(mut self, path: str): &ImportInfo
+	fn GetImport(mut *self, path: str): &ImportInfo
 
 	// Path is the directory path of package to import.
 	// Should return abstract syntax tree of package files.
 	// Logs accepts as error.
 	// Updated module to package's module if exist when updateMod is true.
-	fn ImportPackage(mut self, path: str, updateMod: bool): ([]&ast::AST, []log::Log)
+	fn ImportPackage(mut *self, path: str, updateMod: bool): ([]&ast::AST, []log::Log)
 
 	// Invoked after the package is imported.
 	// Sets module identitity of imported package to current module.
-	fn Imported(mut self, mut &ImportInfo)
+	fn Imported(mut *self, mut &ImportInfo)
 
 	// Returns all imported packages.
 	// The return value may be mutable reference to the internal buffer.
 	// Packages should be ordered by FIFO; starting with the first deepest
 	// imported package, and ending with the last imported package.
-	fn AllPackages(mut self): []&ImportInfo
+	fn AllPackages(mut *self): []&ImportInfo
 }
 
-fn findVarFileInPackage(mut &files: []&SymTab, &v: &Var): &SymTab {
+fn findVarFileInPackage(mut files: []&SymTab, v: &Var): &SymTab {
 	for (_, mut f) in files {
 		if f.findVar1(v) != -1 {
 			ret f
@@ -61,7 +61,7 @@ fn findVarFileInPackage(mut &files: []&SymTab, &v: &Var): &SymTab {
 
 // Returns variable by identifier and bind state.
 // Returns nil if not exist any variable in this identifier.
-fn findVarInPackage(mut &files: []&SymTab, &name: str, _bind: bool): &Var {
+fn findVarInPackage(mut files: []&SymTab, name: str, _bind: bool): &Var {
 	for (_, mut f) in files {
 		mut v := f.FindVar(name, _bind)
 		if v != nil {
@@ -73,7 +73,7 @@ fn findVarInPackage(mut &files: []&SymTab, &name: str, _bind: bool): &Var {
 
 // Returns type alias by identifier and bind state.
 // Returns nil if not exist any type alias in this identifier.
-fn findTypeAliasInPackage(mut &files: []&SymTab, &name: str, _bind: bool): &TypeAlias {
+fn findTypeAliasInPackage(mut files: []&SymTab, name: str, _bind: bool): &TypeAlias {
 	for (_, mut f) in files {
 		mut ta := f.FindTypeAlias(name, _bind)
 		if ta != nil {
@@ -85,7 +85,7 @@ fn findTypeAliasInPackage(mut &files: []&SymTab, &name: str, _bind: bool): &Type
 
 // Returns struct by identifier and bind state.
 // Returns nil if not exist any struct in this identifier.
-fn findStructInPackage(mut &files: []&SymTab, &name: str, _bind: bool): &Struct {
+fn findStructInPackage(mut files: []&SymTab, name: str, _bind: bool): &Struct {
 	for (_, mut f) in files {
 		mut s := f.FindStruct(name, _bind)
 		if s != nil {
@@ -97,7 +97,7 @@ fn findStructInPackage(mut &files: []&SymTab, &name: str, _bind: bool): &Struct 
 
 // Returns function by identifier and bind state.
 // Returns nil if not exist any function in this identifier.
-fn findFuncInPackage(mut &files: []&SymTab, &name: str, _bind: bool): &Func {
+fn findFuncInPackage(mut files: []&SymTab, name: str, _bind: bool): &Func {
 	for (_, mut file) in files {
 		mut f := file.FindFunc(name, _bind)
 		if f != nil {
@@ -109,7 +109,7 @@ fn findFuncInPackage(mut &files: []&SymTab, &name: str, _bind: bool): &Func {
 
 // Returns trait by identifier.
 // Returns nil if not exist any trait in this identifier.
-fn findTraitInPackage(mut &files: []&SymTab, &name: str): &Trait {
+fn findTraitInPackage(mut files: []&SymTab, name: str): &Trait {
 	for (_, mut f) in files {
 		mut t := f.FindTrait(name)
 		if t != nil {
@@ -121,7 +121,7 @@ fn findTraitInPackage(mut &files: []&SymTab, &name: str): &Trait {
 
 // Returns enum by identifier.
 // Returns nil if not exist any enum in this identifier.
-fn findEnumInPackage(mut &files: []&SymTab, &name: str): &Enum {
+fn findEnumInPackage(mut files: []&SymTab, name: str): &Enum {
 	for (_, mut f) in files {
 		mut e := f.FindEnum(name)
 		if e != nil {
@@ -133,7 +133,7 @@ fn findEnumInPackage(mut &files: []&SymTab, &name: str): &Enum {
 
 // Returns enum by identifier.
 // Returns nil if not exist any type enum in this identifier.
-fn findTypeEnumInPackage(mut &files: []&SymTab, &name: str): &TypeEnum {
+fn findTypeEnumInPackage(mut files: []&SymTab, name: str): &TypeEnum {
 	for (_, mut f) in files {
 		mut e := f.FindTypeEnum(name)
 		if e != nil {
@@ -144,7 +144,7 @@ fn findTypeEnumInPackage(mut &files: []&SymTab, &name: str): &TypeEnum {
 }
 
 // Lookups tables with [SymTab.defByIdent] method.
-fn defByIdentPackage(mut &files: []&SymTab, &name: str, _bind: bool): any {
+fn defByIdentPackage(mut files: []&SymTab, name: str, _bind: bool): any {
 	for (_, mut file) in files {
 		mut def := file.defByIdent(name, _bind)
 		if def != nil {
@@ -188,14 +188,14 @@ struct ImportInfo {
 
 impl Lookup for ImportInfo {
 	// Returns always nil.
-	fn SelectPackage(mut self, fn(&ImportInfo): bool): &ImportInfo { ret nil }
+	fn SelectPackage(mut *self, fn(&ImportInfo): bool): &ImportInfo { ret nil }
 
 	// Returns variable by identifier and bind state.
 	// Returns nil if not exist any variable in this identifier.
 	//
 	// Lookups by import way such as identifier selection.
 	// Just lookups non-bind defines.
-	fn FindVar(mut self, name: str, _: bool): &Var {
+	fn FindVar(mut *self, name: str, _: bool): &Var {
 		if !self.isLookupable() {
 			ret nil
 		}
@@ -207,7 +207,7 @@ impl Lookup for ImportInfo {
 	//
 	// Lookups by import way such as identifier selection.
 	// Just lookups non-bind defines.
-	fn FindTypeAlias(mut self, name: str, _: bool): &TypeAlias {
+	fn FindTypeAlias(mut *self, name: str, _: bool): &TypeAlias {
 		if !self.isLookupable() {
 			ret nil
 		}
@@ -219,7 +219,7 @@ impl Lookup for ImportInfo {
 	//
 	// Lookups by import way such as identifier selection.
 	// Just lookups non-bind defines.
-	fn FindStruct(mut self, name: str, _: bool): &Struct {
+	fn FindStruct(mut *self, name: str, _: bool): &Struct {
 		if !self.isLookupable() {
 			ret nil
 		}
@@ -231,7 +231,7 @@ impl Lookup for ImportInfo {
 	//
 	// Lookups by import way such as identifier selection.
 	// Just lookups non-bind defines.
-	fn FindFunc(mut self, name: str, _: bool): &Func {
+	fn FindFunc(mut *self, name: str, _: bool): &Func {
 		if !self.isLookupable() {
 			ret nil
 		}
@@ -242,7 +242,7 @@ impl Lookup for ImportInfo {
 	// Returns nil if not exist any trait in this identifier.
 	//
 	// Lookups by import way such as identifier selection.
-	fn FindTrait(mut self, name: str): &Trait {
+	fn FindTrait(mut *self, name: str): &Trait {
 		if !self.isLookupable() {
 			ret nil
 		}
@@ -253,7 +253,7 @@ impl Lookup for ImportInfo {
 	// Returns nil if not exist any enum in this identifier.
 	//
 	// Lookups by import way such as identifier selection.
-	fn FindEnum(mut self, name: str): &Enum {
+	fn FindEnum(mut *self, name: str): &Enum {
 		if !self.isLookupable() {
 			ret nil
 		}
@@ -264,7 +264,7 @@ impl Lookup for ImportInfo {
 	// Returns nil if not exist any type enum in this identifier.
 	//
 	// Lookups by import way such as identifier selection.
-	fn FindTypeEnum(mut self, name: str): &TypeEnum {
+	fn FindTypeEnum(mut *self, name: str): &TypeEnum {
 		if !self.isLookupable() {
 			ret nil
 		}
@@ -273,7 +273,7 @@ impl Lookup for ImportInfo {
 }
 
 impl ImportInfo {
-	fn isLookupable(self): bool {
+	fn isLookupable(*self): bool {
 		ret !self.Bind
 	}
 }
@@ -286,47 +286,47 @@ struct Package {
 
 impl Lookup for Package {
 	// Returns always nil.
-	fn SelectPackage(mut self, fn(&ImportInfo): bool): &ImportInfo { ret nil }
+	fn SelectPackage(mut *self, fn(&ImportInfo): bool): &ImportInfo { ret nil }
 
 	// Returns variable by identifier and bind state.
 	// Returns nil if not exist any variable in this identifier.
-	fn FindVar(mut self, name: str, _bind: bool): &Var {
+	fn FindVar(mut *self, name: str, _bind: bool): &Var {
 		ret findVarInPackage(self.Files, name, _bind)
 	}
 
 	// Returns type alias by identifier and bind state.
 	// Returns nil if not exist any type alias in this identifier.
-	fn FindTypeAlias(mut self, name: str, _bind: bool): &TypeAlias {
+	fn FindTypeAlias(mut *self, name: str, _bind: bool): &TypeAlias {
 		ret findTypeAliasInPackage(self.Files, name, _bind)
 	}
 
 	// Returns struct by identifier and bind state.
 	// Returns nil if not exist any struct in this identifier.
-	fn FindStruct(mut self, name: str, _bind: bool): &Struct {
+	fn FindStruct(mut *self, name: str, _bind: bool): &Struct {
 		ret findStructInPackage(self.Files, name, _bind)
 	}
 
 	// Returns function by identifier and bind state.
 	// Returns nil if not exist any function in this identifier.
-	fn FindFunc(mut self, name: str, _bind: bool): &Func {
+	fn FindFunc(mut *self, name: str, _bind: bool): &Func {
 		ret findFuncInPackage(self.Files, name, _bind)
 	}
 
 	// Returns trait by identifier.
 	// Returns nil if not exist any trait in this identifier.
-	fn FindTrait(mut self, name: str): &Trait {
+	fn FindTrait(mut *self, name: str): &Trait {
 		ret findTraitInPackage(self.Files, name)
 	}
 
 	// Returns enum by identifier.
 	// Returns nil if not exist any enum in this identifier.
-	fn FindEnum(mut self, name: str): &Enum {
+	fn FindEnum(mut *self, name: str): &Enum {
 		ret findEnumInPackage(self.Files, name)
 	}
 
 	// Returns type enum by identifier.
 	// Returns nil if not exist any type enum in this identifier.
-	fn FindTypeEnum(mut self, name: str): &TypeEnum {
+	fn FindTypeEnum(mut *self, name: str): &TypeEnum {
 		ret findTypeEnumInPackage(self.Files, name)
 	}
 }
@@ -336,7 +336,7 @@ impl Lookup for Package {
 //	isStdPackage(f, "") for determine the whether f is standard library package
 //	isStdPackage(f, "math") for "std/math"
 //	isStdPackage(f, "math/big") for "std/math/big"
-fn isStdPackage(&f: str, p: str): bool {
+fn isStdPackage(f: str, p: str): bool {
 	// Do not handle '/' separators of p, because it
 	// valid path separator for all supported platforms.
 	ret strings::HasPrefix(f, filepath::Join(build::PathStdlib(), p))

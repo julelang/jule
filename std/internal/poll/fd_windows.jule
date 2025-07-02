@@ -39,7 +39,7 @@ struct FD {
 }
 
 impl FD {
-	fn Init(mut self)! {
+	fn Init(mut *self)! {
 		// Disable SIO_UDP_CONNRESET behavior.
 		// http://support.microsoft.com/kb/263823
 		if self.Flags&SocketNoConn == SocketNoConn {
@@ -55,7 +55,7 @@ impl FD {
 
 	// Writes bytes to the file descriptor and returns written byte count.
 	// The number of bytes written can never exceed the length of the buf.
-	fn Write(mut self, buf: []byte)!: (n: int) {
+	fn Write(mut *self, buf: []byte)!: (n: int) {
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte write, return immediately
 			// without trying to write.
@@ -88,7 +88,7 @@ impl FD {
 
 	// Like Write, but wraps sendto syscall.
 	// General for V4 and V6. Unsafe variant.
-	fn WriteV(mut self, buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
+	fn WriteV(mut *self, buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
 		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for WriteV")
 		}
@@ -113,13 +113,13 @@ impl FD {
 
 	// Writes buf to file handle, returns written byte count.
 	// Returns -1 if error occurred.
-	fn writeFile(mut self, mut buf: []byte)!: (n: int) {
+	fn writeFile(mut *self, mut buf: []byte)!: (n: int) {
 		ret sys::WriteFile(sys::Handle(self.File), buf) else { error(error) }
 	}
 
 	// Writes buf to console handle, returns written byte count.
 	// Returns -1 if error occurred.
-	fn writeConsole(mut self, mut buf: []byte)!: (n: int) {
+	fn writeConsole(mut *self, mut buf: []byte)!: (n: int) {
 		n = len(buf)
 		mut runes := make([]rune, 0, 256)
 		if len(self.lastbits) > 0 {
@@ -151,7 +151,7 @@ impl FD {
 			mut u16s := utf16::Encode(chunk)
 			for len(u16s) > 0 {
 				mut written := u32(0)
-				unsafe { sys::WriteConsole(sys::Handle(self.File), &u16s[0], u32(len(u16s)), written, nil) else { error(error) } }
+				unsafe { sys::WriteConsole(sys::Handle(self.File), &u16s[0], u32(len(u16s)), &written, nil) else { error(error) } }
 				u16s = u16s[written:]
 			}
 		}
@@ -163,7 +163,7 @@ impl FD {
 	// If the buf is larger than the number of bytes that can be read,
 	// the buffer will not cause an overflow. Offset will be shifted
 	// by the number of bytes read.
-	fn Read(mut self, mut buf: []byte)!: (n: int) {
+	fn Read(mut *self, mut buf: []byte)!: (n: int) {
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte read, return immediately
 			// without trying to read.
@@ -189,7 +189,7 @@ impl FD {
 
 	// Like Read, but wraps recvfrom syscall.
 	// General for V4 and V6. Unsafe variant.
-	fn ReadV(mut self, mut buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
+	fn ReadV(mut *self, mut buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
 		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
 		}
@@ -205,7 +205,7 @@ impl FD {
 	}
 
 	// Reads from file handle into buf, returns read byte count.
-	fn readFile(mut self, mut buf: []byte)!: (n: int) {
+	fn readFile(mut *self, mut buf: []byte)!: (n: int) {
 		ret sys::ReadFile(sys::Handle(self.File), buf) else {
 			if error == sys::ERROR_BROKEN_PIPE {
 				// Work around ERROR_BROKEN_PIPE is returned on reading EOF from stdin.
@@ -216,7 +216,7 @@ impl FD {
 	}
 
 	// Reads from console handle into buf, returns read byte count.
-	fn readConsole(mut self, mut buf: []byte)!: (n: int) {
+	fn readConsole(mut *self, mut buf: []byte)!: (n: int) {
 		if self.readu16 == nil {
 			// This information adopted from the Go programming language:
 			//
@@ -238,7 +238,7 @@ impl FD {
 					sys::Handle(self.File),
 					&self.readu16[:len(self.readu16)+1][len(self.readu16)],
 					u32(n),
-					nw) else { error(error) }
+					&nw) else { error(error) }
 			}
 			u16s := self.readu16[:len(self.readu16)+int(nw)]
 			self.readu16 = self.readu16[:0]
@@ -290,22 +290,22 @@ impl FD {
 	// Sets offset to next Read/Write operation and returns the new offset.
 	// whence: 0 (Seek.Set) means, relative to the whence of the file, 1 (Seek.Cur)
 	// means relative to the current offset, and 2 (Seek.End) means relative to end.
-	fn Seek(mut self, offset: i64, whence: int)!: (newoffset: i64) {
+	fn Seek(mut *self, offset: i64, whence: int)!: (newoffset: i64) {
 		ret sys::Seek(sys::Handle(self.File), offset, whence) else { error(error) }
 	}
 
 	// Imitates the POSIX ftruncate function.
-	fn Ftruncate(mut self, size: i64)! {
+	fn Ftruncate(mut *self, size: i64)! {
 		sys::Ftruncate(sys::Handle(self.File), size) else { error(error) }
 	}
 
 	// Wraps sys::FlushFileBuffers.
-	fn Fsync(mut self)! {
+	fn Fsync(mut *self)! {
 		sys::FlushFileBuffers(sys::Handle(self.File)) else { error(error) }
 	}
 
 	// Closes file descriptor.
-	fn Close(mut self)! {
+	fn Close(mut *self)! {
 		match {
 		| self.Flags&File == File | self.Flags&Pipe == Pipe | self.Flags&Pipe == Pipe | self.Flags&Console == Console:
 			sys::CloseHandle(sys::Handle(self.File)) else { error(error) }

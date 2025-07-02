@@ -63,6 +63,7 @@ struct Runtime {
 	StrAsSlice:      &sema::FuncIns
 	SliceAsStr:      &sema::FuncIns
 	CloseThread:     &sema::FuncIns
+	CheckNilRef:     &sema::FuncIns
 
 	Map:         &sema::Struct
 	MapIterator: &sema::Struct
@@ -103,7 +104,7 @@ fn Collect(mut ir: &obj::IR): &Meta {
 }
 
 // Collects Runtime from IR if possible.
-fn CollectRuntime(mut &ir: &obj::IR): &Runtime {
+fn CollectRuntime(mut ir: &obj::IR): &Runtime {
 	mut p := obj::SelectImport(ir.Used, linkpathRuntime)
 	if p == nil {
 		ret nil
@@ -141,6 +142,7 @@ fn CollectRuntime(mut &ir: &obj::IR): &Runtime {
 	meta.StrAsSlice = obj::RuntimeFindFunc(p, "strAsSlice").Instances[0]
 	meta.SliceAsStr = obj::RuntimeFindFunc(p, "sliceAsStr").Instances[0]
 	meta.CloseThread = obj::RuntimeFindFunc(p, "closeThread").Instances[0]
+	meta.CheckNilRef = obj::RuntimeFindFunc(p, "checkNilRef").Instances[0]
 
 	// Structs.
 	meta.Map = obj::RuntimeFindStruct(p, "_Map")
@@ -152,7 +154,7 @@ fn CollectRuntime(mut &ir: &obj::IR): &Runtime {
 }
 
 // Collects StrBuilder from IR if possible.
-fn CollectStrBuilder(mut &ir: &obj::IR): &StrBuilder {
+fn CollectStrBuilder(mut ir: &obj::IR): &StrBuilder {
 	const Binded = false
 	const Static = false
 	mut p := obj::SelectImport(ir.Used, linkpathStrings)
@@ -169,7 +171,7 @@ fn CollectStrBuilder(mut &ir: &obj::IR): &StrBuilder {
 }
 
 // Collects MathCmplx from IR if possible.
-fn CollectMathCmplx(mut &ir: &obj::IR): &MathCmplx {
+fn CollectMathCmplx(mut ir: &obj::IR): &MathCmplx {
 	mut p := obj::SelectImport(ir.Used, linkpathMathCmplx)
 	if p == nil {
 		ret nil

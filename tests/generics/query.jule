@@ -15,7 +15,7 @@ fn NewQuery[S: []T, T](mut s: S): Query[T] {
 }
 
 impl Query {
-	fn Where(self, f: fn(x: T): bool): Query[T] {
+	fn Where(*self, f: fn(x: T): bool): Query[T] {
 		mut i := 0
 		mut n := len(self.s)
 		for i < n {
@@ -27,22 +27,22 @@ impl Query {
 			i++
 		}
 		self.s = self.s[:i]
-		ret self
+		ret *self
 	}
 
-	fn Map(self, f: fn(x: T): T): Query[T] {
+	fn Map(*self, f: fn(x: T): T): Query[T] {
 		for i in self.s {
 			self.s[i] = f(self.s[i])
 		}
-		ret self
+		ret *self
 	}
 
-	fn Reverse(self): Query[T] {
+	fn Reverse(*self): Query[T] {
 		slices::Reverse(self.s)
-		ret self
+		ret *self
 	}
 
-	fn OrderBy[E: ordered](self, f: fn(x: T): E): Query[T] {
+	fn OrderBy[E: ordered](*self, f: fn(x: T): E): Query[T] {
 		slices::SortFunc(self.s, fn|x, y| {
 			r0, r1 := f(x), f(y)
 			if r0 == r1 {
@@ -52,10 +52,10 @@ impl Query {
 			}
 			ret -1
 		})
-		ret self
+		ret *self
 	}
 
-	fn OrderByAsc[E: ordered](self, f: fn(x: T): E): Query[T] {
+	fn OrderByAsc[E: ordered](*self, f: fn(x: T): E): Query[T] {
 		slices::SortFunc(self.s, fn|x, y| {
 			r0, r1 := f(x), f(y)
 			if r0 == r1 {
@@ -65,10 +65,10 @@ impl Query {
 			}
 			ret +1
 		})
-		ret self
+		ret *self
 	}
 
-	fn Max[E: ordered](self, f: fn(x: T): E): E {
+	fn Max[E: ordered](*self, f: fn(x: T): E): E {
 		mut m := f(self.s[0])
 		for _, x in self.s[1:] {
 			mut z := f(x)
@@ -79,7 +79,7 @@ impl Query {
 		ret m
 	}
 
-	fn Min[E: ordered](self, f: fn(x: T): E): E {
+	fn Min[E: ordered](*self, f: fn(x: T): E): E {
 		mut m := f(self.s[0])
 		for _, x in self.s[1:] {
 			mut z := f(x)
@@ -90,7 +90,7 @@ impl Query {
 		ret m
 	}
 
-	fn Count(self, f: fn(x: T): bool): (n: int) {
+	fn Count(*self, f: fn(x: T): bool): (n: int) {
 		for _, x in self.s {
 			if f(x) {
 				n++
@@ -99,7 +99,7 @@ impl Query {
 		ret
 	}
 
-	fn Unwrap(self): []T {
+	fn Unwrap(*self): []T {
 		ret self.s
 	}
 }

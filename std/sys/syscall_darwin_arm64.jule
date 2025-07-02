@@ -1751,19 +1751,19 @@ fn Fcntl(fd: int, cmd: int, arg: int)!: int {
 	ret valptr
 }
 
-fn Fstatat(fd: int, path: str, mut &stat: SysStat, flags: int)! {
+fn Fstatat(fd: int, path: str, mut &stat: *SysStat, flags: int)! {
 	cpath := integ::StrToBytes(path)
-	e := unsafe { cpp.fstatat(fd, (*integ::Char)(&cpath[0]), (*cpp.stat)(&stat), flags) }
+	e := unsafe { cpp.fstatat(fd, (*integ::Char)(&cpath[0]), (*cpp.stat)(stat), flags) }
 	if e < _NO_ERROR {
 		error(GetLastErrno())
 	}
 }
 
-fn Stat(path: str, mut &stat: SysStat)! {
+fn Stat(path: str, mut &stat: *SysStat)! {
 	Fstatat(AT_FDCWD, path, stat, 0) else { error(error) }
 }
 
-fn Lstat(path: str, mut &stat: SysStat)! {
+fn Lstat(path: str, mut &stat: *SysStat)! {
 	Fstatat(AT_FDCWD, path, stat, AT_SYMLINK_NOFOLLOW) else { error(error) }
 }
 
@@ -1781,8 +1781,8 @@ fn Fsync(fd: int)! {
 	}
 }
 
-fn Select(nfd: int, mut &r: FdSet, mut &w: FdSet, mut &e: FdSet, mut &timeout: Timeval)!: (n: int) {
-	n = unsafe { cpp.select(nfd, (*cpp.fd_set)(&r), (*cpp.fd_set)(&w), (*cpp.fd_set)(&e), (*cpp.timeval)(&timeout)) }
+fn Select(nfd: int, mut &r: *FdSet, mut &w: *FdSet, mut &e: *FdSet, mut &timeout: *Timeval)!: (n: int) {
+	n = unsafe { cpp.select(nfd, (*cpp.fd_set)(r), (*cpp.fd_set)(w), (*cpp.fd_set)(e), (*cpp.timeval)(timeout)) }
 	if n < _NO_ERROR {
 		error(GetLastErrno())
 	}
@@ -1818,8 +1818,8 @@ fn Listen(s: int, backlog: int)! {
 	}
 }
 
-fn Accept(s: int, addr: uintptr, addrlen: Socklen)!: (fd: int) {
-	fd = unsafe { cpp.accept(s, (*cpp.sockaddr)(addr), (*u32)(&addrlen)) }
+fn Accept(s: int, addr: uintptr, &addrlen: *Socklen)!: (fd: int) {
+	fd = unsafe { cpp.accept(s, (*cpp.sockaddr)(addr), (*u32)(addrlen)) }
 	if fd < _NO_ERROR {
 		error(GetLastErrno())
 	}
@@ -1933,12 +1933,12 @@ fn Fork()!: int {
 	ret int(r)
 }
 
-fn strSliceToCstrSlice(&s: []str, mut &args: [][]byte): []*byte {
-	mut p_args := make([]*byte, len(s)+1)
-	args = make([][]byte, len(s))
-	for i, arg in s {
+fn strSliceToCstrSlice(&s: *[]str, mut &args: *[][]byte): []*byte {
+	mut p_args := make([]*byte, len(*s)+1)
+	*args = make([][]byte, len(*s))
+	for i, arg in *s {
 		mut p_arg := integ::StrToBytes(arg)
-		args[i] = p_arg
+		(*args)[i] = p_arg
 		p_args[i] = &p_arg[0]
 	}
 	p_args[len(p_args)-1] = nil
@@ -1949,8 +1949,8 @@ fn Exec(file: str, args: []str, env: []str)! {
 	let mut c_args2: [][]byte // Avoid deallocation of converted args for safety.
 	let mut c_env2: [][]byte  // Avoid deallocation of converted env for safety.
 	c_file := integ::StrToBytes(file)
-	c_args := strSliceToCstrSlice(args, c_args2)
-	c_env := strSliceToCstrSlice(env, c_env2)
+	c_args := strSliceToCstrSlice(&args, &c_args2)
+	c_env := strSliceToCstrSlice(&env, &c_env2)
 	unsafe { cpp.execve((*integ::Char)(&c_file[0]), (**integ::Char)(&c_args[0]), (**integ::Char)(&c_env[0])) }
 	// If execve was successful, this statement would not be reached.
 	error(GetLastErrno())
@@ -1963,8 +1963,8 @@ fn Kill(pid: int, sig: Signal)! {
 	}
 }
 
-fn Waitpid(pid: int, mut &status: i32, options: int)! {
-	r := unsafe { cpp.waitpid(pid, (*integ::Int)(&status), options) }
+fn Waitpid(pid: int, mut &status: *i32, options: int)! {
+	r := unsafe { cpp.waitpid(pid, (*integ::Int)(status), options) }
 	if r < _NO_ERROR {
 		error(GetLastErrno())
 	}

@@ -77,7 +77,7 @@ impl Int {
 
 		// parse abs
 		mut r := strScan.new(s)
-		z.abs, _, _, ok := scanW(r, base, false)
+		z.abs, _, _, ok := scanW(&r, base, false)
 		if !ok {
 			ret Int{}, false
 		}
@@ -93,7 +93,7 @@ impl Int {
 	// Returns Int by x.
 	fn FromU64(x: u64): Int {
 		mut z := Int{}
-		setWU64(z.abs, x)
+		setWU64(&z.abs, x)
 		ret z
 	}
 
@@ -105,7 +105,7 @@ impl Int {
 		if z.neg {
 			x = -x
 		}
-		setWU64(z.abs, u64(x))
+		setWU64(&z.abs, u64(x))
 		ret z
 	}
 
@@ -127,7 +127,7 @@ impl Int {
 		}
 
 		mut z := Int{}
-		mulRangeW(z.abs, u64(a), u64(b))
+		mulRangeW(&z.abs, u64(a), u64(b))
 		z.neg = neg
 		ret z
 	}
@@ -226,50 +226,50 @@ impl Int {
 		mut z := Int.FromI64(1)
 		for i.Cmp(K) < 0 {
 			z = z.Mul(N.Sub(i))
-			addI(i, i, intOne)
-			quoI(z, z, i)
+			addI(&i, i, intOne)
+			quoI(&z, z, i)
 		}
 		ret z
 	}
 
 	// Returns x(self) + y.
-	fn Add(self, y: Int): Int {
+	fn Add(*self, y: Int): Int {
 		mut z := Int{}
-		addI(z, self, y)
+		addI(&z, *self, y)
 		ret z
 	}
 
 	// Returns x(self) - y.
-	fn Sub(self, y: Int): Int {
+	fn Sub(*self, y: Int): Int {
 		mut z := Int{}
-		subI(z, self, y)
+		subI(&z, *self, y)
 		ret z
 	}
 
 	// Returns x(self) * y.
-	fn Mul(self, y: Int): Int {
+	fn Mul(*self, y: Int): Int {
 		mut z := Int{}
 		// x * y == x * y
 		// x * (-y) == -(x * y)
 		// (-x) * y == -(x * y)
 		// (-x) * (-y) == x * y
 		if self.Cmp(y) == 0 {
-			sqrW(z.abs, self.abs)
+			sqrW(&z.abs, self.abs)
 			ret z
 		}
-		mulW(z.abs, self.abs, y.abs)
+		mulW(&z.abs, self.abs, y.abs)
 		z.neg = len(z.abs) > 0 && self.neg != y.neg // 0 has no sign
 		ret z
 	}
 
 	// Returns square root |√x(self)|.
 	// Panics if number is negative.
-	fn Sqrt(self): Int {
+	fn Sqrt(*self): Int {
 		if self.neg {
 			panic("math/big: Int.Sqrt: square root of negative number")
 		}
 		mut r := Int{neg: false}
-		sqrtW(r.abs, self.abs)
+		sqrtW(&r.abs, self.abs)
 		ret r
 	}
 
@@ -284,34 +284,34 @@ impl Int {
 	//
 	// (See Daan Leijen, “Division and Modulus for Computer Scientists”.)
 	// See [DivMod] for Euclidean division and modulus (unlike Jule).
-	fn QuoRem(self, y: Int): (q: Int, r: Int) {
-		quoRemI(q, r, self, y)
+	fn QuoRem(*self, y: Int): (q: Int, r: Int) {
+		quoRemI(&q, &r, *self, y)
 		ret
 	}
 
 	// Returns the quotient x(self)/y for y != 0.
 	// If y == 0, a division-by-zero run-time panic occurs.
 	// Implements truncated division (like Jule); see [Int.QuoRem] for more details.
-	fn Quo(self, y: Int): (q: Int) {
-		quoI(q, self, y)
+	fn Quo(*self, y: Int): (q: Int) {
+		quoI(&q, *self, y)
 		ret
 	}
 
 	// Returns the quotient x(self)/y for y != 0.
 	// If y == 0, a division-by-zero runtime panic occurs.
 	// Implements Euclidean division; see [Int.DivMod] for more details.
-	fn Div(self, y: Int): Int {
+	fn Div(*self, y: Int): Int {
 		mut z := Int{}
-		divI(z, self, y)
+		divI(&z, *self, y)
 		ret z
 	}
 
 	// Returns the modulus x(self)%y for y != 0.
 	// If y == 0, a division-by-zero run-time panic occurs.
 	// Implements Euclidean modulus (unlike Jule); see [Int.DivMod] for more details.
-	fn Mod(self, y: Int): Int {
+	fn Mod(*self, y: Int): Int {
 		mut r := Int{}
-		modI(r, self, y)
+		modI(&r, *self, y)
 		ret r
 	}
 
@@ -329,7 +329,7 @@ impl Int {
 	// Systems (TOPLAS), 14(2):127-144, New York, NY, USA, 4/1992.
 	// ACM press.)
 	// See [Int.QuoRem] for T-division and modulus (like Jule).
-	fn DivMod(self, y: Int): (q: Int, m: Int) {
+	fn DivMod(*self, y: Int): (q: Int, m: Int) {
 		mut y0 := y // save y
 		if aliasW(self.abs, y.abs) {
 			y0.abs = cloneW(y.abs)
@@ -337,71 +337,71 @@ impl Int {
 		q, m = self.QuoRem(y)
 		if m.neg {
 			if y0.neg {
-				addI(q, q, intOne)
-				subI(m, m, y0)
+				addI(&q, q, intOne)
+				subI(&m, m, y0)
 			} else {
-				subI(q, q, intOne)
-				addI(m, m, y0)
+				subI(&q, q, intOne)
+				addI(&m, m, y0)
 			}
 		}
 		ret
 	}
 
 	// Returns x(self) << y.
-	fn Lsh(self, y: uint): Int {
+	fn Lsh(*self, y: uint): Int {
 		mut z := self.z(cloneW(self.abs))
-		lshI(z, y)
+		lshI(&z, y)
 		ret z
 	}
 
 	// Returns x(self) >> y.
-	fn Rsh(self, y: uint): Int {
+	fn Rsh(*self, y: uint): Int {
 		mut z := self.z(cloneW(self.abs))
-		rshI(z, y)
+		rshI(&z, y)
 		ret z
 	}
 
 	// Returns x | y.
-	fn Or(self, y: Int): Int {
+	fn Or(*self, y: Int): Int {
 		mut z := self.z(cloneW(self.abs))
-		orI(z, self, y)
+		orI(&z, *self, y)
 		ret z
 	}
 
 	// Returns x & y.
-	fn And(self, y: Int): Int {
+	fn And(*self, y: Int): Int {
 		mut z := self.z(cloneW(self.abs))
-		andI(z, self, y)
+		andI(&z, *self, y)
 		ret z
 	}
 
 	// Returns x ^ y.
-	fn Xor(self, y: Int): Int {
+	fn Xor(*self, y: Int): Int {
 		mut z := self.z(cloneW(self.abs))
-		xorI(z, self, y)
+		xorI(&z, *self, y)
 		ret z
 	}
 
 	// Sets self by z.
-	fn set(mut self, mut z: Int) {
+	fn set(mut *self, mut z: Int) {
 		self.abs, self.neg = z.abs, z.neg
 	}
 
 	// Returns new copy based self, copy will be use the abs as representation.
-	fn z(self, mut abs: []Word): Int {
+	fn z(*self, mut abs: []Word): Int {
 		ret Int{
 			abs: abs,
 			neg: self.neg,
 		}
 	}
 
-	fn exp(self, y: Int, mut m: Int, slow: bool): Int {
+	fn exp(*self, y: Int, mut m: Int, slow: bool): Int {
 		// See Knuth, volume 2, section 4.6.3.
 		mut xWords := self.abs
 		mut z := self.z(nil)
 		if y.neg {
 			if len(m.abs) == 0 {
-				setWU64(z.abs, 1)
+				setWU64(&z.abs, 1)
 				ret z
 			}
 			// for y < 0: x**y mod m == (x**(-1))**|y| mod m
@@ -414,11 +414,11 @@ impl Int {
 		yWords := y.abs
 		mWords := m.abs
 
-		expWW(z.abs, xWords, yWords, mWords, slow)
+		expWW(&z.abs, xWords, yWords, mWords, slow)
 		z.neg = len(z.abs) > 0 && self.neg && len(yWords) > 0 && yWords[0]&1 == 1 // 0 has no sign
 		if z.neg && len(mWords) > 0 {
 			// make modulus result positive
-			subW(z.abs, mWords, z.abs) // z == x**y mod |m| && 0 <= z < |m|
+			subW(&z.abs, mWords, z.abs) // z == x**y mod |m| && 0 <= z < |m|
 			z.neg = false
 		}
 		ret z
@@ -430,12 +430,12 @@ impl Int {
 	//
 	// Modular exponentiation of inputs of a particular size is not a
 	// cryptographically constant-time operation.
-	fn ExpMod(self, y: Int, m: Int): Int {
+	fn ExpMod(*self, y: Int, m: Int): Int {
 		ret self.exp(y, unsafe { *(&m) }, false)
 	}
 
 	// Calls the [Int.ExpMod] method with zero mod.
-	fn Exp(self, y: Int): Int {
+	fn Exp(*self, y: Int): Int {
 		ret self.ExpMod(y, intZero)
 	}
 
@@ -448,8 +448,8 @@ impl Int {
 	// Design and Implementation of Symbolic Computation Systems, pp 45-58.
 	// The cosequences are updated according to Algorithm 10.45 from
 	// Cohen et al. "Handbook of Elliptic and Hyperelliptic Curve Cryptography" pp 192.
-	unsafe fn lehmerGCD(self, mut x: *Int, mut y: *Int, mut b: Int): Int {
-		mut a := self
+	fn lehmerGCD(*self, mut &x: *Int, mut &y: *Int, mut b: Int): Int {
+		mut a := *self
 		mut A := Int{}
 		mut B := Int{}
 		mut Ua := Int{}
@@ -489,16 +489,16 @@ impl Int {
 				// Simulate the effect of the single-precision steps using the cosequences.
 				// A = u0*A + v0*B
 				// B = u1*A + v1*B
-				lehmerUpdate(A, B, q, r, s, t, u0, u1, v0, v1, even)
+				lehmerUpdate(&A, &B, &q, &r, &s, &t, u0, u1, v0, v1, even)
 				if extended {
 					// Ua = u0*Ua + v0*Ub
 					// Ub = u1*Ua + v1*Ub
-					lehmerUpdate(Ua, Ub, q, r, s, t, u0, u1, v0, v1, even)
+					lehmerUpdate(&Ua, &Ub, &q, &r, &s, &t, u0, u1, v0, v1, even)
 				}
 			} else {
 				// Single-digit calculations failed to simulate any quotients.
 				// Do a standard Euclidean step.
-				euclidUpdate(A, B, Ua, Ub, q, r, s, t, extended)
+				euclidUpdate(&A, &B, &Ua, &Ub, &q, &r, &s, &t, extended)
 			}
 		}
 
@@ -506,7 +506,7 @@ impl Int {
 			// extended Euclidean algorithm base case if B is a single Word
 			if len(A.abs) > 1 {
 				// A is longer than a single Word, so one update is needed.
-				euclidUpdate(A, B, Ua, Ub, q, r, s, t, extended)
+				euclidUpdate(&A, &B, &Ua, &Ub, &q, &r, &s, &t, extended)
 			}
 			if len(B.abs) > 0 {
 				// A and B are both a single Word.
@@ -527,8 +527,8 @@ impl Int {
 						even = !even
 					}
 
-					setWV(t.abs, ua)
-					setWV(s.abs, va)
+					setWV(&t.abs, ua)
+					setWV(&s.abs, va)
 					t.neg = !even
 					s.neg = even
 
@@ -571,7 +571,7 @@ impl Int {
 	}
 
 	// Returns the greatest common divisor of a(self) and b.
-	// For x and y, GCD sets their value such that z (result) = a*x + b*y.
+	// For x and y, they might be nil, GCD sets their value such that z (result) = a*x + b*y.
 	//
 	// a and b may be positive, zero or negative.
 	// Regardless of the signs of a and b, z is always >= 0.
@@ -581,8 +581,8 @@ impl Int {
 	// If a == 0 and b != 0, GCD returns |b|, x = 0, y = sign(b) * 1.
 	//
 	// If a != 0 and b == 0, GCD returns |a|, x = sign(a) * 1, y = 0.
-	fn GCD1(self, mut &x: Int, mut &y: Int, b: Int): Int {
-		mut a := self // gain mutability for self thanks to interior mutability
+	fn GCD(*self, mut &x: *Int, mut &y: *Int, b: Int): Int {
+		mut a := *self // gain mutability for self thanks to interior mutability
 		if len(self.abs) == 0 || len(b.abs) == 0 {
 			mut z := Int{}
 			lenA, lenB, negA, negB := len(a.abs), len(b.abs), a.neg, b.neg
@@ -593,34 +593,33 @@ impl Int {
 			}
 			z.neg = false
 
-			if lenA == 0 {
-				x = Int.FromU64(0)
-			} else {
-				x = Int.FromU64(1)
-				x.neg = negA
+			if x != nil {
+				if lenA == 0 {
+					*x = Int.FromU64(0)
+				} else {
+					*x = Int.FromU64(1)
+					x.neg = negA
+				}
 			}
 
-			if lenB == 0 {
-				y = Int.FromU64(0)
-			} else {
-				y = Int.FromU64(1)
-				y.neg = negB
+			if y != nil {
+				if lenB == 0 {
+					*y = Int.FromU64(0)
+				} else {
+					*y = Int.FromU64(1)
+					y.neg = negB
+				}
 			}
 			ret z
 		}
-		ret unsafe { self.lehmerGCD(&x, &y, *(&b)) }
-	}
-
-	// Same as the [Int.GCD1] method, but not takes the |x| and |y| parameters.
-	fn GCD(self, b: Int): Int {
-		ret unsafe { self.lehmerGCD(nil, nil, *(&b)) }
+		ret self.lehmerGCD(x, y, unsafe { *(&b) })
 	}
 
 	// Returns the multiplicative inverse of g(self) in the ring ℤ/nℤ.
 	// If g and n are not relatively prime, g has no multiplicative
 	// inverse in the ring ℤ/nℤ.  In this case, z is unchanged and the return value
 	// is zero. If n == 0, a division-by-zero run-time panic occurs.
-	fn ModInverse(self, mut n: Int): Int {
+	fn ModInverse(*self, mut n: Int): Int {
 		mut g := self.z(cloneW(self.abs))
 		// GCD expects parameters a and b to be > 0.
 		if n.neg {
@@ -631,7 +630,7 @@ impl Int {
 		}
 		mut x := Int{}
 		mut y := Int{}
-		g = g.GCD1(x, y, n)
+		g = g.GCD(&x, &y, n)
 
 		// if and only if g==1, g and n are relatively prime
 		if g.Cmp(intOne) != 0 {
@@ -641,7 +640,7 @@ impl Int {
 		// x and y are such that g*x + n*y = 1, therefore x is the inverse element,
 		// but it may be negative, so convert to the range 0 <= z < |n|
 		if x.neg {
-			addI(x, x, n)
+			addI(&x, x, n)
 		}
 		ret x
 	}
@@ -660,7 +659,7 @@ impl Int {
 	//
 	// It is not suitable for judging primes that an adversary may
 	// have crafted to fool the test.
-	fn ProbablyPrime(self, n: int): bool {
+	fn ProbablyPrime(*self, n: int): bool {
 		// Note regarding the doc comment above:
 		// It would be more precise to say that the Baillie-PSW test uses the
 		// extra strong Lucas test as its Lucas test, but since no one knows
@@ -717,12 +716,12 @@ impl Int {
 	}
 
 	// Returns the number of consecutive least significant zero bits of |self|.
-	fn TrailingZeroBits(self): uint {
+	fn TrailingZeroBits(*self): uint {
 		ret trailingZeroBitsW(self.abs)
 	}
 
 	// Returns the length of the absolute value of int in bits. The bit length of 0 is 0.
-	fn BitLen(self): int {
+	fn BitLen(*self): int {
 		// This function is may used in cryptographic operations. It must not leak
 		// anything but the Int's sign and bit size through side-channels. Any
 		// changes must be reviewed by a security expert.
@@ -731,7 +730,7 @@ impl Int {
 
 	// Returns the value of the i'th bit of integer. That is, it
 	// returns (x>>i)&1. The bit index i must be >= 0.
-	fn Bit(self, i: int): uint {
+	fn Bit(*self, i: int): uint {
 		if i < 0 {
 			panic("math/big: Int.Bit: negative bit index")
 		}
@@ -744,48 +743,48 @@ impl Int {
 		}
 		if self.neg {
 			mut abs := cloneW(self.abs)
-			subW(abs, abs, wordOne)
+			subW(&abs, abs, wordOne)
 			ret bitW(abs, uint(i)) ^ 1
 		}
 		ret bitW(self.abs, uint(i))
 	}
 
 	// Returns absolute value of x(self).
-	fn Abs(self): Int {
-		mut r := self
+	fn Abs(*self): Int {
+		mut r := *self
 		r.neg = false
 		ret r
 	}
 
 	// Returns ^x(self).
-	fn Not(self): Int {
+	fn Not(*self): Int {
 		mut z := self.z(cloneW(self.abs))
 		if self.neg {
 			// ^(-x) == ^(^(x-1)) == x-1
-			subW(z.abs, z.abs, wordOne)
+			subW(&z.abs, z.abs, wordOne)
 			z.neg = false
 			ret z
 		}
 		// ^x == -x-1 == -(x+1)
-		addW(z.abs, z.abs, wordOne)
+		addW(&z.abs, z.abs, wordOne)
 		z.neg = true // z cannot be zero if x is positive
 		ret z
 	}
 
 	// Returns -x(self).
-	fn Neg(self): Int {
-		mut r := self
+	fn Neg(*self): Int {
+		mut r := *self
 		r.neg = len(r.abs) > 0 && !r.neg // 0 has no sign
 		ret r
 	}
 
 	// Reports whether x(self) is odd.
-	fn Odd(self): bool {
+	fn Odd(*self): bool {
 		ret len(self.abs) == 0 || self.abs[0]&1 == 1
 	}
 
 	// Reports whether x(self) is even.
-	fn Even(self): bool {
+	fn Even(*self): bool {
 		ret len(self.abs) > 0 && self.abs[0]&1 == 0
 	}
 
@@ -793,7 +792,7 @@ impl Int {
 	//	Sign() = -1 if x < 0
 	//	Sign() = 0 if x == 0
 	//	Sign() = +1 if x > 0
-	fn Sign(self): int {
+	fn Sign(*self): int {
 		// This function is may used in cryptographic operations. It must not leak
 		// anything but the Int's sign and bit size through side-channels. Any
 		// changes must be reviewed by a security expert.
@@ -808,7 +807,7 @@ impl Int {
 
 	// Returns the i64 representation of x(self).
 	// If x cannot be represented in an i64, the result is undefined.
-	fn I64(self): i64 {
+	fn I64(*self): i64 {
 		mut v := i64(low64W(self.abs))
 		if self.neg {
 			v = -v
@@ -818,12 +817,12 @@ impl Int {
 
 	// Returns the u64 representation of x(self).
 	// If x cannot be represented in a u64, the result is undefined.
-	fn U64(self): u64 {
+	fn U64(*self): u64 {
 		ret low64W(self.abs)
 	}
 
 	// Reports whether x(self) can be represented as an i64.
-	fn IsI64(self): bool {
+	fn IsI64(*self): bool {
 		if len(self.abs) <= 64/_W {
 			w := i64(low64W(self.abs))
 			ret w >= 0 || self.neg && w == -w
@@ -832,12 +831,12 @@ impl Int {
 	}
 
 	// Reports whether x(self) can be represented as a u64.
-	fn IsU64(self): bool {
+	fn IsU64(*self): bool {
 		ret !self.neg && len(self.abs) <= 64/_W
 	}
 
 	// Returns string representation of x(self) in decimal format.
-	fn Str(self): str {
+	fn Str(*self): str {
 		ret self.Format(10)
 	}
 
@@ -846,7 +845,7 @@ impl Int {
 	// lower-case letters 'a' to 'z' for digit values 10 to 35, and
 	// the upper-case letters 'A' to 'Z' for digit values 36 to 61.
 	// No prefix (such as "0x") is added to the string.
-	fn Format(self, b: int): str {
+	fn Format(*self, b: int): str {
 		ret unsafe::StrFromBytes(itoaW(self.abs, self.neg, b))
 	}
 
@@ -854,7 +853,7 @@ impl Int {
 	// Returns +1 if x > y
 	// Returns 0 if x == y
 	// Returns -1 if x < y
-	fn Cmp(self, y: Int): (r: int) {
+	fn Cmp(*self, y: Int): (r: int) {
 		// x cmp y == x cmp y
 		// x cmp (-y) == x
 		// (-x) cmp y == y
@@ -877,11 +876,11 @@ impl Int {
 	// Returns +1 if |x| > |y|
 	// Returns 0 if |x| == |y|
 	// Returns -1 if |x| < |y|
-	fn CmpAbs(self, y: Int): int { ret cmpW(self.abs, y.abs) }
+	fn CmpAbs(*self, y: Int): int { ret cmpW(self.abs, y.abs) }
 
 	// Returns the f64 value nearest x(self),
 	// and an indication of any rounding that occurred.
-	fn F64(self): (f64, Accuracy) {
+	fn F64(*self): (f64, Accuracy) {
 		n := bitLenW(self.abs) // NB: still uses slow crypto impl!
 		if n == 0 {
 			ret 0.0, Exact
@@ -896,7 +895,7 @@ impl Int {
 			ret f, Exact
 		}
 		mut f := float{}
-		f.SetInt(self)
+		f.SetInt(*self)
 		ret f.F64()
 	}
 }
@@ -969,61 +968,61 @@ fn lehmerSimulate(A: Int, B: Int): (u0: Word, u1: Word, v0: Word, v1: Word, even
 // For even == true: u0, v1 >= 0 && u1, v0 <= 0
 // For even == false: u0, v1 <= 0 && u1, v0 >= 0
 // q, r, s, t are temporary variables to avoid allocations in the multiplication.
-fn lehmerUpdate(mut &A: Int, mut &B: Int, mut &q: Int, mut &r: Int, mut &s: Int, mut &t: Int,
+fn lehmerUpdate(mut &A: *Int, mut &B: *Int, mut &q: *Int, mut &r: *Int, mut &s: *Int, mut &t: *Int,
 	u0: Word, u1: Word, v0: Word, v1: Word, even: bool) {
-	setWV(t.abs, u0)
-	setWV(s.abs, v0)
+	setWV(&t.abs, u0)
+	setWV(&s.abs, v0)
 	t.neg = !even
 	s.neg = even
 
-	t = A.Mul(t)
-	s = B.Mul(s)
+	*t = A.Mul(*t)
+	*s = B.Mul(*s)
 
-	setWV(r.abs, u1)
-	setWV(q.abs, v1)
+	setWV(&r.abs, u1)
+	setWV(&q.abs, v1)
 	r.neg = even
 	q.neg = !even
 
-	r = A.Mul(r)
-	q = B.Mul(q)
+	*r = A.Mul(*r)
+	*q = B.Mul(*q)
 
-	A = t.Add(s)
-	B = r.Add(q)
+	*A = t.Add(*s)
+	*B = r.Add(*q)
 }
 
 // Performs a single step of the Euclidean GCD algorithm
 // if extended is true, it also updates the cosequence Ua, Ub.
-fn euclidUpdate(mut &A: Int, mut &B: Int, mut &Ua: Int, mut &Ub: Int, mut &q: Int,
-	mut &r: Int, mut &s: Int, mut &t: Int, extended: bool) {
-	q, r = A.QuoRem(B)
+fn euclidUpdate(mut &A: *Int, mut &B: *Int, mut &Ua: *Int, mut &Ub: *Int, mut &q: *Int,
+	mut &r: *Int, mut &s: *Int, mut &t: *Int, extended: bool) {
+	*q, *r = A.QuoRem(*B)
 
-	A, B, r = B, r, A
+	*A, *B, *r = *B, *r, *A
 
 	if extended {
 		// Ua, Ub = Ub, Ua - q*Ub
-		t.set(Ub)
-		s = Ub.Mul(q)
-		Ub = Ua.Sub(s)
-		Ua.set(t)
+		t.set(*Ub)
+		*s = Ub.Mul(*q)
+		*Ub = Ua.Sub(*s)
+		Ua.set(*t)
 	}
 }
 
 // Sets z = x + y.
 // Computation same as the [Int.Add] method.
-fn addI(mut &z: Int, x: Int, y: Int) {
+fn addI(mut &z: *Int, x: Int, y: Int) {
 	mut neg := x.neg
 	if x.neg == y.neg {
 		// x + y == x + y
 		// (-x) + (-y) == -(x + y)
-		addW(z.abs, x.abs, y.abs)
+		addW(&z.abs, x.abs, y.abs)
 	} else {
 		// x + (-y) == x - y == -(y - x)
 		// (-x) + y == y - x == -(x - y)
 		if cmpW(x.abs, y.abs) >= 0 {
-			subW(z.abs, x.abs, y.abs)
+			subW(&z.abs, x.abs, y.abs)
 		} else {
 			neg = !neg
-			subW(z.abs, y.abs, x.abs)
+			subW(&z.abs, y.abs, x.abs)
 		}
 	}
 	z.neg = len(z.abs) > 0 && neg // 0 has no sign
@@ -1031,20 +1030,20 @@ fn addI(mut &z: Int, x: Int, y: Int) {
 
 // Sets z = x - y.
 // Computation same as the [Int.Sub] method.
-fn subI(mut &z: Int, x: Int, y: Int) {
+fn subI(mut &z: *Int, x: Int, y: Int) {
 	mut neg := x.neg
 	if x.neg != y.neg {
 		// x - (-y) == x + y
 		// (-x) - y == -(x + y)
-		addW(z.abs, x.abs, y.abs)
+		addW(&z.abs, x.abs, y.abs)
 	} else {
 		// x - y == x - y == -(y - x)
 		// (-x) - (-y) == y - x == -(x - y)
 		if cmpW(x.abs, y.abs) >= 0 {
-			subW(z.abs, x.abs, y.abs)
+			subW(&z.abs, x.abs, y.abs)
 		} else {
 			neg = !neg
-			subW(z.abs, y.abs, x.abs)
+			subW(&z.abs, y.abs, x.abs)
 		}
 	}
 	z.neg = len(z.abs) > 0 && neg // 0 has no sign
@@ -1052,22 +1051,22 @@ fn subI(mut &z: Int, x: Int, y: Int) {
 
 // Sets quotient to z.
 // Computation same as the [Int.Quo] method.
-fn quoI(mut &z: Int, x: Int, y: Int) {
+fn quoI(mut &z: *Int, x: Int, y: Int) {
 	mut r := []Word(nil)
-	divW(z.abs, r, x.abs, y.abs)
+	divW(&z.abs, &r, x.abs, y.abs)
 	z.neg = len(z.abs) > 0 && x.neg != y.neg // 0 has no sign
 }
 
 // Sets quotient to z.
 // Computation same as the [Int.Div] method.
-fn divI(mut &z: Int, x: Int, y: Int) {
+fn divI(mut &z: *Int, x: Int, y: Int) {
 	mut r := Int{}
-	quoRemI(z, r, x, y)
+	quoRemI(z, &r, x, y)
 	if r.neg {
 		if y.neg {
-			addI(z, z, intOne)
+			addI(z, *z, intOne)
 		} else {
-			subI(z, z, intOne)
+			subI(z, *z, intOne)
 		}
 	}
 }
@@ -1075,60 +1074,60 @@ fn divI(mut &z: Int, x: Int, y: Int) {
 // Sets q = x/y.
 // Sets r = x%y.
 // Same computation as the [Int.QuoRem] method.
-fn quoRemI(mut &q: Int, mut &r: Int, x: Int, y: Int) {
-	divW(q.abs, r.abs, x.abs, y.abs)
+fn quoRemI(mut &q: *Int, mut &r: *Int, x: Int, y: Int) {
+	divW(&q.abs, &r.abs, x.abs, y.abs)
 	q.neg, r.neg = len(q.abs) > 0 && x.neg != y.neg, len(r.abs) > 0 && x.neg // 0 has no sign
 }
 
 // Sets r = z%y.
 // Same computation as the [Int.Mod] method.
-fn modI(mut &r: Int, x: Int, y: Int) {
+fn modI(mut &r: *Int, x: Int, y: Int) {
 	mut y0 := unsafe { *(&y) } // save y
 	if aliasW(x.abs, y.abs) {
 		y0.abs = cloneW(y.abs)
 	}
 	mut q := Int{}
-	quoRemI(q, r, x, y)
+	quoRemI(&q, r, x, y)
 	if r.neg {
 		if y0.neg {
-			subI(r, r, y0)
+			subI(r, *r, y0)
 		} else {
-			addI(r, r, y0)
+			addI(r, *r, y0)
 		}
 	}
 }
 
 // Sets z = x<<y.
 // Same computation as the [Int.Lsh] method.
-fn lshI(mut &z: Int, y: uint) {
-	lshW(z.abs, z.abs, y)
+fn lshI(mut &z: *Int, y: uint) {
+	lshW(&z.abs, z.abs, y)
 }
 
 // Sets z = x>>y.
 // Same computation as the [Int.Rsh] method.
-fn rshI(mut &z: Int, y: uint) {
+fn rshI(mut &z: *Int, y: uint) {
 	if z.neg {
 		// (-x) >> s == ^(x-1) >> s == ^((x-1) >> s) == -(((x-1) >> s) + 1)
-		subW(z.abs, z.abs, wordOne) // no underflow because |x| > 0
-		rshW(z.abs, z.abs, y)
-		addW(z.abs, z.abs, wordOne)
+		subW(&z.abs, z.abs, wordOne) // no underflow because |x| > 0
+		rshW(&z.abs, z.abs, y)
+		addW(&z.abs, z.abs, wordOne)
 		z.neg = true // cannot be zero if x is negative
 	}
-	rshW(z.abs, z.abs, y)
+	rshW(&z.abs, z.abs, y)
 	z.neg = false
 }
 
 // Sets z = x | y.
 // Same computation as the [Int.Or] method.
-fn orI(mut &z: Int, x: Int, y: Int) {
+fn orI(mut &z: *Int, x: Int, y: Int) {
 	if x.neg == y.neg {
 		if x.neg {
 			// (-x) | (-y) == ^(x-1) | ^(y-1) == ^((x-1) & (y-1)) == -(((x-1) & (y-1)) + 1)
 			mut x1 := []Word(nil)
-			subW(x1, x.abs, wordOne)
+			subW(&x1, x.abs, wordOne)
 			mut y1 := []Word(nil)
-			subW(y1, y.abs, wordOne)
-			addW(z.abs, andW(x1, y1), wordOne)
+			subW(&y1, y.abs, wordOne)
+			addW(&z.abs, andW(x1, y1), wordOne)
 			z.neg = true // z cannot be zero if x and y are negative
 			ret
 		}
@@ -1148,22 +1147,22 @@ fn orI(mut &z: Int, x: Int, y: Int) {
 
 	// x | (-y) == x | ^(y-1) == ^((y-1) &^ x) == -(^((y-1) &^ x) + 1)
 	mut y1 := []Word(nil)
-	subW(y1, y.abs, wordOne)
-	addW(z.abs, andNotW(y1, x.abs), wordOne)
+	subW(&y1, y.abs, wordOne)
+	addW(&z.abs, andNotW(y1, x.abs), wordOne)
 	z.neg = true // z cannot be zero if one of x or y is negative
 }
 
 // Sets z = x & y.
 // Same computation as the [Int.And] method.
-fn andI(mut &z: Int, x: Int, y: Int) {
+fn andI(mut &z: *Int, x: Int, y: Int) {
 	if x.neg == y.neg {
 		if x.neg {
 			// (-x) & (-y) == ^(x-1) & ^(y-1) == ^((x-1) | (y-1)) == -(((x-1) | (y-1)) + 1)
 			mut x1 := []Word(nil)
-			subW(x1, x.abs, wordOne)
+			subW(&x1, x.abs, wordOne)
 			mut y1 := []Word(nil)
-			subW(y1, y.abs, wordOne)
-			addW(z.abs, orW(x1, y1), wordOne)
+			subW(&y1, y.abs, wordOne)
+			addW(&z.abs, orW(x1, y1), wordOne)
 			z.neg = true // z cannot be zero if x and y are negative
 			ret
 		}
@@ -1183,21 +1182,21 @@ fn andI(mut &z: Int, x: Int, y: Int) {
 
 	// x & (-y) == x & ^(y-1) == x &^ (y-1)
 	mut y1 := []Word(nil)
-	subW(y1, y.abs, wordOne)
+	subW(&y1, y.abs, wordOne)
 	z.abs = andNotW(x.abs, y1)
 	z.neg = false
 }
 
 // Sets z = x ^ y.
 // Same computation as the [Int.Xor] method.
-fn xorI(mut &z: Int, x: Int, y: Int) {
+fn xorI(mut &z: *Int, x: Int, y: Int) {
 	if x.neg == y.neg {
 		if x.neg {
 			// (-x) ^ (-y) == ^(x-1) ^ ^(y-1) == (x-1) ^ (y-1)
 			mut x1 := []Word(nil)
-			subW(x1, x.abs, wordOne)
+			subW(&x1, x.abs, wordOne)
 			mut y1 := []Word(nil)
-			subW(y1, y.abs, wordOne)
+			subW(&y1, y.abs, wordOne)
 			z.abs = xorW(x1, y1)
 			z.neg = false
 			ret
@@ -1218,8 +1217,8 @@ fn xorI(mut &z: Int, x: Int, y: Int) {
 
 	// x ^ (-y) == x ^ ^(y-1) == ^(x ^ (y-1)) == -((x ^ (y-1)) + 1)
 	mut y1 := []Word(nil)
-	subW(y1, y.abs, wordOne)
+	subW(&y1, y.abs, wordOne)
 	z.abs = cloneW(x.abs)
-	addW(z.abs, xorW(x.abs, y1), wordOne)
+	addW(&z.abs, xorW(x.abs, y1), wordOne)
 	z.neg = true // z cannot be zero if only one of x or y is negative
 }

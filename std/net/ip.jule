@@ -26,7 +26,7 @@ impl IP {
 	}
 
 	// Like self.Str except that it returns and empty string when IP is empty.
-	fn ipEmptyStr(self): str {
+	fn ipEmptyStr(*self): str {
 		if self.Empty() {
 			ret ""
 		}
@@ -34,20 +34,20 @@ impl IP {
 	}
 
 	// Reports whether IP is empty.
-	fn Empty(self): bool {
-		ret len(self) == 0
+	fn Empty(*self): bool {
+		ret len(*self) == 0
 	}
 
 	// Reports wherher IPs are points to the same address.
 	// An IPv4 address and that same address in IPv6 from are considered to be equal.
-	fn Equal(self, other: IP): bool {
+	fn Equal(*self, other: IP): bool {
 		match {
-		| len(self) == len(other):
-			ret str(self) == str(other)
-		| len(self) == IPv4Len && len(other) == IPv6Len:
-			ret str(other[:12]) == str(v4InV6Prefix) && str(self) == str(other[12:])
-		| len(self) == IPv6Len && len(other) == IPv4Len:
-			ret str(self[:12]) == str(v4InV6Prefix) && str(self[12:]) == str(other)
+		| len(*self) == len(other):
+			ret str(*self) == str(other)
+		| len(*self) == IPv4Len && len(other) == IPv6Len:
+			ret str(other[:12]) == str(v4InV6Prefix) && str(*self) == str(other[12:])
+		| len(*self) == IPv6Len && len(other) == IPv4Len:
+			ret str((*self)[:12]) == str(v4InV6Prefix) && str((*self)[12:]) == str(other)
 		|:
 			ret false
 		}
@@ -55,12 +55,12 @@ impl IP {
 
 	// Reports whether IP is an unspecified address,
 	// which is "0.0.0.0" in IPv4 or "::" in IPv6.
-	fn IsUnspecified(self): bool {
+	fn IsUnspecified(*self): bool {
 		ret self.Equal(IPv4Zero) || self.Equal(IPv6Unspecified)
 	}
 
 	// Reports whether IP is a loopback address.
-	fn IsLoopback(self): bool {
+	fn IsLoopback(*self): bool {
 		ip4 := unsafe { (*(&self)).To4() }
 		if !ip4.Empty() {
 			ret ip4[0] == 127
@@ -70,7 +70,7 @@ impl IP {
 
 	// Reports whether IP is a private address according to
 	// RFC 1918 (for IPv4) and RFC 4193 (for IPv6).
-	fn IsPrivate(self): bool {
+	fn IsPrivate(*self): bool {
 		ip4 := unsafe { (*(&self)).To4() }
 		if !ip4.Empty() {
 			// Following RFC 1918, Section 3. Private Address Space which says:
@@ -85,33 +85,33 @@ impl IP {
 		}
 		// Following RFC 4193, Section 8. IANA Considerations which says:
 		//	The IANA has assigned the FC00::/7 prefix to "Unique Local Unicast".
-		ret len(self) == IPv6Len && self[0]&0xFE == 0xFC
+		ret len(*self) == IPv6Len && (*self)[0]&0xFE == 0xFC
 	}
 
 	// Converts the IPv4 address to a 4-byte representation.
 	// Returns empty if IP is not an IPv4 address.
 	// Returned IP may use the common mutable allocation with self.
-	fn To4(mut self): IP {
-		if len(self) == IPv4Len {
-			ret self
+	fn To4(mut *self): IP {
+		if len(*self) == IPv4Len {
+			ret *self
 		}
-		if len(self) == IPv6Len &&
-			isZeros(self[:10]) &&
-			self[10] == 0xFF &&
-			self[11] == 0xFF {
-			ret self[12:16]
+		if len(*self) == IPv6Len &&
+			isZeros((*self)[:10]) &&
+			(*self)[10] == 0xFF &&
+			(*self)[11] == 0xFF {
+			ret (*self)[12:16]
 		}
 		ret IP.Empty()
 	}
 
 	// Converts the IP address to a 16-byte representation.
 	// Returns empty if address is not an IP address (it is the wrong length).
-	fn To16(mut self): IP {
+	fn To16(mut *self): IP {
 		match {
-		| len(self) == IPv4Len:
-			ret IPv4(self[0], self[1], self[2], self[3])
-		| len(self) == IPv6Len:
-			ret self
+		| len(*self) == IPv4Len:
+			ret IPv4((*self)[0], (*self)[1], (*self)[2], (*self)[3])
+		| len(*self) == IPv6Len:
+			ret *self
 		|:
 			ret IP.Empty()
 		}
@@ -123,18 +123,18 @@ impl IP {
 	//	- dotted decimal ("192.0.2.1"), if ip is an IPv4 or IP4-mapped IPv6 address
 	//	- IPv6 conforming to RFC 5952 ("2001:db8::1"), if ip is a valid IPv6 address
 	//	- the hexadecimal form of ip, without punctuation, if no other cases apply
-	fn Str(self): str {
+	fn Str(*self): str {
 		if self.Empty() {
 			ret "<nil>"
 		}
-		if len(self) != IPv4Len && len(self) != IPv6Len {
-			ret "?" + hexStr(self)
+		if len(*self) != IPv4Len && len(*self) != IPv6Len {
+			ret "?" + hexStr(*self)
 		}
 		ip4 := unsafe { (*(&self)).To4() }
 		if len(ip4) == IPv4Len {
 			ret str4(ipAddrFrom4(ip4))
 		}
-		ret str16(ipAddrFrom16(self))
+		ret str16(ipAddrFrom16(*self))
 	}
 }
 

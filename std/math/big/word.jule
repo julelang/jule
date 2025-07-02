@@ -67,21 +67,21 @@ fn getW(n: int): []Word {
 }
 
 // Set words by words.
-fn setWW(mut &z: []Word, x: []Word) {
-	z = makeW(z, len(x))
-	copy(z, x)
+fn setWW(mut &z: *[]Word, x: []Word) {
+	*z = makeW(*z, len(x))
+	copy(*z, x)
 }
 
-fn setWV(mut &z: []Word, x: Word) {
+fn setWV(mut &z: *[]Word, x: Word) {
 	if x == 0 {
-		z = z[:0]
+		*z = (*z)[:0]
 		ret
 	}
-	z = makeW(z, 1)
-	z[0] = x
+	*z = makeW(*z, 1)
+	(*z)[0] = x
 }
 
-fn setWU64(mut &z: []Word, x: u64) {
+fn setWU64(mut &z: *[]Word, x: u64) {
 	// single-word value
 	w := Word(x)
 	if u64(w) == x {
@@ -89,9 +89,9 @@ fn setWU64(mut &z: []Word, x: u64) {
 		ret
 	}
 	// 2-word value
-	z = makeW(z, 2)
-	z[1] = Word(x >> 32)
-	z[0] = Word(x)
+	*z = makeW(*z, 2)
+	(*z)[1] = Word(x >> 32)
+	(*z)[0] = Word(x)
 }
 
 fn clearW(mut z: []Word) {
@@ -295,11 +295,11 @@ fn xorW(x: []Word, y: []Word): []Word {
 
 // Creates a random integer in [0..limit), using the space in z if
 // possible. n is the bit length of limit.
-fn randomW(mut &z: []Word, rand: &rand::Rand, limit: []Word, n: int) {
-	if aliasW(z, limit) {
-		z = nil // z is an alias for limit - cannot reuse
+fn randomW(mut &z: *[]Word, rand: &rand::Rand, limit: []Word, n: int) {
+	if aliasW(*z, limit) {
+		*z = nil // z is an alias for limit - cannot reuse
 	}
-	z = makeW(z, len(limit))
+	*z = makeW(*z, len(limit))
 
 	mut bitLengthOfMSW := uint(n % _W)
 	if bitLengthOfMSW == 0 {
@@ -310,23 +310,23 @@ fn randomW(mut &z: []Word, rand: &rand::Rand, limit: []Word, n: int) {
 	for {
 		const match _W {
 		| 32:
-			for i in z {
-				z[i] = Word(rand.U32())
+			for i in *z {
+				(*z)[i] = Word(rand.U32())
 			}
 		| 64:
-			for i in z {
-				z[i] = Word(rand.U32()) | Word(rand.U32())<<32
+			for i in *z {
+				(*z)[i] = Word(rand.U32()) | Word(rand.U32())<<32
 			}
 		|:
 			panic("math/big: unknown word size")
 		}
-		z[len(limit)-1] &= mask
-		if cmpW(z, limit) < 0 {
+		(*z)[len(limit)-1] &= mask
+		if cmpW(*z, limit) < 0 {
 			break
 		}
 	}
 
-	z = normW(z)
+	*z = normW(*z)
 }
 
 // Returns 1 if there's a 1 bit within the

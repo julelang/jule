@@ -20,7 +20,7 @@ struct data {
 	dynamic:  &dynamic
 }
 
-fn _removeDeads[CommonCollection](mut &alive: CommonCollection, &other: CommonCollection, invalid: uintptr) {
+fn _removeDeads[CommonCollection](mut alive: CommonCollection, other: CommonCollection, invalid: uintptr) {
 lookup:
 	for _, v in alive.vars {
 		if v.var == invalid {
@@ -39,7 +39,7 @@ lookup:
 
 impl data {
 	// Remove the alive variables which is not alive in other data.
-	fn removeDeads(mut self, &other: &data) {
+	fn removeDeads(mut *self, other: &data) {
 		if self.boundary != nil && other.boundary != nil {
 			_removeDeads(self.boundary, other.boundary, invalidBoundary)
 		}
@@ -53,7 +53,7 @@ impl data {
 
 	// Returns checkpoint copy of the data.
 	// The copy is a immutable hard-copy.
-	fn getCheckpoint(mut self): dataCheckpoint {
+	fn getCheckpoint(mut *self): dataCheckpoint {
 		mut c := dataCheckpoint{}
 		if self.boundary != nil {
 			c.boundary = new(boundary)
@@ -74,7 +74,7 @@ impl data {
 	}
 
 	// Like the getCheckpoint(), but uses immutable copy of the internal data.
-	fn getMutCheckpoint(mut self): dataCheckpoint {
+	fn getMutCheckpoint(mut *self): dataCheckpoint {
 		ret dataCheckpoint{
 			boundary: self.boundary,
 			nils: self.nils,
@@ -82,7 +82,7 @@ impl data {
 		}
 	}
 
-	fn loadCheckpoint(mut self, mut c: dataCheckpoint) {
+	fn loadCheckpoint(mut *self, mut c: dataCheckpoint) {
 		self.boundary = c.boundary
 		self.nils = c.nils
 		self.dynamic = c.dynamic
