@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/conv"
 use "std/jule"
 use "std/jule/ast"
 use "std/jule/build"
@@ -289,11 +290,12 @@ fn buildImpl(mut decl: &ast::Impl): &Impl {
 // Just builds symbols, not analyze metadata
 // like struct's implemented traits.
 struct symBuilder {
-	owner:    &symBuilder
-	importer: Importer
-	errors:   []log::Log
-	ast:      &ast::AST
-	table:    &SymTab
+	owner:      &symBuilder
+	importPath: str // Import path, this symBuilder created for.
+	importer:   Importer
+	errors:     []log::Log
+	ast:        &ast::AST
+	table:      &SymTab
 }
 
 impl symBuilder {
@@ -369,20 +371,46 @@ impl symBuilder {
 	// Designed for non-std package paths.
 	// Returns empty string if error occurs.
 	fn checkAbsPath(mut &self, mut filepath: str, mut decl: &ast::Use): str {
-		modPath := self.importer.GetModPath()
+		// If there is no module, no common directories.
+		// For the local packages, the root package needs a module.
+		mut modPath := self.importer.GetModPath()
 		if len(modPath) == 0 {
 			self.pushErr(decl.Path, log::ModuleNotFound)
 			self.pushSuggestion(log::UseModInit)
 			ret ""
 		}
 
+		// Get module name.
+		modName := getModNameFromPath(modPath)
+
+		// Get module name of the filepath.
+		mut filepathModName := filepath
+		i := strings::IndexByte(filepath, os::PathSeparator)
+		if i > 0 {
+			filepathModName = filepath[:i]
+		}
+
+		// All import filepaths are must be start with module name.
+		if modName != filepathModName {
+			self.pushErr(decl.Path, "import path must use the root name of the module")
+			self.pushSuggestion("module name of this package is: " + conv::Quote(modName))
+			ret ""
+		}
+
+		// To handle absolute package path correct,
+		// select the previous directory of the module.
+		// Because filepath is already starts with the module path.
+		modPath = filepath::Dir(modPath)
+
+		// Join filepath with the absolute module path and
+		// make sure we have an absolue path to the package.
 		filepath = filepath::Join(modPath, filepath)
 		filepath = filepath::Abs(filepath) else {
 			self.pushErr(decl.Path, log::UseNotFound, decl.Path.Kind)
 			ret ""
 		}
 
-		// Exist?
+		// Check the absolute path is exist and a directory (package).
 		info := os::Stat(filepath) else {
 			self.pushErr(decl.Path, log::UseNotFound, decl.Path.Kind)
 			ret ""
@@ -435,7 +463,7 @@ impl symBuilder {
 		}
 		std = parts[0] == "std"
 		for _, part in parts {
-			if part == "" || jule::IsBlank(part) {
+			if part == "" || jule::IsBlank(part) || strings::ContainsRune(part, '.') {
 				self.pushErr(decl.Path, log::InvalidImportPath, decl.Path.Kind)
 				ret false, ""
 			}
@@ -502,37 +530,11 @@ impl symBuilder {
 		ret false
 	}
 
-	fn getAsLinkPath(mut &self, mut path: str): str {
-		mut sb := strings::Builder{}
-		sb.Grow(len(path))
-		stdlib := build::PathStdlib()
-		if strings::HasPrefix(path, stdlib) {
-			path = path[len(stdlib):] // cut absolute path prefix
-			sb.WriteStr(`"std`)!
-			sb.WriteStr(strings::ReplaceAll(path, str(filepath::Separator), jule::ImportPathSep))!
-			sb.WriteByte('"')!
-			ret sb.Str()
-		}
-
-		root := filepath::Abs(self.importer.GetModPath()) else { use "" }
-		path = path[len(root):]
-		if len(path) == 0 {
-			path = filepath::Base(root)
-		} else if path[0] == filepath::Separator {
-			path = path[1:]
-		}
-		sb.WriteByte('"')!
-		sb.WriteStr(strings::ReplaceAll(path, str(filepath::Separator), jule::ImportPathSep))!
-		sb.WriteByte('"')!
-		ret sb.Str()
-	}
-
 	fn pushCycleError(mut &self, sb: &symBuilder, path: str, mut &message: *strings::Builder) {
 		const Padding = 7
-		refersTo := log::Logf(
-			log::RefersTo,
-			self.getAsLinkPath(sb.table.File.Dir()),
-			self.getAsLinkPath(path))
+		refersTo := log::Logf(log::RefersTo,
+			"\""+sb.importPath+"\"",
+			"\""+path+"\"")
 		message.WriteStr(strings::Repeat(" ", Padding))!
 		message.WriteStr(refersTo)!
 		message.WriteByte('\n')!
@@ -540,25 +542,20 @@ impl symBuilder {
 
 	fn pushCrossCycleError(mut &self, target: &symBuilder, imp: &ImportInfo, errorToken: &token::Token) {
 		mut message := strings::Builder{}
-		message.Grow(1 << 5)
-		self.pushCycleError(self, imp.Path, &message)
-		mut owner := self.owner
-		mut old := self
-		for owner.owner != nil {
-			self.pushCycleError(old.owner, old.table.File.Dir(), &message)
-			if owner.owner == target {
-				self.pushCycleError(target, owner.table.File.Dir(), &message)
+		self.pushCycleError(self, imp.LinkPath, &message)
+		mut owner, mut old := self.owner, self
+		for owner != nil; owner, old = owner.owner, owner {
+			self.pushCycleError(old.owner, old.importPath, &message)
+			if owner == target {
 				break
 			}
-			old = owner
-			owner = owner.owner
 		}
 		self.pushErr(errorToken, log::PkgIllegalCrossCycle, message.Str())
 	}
 
 	fn checkImportCycles(mut &self, imp: &ImportInfo, decl: &ast::Use): bool {
 		if imp.Path == self.table.File.Dir() {
-			self.pushErr(decl.Token, log::PkgIllegalCycleRefersItself, self.getAsLinkPath(imp.Path))
+			self.pushErr(decl.Token, log::PkgIllegalCycleRefersItself, imp.LinkPath)
 			ret false
 		}
 		if self.owner == nil {
@@ -644,7 +641,7 @@ impl symBuilder {
 
 			for (_, mut ast) in asts {
 				mut table := (&SymTab)(nil)
-				table, errors = buildSymbols(ast, self.importer, self)
+				table, errors = buildSymbols(imp.LinkPath, ast, self.importer, self)
 				// Break import if file has error(s).
 				if len(errors) > 0 {
 					self.errors = append(self.errors, errors...)
@@ -793,4 +790,22 @@ impl symBuilder {
 // See developer reference (6).
 fn isImplicitImport(imp: &ImportInfo): bool {
 	ret imp.Decl.Token == nil
+}
+
+// Returns module name by module path provided by importer.
+// Returns "." if module path is empty.
+fn getModName(importer: Importer): str {
+	ret getModNameFromPath(importer.GetModPath())
+}
+
+// Returns module name by module path.
+// Returns "." if module path is empty.
+fn getModNameFromPath(path: str): str {
+	// This path is the absolute path, it should be.
+	// So, the module name is the base name of the absolue module path.
+	//
+	// Example:
+	//	"foo"         -> "foo"
+	//	"foo/bar/baz" -> "baz"
+	ret filepath::Base(path)
 }

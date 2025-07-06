@@ -14,8 +14,9 @@ const (
 )
 
 // Builds symbol table of AST.
-fn buildSymbols(mut ast: &ast::AST, mut importer: Importer, mut owner: &symBuilder): (&SymTab, []log::Log) {
+fn buildSymbols(importPath: str, mut ast: &ast::AST, mut importer: Importer, mut owner: &symBuilder): (&SymTab, []log::Log) {
 	mut sb := &symBuilder{
+		importPath: importPath,
 		ast: ast,
 		importer: importer,
 		owner: owner,
@@ -44,10 +45,18 @@ fn collectImplicitImports(mut s: &sema, mut file: &SymTab) {
 }
 
 fn analyzePackage(mut files: []&ast::AST, mut importer: Importer, flags: int): (&Package, []log::Log) {
+	// Select import path for the root package.
+	// If there is no module, use "." as import path.
+	// If we have module, use the module root name as import path.
+	mut importPath := "."
+	if importer != nil {
+		importPath = getModName(importer)
+	}
+
 	// Build symbol tables of files.
 	mut tables := make([]&SymTab, 0, len(files))
 	for (_, mut f) in files {
-		mut table, mut errors := buildSymbols(f, importer, nil)
+		mut table, mut errors := buildSymbols(importPath, f, importer, nil)
 		if len(errors) > 0 {
 			ret nil, errors
 		}
