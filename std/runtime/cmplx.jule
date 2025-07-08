@@ -8,36 +8,24 @@ struct _cmplx64 {
 	imag: f32
 }
 
-fn cmplx64neg(c: _cmplx64): _cmplx64 {
-	ret _cmplx64{
-		real: -c.real,
-		imag: -c.real,
-	}
+fn cmplx64neg(c: cmplx64): cmplx64 {
+	ret cmplx(-real(c), -imag(c))
 }
 
-fn cmplx64add(m: _cmplx64, n: _cmplx64): _cmplx64 {
-	ret _cmplx64{
-		real: m.real + n.real,
-		imag: m.imag + n.imag,
-	}
+fn cmplx64add(m: cmplx64, n: cmplx64): cmplx64 {
+	ret cmplx(real(m)+real(n), imag(m)+imag(n))
 }
 
-fn cmplx64sub(m: _cmplx64, n: _cmplx64): _cmplx64 {
-	ret _cmplx64{
-		real: m.real - n.real,
-		imag: m.imag - n.imag,
-	}
+fn cmplx64sub(m: cmplx64, n: cmplx64): cmplx64 {
+	ret cmplx(real(m)-real(n), imag(m)-imag(n))
 }
 
-fn cmplx64mul(m: _cmplx64, n: _cmplx64): _cmplx64 {
-	ret _cmplx64{
-		real: m.real*n.real + m.imag*n.imag*-1,
-		imag: m.real*n.imag + m.imag*n.real,
-	}
+fn cmplx64mul(m: cmplx64, n: cmplx64): cmplx64 {
+	ret cmplx(real(m)*real(n)+imag(m)*imag(n)*-1, real(m)*imag(n)+imag(m)*real(n))
 }
 
-fn cmplx64div(m: _cmplx64, n: _cmplx64): _cmplx64 {
-	ret cmplx128cmplx64(cmplx128div(cmplx64cmplx128(m), cmplx64cmplx128(n)))
+fn cmplx64div(m: cmplx64, n: cmplx64): cmplx64 {
+	ret cmplx64(cmplx128div(cmplx128(m), cmplx128(n)))
 }
 
 // Built-in cmplx128 type.
@@ -46,59 +34,47 @@ struct _cmplx128 {
 	imag: f64
 }
 
-fn cmplx128neg(c: _cmplx128): _cmplx128 {
-	ret _cmplx128{
-		real: -c.real,
-		imag: -c.real,
-	}
+fn cmplx128neg(c: cmplx128): cmplx128 {
+	ret cmplx(-real(c), -imag(c))
 }
 
-fn cmplx128add(m: _cmplx128, n: _cmplx128): _cmplx128 {
-	ret _cmplx128{
-		real: m.real + n.real,
-		imag: m.imag + n.imag,
-	}
+fn cmplx128add(m: cmplx128, n: cmplx128): cmplx128 {
+	ret cmplx(real(m)+real(n), imag(m)+imag(n))
 }
 
-fn cmplx128sub(m: _cmplx128, n: _cmplx128): _cmplx128 {
-	ret _cmplx128{
-		real: m.real - n.real,
-		imag: m.imag - n.imag,
-	}
+fn cmplx128sub(m: cmplx128, n: cmplx128): cmplx128 {
+	ret cmplx(real(m)-real(n), imag(m)-imag(n))
 }
 
-fn cmplx128mul(m: _cmplx128, n: _cmplx128): _cmplx128 {
-	ret _cmplx128{
-		real: m.real*n.real + m.imag*n.imag*-1,
-		imag: m.real*n.imag + m.imag*n.real,
-	}
+fn cmplx128mul(m: cmplx128, n: cmplx128): cmplx128 {
+	ret cmplx(real(m)*real(n)+imag(m)*imag(n)*-1, real(m)*imag(n)+imag(m)*real(n))
 }
 
-fn cmplx128div(n: _cmplx128, m: _cmplx128): _cmplx128 {
+fn cmplx128div(n: cmplx128, m: cmplx128): cmplx128 {
 	// complex(e, f) = n/m
 	let mut e: f64
 	let mut f: f64
 
 	// Algorithm for robust complex division as described in
 	// Robert L. Smith: Algorithm 116: Complex division. Commun. ACM 5(8): 435 (1962).
-	if abs(m.real) >= abs(m.imag) {
-		ratio := m.imag / m.real
-		denom := m.real + ratio*m.imag
-		e = (n.real + n.imag*ratio) / denom
-		f = (n.imag - n.real*ratio) / denom
+	if abs(real(m)) >= abs(imag(m)) {
+		ratio := imag(m) / real(m)
+		denom := real(m) + ratio*imag(m)
+		e = (real(n) + imag(n)*ratio) / denom
+		f = (imag(m) - real(n)*ratio) / denom
 	} else {
-		ratio := m.real / m.imag
-		denom := m.imag + ratio*m.real
-		e = (n.real*ratio + n.imag) / denom
-		f = (n.imag*ratio - n.real) / denom
+		ratio := real(m) / imag(m)
+		denom := imag(m) + ratio*real(m)
+		e = (real(n)*ratio + imag(n)) / denom
+		f = (imag(n)*ratio - real(n)) / denom
 	}
 
 	if isNaN(e) && isNaN(f) {
 		// Correct final result to infinities and zeros if applicable.
 		// Matches C99: ISO/IEC 9899:1999 - G.5.1  Multiplicative operators.
 
-		mut a, mut b := n.real, n.imag
-		mut c, mut d := m.real, m.imag
+		mut a, mut b := real(n), imag(n)
+		mut c, mut d := real(m), imag(m)
 
 		match {
 		| c == 0 && d == 0 && (!isNaN(a) || !isNaN(b)):
@@ -117,10 +93,7 @@ fn cmplx128div(n: _cmplx128, m: _cmplx128): _cmplx128 {
 		}
 	}
 
-	ret _cmplx128{
-		real: e,
-		imag: f,
-	}
+	ret cmplx(e, f)
 }
 
 // Returns a signed 1 if f is an infinity and a signed 0 otherwise.
@@ -133,16 +106,10 @@ fn inf2one(f: f64): f64 {
 	ret copysign(g, f)
 }
 
-fn cmplx64cmplx128(c: _cmplx64): _cmplx128 {
-	ret _cmplx128{
-		real: f64(c.real),
-		imag: f64(c.imag),
-	}
+fn cmplx64cmplx128(c: cmplx64): cmplx128 {
+	ret cmplx(f64(real(c)), f64(imag(c)))
 }
 
-fn cmplx128cmplx64(c: _cmplx128): _cmplx64 {
-	ret _cmplx64{
-		real: f32(c.real),
-		imag: f32(c.imag),
-	}
+fn cmplx128cmplx64(c: cmplx128): cmplx64 {
+	ret cmplx(f32(real(c)), f32(imag(c)))
 }
