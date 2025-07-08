@@ -1784,6 +1784,24 @@ impl exprCoder {
 		}
 	}
 
+	fn cmplxCall(mut &self, mut m: &sema::BuiltinCmplxCallExpr) {
+		self.oc.write(".")
+		p := m.Real.Type.Prim()
+		match {
+		| p.IsF32():
+			identCoder.structureIns(&self.oc.Buf, meta::Program.Runtime.Cmplx64)
+		| p.IsF64():
+			identCoder.structureIns(&self.oc.Buf, meta::Program.Runtime.Cmplx128)
+		|:
+			panic("unreachable")
+		}
+		self.oc.write("{")
+		self.possibleRefExpr(m.Imag.Model)
+		self.oc.write(", ")
+		self.possibleRefExpr(m.Real.Model)
+		self.oc.write("}")
+	}
+
 	fn makeCallSlice(mut &self, mut m: &sema::BuiltinMakeCallExpr) {
 		mut slice := m.Type.Slice()
 		init := ableToInit(slice.Value)
@@ -2228,6 +2246,8 @@ impl exprCoder {
 			self.realCall(m.(&sema::BuiltinRealCallExpr))
 		| &sema::BuiltinImagCallExpr:
 			self.imagCall(m.(&sema::BuiltinImagCallExpr))
+		| &sema::BuiltinCmplxCallExpr:
+			self.cmplxCall(m.(&sema::BuiltinCmplxCallExpr))
 		| &sema::SizeofExpr:
 			self.sizeof(m.(&sema::SizeofExpr))
 		| &sema::AlignofExpr:

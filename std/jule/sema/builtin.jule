@@ -924,19 +924,15 @@ fn builtinCallerReal(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 		e.pushErr(fc.Token, log::MissingExprFor, "c")
 		ret nil
 	}
-	if len(fc.Args) > 2 {
+	if len(fc.Args) > 1 {
 		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "real")
 	}
-	mut dest := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
-	match {
-	| dest == nil:
-		ret nil
-	| dest.Decl:
-		e.pushErr(fc.Args[0].Token, log::InvalidExpr)
+	mut c := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+	if c == nil {
 		ret nil
 	}
-	prim := dest.Type.Prim()
-	if prim == nil || !types::IsCmplx(dest.Type.Prim().Kind) {
+	prim := c.Type.Prim()
+	if prim == nil || !types::IsCmplx(c.Type.Prim().Kind) {
 		e.pushErr(fc.Args[0].Token, log::InvalidExpr)
 		ret nil
 	}
@@ -950,7 +946,7 @@ fn builtinCallerReal(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 		panic("unreachable")
 	}
 	r.Model = &BuiltinRealCallExpr{
-		Cmplx: dest,
+		Cmplx: c,
 	}
 	ret r
 }
@@ -960,19 +956,15 @@ fn builtinCallerImag(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 		e.pushErr(fc.Token, log::MissingExprFor, "c")
 		ret nil
 	}
-	if len(fc.Args) > 2 {
+	if len(fc.Args) > 1 {
 		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "imag")
 	}
-	mut dest := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
-	match {
-	| dest == nil:
-		ret nil
-	| dest.Decl:
-		e.pushErr(fc.Args[0].Token, log::InvalidExpr)
+	mut c := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+	if c == nil {
 		ret nil
 	}
-	prim := dest.Type.Prim()
-	if prim == nil || !types::IsCmplx(dest.Type.Prim().Kind) {
+	prim := c.Type.Prim()
+	if prim == nil || !types::IsCmplx(c.Type.Prim().Kind) {
 		e.pushErr(fc.Args[0].Token, log::InvalidExpr)
 		ret nil
 	}
@@ -986,7 +978,63 @@ fn builtinCallerImag(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 		panic("unreachable")
 	}
 	r.Model = &BuiltinImagCallExpr{
-		Cmplx: dest,
+		Cmplx: c,
+	}
+	ret r
+}
+
+fn builtinCallerCmplx(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
+	if len(fc.Args) < 1 {
+		e.pushErr(fc.Token, log::MissingExprFor, "real")
+		ret nil
+	}
+	if len(fc.Args) < 2 {
+		e.pushErr(fc.Token, log::MissingExprFor, "imag")
+		ret nil
+	}
+	if len(fc.Args) > 2 {
+		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "cmplx")
+	}
+
+	mut prefix := e.prefix
+	e.prefix = primF64
+	defer { e.prefix = prefix }
+
+	mut real := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+	if real == nil {
+		ret nil
+	}
+
+	rp := real.Type.Prim()
+	if rp == nil || !types::IsFloat(rp.Kind) {
+		e.pushErr(fc.Args[0].Token, log::InvalidExpr)
+		ret nil
+	}
+
+	e.prefix = real.Type
+	mut imag := e.evalExpr(fc.Args[1], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+	if imag == nil {
+		ret nil
+	}
+
+	ip := imag.Type.Prim()
+	if ip == nil || ip.Kind != rp.Kind {
+		e.pushErr(fc.Args[1].Token, "expected "+rp.Kind+", found "+ip.Str())
+		ret nil
+	}
+
+	mut r := buildVoidValue()
+	match rp.Kind {
+	| types::F32:
+		r.Type = primCmplx64
+	| types::F64:
+		r.Type = primCmplx128
+	|:
+		panic("unreachable")
+	}
+	r.Model = &BuiltinCmplxCallExpr{
+		Real: real,
+		Imag: imag,
 	}
 	ret r
 }
@@ -1330,6 +1378,7 @@ fn init() {
 	builtinFuncs["close"] = &FuncIns{caller: builtinCallerClose}
 	builtinFuncs["real"] = &FuncIns{caller: builtinCallerReal}
 	builtinFuncs["imag"] = &FuncIns{caller: builtinCallerImag}
+	builtinFuncs["cmplx"] = &FuncIns{caller: builtinCallerCmplx}
 
 	// Initialize built-in functions of the "std/mem" package.
 	builtinFuncsStdMem["SizeOf"] = &FuncIns{caller: builtinCallerStdMemSizeOf}
