@@ -141,6 +141,30 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
+	fn cmplx64(mut &self, c: &constant::Const) {
+		// Pseudo object code.
+		c := c.AsCmplx128()
+
+		self.oc.tc.toType(&self.oc.Buf, types::Cmplx64)
+		self.oc.write("{")
+		ftoa(&self.oc.Buf, c.Real, 32)
+		self.oc.write(", ")
+		ftoa(&self.oc.Buf, c.Imag, 32)
+		self.oc.write("}")
+	}
+
+	fn cmplx128(mut &self, c: &constant::Const) {
+		// Pseudo object code.
+		c := c.AsCmplx128()
+
+		self.oc.tc.toType(&self.oc.Buf, types::Cmplx128)
+		self.oc.write("{")
+		ftoa(&self.oc.Buf, c.Real, 64)
+		self.oc.write(", ")
+		ftoa(&self.oc.Buf, c.Imag, 64)
+		self.oc.write("}")
+	}
+
 	fn constant(mut &self, mut c: &constant::Const) {
 		match {
 		| c.IsStr():
@@ -153,6 +177,13 @@ impl exprCoder {
 				self.float32(c)
 			|:
 				self.float64(c)
+			}
+		| c.IsCmplx128():
+			match {
+			| c.Kind == types::Cmplx64:
+				self.cmplx64(c)
+			|:
+				self.cmplx128(c)
 			}
 		| c.IsInt():
 			i := c.ReadInt()
@@ -305,7 +336,52 @@ impl exprCoder {
 
 	fn _unsafeBinaryNoDynamic(mut &self, mut &buf: *strings::Builder, l: str,
 		r: str, mut lk: &sema::Type, mut rk: &sema::Type, op: int, kind: str) {
+		lp := lk.Prim()
 		match {
+		| lp != nil && lp.IsCmplx128():
+			match op {
+			| token::EQL | token::NEQ:
+				structBinary(buf, meta::Program.Runtime.Cmplx128, l, r, op, kind)
+				ret
+			| token::ADD:
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx128Add)
+			| token::SUB:
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx128Sub)
+			| token::MUL:
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx128Mul)
+			| token::QUO:
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx128Div)
+			|:
+				panic("unreachable")
+			}
+			buf.WriteStr("(")!
+			buf.WriteStr(l)!
+			buf.WriteStr(", ")!
+			buf.WriteStr(r)!
+			buf.WriteStr(")")!
+			ret
+		| lp != nil && lp.IsCmplx64():
+			match op {
+			| token::EQL | token::NEQ:
+				structBinary(buf, meta::Program.Runtime.Cmplx64, l, r, op, kind)
+				ret
+			| token::ADD:
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx64Add)
+			| token::SUB:
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx64Sub)
+			| token::MUL:
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx64Mul)
+			| token::QUO:
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx64Div)
+			|:
+				panic("unreachable")
+			}
+			buf.WriteStr("(")!
+			buf.WriteStr(l)!
+			buf.WriteStr(", ")!
+			buf.WriteStr(r)!
+			buf.WriteStr(")")!
+			ret
 		| lk.Array() != nil:
 			// If this binary operator comparing array type.
 			// The left operand is will be array one always.
@@ -436,7 +512,14 @@ impl exprCoder {
 
 	fn binary(mut &self, mut m: &sema::BinaryExpr) {
 		match m.Op.ID {
-		| token::QUO | token::REM:
+		| token::QUO:
+			// DivByZero analysis no necessary for complex types.
+			lp := m.Left.Type.Prim()
+			if lp != nil && types::IsCmplx(lp.Kind) {
+				break
+			}
+			fall
+		| token::REM:
 			if env::Safety {
 				self.divByZeroBinary(m.Op, m.Left, m.Right)
 				ret
@@ -472,10 +555,27 @@ impl exprCoder {
 	}
 
 	fn unary(mut &self, mut m: &sema::UnaryExpr) {
+		lp := m.Expr.Type.Prim()
+
+		if lp != nil && types::IsCmplx(lp.Kind) {
+			if m.Op.ID == token::SUB {
+				if lp.IsCmplx128() {
+					identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx128Neg)
+				} else {
+					identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx64Neg)
+				}
+				self.oc.write("(")
+				defer {
+					self.oc.write(")")
+				}
+			}
+			self.possibleRefExpr(m.Expr.Model)
+			ret
+		}
+
 		// guarantee integer wrap around
 		match m.Op.ID {
 		| token::ADD | token::SUB | token::XOR:
-			lp := m.Expr.Type.Prim()
 			if lp != nil && types::IsInt(lp.Kind) {
 				self.oc.write("(")
 				self.oc.tc.prim(&self.oc.Buf, lp)
@@ -769,30 +869,45 @@ impl exprCoder {
 			ret
 		}
 		mut prim := m.Type.Prim()
-		if prim != nil && prim.IsStr() {
-			mut eprim := m.Expr.Type.Prim()
-			if eprim != nil && prim != nil {
-				if eprim.IsU8() {
-					self.oc.write("__jule_strFromByte(")
-				} else {
-					self.oc.write("__jule_strFromRune(")
-				}
+		if prim != nil {
+			match {
+			| prim.IsCmplx64():
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx128cmplx64)
+				self.oc.write("(")
 				self.possibleRefExpr(m.Expr.Model)
 				self.oc.write(")")
 				ret
-			}
-			mut slc := m.Expr.Type.Slice()
-			if slc != nil {
-				eprim = slc.Value.Prim()
-				// []rune or []byte
-				if eprim.IsI32() {
-					self.oc.write("__jule_runesToStr(")
-				} else {
-					self.oc.write("__jule_bytesToStr(")
-				}
+			| prim.IsCmplx128():
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx64cmplx128)
+				self.oc.write("(")
 				self.possibleRefExpr(m.Expr.Model)
 				self.oc.write(")")
 				ret
+			| prim.IsStr():
+				mut eprim := m.Expr.Type.Prim()
+				if eprim != nil && prim != nil {
+					if eprim.IsU8() {
+						self.oc.write("__jule_strFromByte(")
+					} else {
+						self.oc.write("__jule_strFromRune(")
+					}
+					self.possibleRefExpr(m.Expr.Model)
+					self.oc.write(")")
+					ret
+				}
+				mut slc := m.Expr.Type.Slice()
+				if slc != nil {
+					eprim = slc.Value.Prim()
+					// []rune or []byte
+					if eprim.IsI32() {
+						self.oc.write("__jule_runesToStr(")
+					} else {
+						self.oc.write("__jule_bytesToStr(")
+					}
+					self.possibleRefExpr(m.Expr.Model)
+					self.oc.write(")")
+					ret
+				}
 			}
 		}
 		prim = m.Expr.Type.Prim()
@@ -1641,6 +1756,34 @@ impl exprCoder {
 		}
 	}
 
+	fn realCall(mut &self, mut m: &sema::BuiltinRealCallExpr) {
+		self.possibleRefExpr(m.Cmplx.Model)
+		self.oc.write(".")
+		p := m.Cmplx.Type.Prim()
+		match {
+		| p.IsCmplx64():
+			identCoder.field(&self.oc.Buf, meta::Program.Runtime.Cmplx64.FindField("real").Decl)
+		| p.IsCmplx128():
+			identCoder.field(&self.oc.Buf, meta::Program.Runtime.Cmplx128.FindField("real").Decl)
+		|:
+			panic("unreachable")
+		}
+	}
+
+	fn imagCall(mut &self, mut m: &sema::BuiltinImagCallExpr) {
+		self.possibleRefExpr(m.Cmplx.Model)
+		self.oc.write(".")
+		p := m.Cmplx.Type.Prim()
+		match {
+		| p.IsCmplx64():
+			identCoder.field(&self.oc.Buf, meta::Program.Runtime.Cmplx64.FindField("imag").Decl)
+		| p.IsCmplx128():
+			identCoder.field(&self.oc.Buf, meta::Program.Runtime.Cmplx128.FindField("imag").Decl)
+		|:
+			panic("unreachable")
+		}
+	}
+
 	fn makeCallSlice(mut &self, mut m: &sema::BuiltinMakeCallExpr) {
 		mut slice := m.Type.Slice()
 		init := ableToInit(slice.Value)
@@ -2081,6 +2224,10 @@ impl exprCoder {
 			self.capCall(m.(&sema::BuiltinCapCallExpr))
 		| &sema::BuiltinDeleteCallExpr:
 			self.deleteCall(m.(&sema::BuiltinDeleteCallExpr))
+		| &sema::BuiltinRealCallExpr:
+			self.realCall(m.(&sema::BuiltinRealCallExpr))
+		| &sema::BuiltinImagCallExpr:
+			self.imagCall(m.(&sema::BuiltinImagCallExpr))
 		| &sema::SizeofExpr:
 			self.sizeof(m.(&sema::SizeofExpr))
 		| &sema::AlignofExpr:

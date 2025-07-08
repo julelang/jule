@@ -8,6 +8,8 @@ const (
 	uvneginf = 0xFFF0000000000000
 )
 
+let _inf = f64frombits(uvinf)
+
 // Equals to the math::NaN function.
 #export "__jule_NaN"
 fn nan(): f64 {
@@ -23,11 +25,33 @@ fn inf(sign: int): f64 {
 	ret f64frombits(uvneginf)
 }
 
+// Equals to the math::Abs function.
+fn abs(x: f64): f64 { ret f64frombits(f64bits(x) & ^(1 << 63)) }
+
+// Equals to the math::IsNaN function.
+fn isNaN(x: f64): bool { ret x != x }
+
 // Equals to the math::F64bits function.
 fn f64bits(f: f64): u64 { ret unsafe { *((*u64)(&f)) } }
 
 // Equals to the math::F64frombits function.
 fn f64frombits(b: u64): f64 { ret unsafe { *((*f64)(&b)) } }
+
+// Equals to the math::Copysign function.
+fn copysign(f: f64, sign: f64): f64 {
+	const SignBit = 1 << 63
+	ret f64frombits(f64bits(f)&^SignBit | f64bits(sign)&SignBit)
+}
+
+// Reports whether f is neither NaN nor an infinity.
+fn isFinite(f: f64): bool {
+	ret !isNaN(f - f)
+}
+
+// Reports whether f is an infinity.
+fn isInf(f: f64): bool {
+	ret !isNaN(f) && !isFinite(f)
+}
 
 // Returns the 128-bit product of x and y: (hi, lo) = x * y
 // with the product bits' upper half returned in hi and the lower

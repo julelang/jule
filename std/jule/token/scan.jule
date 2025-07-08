@@ -294,7 +294,7 @@ impl Scanner {
 		mut prefix := rune(0) // one of 0 (decimal), '0' (0-octal), 'x', 'o', or 'b'
 		mut digsep := 0       // bit 0: digit present, bit 1: '_' present
 		mut invalid := -1     // index of invalid digit in literal, or < 0
-		mut float := false    // is floating-point literal
+		mut tok := INT
 
 		// integer part
 		if self.r != '.' {
@@ -320,7 +320,7 @@ impl Scanner {
 
 		// fractional part
 		if self.r == '.' {
-			float = true
+			tok = FLOAT
 			if prefix == 'o' || prefix == 'b' {
 				self.pushErr(self.offset, "invalid radix point in "+litname(prefix))
 			}
@@ -342,7 +342,7 @@ impl Scanner {
 				self.pushErr(self.offset, "{} exponent requires hexadecimal mantissa", self.r)
 			}
 			self.next()
-			float = true
+			tok = FLOAT
 			if self.r == '+' || self.r == '-' {
 				self.next()
 			}
@@ -352,12 +352,18 @@ impl Scanner {
 			if ds&1 == 0 {
 				self.pushErr(self.offset, "exponent has no digits")
 			}
-		} else if prefix == 'x' && float {
+		} else if prefix == 'x' && tok == FLOAT {
 			self.pushErr(self.offset, "hexadecimal mantissa requires a 'p' exponent")
 		}
 
+		// suffix 'i'
+		if self.r == 'i' {
+			tok = IMAG
+			self.next()
+		}
+
 		lit := unsafe::StrFromBytes(self.buf.Slice2(offs, self.offset))
-		if !float && invalid >= 0 {
+		if tok == INT && invalid >= 0 {
 			self.pushErr(invalid, "invalid digit {} in {}", lit[invalid-offs], litname(prefix))
 		}
 		if digsep&2 != 0 {
@@ -367,10 +373,7 @@ impl Scanner {
 			}
 		}
 
-		token.ID = INT
-		if float {
-			token.ID = FLOAT
-		}
+		token.ID = tok
 		token.Kind = lit
 	}
 

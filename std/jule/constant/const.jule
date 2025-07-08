@@ -5,6 +5,11 @@
 use "std/conv"
 use "std/math/big"
 
+struct cmplx {
+	Real: f64
+	Imag: f64
+}
+
 // Constant data.
 // Use Const.new_nil function instead of Const{} for nil literal.
 struct Const {
@@ -30,6 +35,9 @@ impl Const {
 
 	// Returns new constant value instance from 64-bit floating-point.
 	fn NewF64(x: f64): &Const { ret &Const{data: x} }
+
+	// Returns new constant value instance from 128-bit floating-point complex.
+	fn NewCmplx128(real: f64, imag: f64): &Const { ret &Const{data: &cmplx{real, imag}} }
 
 	// Returns new constant value instance with nil.
 	fn NewNil(): &Const { ret &Const{data: nil} }
@@ -72,6 +80,15 @@ impl Const {
 			ret 0
 		}
 		ret self.data.(f64)
+	}
+
+	// Reads 128-bit floating-point complex data.
+	// Returns 0 if data is not 128-bit floating-point complex.
+	fn ReadCmplx128(*self): cmplx {
+		if !self.IsCmplx128() {
+			ret cmplx{}
+		}
+		ret *self.data.(&cmplx)
 	}
 
 	//
@@ -126,6 +143,22 @@ impl Const {
 		}
 	}
 
+	// Reads data as 128-bit floating-point complex.
+	// Returns 0 if data is string, bool or which is not numeric.
+	fn AsCmplx128(*self): cmplx {
+		match type self.data {
+		| f64:
+			ret cmplx{Real: self.data.(f64)}
+		| big::Int:
+			f, _ := self.data.(big::Int).F64()
+			ret cmplx{Real: f}
+		| &cmplx:
+			ret *self.data.(&cmplx)
+		|:
+			ret cmplx{}
+		}
+	}
+
 	//
 	// Set
 	//
@@ -147,6 +180,9 @@ impl Const {
 
 	// Sets constant value from 64-bit floating-point.
 	fn SetF64(mut *self, x: f64) { self.data = x }
+
+	// Sets constant value from 128-bit floating-point complex.
+	fn SetCmplx128(mut *self, real: f64, imag: f64) { self.data = &cmplx{real, imag} }
 
 	// Sets constant value to nil.
 	fn SetNil(mut *self) { self.data = nil }
@@ -179,6 +215,12 @@ impl Const {
 		ret ok
 	}
 
+	// Reports whether data is 128-bit floating-point complex.
+	fn IsCmplx128(*self): bool {
+		_, ok := self.data.(&cmplx)
+		ret ok
+	}
+
 	// Reports whether data is nil.
 	fn IsNil(*self): bool { ret self.data == nil }
 
@@ -188,6 +230,8 @@ impl Const {
 		| self.IsInt() == x.IsInt():
 			ret true
 		| self.IsF64() == x.IsF64():
+			ret true
+		| self.IsCmplx128() == x.IsCmplx128():
 			ret true
 		| self.IsBool() == x.IsBool():
 			ret true
@@ -247,6 +291,8 @@ impl Const {
 			ret i.U64() == x.AsU64()
 		| self.IsF64():
 			ret self.ReadF64() == x.AsF64()
+		| self.IsCmplx128():
+			ret self.ReadCmplx128() == x.AsCmplx128()
 		|:
 			ret false
 		}
@@ -377,6 +423,10 @@ impl Const {
 				ret false
 			}
 			self.SetStr(self.ReadStr() + x.ReadStr())
+		| self.IsCmplx128() || x.IsCmplx128():
+			a := self.AsCmplx128()
+			b := x.AsCmplx128()
+			self.SetCmplx128(a.Real+b.Real, a.Imag+b.Imag)
 		| self.IsF64():
 			self.SetF64(self.ReadF64() + x.AsF64())
 		| self.IsInt():
@@ -403,6 +453,10 @@ impl Const {
 		match {
 		| self.IsF64():
 			self.SetF64(self.ReadF64() - x.AsF64())
+		| self.IsCmplx128() || x.IsCmplx128():
+			a := self.AsCmplx128()
+			b := x.AsCmplx128()
+			self.SetCmplx128(a.Real-b.Real, a.Imag-b.Imag)
 		| self.IsInt():
 			i := self.data.(big::Int)
 			if x.IsInt() {
@@ -427,6 +481,10 @@ impl Const {
 		match {
 		| self.IsF64():
 			self.SetF64(self.ReadF64() * x.AsF64())
+		| self.IsCmplx128() || x.IsCmplx128():
+			a := self.AsCmplx128()
+			b := x.AsCmplx128()
+			self.SetCmplx128(a.Real*b.Real+a.Imag*b.Imag-1, a.Real*b.Imag+a.Imag*b.Real)
 		| self.IsInt():
 			i := self.data.(big::Int)
 			if x.IsInt() {
@@ -459,6 +517,8 @@ impl Const {
 				ret false
 			}
 			self.SetF64(self.ReadF64() / l)
+		| self.IsCmplx128() || x.IsCmplx128():
+			panic("not implemented")
 		| self.IsInt():
 			i := self.data.(big::Int)
 			if x.IsInt() {
@@ -590,6 +650,8 @@ impl Const {
 			ret i.Format(10)
 		| self.IsF64():
 			ret conv::FormatFloat(self.data.(f64), 'g', -1, 64)
+		| self.IsCmplx128():
+			panic("not implemented")
 		|:
 			panic("unreachable")
 		}
