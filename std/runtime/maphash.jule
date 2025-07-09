@@ -42,6 +42,14 @@ fn f64hash(f: f64, seed: uintptr): uintptr {
 	}
 }
 
+fn cmplx64hash(c: cmplx64, seed: uintptr): uintptr {
+	ret f32hash(imag(c), f32hash(real(c), seed))
+}
+
+fn cmplx128hash(c: cmplx128, seed: uintptr): uintptr {
+	ret f64hash(imag(c), f64hash(real(c), seed))
+}
+
 fn boolhash(b: bool, seed: uintptr): uintptr {
 	if b {
 		ret seed + 1
@@ -115,6 +123,10 @@ fn maphash[K](k: K, seed: uintptr): uintptr {
 		ret f32hash(f32(k), seed)
 	| comptime::F64:
 		ret f64hash(f64(k), seed)
+	| comptime::Cmplx64:
+		ret cmplx64hash(cmplx64(k), seed)
+	| comptime::Cmplx128:
+		ret cmplx128hash(cmplx128(k), seed)
 	| comptime::Trait | comptime::Any | comptime::TypeEnum:
 		// If hash function pointer equals to nil, underlying type is not hashable.
 		unsafe {
