@@ -246,7 +246,7 @@ impl eval {
 			self.pushErr(l.Token, log::ConstantOverflow)
 			ret nil
 		}
-		mut constant := constant::Const.NewCmplx128(0, f)
+		mut constant := constant::Const.NewCmplx128(cmplx(0, f))
 		ret &Value{
 			untyped: true,
 			Mutable: true,
@@ -3534,9 +3534,9 @@ impl unaryEval {
 			| self.v.Constant.IsCmplx128():
 				a := self.v.Constant.ReadCmplx128()
 				if self.v.Type.Prim().IsCmplx64() {
-					self.v.Constant.SetCmplx128(f64(-f32(a.Real)), f64(-f32(a.Imag)))
+					self.v.Constant.SetCmplx128(cmplx128(-cmplx64(a)))
 				} else {
-					self.v.Constant.SetCmplx128(a.Real, -a.Imag)
+					self.v.Constant.SetCmplx128(-a)
 				}
 			| self.v.Constant.IsF64():
 				if self.v.Type.Prim().IsF32() {
@@ -5377,9 +5377,9 @@ fn castConstByType(mut s: &sema, token: &token::Token, mut t: &Type, mut v: &Val
 		if !v.Constant.IsCmplx128() {
 			match types::BitSizeOf(types::RealKindOf(kind)) {
 			| 128:
-				v.Constant.SetCmplx128(v.Constant.AsF64(), 0)
+				v.Constant.SetCmplx128(cmplx(v.Constant.AsF64(), 0))
 			| 64:
-				v.Constant.SetCmplx128(f64(f32(v.Constant.AsF64())), 0)
+				v.Constant.SetCmplx128(cmplx(f64(f32(v.Constant.AsF64())), 0))
 			}
 		}
 		v.Constant.Kind = kind
