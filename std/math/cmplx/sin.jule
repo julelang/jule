@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use "std/math"
-
 // The Jule code is a modified version of the original Go code from
 // https://github.com/golang/go/blob/go1.20/src/math/cmplx/sin.go and came with this notice.
 //
@@ -30,6 +28,8 @@ use "std/math"
 //   Stephen L. Moshier
 //   moshier@na-net.ornl.gov
 
+use "std/math"
+
 // Complex circular sine
 //
 // DESCRIPTION:
@@ -52,23 +52,23 @@ use "std/math"
 // Also tested by csin(casin(z)) = z.
 
 // Returns the sine of complex number.
-fn Sin(x: Cmplx): Cmplx {
+fn Sin(x: cmplx128): cmplx128 {
 	match {
-	| x.Imag() == 0 && (math::IsInf(x.Real(), 0) || math::IsNaN(x.Real())):
-		ret New(math::NaN(), x.Imag())
-	| math::IsInf(x.Imag(), 0):
+	| imag(x) == 0 && (math::IsInf(real(x), 0) || math::IsNaN(real(x))):
+		ret cmplx(math::NaN(), imag(x))
+	| math::IsInf(imag(x), 0):
 		match {
-		| x.Real() == 0:
+		| real(x) == 0:
 			ret x
-		| math::IsInf(x.Real(), 0) | math::IsNaN(x.Real()):
-			ret New(math::NaN(), x.Imag())
+		| math::IsInf(real(x), 0) | math::IsNaN(real(x)):
+			ret cmplx(math::NaN(), imag(x))
 		}
-	| x.Real() == 0 && math::IsNaN(x.Imag()):
+	| real(x) == 0 && math::IsNaN(imag(x)):
 		ret x
 	}
-	s, c := math::Sincos(x.Real())
-	sh, ch := sinhcosh(x.Imag())
-	ret New(s*ch, c*sh)
+	s, c := math::Sincos(real(x))
+	sh, ch := sinhcosh(imag(x))
+	ret cmplx(s*ch, c*sh)
 }
 
 // Complex hyperbolic sine
@@ -85,23 +85,23 @@ fn Sin(x: Cmplx): Cmplx {
 //    IEEE      -10,+10     30000       3.1e-16     8.2e-17
 
 // Returns the hyperbolic sine of complex number.
-fn Sinh(x: Cmplx): Cmplx {
+fn Sinh(x: cmplx128): cmplx128 {
 	match {
-	| x.Real() == 0 && (math::IsInf(x.Imag(), 0) || math::IsNaN(x.Imag())):
-		ret New(x.Real(), math::NaN())
-	| math::IsInf(x.Real(), 0):
+	| real(x) == 0 && (math::IsInf(imag(x), 0) || math::IsNaN(imag(x))):
+		ret cmplx(real(x), math::NaN())
+	| math::IsInf(real(x), 0):
 		match {
-		| x.Imag() == 0:
-			ret New(x.Real(), x.Imag())
-		| math::IsInf(x.Imag(), 0) | math::IsNaN(x.Imag()):
-			ret New(x.Real(), math::NaN())
+		| imag(x) == 0:
+			ret x
+		| math::IsInf(imag(x), 0) | math::IsNaN(imag(x)):
+			ret cmplx(real(x), math::NaN())
 		}
-	| x.Imag() == 0 && math::IsNaN(x.Real()):
-		ret New(math::NaN(), x.Imag())
+	| imag(x) == 0 && math::IsNaN(real(x)):
+		ret cmplx(math::NaN(), imag(x))
 	}
-	s, c := math::Sincos(x.Imag())
-	sh, ch := sinhcosh(x.Real())
-	ret New(c*sh, s*ch)
+	s, c := math::Sincos(imag(x))
+	sh, ch := sinhcosh(real(x))
+	ret cmplx(c*sh, s*ch)
 }
 
 // Complex circular cosine
@@ -123,24 +123,24 @@ fn Sinh(x: Cmplx): Cmplx {
 //    IEEE      -10,+10     30000       3.8e-16     1.0e-16
 
 // Returns the cosine of complex number.
-fn Cos(x: Cmplx): Cmplx {
-	re, im := x.Real(), x.Imag()
+fn Cos(x: cmplx128): cmplx128 {
+	re, im := real(x), imag(x)
 	match {
 	| im == 0 && (math::IsInf(re, 0) || math::IsNaN(re)):
-		ret New(math::NaN(), -im*math::Copysign(0, re))
+		ret cmplx(math::NaN(), -im*math::Copysign(0, re))
 	| math::IsInf(im, 0):
 		match {
 		| re == 0:
-			ret New(math::Inf(1), -re*math::Copysign(0, im))
+			ret cmplx(math::Inf(1), -re*math::Copysign(0, im))
 		| math::IsInf(re, 0) || math::IsNaN(re):
-			ret New(math::Inf(1), math::NaN())
+			ret cmplx(math::Inf(1), math::NaN())
 		}
 	| re == 0 && math::IsNaN(im):
-		ret New(math::NaN(), 0)
+		ret cmplx(math::NaN(), 0)
 	}
-	s, mut c := math::Sincos(x.Real())
-	sh, ch := sinhcosh(x.Imag())
-	ret New(c*ch, -s*sh)
+	s, mut c := math::Sincos(real(x))
+	sh, ch := sinhcosh(imag(x))
+	ret cmplx(c*ch, -s*sh)
 }
 
 // Complex hyperbolic cosine
@@ -156,23 +156,23 @@ fn Cos(x: Cmplx): Cmplx {
 //    IEEE      -10,+10     30000       2.9e-16     8.1e-17
 
 // Returns the hyperbolic cosine of complex number.
-fn Cosh(x: Cmplx): Cmplx {
+fn Cosh(x: cmplx128): cmplx128 {
 	match {
-	| x.Real() == 0 && (math::IsInf(x.Imag(), 0) || math::IsNaN(x.Imag())):
-		ret New(math::NaN(), x.Real()*math::Copysign(0, x.Imag()))
-	| math::IsInf(x.Real(), 0):
+	| real(x) == 0 && (math::IsInf(imag(x), 0) || math::IsNaN(imag(x))):
+		ret cmplx(math::NaN(), real(x)*math::Copysign(0, imag(x)))
+	| math::IsInf(real(x), 0):
 		match {
-		| x.Imag() == 0:
-			ret New(math::Inf(1), x.Imag()*math::Copysign(0, x.Real()))
-		| math::IsInf(x.Imag(), 0) || math::IsNaN(x.Imag()):
-			ret New(math::Inf(1), math::NaN())
+		| imag(x) == 0:
+			ret cmplx(math::Inf(1), imag(x)*math::Copysign(0, real(x)))
+		| math::IsInf(imag(x), 0) || math::IsNaN(imag(x)):
+			ret cmplx(math::Inf(1), math::NaN())
 		}
-	| x.Imag() == 0 && math::IsNaN(x.Real()):
-		ret New(math::NaN(), x.Imag())
+	| imag(x) == 0 && math::IsNaN(real(x)):
+		ret cmplx(math::NaN(), imag(x))
 	}
-	s, c := math::Sincos(x.Imag())
-	sh, ch := sinhcosh(x.Real())
-	ret New(c*ch, s*sh)
+	s, c := math::Sincos(imag(x))
+	sh, ch := sinhcosh(real(x))
+	ret cmplx(c*ch, s*sh)
 }
 
 // calculate sinh and cosh.

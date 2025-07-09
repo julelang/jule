@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use "std/math"
-
 // The Jule code is a modified version of the original Go code from
 // https://github.com/golang/go/blob/go1.20/src/math/cmplx/exp.go and came with this notice.
 //
@@ -30,6 +28,8 @@ use "std/math"
 //   Stephen L. Moshier
 //   moshier@na-net.ornl.gov
 
+use "std/math"
+
 // Complex exponential function
 //
 // DESCRIPTION:
@@ -50,24 +50,24 @@ use "std/math"
 //    IEEE      -10,+10     30000       3.0e-16     8.7e-17
 
 // Returns e**x, the base-e exponential of x.
-fn Exp(x: Cmplx): Cmplx {
+fn Exp(x: cmplx128): cmplx128 {
 	match {
-	| math::IsInf(x.Real(), 0):
+	| math::IsInf(real(x), 0):
 		match {
-		| x.Real() > 0 && x.Imag() == 0:
+		| real(x) > 0 && imag(x) == 0:
 			ret x
-		| math::IsInf(x.Imag(), 0) | math::IsNaN(x.Imag()):
-			if x.Real() < 0 {
-				ret New(0, math::Copysign(0, x.Imag()))
+		| math::IsInf(imag(x), 0) | math::IsNaN(imag(x)):
+			if real(x) < 0 {
+				ret cmplx(0, math::Copysign(0, imag(x)))
 			}
-			ret New(math::Inf(1.0), math::NaN())
+			ret cmplx(math::Inf(1.0), math::NaN())
 		}
-	| math::IsNaN(x.Real()):
-		if x.Imag() == 0 {
-			ret New(math::NaN(), x.Imag())
+	| math::IsNaN(real(x)):
+		if imag(x) == 0 {
+			ret cmplx(math::NaN(), imag(x))
 		}
 	}
-	r := math::Exp(x.Real())
-	s, c := math::Sincos(x.Imag())
-	ret New(r*c, r*s)
+	r := math::Exp(real(x))
+	s, c := math::Sincos(imag(x))
+	ret cmplx(r*c, r*s)
 }
