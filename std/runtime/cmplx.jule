@@ -1,0 +1,123 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Built-in cmplx64 type.
+struct _cmplx64 {
+	real: f32
+	imag: f32
+}
+
+fn cmplx64eq(m: cmplx64, n: cmplx64): bool {
+	ret real(m) == real(n) && imag(m) == imag(n)
+}
+
+fn cmplx64neg(c: cmplx64): cmplx64 {
+	ret cmplx(-real(c), -imag(c))
+}
+
+fn cmplx64add(m: cmplx64, n: cmplx64): cmplx64 {
+	ret cmplx(real(m)+real(n), imag(m)+imag(n))
+}
+
+fn cmplx64sub(m: cmplx64, n: cmplx64): cmplx64 {
+	ret cmplx(real(m)-real(n), imag(m)-imag(n))
+}
+
+fn cmplx64mul(m: cmplx64, n: cmplx64): cmplx64 {
+	ret cmplx(real(m)*real(n)+imag(m)*imag(n)*-1, real(m)*imag(n)+imag(m)*real(n))
+}
+
+fn cmplx64div(m: cmplx64, n: cmplx64): cmplx64 {
+	ret cmplx64(cmplx128div(cmplx128(m), cmplx128(n)))
+}
+
+// Built-in cmplx128 type.
+struct _cmplx128 {
+	real: f64
+	imag: f64
+}
+
+fn cmplx128eq(m: cmplx128, n: cmplx128): bool {
+	ret real(m) == real(n) && imag(m) == imag(n)
+}
+
+fn cmplx128neg(c: cmplx128): cmplx128 {
+	ret cmplx(-real(c), -imag(c))
+}
+
+fn cmplx128add(m: cmplx128, n: cmplx128): cmplx128 {
+	ret cmplx(real(m)+real(n), imag(m)+imag(n))
+}
+
+fn cmplx128sub(m: cmplx128, n: cmplx128): cmplx128 {
+	ret cmplx(real(m)-real(n), imag(m)-imag(n))
+}
+
+fn cmplx128mul(m: cmplx128, n: cmplx128): cmplx128 {
+	ret cmplx(real(m)*real(n)+imag(m)*imag(n)*-1, real(m)*imag(n)+imag(m)*real(n))
+}
+
+fn cmplx128div(n: cmplx128, m: cmplx128): cmplx128 {
+	// complex(e, f) = n/m
+	let mut e: f64
+	let mut f: f64
+
+	// Algorithm for robust complex division as described in
+	// Robert L. Smith: Algorithm 116: Complex division. Commun. ACM 5(8): 435 (1962).
+	if abs(real(m)) >= abs(imag(m)) {
+		ratio := imag(m) / real(m)
+		denom := real(m) + ratio*imag(m)
+		e = (real(n) + imag(n)*ratio) / denom
+		f = (imag(n) - real(n)*ratio) / denom
+	} else {
+		ratio := real(m) / imag(m)
+		denom := imag(m) + ratio*real(m)
+		e = (real(n)*ratio + imag(n)) / denom
+		f = (imag(n)*ratio - real(n)) / denom
+	}
+
+	if isNaN(e) && isNaN(f) {
+		// Correct final result to infinities and zeros if applicable.
+		// Matches C99: ISO/IEC 9899:1999 - G.5.1  Multiplicative operators.
+
+		mut a, mut b := real(n), imag(n)
+		mut c, mut d := real(m), imag(m)
+
+		match {
+		| m == 0 && (!isNaN(a) || !isNaN(b)):
+			e = copysign(_inf, c) * a
+			f = copysign(_inf, c) * b
+		| (isInf(a) || isInf(b)) && isFinite(c) && isFinite(d):
+			a = inf2one(a)
+			b = inf2one(b)
+			e = _inf * (a*c + b*d)
+			f = _inf * (b*c - a*d)
+		| (isInf(c) || isInf(d)) && isFinite(a) && isFinite(b):
+			c = inf2one(c)
+			d = inf2one(d)
+			e = 0 * (a*c + b*d)
+			f = 0 * (b*c - a*d)
+		}
+	}
+
+	ret cmplx(e, f)
+}
+
+// Returns a signed 1 if f is an infinity and a signed 0 otherwise.
+// The sign of the result is the sign of f.
+fn inf2one(f: f64): f64 {
+	mut g := 0.0
+	if isInf(f) {
+		g = 1.0
+	}
+	ret copysign(g, f)
+}
+
+fn cmplx64cmplx128(c: cmplx64): cmplx128 {
+	ret cmplx(f64(real(c)), f64(imag(c)))
+}
+
+fn cmplx128cmplx64(c: cmplx128): cmplx64 {
+	ret cmplx(f32(real(c)), f32(imag(c)))
+}

@@ -1,0 +1,127 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// The Jule code is a modified version of the original Go code from
+// https://github.com/golang/go/blob/go1.24.3/src/strconv/atoc.go and came with this notice.
+//
+// ====================================================
+// Copyright (c) 2009 The Go Authors. All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// ====================================================
+
+const fnParseCmplx = "ParseCmplx"
+
+// convErr splits an error returned by parseFloatPrefix
+// into a syntax or range error for ParseCmplx.
+fn convErr(mut err: any, s: str): any {
+	mut x, ok := err.(&NumError)
+	if ok {
+		x.Func = fnParseCmplx
+		x.Num = s
+	}
+	ret x
+}
+
+// Converts the string s to a complex number
+// with the precision specified by bitSize: 64 for cmplx64, or 128 for cmplx128.
+// When bitSize=64, the result still has type cmplx128, but it will be
+// convertible to cmplx64 without changing its value.
+//
+// The number represented by s must be of the form N, Ni, or N±Ni, where N stands
+// for a floating-point number as recognized by [ParseFloat], and i is the imaginary
+// component. If the second N is unsigned, a + sign is required between the two components
+// as indicated by the ±. If the second N is NaN, only a + sign is accepted.
+// The form may be parenthesized and cannot contain any spaces.
+// The resulting complex number consists of the two components converted by ParseFloat.
+//
+// The errors that it returns have concrete type [&NumError]
+// and include err.Num = s.
+//
+// If s is not syntactically well-formed, it returns err.Err = ErrSyntax.
+//
+// If s is syntactically well-formed but either component is more than 1/2 ULP
+// away from the largest floating point number of the given component's size,
+// it returns err.Err = ErrRange and c = ±Inf for the respective component.
+fn ParseCmplx(mut s: str, bitSize: int)!: cmplx128 {
+	mut size := 64
+	if bitSize == 64 {
+		size = 32 // cmplx64 uses f32 parts
+	}
+
+	orig := s
+
+	// Remove parentheses, if any.
+	if len(s) >= 2 && s[0] == '(' && s[len(s)-1] == ')' {
+		s = s[1 : len(s)-1]
+	}
+
+	// Read real part (possibly imaginary part if followed by 'i').
+	mut re, mut n, mut err := parseFloatPrefix(s, size)
+	if err != nil {
+		error(convErr(err, orig))
+	}
+
+	s = s[n:]
+
+	// If we have nothing left, we're done.
+	if len(s) == 0 {
+		ret cmplx(re, 0)
+	}
+
+	// Otherwise, look at the next character.
+	match s[0] {
+	| '+':
+		// Consume the '+' to avoid an error if we have "+NaNi", but
+		// do this only if we don't have a "++" (don't hide that error).
+		if len(s) > 1 && s[1] != '+' {
+			s = s[1:]
+		}
+	| '-':
+		// ok
+	| 'i':
+		// If 'i' is the last character, we only have an imaginary part.
+		if len(s) == 1 {
+			ret cmplx(0, re)
+		}
+		fall
+	|:
+		error(syntaxError(fnParseCmplx, orig))
+	}
+
+	// Read imaginary part.
+	im, n, err := parseFloatPrefix(s, size)
+	if err != nil {
+		error(convErr(err, orig))
+	}
+	s = s[n:]
+	if s != "i" {
+		error(syntaxError(fnParseCmplx, orig))
+	}
+	ret cmplx(re, im)
+}

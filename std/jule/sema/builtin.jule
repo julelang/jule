@@ -52,6 +52,8 @@ let mut primU32 = &Type{Kind: buildPrimType(types::U32)}
 let mut primU64 = &Type{Kind: buildPrimType(types::U64)}
 let mut primF32 = &Type{Kind: buildPrimType(types::F32)}
 let mut primF64 = &Type{Kind: buildPrimType(types::F64)}
+let mut primCmplx64 = &Type{Kind: buildPrimType(types::Cmplx64)}
+let mut primCmplx128 = &Type{Kind: buildPrimType(types::Cmplx128)}
 
 let mut builtinVars = map[str]&Var{
 	"nil": &Var{
@@ -114,6 +116,8 @@ let mut builtinTypeAliases: map[str]&TypeAlias = {
 	"u64": primTypeAlias("u64", primU64),
 	"f32": primTypeAlias("f32", primF32),
 	"f64": primTypeAlias("f64", primF64),
+	"cmplx64": primTypeAlias("cmplx64", primCmplx64),
+	"cmplx128": primTypeAlias("cmplx128", primCmplx128),
 	"byte": primTypeAlias("byte", primU8),
 	"rune": primTypeAlias("rune", primI32),
 }
@@ -915,6 +919,126 @@ fn builtinCallerClose(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Val
 	}
 }
 
+fn builtinCallerReal(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
+	if len(fc.Args) < 1 {
+		e.pushErr(fc.Token, log::MissingExprFor, "c")
+		ret nil
+	}
+	if len(fc.Args) > 1 {
+		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "real")
+	}
+	mut c := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+	if c == nil {
+		ret nil
+	}
+	prim := c.Type.Prim()
+	if prim == nil || !types::IsCmplx(c.Type.Prim().Kind) {
+		e.pushErr(fc.Args[0].Token, log::InvalidExpr)
+		ret nil
+	}
+	mut r := buildVoidValue()
+	match prim.Kind {
+	| types::Cmplx64:
+		r.Type = primF32
+	| types::Cmplx128:
+		r.Type = primF64
+	|:
+		panic("unreachable")
+	}
+	r.Model = &BuiltinRealCallExpr{
+		Cmplx: c,
+	}
+	ret r
+}
+
+fn builtinCallerImag(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
+	if len(fc.Args) < 1 {
+		e.pushErr(fc.Token, log::MissingExprFor, "c")
+		ret nil
+	}
+	if len(fc.Args) > 1 {
+		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "imag")
+	}
+	mut c := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+	if c == nil {
+		ret nil
+	}
+	prim := c.Type.Prim()
+	if prim == nil || !types::IsCmplx(c.Type.Prim().Kind) {
+		e.pushErr(fc.Args[0].Token, log::InvalidExpr)
+		ret nil
+	}
+	mut r := buildVoidValue()
+	match prim.Kind {
+	| types::Cmplx64:
+		r.Type = primF32
+	| types::Cmplx128:
+		r.Type = primF64
+	|:
+		panic("unreachable")
+	}
+	r.Model = &BuiltinImagCallExpr{
+		Cmplx: c,
+	}
+	ret r
+}
+
+fn builtinCallerCmplx(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
+	if len(fc.Args) < 1 {
+		e.pushErr(fc.Token, log::MissingExprFor, "real")
+		ret nil
+	}
+	if len(fc.Args) < 2 {
+		e.pushErr(fc.Token, log::MissingExprFor, "imag")
+		ret nil
+	}
+	if len(fc.Args) > 2 {
+		e.pushErr(fc.Args[1].Token, log::ArgumentOverflow, "cmplx")
+	}
+
+	mut prefix := e.prefix
+	e.prefix = primF64
+	defer { e.prefix = prefix }
+
+	mut real := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+	if real == nil {
+		ret nil
+	}
+
+	rp := real.Type.Prim()
+	if rp == nil || !types::IsFloat(rp.Kind) {
+		e.pushErr(fc.Args[0].Token, log::InvalidExpr)
+		ret nil
+	}
+
+	e.prefix = real.Type
+	mut imag := e.evalExpr(fc.Args[1], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+	if imag == nil {
+		ret nil
+	}
+
+	ip := imag.Type.Prim()
+	if ip == nil || ip.Kind != rp.Kind {
+		e.pushErr(fc.Args[1].Token, "expected "+rp.Kind+", found "+ip.Str())
+		ret nil
+	}
+
+	mut r := buildVoidValue()
+	match rp.Kind {
+	| types::F32:
+		r.Type = primCmplx64
+	| types::F64:
+		r.Type = primCmplx128
+	|:
+		panic("unreachable")
+	}
+	r.Model = &BuiltinCmplxCallExpr{
+		Real: real,
+		Imag: imag,
+	}
+	ret r
+}
+
 fn builtinCallerStdComptimeTypeOf(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, log::MissingExprFor, "type|expr")
@@ -1252,6 +1376,9 @@ fn init() {
 	builtinFuncs["cap"] = &FuncIns{caller: builtinCallerCap}
 	builtinFuncs["delete"] = &FuncIns{caller: builtinCallerDelete}
 	builtinFuncs["close"] = &FuncIns{caller: builtinCallerClose}
+	builtinFuncs["real"] = &FuncIns{caller: builtinCallerReal}
+	builtinFuncs["imag"] = &FuncIns{caller: builtinCallerImag}
+	builtinFuncs["cmplx"] = &FuncIns{caller: builtinCallerCmplx}
 
 	// Initialize built-in functions of the "std/mem" package.
 	builtinFuncsStdMem["SizeOf"] = &FuncIns{caller: builtinCallerStdMemSizeOf}

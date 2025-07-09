@@ -8,9 +8,8 @@ use "std/jule/sema"
 
 // Linkpath of common packages.
 const (
-	linkpathRuntime   = "std/runtime"
-	linkpathStrings   = "std/strings"
-	linkpathMathCmplx = "std/math/cmplx"
+	linkpathRuntime = "std/runtime"
+	linkpathStrings = "std/strings"
 )
 
 // Program metadata for the main IR.
@@ -64,32 +63,33 @@ struct Runtime {
 	SliceAsStr:      &sema::FuncIns
 	CloseThread:     &sema::FuncIns
 	CheckNilRef:     &sema::FuncIns
+	Cmplx64Eq:       &sema::FuncIns
+	Cmplx64Neg:      &sema::FuncIns
+	Cmplx64Add:      &sema::FuncIns
+	Cmplx64Sub:      &sema::FuncIns
+	Cmplx64Mul:      &sema::FuncIns
+	Cmplx64Div:      &sema::FuncIns
+	Cmplx128Eq:      &sema::FuncIns
+	Cmplx128Neg:     &sema::FuncIns
+	Cmplx128Add:     &sema::FuncIns
+	Cmplx128Sub:     &sema::FuncIns
+	Cmplx128Mul:     &sema::FuncIns
+	Cmplx128Div:     &sema::FuncIns
+	Cmplx128cmplx64: &sema::FuncIns
+	Cmplx64cmplx128: &sema::FuncIns
 
 	Map:         &sema::Struct
 	MapIterator: &sema::Struct
 	Pchan:       &sema::Struct
 	Hchan:       &sema::Struct
-}
-
-// Metadata for the std/math/cmplx package.
-struct MathCmplx {
-	Cmplx: &sema::StructIns // Cmplx
-
-	CmplxAdd:  &sema::FuncIns // Cmplx.Add
-	CmplxSub:  &sema::FuncIns // Cmplx.Sub
-	CmplxMul:  &sema::FuncIns // Cmplx.Mul
-	CmplxDiv:  &sema::FuncIns // Cmplx.Div
-	CmplxAddZ: &sema::FuncIns // Cmplx.add
-	CmplxSubZ: &sema::FuncIns // Cmplx.sub
-	CmplxMulZ: &sema::FuncIns // Cmplx.mul
-	CmplxDivZ: &sema::FuncIns // Cmplx.div
+	Cmplx64:     &sema::StructIns
+	Cmplx128:    &sema::StructIns
 }
 
 // Metadata for common objects.
 struct Meta {
 	Runtime:    &Runtime
 	StrBuilder: &StrBuilder
-	MathCmplx:  &MathCmplx
 
 	EntryPoint: &sema::Func
 }
@@ -99,7 +99,6 @@ fn Collect(mut ir: &obj::IR): &Meta {
 	mut meta := new(Meta)
 	meta.Runtime = CollectRuntime(ir)
 	meta.StrBuilder = CollectStrBuilder(ir)
-	meta.MathCmplx = CollectMathCmplx(ir)
 	ret meta
 }
 
@@ -143,12 +142,28 @@ fn CollectRuntime(mut ir: &obj::IR): &Runtime {
 	meta.SliceAsStr = obj::RuntimeFindFunc(p, "sliceAsStr").Instances[0]
 	meta.CloseThread = obj::RuntimeFindFunc(p, "closeThread").Instances[0]
 	meta.CheckNilRef = obj::RuntimeFindFunc(p, "checkNilRef").Instances[0]
+	meta.Cmplx64Eq = obj::RuntimeFindFunc(p, "cmplx64eq").Instances[0]
+	meta.Cmplx64Neg = obj::RuntimeFindFunc(p, "cmplx64neg").Instances[0]
+	meta.Cmplx64Add = obj::RuntimeFindFunc(p, "cmplx64add").Instances[0]
+	meta.Cmplx64Sub = obj::RuntimeFindFunc(p, "cmplx64sub").Instances[0]
+	meta.Cmplx64Mul = obj::RuntimeFindFunc(p, "cmplx64mul").Instances[0]
+	meta.Cmplx64Div = obj::RuntimeFindFunc(p, "cmplx64div").Instances[0]
+	meta.Cmplx128Eq = obj::RuntimeFindFunc(p, "cmplx128eq").Instances[0]
+	meta.Cmplx128Neg = obj::RuntimeFindFunc(p, "cmplx128neg").Instances[0]
+	meta.Cmplx128Add = obj::RuntimeFindFunc(p, "cmplx128add").Instances[0]
+	meta.Cmplx128Sub = obj::RuntimeFindFunc(p, "cmplx128sub").Instances[0]
+	meta.Cmplx128Mul = obj::RuntimeFindFunc(p, "cmplx128mul").Instances[0]
+	meta.Cmplx128Div = obj::RuntimeFindFunc(p, "cmplx128div").Instances[0]
+	meta.Cmplx128cmplx64 = obj::RuntimeFindFunc(p, "cmplx128cmplx64").Instances[0]
+	meta.Cmplx64cmplx128 = obj::RuntimeFindFunc(p, "cmplx64cmplx128").Instances[0]
 
 	// Structs.
 	meta.Map = obj::RuntimeFindStruct(p, "_Map")
 	meta.MapIterator = obj::RuntimeFindStruct(p, "mapIterator")
 	meta.Pchan = obj::RuntimeFindStruct(p, "pchan")
 	meta.Hchan = obj::RuntimeFindStruct(p, "hchan")
+	meta.Cmplx64 = obj::RuntimeFindStruct(p, "_cmplx64").Instances[0]
+	meta.Cmplx128 = obj::RuntimeFindStruct(p, "_cmplx128").Instances[0]
 
 	ret meta
 }
@@ -167,27 +182,5 @@ fn CollectStrBuilder(mut ir: &obj::IR): &StrBuilder {
 	const for _, f in metav.Type().Decl().Fields() {
 		metav.Field(f.Name()).Unwrap() = b.FindMethod(f.Name(), Static).Instances[0]
 	}
-	ret meta
-}
-
-// Collects MathCmplx from IR if possible.
-fn CollectMathCmplx(mut ir: &obj::IR): &MathCmplx {
-	mut p := obj::SelectImport(ir.Used, linkpathMathCmplx)
-	if p == nil {
-		ret nil
-	}
-	mut meta := new(MathCmplx)
-
-	const Static = false
-	meta.Cmplx = obj::RuntimeFindStruct(p, "Cmplx").Instances[0]
-	meta.CmplxAdd = meta.Cmplx.FindMethod("Add", Static).Instances[0]
-	meta.CmplxSub = meta.Cmplx.FindMethod("Sub", Static).Instances[0]
-	meta.CmplxMul = meta.Cmplx.FindMethod("Mul", Static).Instances[0]
-	meta.CmplxDiv = meta.Cmplx.FindMethod("Div", Static).Instances[0]
-	meta.CmplxAddZ = meta.Cmplx.FindMethod("add", Static).Instances[0]
-	meta.CmplxSubZ = meta.Cmplx.FindMethod("sub", Static).Instances[0]
-	meta.CmplxMulZ = meta.Cmplx.FindMethod("mul", Static).Instances[0]
-	meta.CmplxDivZ = meta.Cmplx.FindMethod("div", Static).Instances[0]
-
 	ret meta
 }

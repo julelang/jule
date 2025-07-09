@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use "std/math"
-
 // The Jule code is a modified version of the original Go code from
 // https://github.com/golang/go/blob/go1.20/src/math/cmplx/pow.go and came with this notice.
 //
@@ -30,6 +28,8 @@ use "std/math"
 //   Stephen L. Moshier
 //   moshier@na-net.ornl.gov
 
+use "std/math"
+
 // Complex power function
 //
 // DESCRIPTION:
@@ -48,36 +48,36 @@ use "std/math"
 // For generalized compatibility with math::pow:
 //
 //	Pow(0, ±0) returns 1+0i
-//	Pow(0, c) for c.Real()<0 returns Inf+0i if c.Imag() is zero, otherwise Inf+Inf i.
-fn Pow(x: Cmplx, y: Cmplx): Cmplx {
-	if IsZero(x) { // Guaranteed also true for x == -0.
+//	Pow(0, c) for real(c)<0 returns Inf+0i if imag(c) is zero, otherwise Inf+Inf i.
+fn Pow(x: cmplx128, y: cmplx128): cmplx128 {
+	if x == 0 { // Guaranteed also true for x == -0.
 		if IsNaN(y) {
 			ret NaN()
 		}
 		match {
-		| y.Real() == 0:
-			ret New(1, 0)
-		| y.Real() < 0:
-			if y.Imag() == 0 {
-				ret New(math::Inf(1), 0)
+		| real(y) == 0:
+			ret 1
+		| real(y) < 0:
+			if imag(y) == 0 {
+				ret cmplx(math::Inf(1), 0)
 			}
 			ret Inf(1)
-		| y.Real() > 0:
-			ret Zero()
+		| real(y) > 0:
+			ret 0
 		}
 		panic("cmplx: not reached")
 	}
 	modulus := Abs(x)
 	if modulus == 0 {
-		ret Zero()
+		ret 0
 	}
-	mut r := math::Pow(modulus, y.Real())
+	mut r := math::Pow(modulus, real(y))
 	arg := Phase(x)
-	mut theta := y.Real() * arg
-	if y.Imag() != 0 {
-		r *= math::Exp(-y.Imag() * arg)
-		theta += y.Imag() * math::Log(modulus)
+	mut theta := real(y) * arg
+	if imag(y) != 0 {
+		r *= math::Exp(-imag(y) * arg)
+		theta += imag(y) * math::Log(modulus)
 	}
 	s, c := math::Sincos(theta)
-	ret New(r*c, r*s)
+	ret cmplx(r*c, r*s)
 }

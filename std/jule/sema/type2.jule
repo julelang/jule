@@ -39,6 +39,37 @@ fn traitHasReferenceReceiver(t: &Trait): bool {
 	ret false
 }
 
+fn cmplxAssignable(kind: str, mut v: &Value): bool {
+	if v.Constant.IsCmplx128() {
+		if kind == types::Cmplx128 {
+			ret true
+		}
+		cmplx := v.Constant.ReadCmplx128()
+		ret _floatAssignable(real(cmplx)) && _floatAssignable(imag(cmplx))
+	}
+	bits := types::BitSizeOf(kind)
+	// If complex is 128-bit, all typed primitive types should fit.
+	if bits == 128 {
+		ret true
+	}
+	ret floatAssignable(types::FloatFromBits(bits/2), v)
+}
+
+// Checks for 32-bit floating point.
+fn _floatAssignable(f: f64): bool {
+	f2 := f64(f32(f))
+	match {
+	| math::IsNaN(f2):
+		ret math::IsNaN(f)
+	| math::IsInf(f2, 1):
+		ret math::IsInf(f, 1)
+	| math::IsInf(f2, -1):
+		ret math::IsInf(f, -1)
+	|:
+		ret true
+	}
+}
+
 fn floatAssignable(kind: str, v: &Value): bool {
 	if !v.Constant.IsInt() && !v.Constant.IsF64() {
 		ret false
@@ -61,17 +92,7 @@ fn floatAssignable(kind: str, v: &Value): bool {
 	if bits == 64 {
 		ret true
 	}
-	f2 := f64(f32(f))
-	match {
-	| math::IsNaN(f2):
-		ret math::IsNaN(f)
-	| math::IsInf(f2, 1):
-		ret math::IsInf(f, 1)
-	| math::IsInf(f2, -1):
-		ret math::IsInf(f, -1)
-	|:
-		ret true
-	}
+	ret _floatAssignable(f)
 }
 
 fn sigAssignable(kind: str, mut v: &Value): bool {
@@ -380,6 +401,17 @@ impl assignTypeChecker {
 		// Should be numeric.
 		kind := prim.Kind
 		match {
+		| types::IsCmplx(kind):
+			if !cmplxAssignable(kind, self.v) {
+				self.s.pushErr(self.errorToken, log::ConstantOverflowType, self.v.Constant.Str(), self.dest.Str())
+				ret true // Return true to avoid more errors.
+			}
+			// We have to do implicit casting if needed.
+			// Because complex numbers supports implicit casting for integer literals.
+			// For example; 123 -> 123+0i
+			castConstByType(self.s, self.errorToken, self.dest, self.v)
+			self.v.Type = self.dest
+			self.v.untyped = false
 		| types::IsFloat(kind):
 			if !floatAssignable(kind, self.v) {
 				self.s.pushErr(self.errorToken, log::ConstantOverflowType, self.v.Constant.Str(), self.dest.Str())

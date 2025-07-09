@@ -241,6 +241,21 @@ impl eval {
 		}
 	}
 
+	fn litImag(mut *self, l: &ast::LitExpr): &Value {
+		f := conv::ParseFloat(l.Value[:len(l.Value)-1], 64) else {
+			self.pushErr(l.Token, log::ConstantOverflow)
+			ret nil
+		}
+		mut constant := constant::Const.NewCmplx128(cmplx(0, f))
+		ret &Value{
+			untyped: true,
+			Mutable: true,
+			Constant: constant,
+			Type: primCmplx128,
+			Model: constant,
+		}
+	}
+
 	fn litInt(mut *self, l: &ast::LitExpr): &Value {
 		// Maximum value of bitLimit integer.
 		const (
@@ -312,6 +327,8 @@ impl eval {
 			ret self.litFloat(lit)
 		| token::INT:
 			ret self.litInt(lit)
+		| token::IMAG:
+			ret self.litImag(lit)
 		|:
 			panic("unreachable")
 		}
@@ -1596,6 +1613,33 @@ impl eval {
 		}
 	}
 
+	fn castCmplx(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
+		if v.IsConst() {
+			castConstByType(self.s, errorToken, t, v)
+			v.Decl = true // Do not use casting model. See developer reference (11).
+		} else {
+			v.Constant = nil
+			v.untyped = false
+		}
+
+		if v.Type.Enum() != nil {
+			if v.IsConst() {
+				ret
+			}
+			mut e := v.Type.Enum()
+			if types::IsCmplx(e.TypeSym.Type.Prim().Str()) {
+				ret
+			}
+		}
+
+		prim := v.Type.Prim()
+		if prim != nil && (v.IsConst() && types::IsNum(prim.Str()) || types::IsCmplx(prim.Str())) {
+			ret
+		}
+
+		self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+	}
+
 	fn castInt(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		if v.IsConst() {
 			castConstByType(self.s, errorToken, t, v)
@@ -1671,6 +1715,8 @@ impl eval {
 			self.castStr(t, v, errorToken)
 		| prim.IsBool():
 			self.castBool(t, v, errorToken)
+		| types::IsCmplx(prim.Kind):
+			self.castCmplx(t, v, errorToken)
 		| types::IsInt(prim.Str()):
 			self.castInt(t, v, errorToken)
 		| types::IsNum(prim.Str()):
@@ -3485,6 +3531,13 @@ impl unaryEval {
 
 		if self.v.IsConst() {
 			match {
+			| self.v.Constant.IsCmplx128():
+				a := self.v.Constant.ReadCmplx128()
+				if self.v.Type.Prim().IsCmplx64() {
+					self.v.Constant.SetCmplx128(cmplx128(-cmplx64(a)))
+				} else {
+					self.v.Constant.SetCmplx128(-a)
+				}
 			| self.v.Constant.IsF64():
 				if self.v.Type.Prim().IsF32() {
 					self.v.Constant.SetF64(f64(-f32(self.v.Constant.ReadF64())))
@@ -3600,6 +3653,8 @@ impl unaryEval {
 			match {
 			| self.v.Constant.IsF64():
 				self.v.Constant.SetF64(+self.v.Constant.ReadF64())
+			| self.v.Constant.IsCmplx128():
+				// No-op.
 			| self.v.Constant.IsInt():
 				// No-op
 			|:
@@ -4315,6 +4370,17 @@ impl binaryEval {
 	fn setTypeToGreater(mut *self) {
 		lp := self.l.Type.Prim()
 		rp := self.r.Type.Prim()
+
+		// Special case: complex numbers.
+		// Always use complex number type of the operand.
+		if lp.IsCmplx64() || lp.IsCmplx128() {
+			self.r.Type = self.l.Type
+			if self.r.IsConst() {
+				self.r.Constant.Kind = lp.Kind
+			}
+			ret
+		}
+
 		if self.l.untyped && !self.r.untyped {
 			self.l.Type = self.r.Type
 			if self.l.IsConst() {
@@ -4375,6 +4441,30 @@ impl binaryEval {
 			self.e.s.pushCompatibilityError(self.l.Type, self.r, self.op)
 			ret false
 		}
+
+		// Special case: complex numbers.
+		// They always needs extra effort to handle implicit castings.
+		if lk == types::Cmplx64 {
+			if self.r.IsConst() && self.r.untyped {
+				ret castConstByType(self.e.s, self.rt, self.l.Type, self.r)
+			}
+			if rk != types::Cmplx64 {
+				self.e.s.pushCompatibilityError(self.l.Type, self.r, self.op)
+				ret false
+			}
+			ret true
+		}
+		if lk == types::Cmplx128 {
+			if self.r.IsConst() && self.r.untyped {
+				ret castConstByType(self.e.s, self.rt, self.l.Type, self.r)
+			}
+			if rk != types::Cmplx128 {
+				self.e.s.pushCompatibilityError(self.l.Type, self.r, self.op)
+				ret false
+			}
+			ret true
+		}
+
 		if self.l.IsConst() && self.l.untyped {
 			if !self.r.untyped && self.r.IsConst() {
 				ret castConstByType(self.e.s, self.lt, self.r.Type, self.l)
@@ -4488,6 +4578,36 @@ impl binaryEval {
 		ret self.l
 	}
 
+	fn evalCmplx(mut *self): &Value {
+		if !self.numbersAreCompatible() {
+			ret nil
+		}
+
+		// Logicals.
+		match self.op.ID {
+		| token::EQL
+		| token::NEQ:
+			self.setTypeToGreater()
+			ret &Value{
+				untyped: true,
+				Type: primBool,
+			}
+		}
+
+		// Arithmetics.
+		match self.op.ID {
+		| token::ADD
+		| token::SUB
+		| token::MUL
+		| token::QUO:
+			self.setTypeToGreater()
+			ret self.l
+		|:
+			self.e.pushErr(self.op, log::OperatorNotForFloat, self.op.Kind)
+			ret nil
+		}
+	}
+
 	fn evalFloat(mut *self): &Value {
 		if !self.numbersAreCompatible() {
 			ret nil
@@ -4596,6 +4716,18 @@ impl binaryEval {
 		}
 
 		match {
+		| types::IsCmplx(prim.Kind):
+			ret self.evalCmplx()
+		| types::IsCmplx(rp.Kind):
+			// Do not fall statement here for the case above.
+			// To handle both complex operand cases, this is needed.
+			//	In such expressions; r != 10+6i
+			//	If we swap operands, constant part comes first.
+			//	If type of r is cmplx64, type mismatch error appears.
+			//	Because 10+6i literal is untyped cmplx128 by default.
+			//	To handle properly, always check the left operand first.
+			self.l, self.r = self.r, self.l
+			ret self.evalCmplx()
 		| types::IsFloat(prim.Kind):
 			ret self.evalFloat()
 		| types::IsInt(prim.Kind):
@@ -5235,6 +5367,20 @@ fn castConstByType(mut s: &sema, token: &token::Token, mut t: &Type, mut v: &Val
 			v.Constant.SetF64(v.Constant.AsF64())
 		| 32:
 			v.Constant.SetF64(f64(f32(v.Constant.AsF64())))
+		}
+		v.Constant.Kind = kind
+	| types::IsCmplx(kind):
+		if v.untyped && token != nil && !cmplxAssignable(kind, v) {
+			s.pushErr(token, log::ConstantOverflowType, v.Constant.Str(), t.Str())
+			ret false
+		}
+		if !v.Constant.IsCmplx128() {
+			match types::BitSizeOf(types::RealKindOf(kind)) {
+			| 128:
+				v.Constant.SetCmplx128(cmplx(v.Constant.AsF64(), 0))
+			| 64:
+				v.Constant.SetCmplx128(cmplx(f64(f32(v.Constant.AsF64())), 0))
+			}
 		}
 		v.Constant.Kind = kind
 	}

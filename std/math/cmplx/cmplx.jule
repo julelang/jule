@@ -4,212 +4,35 @@
 
 use "std/math"
 
-// Complex number.
-struct Cmplx {
-	real: f64
-	imag: f64
-}
-
-impl Cmplx {
-	// Returns real part of complex number.
-	fn Real(*self): f64 {
-		ret self.real
-	}
-
-	// Returns imaginary part of complex number.
-	fn Imag(*self): f64 {
-		ret self.imag
-	}
-
-	// Returns addition of complex numbers.
-	fn Add(*self, c: Cmplx): Cmplx {
-		mut r := *self
-		r.add(c)
-		ret r
-	}
-
-	// Adds complex numbers and sets result to self.
-	fn add(mut *self, c: Cmplx) {
-		self.real += c.Real()
-		self.imag += c.Imag()
-	}
-
-	// Returns subtraction of complex numbers.
-	fn Sub(*self, c: Cmplx): Cmplx {
-		mut r := *self
-		r.sub(c)
-		ret r
-	}
-
-	// Subtracts complex numbers and sets result to self.
-	fn sub(mut *self, c: Cmplx) {
-		self.real -= c.Real()
-		self.imag -= c.Imag()
-	}
-
-	// Returns multiplication of complex numbers.
-	fn Mul(*self, c: Cmplx): Cmplx {
-		mut r := *self
-		r.mul(c)
-		ret r
-	}
-
-	// Multiplies complex numbers and sets result to self.
-	fn mul(mut *self, c: Cmplx) {
-		real := self.Real()*c.Real() + self.Imag()*c.Imag()*-1
-		imag := self.Real()*c.Imag() + self.Imag()*c.Real()
-		self.real = real
-		self.imag = imag
-	}
-
-	// Returns division of complex numbers.
-	// Returns NaN complex number if denominator is zero.
-	fn Div(*self, c: Cmplx): Cmplx {
-		mut r := *self
-		r.div(c)
-		ret r
-	}
-
-	// Divides complex numbers and sets result to self.
-	fn div(mut *self, m: Cmplx) {
-		// Algorithm for robust complex division as described in
-		// Robert L. Smith: Algorithm 116: Complex division. Commun. ACM 5(8): 435 (1962).
-		mut r, mut i := 0.0, 0.0
-
-		if math::Abs(m.Real()) >= math::Abs(m.Imag()) {
-			if m.Real() == 0 {
-				r = math::NaN()
-				i = math::NaN()
-			} else {
-				ratio := m.Imag() / m.Real()
-				denom := m.Real() + ratio*m.Imag()
-				if denom == 0 {
-					r = math::NaN()
-					i = math::NaN()
-				} else {
-					r = (self.Real() + self.Imag()*ratio) / denom
-					i = (self.Imag() - self.Real()*ratio) / denom
-				}
-			}
-		} else {
-			if m.Imag() == 0 {
-				r = math::NaN()
-				i = math::NaN()
-			} else {
-				ratio := m.Real() / m.Imag()
-				denom := m.Imag() + ratio*m.Real()
-				if denom == 0 {
-					r = math::NaN()
-					i = math::NaN()
-				} else {
-					r = (self.Real()*ratio + self.Imag()) / denom
-					i = (self.Imag()*ratio - self.Real()) / denom
-				}
-			}
-		}
-
-		if math::IsNaN(r) && math::IsNaN(i) {
-			// Correct final result to infinities and zeros if applicable.
-			// Matches C99: ISO/IEC 9899:1999 - G.5.1  Multiplicative operators.
-
-			mut a, mut b := self.Real(), self.Imag()
-			mut c, mut d := m.Real(), m.Imag()
-
-			inf := math::F64frombits(0x7FF0000000000000)
-
-			match {
-			| IsZero(m) && (!math::IsNaN(a) || !math::IsNaN(b)):
-				r = math::Copysign(inf, c) * a
-				i = math::Copysign(inf, c) * b
-			| (isInf(a) || isInf(b)) && isFinite(c) && isFinite(d):
-				a = inf2one(a)
-				b = inf2one(b)
-				r = inf * (a*c + b*d)
-				i = inf * (b*c - a*d)
-			| (isInf(c) || isInf(d)) && isFinite(a) && isFinite(b):
-				c = inf2one(c)
-				d = inf2one(d)
-				r = 0 * (a*c + b*d)
-				i = 0 * (b*c - a*d)
-			}
-		}
-
-		self.real, self.imag = r, i
-	}
-
-	// Unary minus operator.
-	fn Neg(*self): Cmplx {
-		ret New(-self.Real(), -self.Imag())
-	}
-}
-
-// Reports whether f is neither NaN nor an infinity.
-fn isFinite(f: f64): bool {
-	ret !math::IsNaN(f - f)
-}
-
-// Reports whether f is an infinity.
-fn isInf(f: f64): bool {
-	ret !math::IsNaN(f) && !isFinite(f)
-}
-
-// Returns a signed 1 if f is an infinity and a signed 0 otherwise.
-// The sign of the result is the sign of f.
-fn inf2one(f: f64): f64 {
-	mut g := 0.0
-	if math::IsInf(f, 0) {
-		g = 1.0
-	}
-	ret math::Copysign(g, f)
-}
-
 // Returns conjugate of complex number.
-fn Conj(x: Cmplx): Cmplx {
-	ret New(x.Real(), -x.Imag())
+fn Conj(x: cmplx128): cmplx128 {
+	ret cmplx(real(x), -imag(x))
 }
 
 // Reports whether either real or imag is an infinity.
-fn IsInf(x: Cmplx): bool {
-	ret math::IsInf(x.Real(), 0) || math::IsInf(x.Imag(), 0)
+fn IsInf(x: cmplx128): bool {
+	ret math::IsInf(real(x), 0) || math::IsInf(imag(x), 0)
 }
 
 // Reports whether either real or imag is NaN and neither is an infinity.
-fn IsNaN(x: Cmplx): bool {
+fn IsNaN(x: cmplx128): bool {
 	match {
-	| math::IsInf(x.Real(), 0) | math::IsInf(x.Imag(), 0):
+	| math::IsInf(real(x), 0) | math::IsInf(imag(x), 0):
 		ret false
-	| math::IsNaN(x.Real()) | math::IsNaN(x.Imag()):
+	| math::IsNaN(real(x)) | math::IsNaN(imag(x)):
 		ret true
 	|:
 		ret false
 	}
 }
 
-// Reports whether real and imag is zero.
-fn IsZero(x: Cmplx): bool {
-	ret x.Real() == 0 && x.Imag() == 0
-}
-
-// Returns new complex number.
-fn New(real: f64, imag: f64): Cmplx {
-	ret Cmplx{
-		real: real,
-		imag: imag,
-	}
-}
-
 // Returns NaN complex number.
-fn NaN(): Cmplx {
-	ret New(math::NaN(), math::NaN())
+fn NaN(): cmplx128 {
+	ret cmplx(math::NaN(), math::NaN())
 }
 
 // Returns Inf complex number.
 // Uses positive infinity if sign >= 0, negative infinity if !sign < 0.
-fn Inf(sign: int): Cmplx {
-	ret New(math::Inf(sign), math::Inf(sign))
-}
-
-// Returns zero complex number.
-fn Zero(): Cmplx {
-	ret New(0, 0)
+fn Inf(sign: int): cmplx128 {
+	ret cmplx(math::Inf(sign), math::Inf(sign))
 }

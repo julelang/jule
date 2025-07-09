@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use "std/math"
-
 // The Jule code is a modified version of the original Go code from
 // https://github.com/golang/go/blob/go1.20/src/math/cmplx/sqrt.go and came with this notice.
 //
@@ -29,6 +27,8 @@ use "std/math"
 //
 //   Stephen L. Moshier
 //   moshier@na-net.ornl.gov
+
+use "std/math"
 
 // Complex square root
 //
@@ -56,30 +56,30 @@ use "std/math"
 //    IEEE      -10,+10   1,000,000     2.9e-16     6.1e-17
 
 // Returns the square root of complex number.
-// The result r is chosen so that r.Real() ≥ 0 and r.Imag() has the same sign as x.Imag().
-fn Sqrt(x: Cmplx): Cmplx {
-	if x.Imag() == 0 {
+// The result r is chosen so that real(r) ≥ 0 and imag(r) has the same sign as imag(x).
+fn Sqrt(x: cmplx128): cmplx128 {
+	if imag(x) == 0 {
 		// Ensure that imag(r) has the same sign as imag(x) for imag(x) == signed zero.
-		if x.Real() == 0 {
-			ret New(0, x.Imag())
+		if real(x) == 0 {
+			ret cmplx(0, imag(x))
 		}
-		if x.Real() < 0 {
-			ret New(0, math::Copysign(math::Sqrt(-x.Real()), x.Imag()))
+		if real(x) < 0 {
+			ret cmplx(0, math::Copysign(math::Sqrt(-real(x)), imag(x)))
 		}
-		ret New(math::Sqrt(x.Real()), x.Imag())
-	} else if math::IsInf(x.Imag(), 0) {
-		ret New(math::Inf(1.0), x.Imag())
+		ret cmplx(math::Sqrt(real(x)), imag(x))
+	} else if math::IsInf(imag(x), 0) {
+		ret cmplx(math::Inf(1.0), imag(x))
 	}
-	if x.Real() == 0 {
-		if x.Imag() < 0 {
-			r := math::Sqrt(-0.5 * x.Imag())
-			ret New(r, -r)
+	if real(x) == 0 {
+		if imag(x) < 0 {
+			r := math::Sqrt(-0.5 * imag(x))
+			ret cmplx(r, -r)
 		}
-		r := math::Sqrt(0.5 * x.Imag())
-		ret New(r, r)
+		r := math::Sqrt(0.5 * imag(x))
+		ret cmplx(r, r)
 	}
-	mut a := x.Real()
-	mut b := x.Imag()
+	mut a := real(x)
+	mut b := imag(x)
 	mut scale := 0.
 	// Rescale to avoid internal overflow or underflow.
 	if math::Abs(a) > 4 || math::Abs(b) > 4 {
@@ -103,7 +103,7 @@ fn Sqrt(x: Cmplx): Cmplx {
 		r *= scale
 	}
 	if b < 0 {
-		ret New(t, -r)
+		ret cmplx(t, -r)
 	}
-	ret New(t, r)
+	ret cmplx(t, r)
 }

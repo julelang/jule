@@ -446,48 +446,6 @@ impl scopeOptimizer {
 		exprOptimizer.optimizeValue(&postfix.Expr, self.data, self)
 	}
 
-	fn cmplxAssign(mut &self, mut assign: &sema::Assign): bool {
-		if !StdMathCmplx || assign.Op.ID != token::ASSIGN || meta::Program.MathCmplx == nil {
-			ret false
-		}
-		mut s := assign.Left.Type.Struct()
-		if s == nil || s != meta::Program.MathCmplx.Cmplx {
-			ret false
-		}
-		match type assign.Right.Model {
-		| &sema::FuncCallExpr:
-			break
-		|:
-			ret false
-		}
-		mut fc := assign.Right.Model.(&sema::FuncCallExpr)
-		match type fc.Expr {
-		| &sema::StructSubIdentExpr:
-			break
-		|:
-			ret false
-		}
-		mut siem := fc.Expr.(&sema::StructSubIdentExpr)
-		if !obj::EqualModels(assign.Left.Model, siem.Expr.Model) {
-			ret false
-		}
-		match fc.Func {
-		| meta::Program.MathCmplx.CmplxAdd:
-			fc.Func = meta::Program.MathCmplx.CmplxAddZ
-		| meta::Program.MathCmplx.CmplxSub:
-			fc.Func = meta::Program.MathCmplx.CmplxSubZ
-		| meta::Program.MathCmplx.CmplxMul:
-			fc.Func = meta::Program.MathCmplx.CmplxMulZ
-		| meta::Program.MathCmplx.CmplxDiv:
-			fc.Func = meta::Program.MathCmplx.CmplxDivZ
-		|:
-			ret false
-		}
-		siem.Method = fc.Func
-		self.setCurrentStmt(&sema::Value{Model: fc})
-		ret true
-	}
-
 	fn optimizeAssign(mut &self, mut assign: &sema::Assign) {
 		if assign.Op.ID == token::ASSIGN &&
 			obj::EqualModels(assign.Left.Model, assign.Right.Model) {
@@ -525,8 +483,7 @@ impl scopeOptimizer {
 
 		match {
 		| self.strAssign(assign)
-		| self.sliceAssign(assign)
-		| self.cmplxAssign(assign):
+		| self.sliceAssign(assign):
 			ret
 		}
 

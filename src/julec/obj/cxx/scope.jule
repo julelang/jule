@@ -11,6 +11,7 @@ use "std/jule/constant"
 use "std/jule/directive"
 use "std/jule/sema"
 use "std/jule/token"
+use "std/jule/types"
 use "std/strings"
 use "std/unsafe"
 
@@ -562,7 +563,7 @@ impl scopeCoder {
 		identCoder.label(&self.oc.Buf, uintptr(gt.Label))
 	}
 
-	fn tryMapSet(mut &self, mut m: sema::Expr): (ok: bool) {
+	fn tryMapSet(mut &self, mut m: compExpr): (ok: bool) {
 		mut iem, ok := m.(&sema::IndexingExpr)
 		if !ok {
 			ret
@@ -602,7 +603,7 @@ impl scopeCoder {
 		self.oc.write(p.Op)
 	}
 
-	fn assignLeft(mut &self, mut model: sema::Expr) {
+	fn assignLeft(mut &self, mut model: compExpr) {
 		ok := self.tryMapSet(model)
 		if !ok {
 			self.oc.ec.possibleRefExpr(model)
@@ -627,6 +628,87 @@ impl scopeCoder {
 		self.oc.ec.divByZeroBinary(a.Op, a.Left, a.Right)
 	}
 
+	fn cmplxAssign(mut &self, mut a: &sema::Assign, kind: str) {
+		mut fc := isExceptionalResult(a.Right.Model)
+		if a.Op.ID == token::ASSIGN && fc != nil {
+			self.oc.ec.handleExceptionalCallWithData(fc, useExprMemory{
+				DestType: a.Left.Type,
+				Model: a.Left.Model,
+				Type: useExprAssignment,
+				OpId: a.Op.ID,
+				OpKind: a.Op.Kind,
+			})
+			ret
+		}
+
+		// Build necessary temporary variable.
+		if fc != nil {
+			self.oc.addIndent()
+			self.oc.write("{\n")
+			self.oc.indent()
+			self.oc.tc.kind(&self.oc.Buf, a.Right.Type)
+			self.oc.write(" __cmplx_temp;")
+			self.oc.ec.handleExceptionalCallWithData(fc, useExprMemory{
+				DestType: a.Left.Type,
+				Model: "__cmplx_temp",
+				Type: useExprAssignment,
+				OpId: token::ASSIGN,
+				OpKind: "=",
+			})
+			self.oc.write("\n")
+			self.oc.indent()
+		}
+
+		self.assignLeft(a.Left.Model)
+		self.oc.write(" = ")
+		match a.Op.ID {
+		| token::ASSIGN:
+			self.oc.ec.possibleRefExpr(a.Right.Model)
+			ret
+		| token::ADD_ASSIGN:
+			if kind == types::Cmplx128 {
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx128Add)
+			} else {
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx64Add)
+			}
+		| token::SUB_ASSIGN:
+			if kind == types::Cmplx128 {
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx128Sub)
+			} else {
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx64Sub)
+			}
+		| token::MUL_ASSIGN:
+			if kind == types::Cmplx128 {
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx128Mul)
+			} else {
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx64Mul)
+			}
+		| token::QUO_ASSIGN:
+			if kind == types::Cmplx128 {
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx128Div)
+			} else {
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx64Div)
+			}
+		|:
+			panic("unreachable")
+		}
+		self.oc.write("(")
+		self.assignLeft(a.Left.Model)
+		self.oc.write(", ")
+		if fc == nil {
+			self.oc.ec.possibleRefExpr(a.Right.Model)
+		} else {
+			self.oc.write("__cmplx_temp")
+		}
+		self.oc.write(")")
+		if fc != nil {
+			self.oc.write(";\n")
+			self.oc.doneIndent()
+			self.oc.indent()
+			self.oc.write("}")
+		}
+	}
+
 	fn assign(mut &self, mut a: &sema::Assign) {
 		// optimize may optimize multi-assign statements
 		// it uses common tokens of normalized statement
@@ -637,6 +719,12 @@ impl scopeCoder {
 		if a.Op.ID == token::DEFINE {
 			op = token::ASSIGN
 			kind = "="
+		}
+
+		lp := a.Left.Type.Prim()
+		if lp != nil && types::IsCmplx(lp.Kind) {
+			self.cmplxAssign(a, lp.Kind)
+			ret
 		}
 
 		mut fc := isExceptionalResult(a.Right.Model)
@@ -766,7 +854,7 @@ impl scopeCoder {
 		self.oc.write("})")
 	}
 
-	fn assignWithPossibleCast(mut &self, mut l: sema::Expr, mut lt: &sema::Type, mut r: sema::Expr, mut rt: &sema::Type) {
+	fn assignWithPossibleCast(mut &self, mut l: compExpr, mut lt: &sema::Type, mut r: compExpr, mut rt: &sema::Type) {
 		self.assignLeft(l)
 		match {
 		| rt.IsNil() || rt.Equal(lt):
