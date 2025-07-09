@@ -336,41 +336,41 @@ impl exprCoder {
 		r: str, mut lk: &sema::Type, mut rk: &sema::Type, op: int, kind: str) {
 		lp := lk.Prim()
 		match {
-		| lp != nil && lp.IsCmplx128():
+		| lp != nil && (lp.IsCmplx128() || lp.IsCmplx64()):
 			match op {
 			| token::EQL | token::NEQ:
-				structBinary(buf, meta::Program.Runtime.Cmplx128, l, r, op, kind)
-				ret
+				if op == token::NEQ {
+					buf.WriteByte('!')!
+				}
+				if lp.IsCmplx128() {
+					identCoder.funcIns(buf, meta::Program.Runtime.Cmplx128Eq)
+				} else {
+					identCoder.funcIns(buf, meta::Program.Runtime.Cmplx64Eq)
+				}
 			| token::ADD:
-				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx128Add)
+				if lp.IsCmplx128() {
+					identCoder.funcIns(buf, meta::Program.Runtime.Cmplx128Add)
+				} else {
+					identCoder.funcIns(buf, meta::Program.Runtime.Cmplx64Add)
+				}
 			| token::SUB:
-				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx128Sub)
+				if lp.IsCmplx128() {
+					identCoder.funcIns(buf, meta::Program.Runtime.Cmplx128Sub)
+				} else {
+					identCoder.funcIns(buf, meta::Program.Runtime.Cmplx64Sub)
+				}
 			| token::MUL:
-				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx128Mul)
+				if lp.IsCmplx128() {
+					identCoder.funcIns(buf, meta::Program.Runtime.Cmplx128Mul)
+				} else {
+					identCoder.funcIns(buf, meta::Program.Runtime.Cmplx64Mul)
+				}
 			| token::QUO:
-				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx128Div)
-			|:
-				panic("unreachable")
-			}
-			buf.WriteStr("(")!
-			buf.WriteStr(l)!
-			buf.WriteStr(", ")!
-			buf.WriteStr(r)!
-			buf.WriteStr(")")!
-			ret
-		| lp != nil && lp.IsCmplx64():
-			match op {
-			| token::EQL | token::NEQ:
-				structBinary(buf, meta::Program.Runtime.Cmplx64, l, r, op, kind)
-				ret
-			| token::ADD:
-				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx64Add)
-			| token::SUB:
-				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx64Sub)
-			| token::MUL:
-				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx64Mul)
-			| token::QUO:
-				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx64Div)
+				if lp.IsCmplx128() {
+					identCoder.funcIns(buf, meta::Program.Runtime.Cmplx128Div)
+				} else {
+					identCoder.funcIns(buf, meta::Program.Runtime.Cmplx64Div)
+				}
 			|:
 				panic("unreachable")
 			}
