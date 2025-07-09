@@ -1,0 +1,231 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/conv"
+use "std/math"
+use "std/math/cmplx"
+use "std/testing"
+
+let infp0 = cmplx(math::Inf(+1), 0)
+let infm0 = cmplx(math::Inf(-1), 0)
+let inf0p = cmplx(0, math::Inf(+1))
+let inf0m = cmplx(0, math::Inf(-1))
+
+let infpp = cmplx(math::Inf(+1), math::Inf(+1))
+let infpm = cmplx(math::Inf(+1), math::Inf(-1))
+let infmp = cmplx(math::Inf(-1), math::Inf(+1))
+let infmm = cmplx(math::Inf(-1), math::Inf(-1))
+
+struct atocTest {
+	input: str
+	out:   cmplx128
+	err:   any
+}
+
+let mut testsAtoc: []atocTest = [
+	// Clearly invalid
+	{"", 0, conv::ErrSyntax},
+	{" ", 0, conv::ErrSyntax},
+	{"(", 0, conv::ErrSyntax},
+	{")", 0, conv::ErrSyntax},
+	{"i", 0, conv::ErrSyntax},
+	{"+i", 0, conv::ErrSyntax},
+	{"-i", 0, conv::ErrSyntax},
+	{"1I", 0, conv::ErrSyntax},
+	{"10  + 5i", 0, conv::ErrSyntax},
+	{"3+", 0, conv::ErrSyntax},
+	{"3+5", 0, conv::ErrSyntax},
+	{"3+5+5i", 0, conv::ErrSyntax},
+
+	// Parentheses
+	{"()", 0, conv::ErrSyntax},
+	{"(i)", 0, conv::ErrSyntax},
+	{"(0)", 0, nil},
+	{"(1i)", 1i, nil},
+	{"(3.0+5.5i)", 3.0 + 5.5i, nil},
+	{"(1)+1i", 0, conv::ErrSyntax},
+	{"(3.0+5.5i", 0, conv::ErrSyntax},
+	{"3.0+5.5i)", 0, conv::ErrSyntax},
+
+	// NaNs
+	{"NaN", cmplx(math::NaN(), 0), nil},
+	{"NANi", cmplx(0, math::NaN()), nil},
+	{"nan+nAni", cmplx(math::NaN(), math::NaN()), nil},
+	{"+NaN", 0, conv::ErrSyntax},
+	{"-NaN", 0, conv::ErrSyntax},
+	{"NaN-NaNi", 0, conv::ErrSyntax},
+
+	// Infs
+	{"Inf", infp0, nil},
+	{"+inf", infp0, nil},
+	{"-inf", infm0, nil},
+	{"Infinity", infp0, nil},
+	{"+INFINITY", infp0, nil},
+	{"-infinity", infm0, nil},
+	{"+infi", inf0p, nil},
+	{"0-infinityi", inf0m, nil},
+	{"Inf+Infi", infpp, nil},
+	{"+Inf-Infi", infpm, nil},
+	{"-Infinity+Infi", infmp, nil},
+	{"inf-inf", 0, conv::ErrSyntax},
+
+	// Zeros
+	{"0", 0, nil},
+	{"0i", 0, nil},
+	{"-0.0i", 0, nil},
+	{"0+0.0i", 0, nil},
+	{"0e+0i", 0, nil},
+	{"0e-0+0i", 0, nil},
+	{"-0.0-0.0i", 0, nil},
+	{"0e+012345", 0, nil},
+	{"0x0p+012345i", 0, nil},
+	{"0x0.00p-012345i", 0, nil},
+	{"+0e-0+0e-0i", 0, nil},
+	{"0e+0+0e+0i", 0, nil},
+	{"-0e+0-0e+0i", 0, nil},
+
+	// Regular non-zeroes
+	{"0.1", 0.1, nil},
+	{"0.1i", 0 + 0.1i, nil},
+	{"0.123", 0.123, nil},
+	{"0.123i", 0 + 0.123i, nil},
+	{"0.123+0.123i", 0.123 + 0.123i, nil},
+	{"99", 99, nil},
+	{"+99", 99, nil},
+	{"-99", -99, nil},
+	{"+1i", 1i, nil},
+	{"-1i", -1i, nil},
+	{"+3+1i", 3 + 1i, nil},
+	{"30+3i", 30 + 3i, nil},
+	{"+3e+3-3e+3i", 3e+3 - 3e+3i, nil},
+	{"+3e+3+3e+3i", 3e+3 + 3e+3i, nil},
+	{"+3e+3+3e+3i+", 0, conv::ErrSyntax},
+
+	// Separators
+	{"0.1", 0.1, nil},
+	{"0.1i", 0 + 0.1i, nil},
+	{"0.1_2_3", 0.123, nil},
+	{"+0x_3p3i", 0x3p3i, nil},
+	{"0_0+0x_0p0i", 0, nil},
+	{"0x_10.3p-8+0x3p3i", 0x10.3p-8 + 0x3p3i, nil},
+	{"+0x_1_0.3p-8+0x_3_0p3i", 0x10.3p-8 + 0x30p3i, nil},
+	{"0x1_0.3p+8-0x_3p3i", 0x10.3p+8 - 0x3p3i, nil},
+
+	// Hexadecimals
+	{"0x10.3p-8+0x3p3i", 0x10.3p-8 + 0x3p3i, nil},
+	{"+0x10.3p-8+0x3p3i", 0x10.3p-8 + 0x3p3i, nil},
+	{"0x10.3p+8-0x3p3i", 0x10.3p+8 - 0x3p3i, nil},
+	{"0x1p0", 1, nil},
+	{"0x1p1", 2, nil},
+	{"0x1p-1", 0.5, nil},
+	{"0x1ep-1", 15, nil},
+	{"-0x1ep-1", -15, nil},
+	{"-0x2p3", -16, nil},
+	{"0x1e2", 0, conv::ErrSyntax},
+	{"1p2", 0, conv::ErrSyntax},
+	{"0x1e2i", 0, conv::ErrSyntax},
+
+	// ErrRange
+	// next float64 - too large
+	{"+0x1p1024", infp0, conv::ErrRange},
+	{"-0x1p1024", infm0, conv::ErrRange},
+	{"+0x1p1024i", inf0p, conv::ErrRange},
+	{"-0x1p1024i", inf0m, conv::ErrRange},
+	{"+0x1p1024+0x1p1024i", infpp, conv::ErrRange},
+	{"+0x1p1024-0x1p1024i", infpm, conv::ErrRange},
+	{"-0x1p1024+0x1p1024i", infmp, conv::ErrRange},
+	{"-0x1p1024-0x1p1024i", infmm, conv::ErrRange},
+	// the border is ...158079
+	// borderline - okay
+	{"+0x1.fffffffffffff7fffp1023+0x1.fffffffffffff7fffp1023i", 1.7976931348623157e+308 + 1.7976931348623157e+308i, nil},
+	{"+0x1.fffffffffffff7fffp1023-0x1.fffffffffffff7fffp1023i", 1.7976931348623157e+308 - 1.7976931348623157e+308i, nil},
+	{"-0x1.fffffffffffff7fffp1023+0x1.fffffffffffff7fffp1023i", -1.7976931348623157e+308 + 1.7976931348623157e+308i, nil},
+	{"-0x1.fffffffffffff7fffp1023-0x1.fffffffffffff7fffp1023i", -1.7976931348623157e+308 - 1.7976931348623157e+308i, nil},
+	// borderline - too large
+	{"+0x1.fffffffffffff8p1023", infp0, conv::ErrRange},
+	{"-0x1fffffffffffff.8p+971", infm0, conv::ErrRange},
+	{"+0x1.fffffffffffff8p1023i", inf0p, conv::ErrRange},
+	{"-0x1fffffffffffff.8p+971i", inf0m, conv::ErrRange},
+	{"+0x1.fffffffffffff8p1023+0x1.fffffffffffff8p1023i", infpp, conv::ErrRange},
+	{"+0x1.fffffffffffff8p1023-0x1.fffffffffffff8p1023i", infpm, conv::ErrRange},
+	{"-0x1fffffffffffff.8p+971+0x1fffffffffffff.8p+971i", infmp, conv::ErrRange},
+	{"-0x1fffffffffffff8p+967-0x1fffffffffffff8p+967i", infmm, conv::ErrRange},
+	// a little too large
+	{"1e308+1e308i", 1e+308 + 1e+308i, nil},
+	{"2e308+2e308i", infpp, conv::ErrRange},
+	{"1e309+1e309i", infpp, conv::ErrRange},
+	{"0x1p1025+0x1p1025i", infpp, conv::ErrRange},
+	{"2e308", infp0, conv::ErrRange},
+	{"1e309", infp0, conv::ErrRange},
+	{"0x1p1025", infp0, conv::ErrRange},
+	{"2e308i", inf0p, conv::ErrRange},
+	{"1e309i", inf0p, conv::ErrRange},
+	{"0x1p1025i", inf0p, conv::ErrRange},
+	// way too large
+	{"+1e310+1e310i", infpp, conv::ErrRange},
+	{"+1e310-1e310i", infpm, conv::ErrRange},
+	{"-1e310+1e310i", infmp, conv::ErrRange},
+	{"-1e310-1e310i", infmm, conv::ErrRange},
+	// under/overflow exponent
+	{"1e-4294967296", 0, nil},
+	{"1e-4294967296i", 0, nil},
+	{"1e-4294967296+1i", 1i, nil},
+	{"1+1e-4294967296i", 1, nil},
+	{"1e-4294967296+1e-4294967296i", 0, nil},
+	{"1e+4294967296", infp0, conv::ErrRange},
+	{"1e+4294967296i", inf0p, conv::ErrRange},
+	{"1e+4294967296+1e+4294967296i", infpp, conv::ErrRange},
+	{"1e+4294967296-1e+4294967296i", infpm, conv::ErrRange},
+]
+
+fn eqErr(err1: any, err2: any): bool {
+	num1, mut ok := err1.(&conv::NumError)
+	if !ok {
+		ret err1 == err2
+	}
+	num2, ok := err2.(&conv::NumError)
+	if !ok {
+		ret err1 == err2
+	}
+	ret *num1 == *num2
+}
+
+#test
+fn testParseCmplx(t: &testing::T) {
+	for i in testsAtoc {
+		mut &test := unsafe { &(*(&testsAtoc[i])) }
+		if test.err != nil {
+			test.err = &conv::NumError{Func: "ParseCmplx", Num: test.input, Err: test.err}
+		}
+		let mut err: any
+		mut got := conv::ParseCmplx(test.input, 128) else {
+			err = error
+			use test.out
+		}
+		if !eqErr(err, test.err) {
+			t.Errorf("ParseCmplx({}, 128) = {}, {}; want {}, {}", test.input, got, err, test.out, test.err)
+			continue
+		}
+		if !(cmplx::IsNaN(test.out) && cmplx::IsNaN(got)) && got != test.out {
+			t.Errorf("ParseCmplx({}, 128) = {}, {}; want {}, {}", test.input, got, err, test.out, test.err)
+			continue
+		}
+
+		if cmplx128(cmplx64(test.out)) == test.out {
+			err = nil
+			got = conv::ParseCmplx(test.input, 64) else {
+				err = error
+				use test.out
+			}
+			if !eqErr(err, test.err) {
+				t.Errorf("ParseCmplx({}, 64) = {}, {}; want {}, {}", test.input, got, err, test.out, test.err)
+				continue
+			}
+			got64 := cmplx64(got)
+			if cmplx128(got64) != test.out {
+				t.Errorf("ParseCmplx({}, 64) = {}, {}; want {}, {}", test.input, got, err, test.out, test.err)
+			}
+		}
+	}
+}
