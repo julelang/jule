@@ -2411,11 +2411,18 @@ impl exprCoder {
 		}
 		prim := t.Prim()
 		if prim != nil {
-			if types::IsNum(prim.Kind) {
+			match {
+			| prim.IsCmplx64():
+				identCoder.structureIns(&self.oc.Buf, meta::Program.Runtime.Cmplx64)
+				self.oc.write("{0, 0}")
+			| prim.IsCmplx128():
+				identCoder.structureIns(&self.oc.Buf, meta::Program.Runtime.Cmplx128)
+				self.oc.write("{0, 0}")
+			| types::IsNum(prim.Kind):
 				self.oc.write("0")
-			} else if prim.IsBool() {
+			| prim.IsBool():
 				self.oc.write("false")
-			} else if prim.IsStr() {
+			| prim.IsStr():
 				self.oc.write(typeStr + "()")
 			}
 			ret
