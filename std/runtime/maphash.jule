@@ -70,7 +70,7 @@ fn arrayhash[A](a: A, mut seed: uintptr): uintptr {
 fn strhash(s: str, seed: uintptr): uintptr {
 	unsafe {
 		sp := (*runtime::Str)(&s)
-		ret memhash(sp.Slice, uintptr(sp.Len), seed)
+		ret memhash(sp.Slice, seed, uintptr(sp.Len))
 	}
 }
 
@@ -88,7 +88,7 @@ fn i64hash(i: u64, seed: uintptr): uintptr {
 // Exported as private non-usual API to escape from deadcode optimizations.
 #export "__jule_priv_dynhash"
 fn dynhash(ptr: *&uintptr, seed: uintptr): uintptr {
-	ret unsafe { memhash((*unsafe)(uintptr(*ptr)), _ptrSize, seed) }
+	ret unsafe { memhash((*unsafe)(uintptr(*ptr)), seed, _ptrSize) }
 }
 
 fn maphash[K](k: K, seed: uintptr): uintptr {
@@ -128,7 +128,7 @@ fn maphash[K](k: K, seed: uintptr): uintptr {
 		ret strhash(str(k), seed)
 	| comptime::Uintptr | comptime::Ptr | comptime::Smartptr:
 		z := uintptr(k)
-		ret unsafe { memhash(&z, _ptrSize, seed) }
+		ret unsafe { memhash(&z, seed, _ptrSize) }
 	| comptime::Bool:
 		ret boolhash(bool(k), seed)
 	| comptime::Array:
@@ -137,7 +137,7 @@ fn maphash[K](k: K, seed: uintptr): uintptr {
 		ret structhash(k, seed)
 	| comptime::Chan:
 		z := unsafe { uintptr(*(*&hchan)(&k)) }
-		ret unsafe { memhash(&z, _ptrSize, seed) }
+		ret unsafe { memhash(&z, seed, _ptrSize) }
 	}
 	panic("unreachable")
 }
