@@ -159,6 +159,16 @@ fn f64ToStr(mut v: f64): str {
 	ret unsafe::StrFromBytes(buf[:])
 }
 
+fn cmplx128ToStr(c: cmplx128): str {
+	mut buf := make([]byte, 0, 2+7*2+1) // enough size for; (1.0 + 1.0i)
+	buf = append(buf, '(')
+	buf = append(buf, f64ToStr(real(c))...)
+	buf = append(buf, ',', ' ')
+	buf = append(buf, f64ToStr(imag(c))...)
+	buf = append(buf, 'i', ')')
+	ret unsafe::StrFromBytes(buf)
+}
+
 // Returns x in string form with default format.
 // Compatible with slices.
 fn arrToStr[T](x: T): str {
@@ -275,6 +285,8 @@ fn toStr[T](x: T): str {
 		ret u64ToStr(u64(x))
 	| comptime::F32 | comptime::F64:
 		ret f64ToStr(f64(x))
+	| comptime::Cmplx64 | comptime::Cmplx128:
+		ret cmplx128ToStr(cmplx128(x))
 	| comptime::Bool:
 		ret boolToStr(bool(x))
 	| comptime::Any | comptime::TypeEnum | comptime::Trait:
