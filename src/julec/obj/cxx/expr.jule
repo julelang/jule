@@ -2620,14 +2620,14 @@ const (
 
 struct useExprMemory {
 	DestType: &sema::Type
-	Model:    sema::Expr
+	Model:    compExpr
 	Type:     int
 	OpId:     int
 	OpKind:   str
 }
 
 impl useExprMemory {
-	fn write(mut *self, mut e: &exprCoder, mut src: sema::Expr, mut srcType: &sema::Type) {
+	fn write(mut *self, mut e: &exprCoder, mut src: compExpr, mut srcType: &sema::Type) {
 		match self.Type {
 		| useExprPlain:
 			if src != nil && self.DestType != nil {
@@ -2653,11 +2653,11 @@ impl useExprMemory {
 			}
 			assign.Left = &sema::OperandExpr{
 				Type: self.DestType,
-				Model: self.Model,
+				Model: unsafe { *(*sema::Expr)(&self.Model) },
 			}
 			assign.Right = &sema::OperandExpr{
 				Type: srcType,
-				Model: src,
+				Model: unsafe { *(*sema::Expr)(&src) },
 			}
 			e.oc.sc.assign(assign)
 		|:
