@@ -4716,10 +4716,17 @@ impl binaryEval {
 		}
 
 		match {
-		| types::IsCmplx(rp.Kind):
-			self.l, self.r = self.r, self.l
-			fall
 		| types::IsCmplx(prim.Kind):
+			ret self.evalCmplx()
+		| types::IsCmplx(rp.Kind):
+			// Do not fall statement here for the case above.
+			// To handle both complex operand cases, this is needed.
+			//	In such expressions; r != 10+6i
+			//	If we swap operands, constant part comes first.
+			//	If type of r is cmplx64, type mismatch error appears.
+			//	Because 10+6i literal is untyped cmplx128 by default.
+			//	To handle properly, always check the left operand first.
+			self.l, self.r = self.r, self.l
 			ret self.evalCmplx()
 		| types::IsFloat(prim.Kind):
 			ret self.evalFloat()
