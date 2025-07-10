@@ -838,7 +838,11 @@ impl dynamicTypeAnnotation {
 	// If type is generic, checks for the source type k and tries to infer.
 	// Reports successful state and self.k is generic.
 	unsafe fn annotateAny(mut *self, mut k: &Type): (ok: bool, generic: bool) {
-		kind := (*self.k).Str()
+		prim := (*self.k).Prim()
+		if prim == nil {
+			ret false, false
+		}
+		kind := prim.Kind
 		for i, g in self.f.Decl.Generics {
 			if kind != g.Name {
 				continue
@@ -968,8 +972,7 @@ impl fnCallArgChecker {
 
 	fn checkArg(mut *self, mut p: &ParamIns, mut arg: &Value, mut errorToken: &token::Token): (ok: bool) {
 		if self.dynamicAnnotation && parameterUsesGenerics(p, self.f.Decl.Generics) {
-			// Accept as fail if parameter is variadic or expression is invalid.
-			ok = !p.Decl.Variadic && isGoodValueToInfer(arg)
+			ok = isGoodValueToInfer(arg)
 			if ok {
 				mut dta := dynamicTypeAnnotation{
 					e: self.e,
