@@ -225,7 +225,12 @@ impl ObjectCoder {
 		// setup argument data
 		for (j, mut p) in f.Params {
 			self.coSpawnObj.WriteByte(indentKind)!
-			self.tc.kind(&self.coSpawnObj, p.Type)
+			// If parameter is variadic, we handle it as slice.
+			if p.Decl.Variadic {
+				self.tc.asSlice(&self.coSpawnObj, p.Type)
+			} else {
+				self.tc.kind(&self.coSpawnObj, p.Type)
+			}
 			self.coSpawnObj.WriteByte(' ')!
 			self.coSpawnObj.WriteStr(coSpawnArgDataParam)!
 			self.coSpawnObj.WriteStr(conv::Itoa(j))!
