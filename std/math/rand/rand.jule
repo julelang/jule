@@ -36,8 +36,17 @@
 // ====================================================
 
 use "std/math/bits"
+use "std/runtime"
 
 const is32bit = ^uint(0)>>32 == 0
+
+// A Source is a source of uniformly-distributed
+// pseudo-random u64 values in the range [0, 1<<64).
+//
+// It is not safe for concurrent use by multiple threads.
+trait Source {
+	fn U64(*self): u64
+}
 
 // Implements a type of pseudo random number generator (PRNG).
 // Outputs might be easily predictable regardless of how it's seeded.
@@ -46,42 +55,45 @@ struct Rand {
 	src: Source
 }
 
-impl Rand {
-	// Returns new Rand that uses random values from src
-	// to generate other random values.
-	fn New(src: Source): &Rand {
-		ret &Rand{src: unsafe { *(&src) }}
-	}
+// Returns new Rand that uses random values from src
+// to generate other random values.
+fn New(src: Source): &Rand {
+	ret &Rand{src: unsafe { *(&src) }}
+}
 
+impl Rand {
 	// Returns a pseudo-random 64-bit value as u64.
 	fn U64(*self): u64 { ret self.src.U64() }
 
 	// Returns a pseudo-random 32-bit value as u32.
-	fn U32(*self): u32 { ret u32(self.U64() >> 32) }
+	fn U32(*self): u32 { ret u32(self.src.U64() >> 32) }
 
 	// Returns a non-negative pseudo-random 64-bit value as i64.
-	fn I64(*self): i64 { ret i64(^(self.U64() & (1 << 63))) }
+	fn I64(*self): i64 { ret i64(^(self.src.U64() & (1 << 63))) }
 
 	// Returns a non-negative pseudo-random 32-bit value as i32.
-	fn I32(*self): i32 { ret i32(self.U64() >> 33) }
+	fn I32(*self): i32 { ret i32(self.src.U64() >> 33) }
 
 	// Returns a non-negative pseudo-random int.
-	fn Int(*self): int { ret int(uint(self.U64()) << 1 >> 1) }
+	fn Int(*self): int { ret int(uint(self.src.U64()) << 1 >> 1) }
+
+	// Returns a pseudo-random uint.
+	fn Uint(*self): uint { ret uint(self.src.U64()) }
 
 	// Returns, as a u64, a non-negative pseudo-random number in the half-open interval [0,n).
 	// It panics if n == 0.
-	fn U64n(*self, n: u64): u64 {
+	fn U64N(*self, n: u64): u64 {
 		if n == 0 {
-			panic("math/rand: U64n: invalid argument")
+			panic("math/rand: U64N: invalid argument")
 		}
 		ret self.u64n(n)
 	}
 
 	// Returns, as an i64, a non-negative pseudo-random number in the half-open interval [0,n).
 	// It panics if n == 0.
-	fn I64n(*self, n: i64): i64 {
+	fn I64N(*self, n: i64): i64 {
 		if n == 0 {
-			panic("math/rand: I64n: invalid argument")
+			panic("math/rand: I64N: invalid argument")
 		}
 		ret i64(self.u64n(u64(n)))
 	}
@@ -176,36 +188,36 @@ impl Rand {
 
 	// Returns, as an i32, a non-negative pseudo-random number in the half-open interval [0,n).
 	// It panics if n <= 0.
-	fn I32n(*self, n: i32): i32 {
+	fn I32N(*self, n: i32): i32 {
 		if n <= 0 {
-			panic("math/rand: I32n: invalid argument")
+			panic("math/rand: I32N: invalid argument")
 		}
 		ret i32(self.u64n(u64(n)))
 	}
 
 	// Returns, as a u32, a non-negative pseudo-random number in the half-open interval [0,n).
 	// It panics if n == 0.
-	fn U32n(*self, n: u32): u32 {
+	fn U32N(*self, n: u32): u32 {
 		if n == 0 {
-			panic("math/rand: U32n: invalid argument")
+			panic("math/rand: U32N: invalid argument")
 		}
 		ret u32(self.u64n(u64(n)))
 	}
 
 	// Returns, as an int, a non-negative pseudo-random number in the half-open interval [0,n).
 	// It panics if n <= 0.
-	fn Intn(*self, n: int): int {
+	fn IntN(*self, n: int): int {
 		if n <= 0 {
-			panic("math/rand: Intn: invalid argument")
+			panic("math/rand: IntN: invalid argument")
 		}
 		ret int(self.u64n(u64(n)))
 	}
 
 	// Returns, as a uint, a non-negative pseudo-random number in the half-open interval [0,n).
 	// It panics if n == 0.
-	fn Uintn(*self, n: uint): uint {
+	fn UintN(*self, n: uint): uint {
 		if n == 0 {
-			panic("math/rand: Uintn: invalid argument")
+			panic("math/rand: UintN: invalid argument")
 		}
 		ret uint(self.u64n(u64(n)))
 	}
@@ -221,4 +233,121 @@ impl Rand {
 		// There are exactly 1<<24 f32s in [0,1). Use Intn(1<<24) / (1<<24).
 		ret f32(self.U32()<<8>>8) / (1 << 24)
 	}
+
+	// Returns, as a slice of n ints, a pseudo-random permutation of the integers
+	// in the half-open interval [0,n).
+	fn Perm(*self, n: int): []int {
+		mut p := make([]int, n)
+		for i in p {
+			p[i] = i
+		}
+		self.Shuffle(len(p), fn|i, j| { p[i], p[j] = p[j], p[i] })
+		ret p
+	}
+
+	// Shuffle pseudo-randomizes the order of elements.
+	// n is the number of elements. It panics if n < 0.
+	// swap swaps the elements with indexes i and j.
+	fn Shuffle(*self, n: int, swap: fn(i: int, j: int)) {
+		if n < 0 {
+			panic("invalid argument to Shuffle")
+		}
+
+		// Fisher-Yates shuffle: https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+		// Shuffle really ought not be called with n that doesn't fit in 32 bits.
+		// Not only will it take a very long time, but with 2³¹! possible permutations,
+		// there's no way that any PRNG can have a big enough internal state to
+		// generate even a minuscule percentage of the possible permutations.
+		// Nevertheless, the right API signature accepts an int n, so handle it as best we can.
+		mut i := n - 1
+		for i > 0; i-- {
+			j := int(self.u64n(u64(i + 1)))
+			swap(i, j)
+		}
+	}
 }
+
+struct runtimeSource{}
+
+impl Source for runtimeSource {
+	fn U64(*self): u64 {
+		ret runtime::rand()
+	}
+}
+
+// The source of runtime numbers for the top-level convenience function.
+let globalRand = Rand{src: runtimeSource{}}
+
+// Returns a non-negative pseudo-random 63-bit integer as an i64 from the default Source.
+fn I64(): i64 { ret globalRand.I64() }
+
+// Returns a pseudo-random 32-bit value as a u32 from the default Source.
+fn U32(): u32 { ret globalRand.U32() }
+
+//  Returns, as a u64, a pseudo-random number in the half-open interval [0,n) from the default Source.
+// It panics if n == 0.
+fn U64N(n: u64): u64 { ret globalRand.U64N(n) }
+
+// Returns, as a u32, a pseudo-random number in the half-open interval [0,n) from the default Source.
+// It panics if n == 0.
+fn U32N(n: u32): u32 { ret globalRand.U32N(n) }
+
+// Returns a pseudo-random 64-bit value as a u64 from the default Source.
+fn U64(): u64 { ret globalRand.U64() }
+
+// Returns a non-negative pseudo-random 31-bit integer as an i32 from the default Source.
+fn I32(): i32 { ret globalRand.I32() }
+
+// Returns a non-negative pseudo-random int from the default Source.
+fn Int(): int { ret globalRand.Int() }
+
+// Returns a pseudo-random uint from the default Source.
+fn Uint(): uint { ret globalRand.Uint() }
+
+// Returns, as an i64, a pseudo-random number in the half-open interval [0,n) from the default Source.
+// It panics if n <= 0.
+fn I64N(n: i64): i64 { ret globalRand.I64N(n) }
+
+// Returns, as an i32, a pseudo-random number in the half-open interval [0,n) from the default Source.
+// It panics if n <= 0.
+fn Int32N(n: i32): i32 { ret globalRand.I32N(n) }
+
+// Returns, as an int, a pseudo-random number in the half-open interval [0,n) from the default Source.
+// It panics if n <= 0.
+fn IntN(n: int): int { ret globalRand.IntN(n) }
+
+// Returns, as a uint, a pseudo-random number in the half-open interval [0,n) from the default Source.
+// It panics if n == 0.
+fn UintN(n: uint): uint { ret globalRand.UintN(n) }
+
+// Returns, as a f64, a pseudo-random number in the half-open interval [0.0,1.0)
+// from the default Source.
+fn F64(): f64 { ret globalRand.F64() }
+
+// Returns, as a f32, a pseudo-random number in the half-open interval [0.0,1.0) from the default Source.
+fn F32(): f32 { ret globalRand.F32() }
+
+// Returns, as a slice of n ints, a pseudo-random permutation of the integers
+// in the half-open interval [0,n) from the default Source.
+fn Perm(n: int): []int { ret globalRand.Perm(n) }
+
+// Shuffle pseudo-randomizes the order of elements using the default Source.
+// n is the number of elements. It panics if n < 0.
+// swap swaps the elements with indexes i and j.
+fn Shuffle(n: int, swap: fn(i: int, j: int)) { globalRand.Shuffle(n, swap) }
+
+// Returns a normally distributed f64 in the range [-f64.Max, +f64.Max] with
+// standard normal distribution (mean = 0, stddev = 1) from the default Source.
+// To produce a different normal distribution, callers can adjust the output using:
+//
+//	sample = NormF64() * desiredStdDev + desiredMean
+fn NormF64(): f64 { ret globalRand.NormF64() }
+
+// Returns an exponentially distributed f64 in the range
+// (0, +f64.Max] with an exponential distribution whose rate parameter
+// (lambda) is 1 and whose mean is 1/lambda (1) from the default Source.
+// To produce a distribution with a different rate parameter,
+// callers can adjust the output using:
+//
+//	sample = ExpF64() / desiredRateParameter
+fn ExpFloat64(): f64 { ret globalRand.ExpF64() }

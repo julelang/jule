@@ -1,0 +1,111 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// The Jule code is a modified version of the original Go code from
+// https://github.com/golang/go/blob/go1.24.3/src/math/rand/v2/zipf.go and came with this notice.
+//
+// ====================================================
+// Copyright (c) 2009 The Go Authors. All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// ====================================================
+
+// W.Hormann, G.Derflinger:
+// "Rejection-Inversion to Generate Variates
+// from Monotone Discrete Distributions"
+// http://eeyore.wu-wien.ac.at/papers/96-04-04.wh-der.ps.gz
+
+use "std/math"
+
+// A Zipf generates Zipf distributed variates.
+struct Zipf {
+	r:            &Rand
+	imax:         f64
+	v:            f64
+	q:            f64
+	s:            f64
+	oneminusQ:    f64
+	oneminusQinv: f64
+	hxm:          f64
+	hx0minusHxm:  f64
+}
+
+// Returns a Zipf variate generator.
+// The generator generates values k ∈ [0, imax]
+// such that P(k) is proportional to (v + k) ** (-s).
+// Requirements: s > 1 and v >= 1.
+fn NewZipf(r: &Rand, s: f64, v: f64, imax: u64): &Zipf {
+	mut z := new(Zipf)
+	if s <= 1.0 || v < 1 {
+		ret nil
+	}
+	z.r = unsafe { *(&r) }
+	z.imax = f64(imax)
+	z.v = v
+	z.q = s
+	z.oneminusQ = 1.0 - z.q
+	z.oneminusQinv = 1.0 / z.oneminusQ
+	z.hxm = z.h(z.imax + 0.5)
+	z.hx0minusHxm = z.h(0.5) - math::Exp(math::Log(z.v)*(-z.q)) - z.hxm
+	z.s = 1 - z.hinv(z.h(1.5)-math::Exp(-z.q*math::Log(z.v+1.0)))
+	ret z
+}
+
+impl Zipf {
+	fn h(*self, x: f64): f64 {
+		ret math::Exp(self.oneminusQ*math::Log(self.v+x)) * self.oneminusQinv
+	}
+
+	fn hinv(*self, x: f64): f64 {
+		ret math::Exp(self.oneminusQinv*math::Log(self.oneminusQ*x)) - self.v
+	}
+}
+
+impl Source for Zipf {
+	// Returns a value drawn from the Zipf distribution described by the Zipf object.
+	fn U64(*self): u64 {
+		if self == nil {
+			panic("rand: nil Zipf")
+		}
+		mut k := 0.0
+
+		for {
+			r := self.r.F64() // r on [0,1]
+			ur := self.hxm + r*self.hx0minusHxm
+			x := self.hinv(ur)
+			k = math::Floor(x + 0.5)
+			if k-x <= self.s {
+				break
+			}
+			if ur >= self.h(k+0.5)-math::Exp(-math::Log(k+self.v)*self.q) {
+				break
+			}
+		}
+		ret u64(k)
+	}
+}
