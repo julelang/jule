@@ -1167,18 +1167,34 @@ impl typeChecker {
 			if gstructs {
 				self.s.meta.gstructs = append(self.s.meta.gstructs, ins)
 			} else if self.s != ins.Decl.sema { // Avoid checking generic defines of this sema.
-				// We can check structures using this sema.
+				// Save current gstructs for analyais and remove the shared gstruct collection.
+				// They will be checked with our local copy.
+				// Then disable gstruct collection.
+				//
+				// This is a crucial step. Because if we use gstruct collection mode
+				// enabled during gstruct analysis, they may append new instances
+				// to the collection. But actually, we collected all needed
+				// gstruct instances for the current (ins) main structure instance.
+				// So clear the data, disable the gstruct collection mode.
+				// Thus, other semas can use gstruct collection mode properly.
+				// Otherwise, we have to analysis gstruct collection,
+				// even with the new possible items for different main instance analysis.
+				mut gstructs := self.s.meta.gstructs
+				self.s.meta.gstructs = nil
+				self.s.meta.flags &= ^semametaGstruct
+
+				// Before the checking main structure, check gstructs, if any.
+				// Because the main structure depends to them.
+				//
+				// We can check structures using the current sema.
 				// The checkStructIns method will check structure instance in
 				// its environment and errors will be reflected to this sema.
-				for (_, mut gins) in self.s.meta.gstructs {
+				for (_, mut gins) in gstructs {
 					self.s.checkStructIns(gins)
 				}
+
+				// Check the main structure.
 				self.s.checkStructIns(ins)
-				// Remove gstruct collection items, they are checked.
-				// But keep the capacity to reduce allocations.
-				// Disable gstruct collection.
-				self.s.meta.gstructs = self.s.meta.gstructs[:0]
-				self.s.meta.flags &= ^semametaGstruct
 			} else if ins.Decl.checked {
 				// gstruct collection is not enable and semas are same.
 				// So this structure is instantiated in the it's own package.
