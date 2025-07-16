@@ -228,7 +228,7 @@ impl eval {
 
 	fn litFloat(mut *self, l: &ast::LitExpr): &Value {
 		f := conv::ParseFloat(l.Value, 64) else {
-			self.pushErr(l.Token, log::ConstantOverflow)
+			self.pushErr(l.Token, "untyped value @ overflows floating-point type", l.Value)
 			ret nil
 		}
 		mut constant := constant::Const.NewF64(f)
@@ -243,7 +243,7 @@ impl eval {
 
 	fn litImag(mut *self, l: &ast::LitExpr): &Value {
 		f := conv::ParseFloat(l.Value[:len(l.Value)-1], 64) else {
-			self.pushErr(l.Token, log::ConstantOverflow)
+			self.pushErr(l.Token, "untyped value @ overflows floating-point type", l.Value)
 			ret nil
 		}
 		mut constant := constant::Const.NewCmplx128(cmplx(0, f))
@@ -269,28 +269,28 @@ impl eval {
 			lit := l.Value[2:]
 			n := len(lit) - strings::Count(lit, "_")
 			if n > len(maxhex) {
-				self.pushErr(l.Token, log::ConstantOverflow)
+				self.pushErr(l.Token, "untyped value @ overflows integer type", l.Value)
 				ret nil
 			}
 		| strings::HasPrefix(l.Value, "0b"): // Binary
 			lit := l.Value[2:]
 			n := len(lit) - strings::Count(lit, "_")
 			if n > len(maxbinary) {
-				self.pushErr(l.Token, log::ConstantOverflow)
+				self.pushErr(l.Token, "untyped value @ overflows integer type", l.Value)
 				ret nil
 			}
 		| strings::HasPrefix(l.Value, "0o"): // Ocatal
 			lit := l.Value[2:]
 			n := len(lit) - strings::Count(lit, "_")
 			if n > len(maxoctal) {
-				self.pushErr(l.Token, log::ConstantOverflow)
+				self.pushErr(l.Token, "untyped value @ overflows integer type", l.Value)
 				ret nil
 			}
 		| l.Value[0] == '0' && len(l.Value) > 1: // Octal
 			lit := l.Value[1:]
 			n := len(lit) - strings::Count(lit, "_")
 			if n > len(maxoctal) {
-				self.pushErr(l.Token, log::ConstantOverflow)
+				self.pushErr(l.Token, "untyped value @ overflows integer type", l.Value)
 				ret nil
 			}
 		|:
@@ -298,7 +298,7 @@ impl eval {
 			lit := l.Value[1:]
 			n := len(lit) - strings::Count(lit, "_")
 			if n > len(maxdecimal) {
-				self.pushErr(l.Token, log::ConstantOverflow)
+				self.pushErr(l.Token, "untyped value @ overflows integer type", l.Value)
 				ret nil
 			}
 		}
@@ -306,7 +306,7 @@ impl eval {
 		mut v := new(Value)
 		i, _ := big::Int.Parse(l.Value, 0)
 		if i.BitLen() > bitLimit {
-			self.pushErr(l.Token, log::ConstantOverflow)
+			self.pushErr(l.Token, "untyped value @ overflows integer type", l.Value)
 			ret nil
 		}
 		v.Constant = constant::Const.NewInt(i)
@@ -456,8 +456,8 @@ impl eval {
 
 	fn evalEnum(mut *self, mut enm: &Enum, errorToken: &token::Token): &Value {
 		if !self.s.isAccessibleDefine(enm.Public, enm.Token) {
-			self.pushErr(errorToken, log::IdentIsNotAccessible, enm.Name)
-			self.pushSuggestion(log::MakePubToAccess)
+			self.pushErr(errorToken, "define is private and could not be accessed: "+enm.Name)
+			self.pushSuggestion("make it public by starting with a capital letter")
 			ret nil
 		}
 		ret self._evalEnum(enm)
@@ -474,8 +474,8 @@ impl eval {
 
 	fn evalTypeEnum(mut *self, mut enm: &TypeEnum, errorToken: &token::Token): &Value {
 		if !self.s.isAccessibleDefine(enm.Public, enm.Token) {
-			self.pushErr(errorToken, log::IdentIsNotAccessible, enm.Name)
-			self.pushSuggestion(log::MakePubToAccess)
+			self.pushErr(errorToken, "define is private and could not be accessed: "+enm.Name)
+			self.pushSuggestion("make it public by starting with a capital letter")
 			ret nil
 		}
 		ret self._evalTypeEnum(enm)
@@ -494,8 +494,8 @@ impl eval {
 
 	fn evalStruct(mut *self, mut s: &Struct, mut errorToken: &token::Token): &Value {
 		if !self.s.isAccessibleDefine(s.Public, s.Token) {
-			self.pushErr(errorToken, log::IdentIsNotAccessible, s.Name)
-			self.pushSuggestion(log::MakePubToAccess)
+			self.pushErr(errorToken, "define is private and could not be accessed: "+s.Name)
+			self.pushSuggestion("make it public by starting with a capital letter")
 			ret nil
 		}
 
@@ -531,8 +531,8 @@ impl eval {
 
 	fn evalFunc(mut *self, mut f: &Func, errorToken: &token::Token): &Value {
 		if !self.s.isAccessibleDefine(f.Public, f.Token) {
-			self.pushErr(errorToken, log::IdentIsNotAccessible, f.Name)
-			self.pushSuggestion(log::MakePubToAccess)
+			self.pushErr(errorToken, "define is private and could not be accessed: "+f.Name)
+			self.pushSuggestion("make it public by starting with a capital letter")
 			ret nil
 		}
 
@@ -557,8 +557,8 @@ impl eval {
 		// If this variable is available, it should be defined in the scope.
 		// Then, it is accessible.
 		if v.Scope == nil && !self.s.isAccessibleDefine(v.Public, v.Token) {
-			self.pushErr(errorToken, log::IdentIsNotAccessible, v.Name)
-			self.pushSuggestion(log::MakePubToAccess)
+			self.pushErr(errorToken, "define is private and could not be accessed: "+v.Name)
+			self.pushSuggestion("make it public by starting with a capital letter")
 			ret nil
 		}
 
@@ -587,7 +587,7 @@ impl eval {
 			// But closures performs risky memory handling for references. So catch them.
 			// Just one exception: deferred scope functions safe for references.
 			if s.owner != nil && !s.owner.Scope.Deferred && s.owner.Anon && v.Scope != s.owner.Scope {
-				self.pushErr(errorToken, log::UsedRefInAnonFuncFromParentScope, v.Name)
+				self.pushErr(errorToken, "anonymous function cannot access reference @ of parent scope", conv::Quote(v.Name))
 			}
 		}
 
@@ -655,8 +655,8 @@ impl eval {
 
 	fn evalTypeAlias(mut *self, mut ta: &TypeAlias, errorToken: &token::Token): &Value {
 		if !self.s.isAccessibleDefine(ta.Public, ta.Token) {
-			self.pushErr(errorToken, log::IdentIsNotAccessible, ta.Name)
-			self.pushSuggestion(log::MakePubToAccess)
+			self.pushErr(errorToken, "define is private and could not be accessed: "+ta.Name)
+			self.pushSuggestion("make it public by starting with a capital letter")
 			ret nil
 		}
 
@@ -740,7 +740,7 @@ impl eval {
 		| &Trait:
 			ret self.evalTrait(def.(&Trait))
 		}
-		self.pushErr(name, log::IdentNotExist, name.Kind)
+		self.pushErr(name, "undefined: "+name.Kind)
 		ret nil
 	}
 
@@ -757,7 +757,7 @@ impl eval {
 
 	fn evalVariadic(mut &self, mut v: &ast::VariadicExpr): &Value {
 		if v.X == nil {
-			self.pushErr(v.Token, log::InvalidExpr)
+			self.pushErr(v.Token, "invalid expression")
 			ret nil
 		}
 
@@ -770,7 +770,7 @@ impl eval {
 			ret nil
 		}
 		if !val.Type.Variadicable() {
-			self.pushErr(v.Token, log::VariadicWithNonVariadicable, val.Type.Str())
+			self.pushErr(v.Token, "type @ is not variadicable", val.Type.Str())
 			ret nil
 		}
 		makeVariadic(val, val.Type.Slice().Value)
@@ -802,7 +802,7 @@ impl eval {
 			if ok && vr.X == nil {
 				// Filled.
 				if pt.Auto {
-					self.pushErr(s.Token, log::AutoSizedArrFilled)
+					self.pushErr(s.Token, "fill expression cannot be used for auto-sized array types")
 					ret nil
 				}
 				filled = true
@@ -813,7 +813,7 @@ impl eval {
 		arr.N = len(s.X)
 		if !pt.Auto {
 			if arr.N > pt.N {
-				self.pushErr(s.Token, log::OverflowLimits)
+				self.pushErr(s.Token, "expected array literal with length @, found @", conv::Itoa(pt.N), conv::Itoa(arr.N))
 			} else if arr.N < pt.N {
 				arr.N = pt.N
 			}
@@ -925,7 +925,8 @@ impl eval {
 		self.prefix = nil
 
 		if len(s.X) == 0 {
-			self.pushErr(s.Token, log::DynamicTypeAnnotationFailed)
+			self.pushErr(s.Token, "empty slice literal with unkown type")
+			self.pushSuggestion("use explicit literal, like; []Slice([])")
 			ret nil
 		}
 
@@ -951,7 +952,7 @@ impl eval {
 		match errKey {
 		| "":
 			ret true
-		| log::InvalidTypeForIndexing:
+		| "invalid type for index: @":
 			self.pushErr(token, errKey, v.Type.Str())
 		|:
 			self.pushErr(token, errKey)
@@ -960,7 +961,7 @@ impl eval {
 	}
 
 	fn indexPtr(mut *self, mut v: &Value, mut index: &Value, mut i: &ast::IndexExpr) {
-		self.checkIntegerIndexByData(index, i.Token)
+		self.checkIntegerIndexByData(index, i.Index.Token)
 		v.Lvalue = true
 
 		if isRef(v) {
@@ -972,11 +973,11 @@ impl eval {
 		mut ptr := v.Type.Ptr()
 		match {
 		| ptr.IsUnsafe():
-			self.pushErr(i.Token, log::UnsafePtrIndexing)
+			self.pushErr(i.Token, "cannot index unsafe pointer (*unsafe) type")
 			ret
 		| !self.isUnsafe():
-			self.pushErr(i.Token, log::UnsafeBehaviorAtOutOfUnsafeScope)
-			self.pushSuggestion(log::WriteYourCodeInUnsafeJule)
+			self.pushErr(i.Token, "index on raw-pointer cannot be done without Unsafe Jule")
+			self.pushSuggestion(`use unsafe Jule with "unsafe { ... }"`)
 		}
 
 		v.Type = ptr.Value
@@ -985,17 +986,21 @@ impl eval {
 	fn indexArr(mut *self, mut v: &Value, mut index: &Value, mut i: &ast::IndexExpr) {
 		mut arr := v.Type.Array()
 		v.Type = arr.Value
-		self.checkIntegerIndexByData(index, i.Token)
+		self.checkIntegerIndexByData(index, i.Index.Token)
 		v.Lvalue = true
-		if index.IsConst() && index.Constant.AsF64() >= f64(arr.N) {
-			self.pushErr(i.Token, log::OverflowLimits)
+		if index.IsConst() {
+			idx := index.Constant.AsF64()
+			if idx >= f64(arr.N) {
+				self.pushErr(i.Index.Token, "index @ overflows limits of the array type with length @",
+					conv::FormatUint(index.Constant.AsU64(), 10), conv::Itoa(arr.N))
+			}
 		}
 	}
 
 	fn indexSlice(mut *self, mut v: &Value, mut index: &Value, mut i: &ast::IndexExpr) {
 		mut slc := v.Type.Slice()
 		v.Type = slc.Value
-		self.checkIntegerIndexByData(index, i.Token)
+		self.checkIntegerIndexByData(index, i.Index.Token)
 		v.Lvalue = true
 	}
 
@@ -1009,7 +1014,7 @@ impl eval {
 			s: self.s,
 			dest: m.Key,
 			v: index,
-			errorToken: i.Token,
+			errorToken: i.Index.Token,
 			refers: self.getOwnerRefers(),
 		}
 		_ = atc.check()
@@ -1025,7 +1030,7 @@ impl eval {
 			ret
 		}
 
-		self.checkIntegerIndexByData(index, i.Token)
+		self.checkIntegerIndexByData(index, i.Index.Token)
 
 		v.untyped = v.IsConst()
 		if !index.IsConst() {
@@ -1035,12 +1040,13 @@ impl eval {
 		}
 
 		if v.untyped {
-			j := index.Constant.AsI64()
+			idx := index.Constant.AsI64()
 			s := v.Constant.ReadStr()
-			if int(j) >= len(s) {
-				self.pushErr(i.Token, log::OverflowLimits)
+			if idx >= i64(len(s)) {
+				self.pushErr(i.Index.Token, "index @ overflows limits of the string type with length @",
+					conv::FormatInt(idx, 10), conv::Itoa(len(s)))
 			} else {
-				v.Constant.SetU64(u64(s[j]))
+				v.Constant.SetU64(u64(s[idx]))
 			}
 		}
 	}
@@ -1056,18 +1062,19 @@ impl eval {
 		}
 		if !index.IsConst() {
 			*v = nil
-			self.pushErr(i.Index.Token, log::ExprNotConst)
+			self.pushErr(i.Index.Token, "expression must be constant")
 			ret
 		}
 		// guaranteed: index >= 0
-		j := int(index.Constant.AsI64())
+		idx := index.Constant.AsI64()
 		mut ci := (*v).Type.comptimeRange()
-		if j >= ci.kind.len() {
+		if idx >= i64(ci.kind.len()) {
 			*v = nil
-			self.pushErr(i.Index.Token, log::OverflowLimits)
+			self.pushErr(i.Index.Token, "index @ overflows limits of the comptime range type with length @",
+				conv::FormatInt(idx, 10), conv::Itoa(ci.kind.len()))
 			ret
 		}
-		ci.kind.index(*v, j)
+		ci.kind.index(*v, int(idx))
 	}
 
 	fn toIndex(mut *self, mut &v: *&Value, mut index: &Value, mut i: &ast::IndexExpr) {
@@ -1095,7 +1102,7 @@ impl eval {
 			self.comptimeRange(v, index, i)
 			ret
 		}
-		self.pushErr(i.Token, log::NotSupportsIndexing, (*v).Type.Str())
+		self.pushErr(i.Token, "cannot index type @", (*v).Type.Str())
 	}
 
 	fn pushGenericsFromData(mut &self, mut &generics: *[]&InsGeneric, mut indx: &ast::IndexExpr): (ok: bool) {
@@ -1127,7 +1134,7 @@ impl eval {
 	fn evalIdentDeclFromIndex(mut &self, mut &v: *&Value, mut i: &ast::IndexExpr) {
 		mut s := (*v).Type.Struct()
 		if s == nil {
-			self.pushErr(i.X.Token, log::TypeNotSupportsGenerics, (*v).Type.Str())
+			self.pushErr(i.X.Token, "type @ does not supports generics", (*v).Type.Str())
 			*v = nil
 			ret
 		}
@@ -1303,7 +1310,7 @@ impl eval {
 
 	fn slicingArr(mut *self, s: &ast::SlicingExpr, mut v: &Value, c: &Value) {
 		if c != nil {
-			self.pushErr(s.Token, log::UnsupportedTypeIndex3Slice, v.Type.Str())
+			self.pushErr(s.Token, "type @ does not support 3-index slice", v.Type.Str())
 		}
 
 		mut valueTyp := v.Type.Array().Value
@@ -1334,7 +1341,7 @@ impl eval {
 		}
 
 		if c != nil {
-			self.pushErr(s.Token, log::UnsupportedTypeIndex3Slice, v.Type.Str())
+			self.pushErr(s.Token, "type @ does not support 3-index slice", v.Type.Str())
 		}
 
 		if l.IsConst() && r.IsConst() {
@@ -1379,7 +1386,7 @@ impl eval {
 			}
 		}
 
-		self.pushErr(s.Token, log::NotSupportsSlicing, v.Type.Str())
+		self.pushErr(s.Token, "type @ does not support slice", v.Type.Str())
 	}
 
 	fn evalSlicing(mut &self, mut s: &ast::SlicingExpr): &Value {
@@ -1431,20 +1438,20 @@ impl eval {
 		sptr := v.Type.Sptr()
 		if sptr != nil {
 			if !t.Ptr().Value.Equal(sptr.Value) {
-				self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+				self.pushErr(errorToken, "type @ does not support casting to type @", v.Type.Str(), t.Str())
 			}
 			ret
 		}
 
 		if !self.isUnsafe() {
-			self.pushErr(errorToken, log::UnsafeBehaviorAtOutOfUnsafeScope)
-			self.pushSuggestion(log::WriteYourCodeInUnsafeJule)
+			self.pushErr(errorToken, "casting to raw-pointer cannot be done without Unsafe Jule")
+			self.pushSuggestion(`use unsafe Jule with "unsafe { ... }"`)
 			ret
 		}
 
 		prim := v.Type.Prim()
 		if v.Type.Ptr() == nil && (prim == nil || !types::IsInt(prim.Str())) {
-			self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+			self.pushErr(errorToken, "type @ does not support casting to type @", v.Type.Str(), t.Str())
 		}
 	}
 
@@ -1458,7 +1465,7 @@ impl eval {
 		mut tr := v.Type.Trait()
 		if tr == nil {
 			if !preStrict {
-				self.pushErr(errorToken, log::TypeNotSupportsTypeAssertionTo, v.Type.Str(), t.Str())
+				self.pushErr(errorToken, "type @ not supports type assertion to type @", v.Type.Str(), t.Str())
 			}
 			ret false
 		}
@@ -1470,7 +1477,7 @@ impl eval {
 		if !s.Decl.IsImplements(tr) {
 			// Log error but do not return false.
 			// We know type is trait, casting is not possible.
-			self.pushErr(errorToken, log::TypeNotSupportsTypeAssertionTo, v.Type.Str(), t.Str())
+			self.pushErr(errorToken, "type @ not supports type assertion to type @", v.Type.Str(), t.Str())
 		}
 		ret true
 	}
@@ -1483,14 +1490,14 @@ impl eval {
 		mut ptr := v.Type.Ptr()
 		if ptr != nil && sptr.Value.Equal(ptr.Value) {
 			if !self.isUnsafe() {
-				self.pushErr(errorToken, log::UnsafeBehaviorAtOutOfUnsafeScope)
-				self.pushSuggestion(log::WriteYourCodeInUnsafeJule)
+				self.pushErr(errorToken, "casting to smart-pointer from raw-pointer cannot be done without Unsafe Jule")
+				self.pushSuggestion(`use unsafe Jule with "unsafe { ... }"`)
 			}
 			// Ok.
 			ret
 		}
 
-		self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+		self.pushErr(errorToken, "type @ does not support casting to type @", v.Type.Str(), t.Str())
 	}
 
 	fn castSlice(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
@@ -1500,18 +1507,18 @@ impl eval {
 
 		if v.Type.Enum() != nil {
 			if v.Type.Enum().TypeSym.Type.Prim() == nil || !v.Type.Enum().TypeSym.Type.Prim().IsStr() {
-				self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+				self.pushErr(errorToken, "type @ does not support casting to type @", v.Type.Str(), t.Str())
 				ret
 			}
 		} else if v.Type.Prim() == nil || !v.Type.Prim().IsStr() {
-			self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+			self.pushErr(errorToken, "type @ does not support casting to type @", v.Type.Str(), t.Str())
 			ret
 		}
 
 		t = t.Slice().Value
 		mut prim := t.Prim()
 		if prim == nil || (!prim.IsU8() && !prim.IsI32()) {
-			self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+			self.pushErr(errorToken, "type @ does not support casting to type @", v.Type.Str(), t.Str())
 			ret
 		}
 
@@ -1559,7 +1566,7 @@ impl eval {
 	fn castBool(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		prim := v.Type.Prim()
 		if prim == nil || !prim.IsBool() {
-			self.pushErr(errorToken, log::TypeNotSupportsCastingTo, t.Str(), v.Type.Str())
+			self.pushErr(errorToken, "type @ does not support casting to type @", t.Str(), v.Type.Str())
 		}
 	}
 
@@ -1580,7 +1587,7 @@ impl eval {
 				ret
 			}
 			if !prim.IsU8() && !prim.IsI32() {
-				self.pushErr(errorToken, log::TypeNotSupportsCastingTo, t.Str(), v.Type.Str())
+				self.pushErr(errorToken, "type @ does not support casting to type @", t.Str(), v.Type.Str())
 				ret
 			}
 			// Cast constant expressions.
@@ -1601,14 +1608,14 @@ impl eval {
 
 		mut s := v.Type.Slice()
 		if s == nil {
-			self.pushErr(errorToken, log::TypeNotSupportsCastingTo, t.Str(), v.Type.Str())
+			self.pushErr(errorToken, "type @ does not support casting to type @", t.Str(), v.Type.Str())
 			ret
 		}
 
 		t = s.Value
 		prim = t.Prim()
 		if prim == nil || (!prim.IsU8() && !prim.IsI32()) {
-			self.pushErr(errorToken, log::TypeNotSupportsCastingTo, t.Str(), v.Type.Str())
+			self.pushErr(errorToken, "type @ does not support casting to type @", t.Str(), v.Type.Str())
 			ret
 		}
 	}
@@ -1637,7 +1644,7 @@ impl eval {
 			ret
 		}
 
-		self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+		self.pushErr(errorToken, "type @ does not support casting to type @", v.Type.Str(), t.Str())
 	}
 
 	fn castInt(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
@@ -1660,7 +1667,7 @@ impl eval {
 		if v.Type.Sptr() != nil {
 			prim := t.Prim()
 			if !prim.IsUintptr() {
-				self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+				self.pushErr(errorToken, "type @ does not support casting to type @", v.Type.Str(), t.Str())
 			}
 			ret
 		}
@@ -1669,8 +1676,8 @@ impl eval {
 			if prim.IsUintptr() {
 				// Ignore case.
 			} else if !self.isUnsafe() {
-				self.pushErr(errorToken, log::UnsafeBehaviorAtOutOfUnsafeScope)
-				self.pushSuggestion(log::WriteYourCodeInUnsafeJule)
+				self.pushErr(errorToken, "casting raw-pointer to integer cannot be done without Unsafe Jule")
+				self.pushSuggestion(`cast to uintptr or use unsafe Jule with "unsafe { ... }"`)
 			}
 			ret
 		}
@@ -1680,7 +1687,7 @@ impl eval {
 			ret
 		}
 
-		self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+		self.pushErr(errorToken, "type @ does not support casting to type @", v.Type.Str(), t.Str())
 	}
 
 	fn castNum(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
@@ -1705,7 +1712,7 @@ impl eval {
 			ret
 		}
 
-		self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+		self.pushErr(errorToken, "type @ does not support casting to type @", v.Type.Str(), t.Str())
 	}
 
 	fn castPrim(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
@@ -1724,7 +1731,7 @@ impl eval {
 		| types::IsNum(prim.Str()):
 			self.castNum(t, v, errorToken)
 		|:
-			self.pushErr(errorToken, log::TypeNotSupportsCasting, t.Str())
+			self.pushErr(errorToken, "type @ does not support casting", t.Str())
 		}
 	}
 
@@ -1733,7 +1740,7 @@ impl eval {
 		// quick check: if type t and value type comparable.
 		if !self.s.checkTypeCompatibility(t, v.Type, errorToken, typeCompDefault) {
 			self.s.errors = self.s.errors[:n] // Remove logged errors by checkTypeCompatibility.
-			self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+			self.pushErr(errorToken, "type @ does not support casting to type @", v.Type.Str(), t.Str())
 		}
 		v.Constant = nil
 		v.untyped = false
@@ -1743,7 +1750,7 @@ impl eval {
 		n := len(self.s.errors)
 		if !self.s.checkTypeCompatibility(t, v.Type, errorToken, typeCompDefault) {
 			self.s.errors = self.s.errors[:n] // Remove logged errors by checkTypeCompatibility.
-			self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+			self.pushErr(errorToken, "type @ does not support casting to type @", v.Type.Str(), t.Str())
 		}
 		v.Constant = nil
 		v.untyped = false
@@ -1752,23 +1759,23 @@ impl eval {
 	fn castChan(mut *self, mut t: &Type, mut v: &Value, mut errorToken: &token::Token) {
 		vc := v.Type.Chan()
 		if vc == nil {
-			self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+			self.pushErr(errorToken, "type @ does not support casting to type @", v.Type.Str(), t.Str())
 			ret
 		}
 		c := t.Chan()
 		if !vc.Value.Equal(c.Value) {
-			self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+			self.pushErr(errorToken, "type @ does not support casting to type @", v.Type.Str(), t.Str())
 			ret
 		}
 		if c.Recv && !vc.Recv || c.Send && !vc.Send {
-			self.pushErr(errorToken, log::TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+			self.pushErr(errorToken, "type @ does not support casting to type @", v.Type.Str(), t.Str())
 			ret
 		}
 	}
 
 	fn evalCastByTypeNData(mut *self, mut t: &Type, mut v: &Value, mut errorToken: &token::Token): &Value {
 		if v != nil && v.Decl {
-			self.pushErr(errorToken, log::InvalidExpr)
+			self.pushErr(errorToken, "invalid expression")
 			ret nil
 		}
 
@@ -1778,7 +1785,7 @@ impl eval {
 			match {
 			| v.IsNil():
 				if !t.NilCompatible() {
-					self.pushErr(errorToken, log::TypeNotSupportsCastingTo, "<nil>", t.Str())
+					self.pushErr(errorToken, "type @ does not support casting to nil", t.Str())
 				}
 				v.Constant = nil // Remove nil constant.
 				v.untyped = false
@@ -1831,7 +1838,7 @@ impl eval {
 				| t.Chan() != nil:
 					self.castChan(t, v, errorToken)
 				|:
-					self.pushErr(errorToken, log::TypeNotSupportsCasting, t.Str())
+					self.pushErr(errorToken, "type @ does not support casting", t.Str())
 					v = nil
 				}
 			}
@@ -1848,8 +1855,8 @@ impl eval {
 			// casting is valid, just Unsafe Jule is missing. Push only information error for that.
 			// Allow untyped constant literals for casting with no Unsafe Jule.
 			if !self.isUnsafe() && (!v.IsConst() || !v.untyped) {
-				self.pushErr(errorToken, log::UnsafeBehaviorAtOutOfUnsafeScope)
-				self.pushSuggestion(log::CastingBindedTypesRequiresUnsafeJule)
+				self.pushErr(errorToken, "casting bind type cannot be done without Unsafe Jule")
+				self.pushSuggestion(`use unsafe Jule with "unsafe { ... }"`)
 			}
 		}
 
@@ -1925,7 +1932,7 @@ impl eval {
 	fn evalNamespace(mut *self, mut s: &ast::NamespaceExpr): &Value {
 		mut imp := findNamespace(self.lookup, s.Namespace.Kind)
 		if imp == nil {
-			self.pushErr(s.Namespace, log::NamespaceNotExist, s.Namespace.Kind)
+			self.pushErr(s.Namespace, "undefined namespace: "+conv::Quote(s.Namespace.Kind))
 			ret nil
 		}
 
@@ -1951,7 +1958,7 @@ impl eval {
 		// NOTICE: Instance already checked (just fields) if generic quantity passes.
 
 		if self.field != nil && self.field.Decl.Owner == s.Decl {
-			self.pushErr(errorToken, log::IllegalCycleRefersItself, s.Decl.Name)
+			self.pushErr(errorToken, "illegal cycle in declaration: @ refers to itself", s.Decl.Name)
 		}
 
 		self.pushReference(s)
@@ -1991,7 +1998,7 @@ impl eval {
 			if m != nil {
 				ret self.evalMap(m, t, lit.Lit)
 			}
-			self.pushErr(lit.Type.Token, log::InvalidSyntax)
+			self.pushErr(lit.Type.Token, "invalid syntax")
 			ret nil
 		}
 
@@ -2055,15 +2062,17 @@ impl eval {
 
 	fn callTypeFunc(mut &self, mut fc: &ast::CallExpr, mut &v: *&Value) {
 		if len(fc.Args) < 1 {
-			self.pushErr(fc.Token, log::MissingExprFor, "v")
+			self.pushErr(fc.Token, "value is missing to cast type @", (*v).Type.Str())
+			self.pushSuggestion("cast like; Type(value)")
 		} else if len(fc.Args) > 1 {
-			self.pushErr(fc.Args[1].Token, log::ArgumentOverflow, (*v).Type.Str())
+			self.pushErr(fc.Args[1].Token, "passed more value to cast than expected")
+			self.pushSuggestion("cast like; Type(value)")
 		} else if fc.IsCo {
-			self.pushErr(fc.Token, log::CoForCastingCall)
+			self.pushErr(fc.Token, "concurrent call is undefined for casting expressions")
 			*v = nil
 			ret
 		} else if fc.Exception != nil {
-			self.pushErr(fc.Token, log::TypeCallWithExceptional)
+			self.pushErr(fc.Token, "exceptional handler scope is undefined for casting expressions")
 			*v = nil
 			ret
 		}
@@ -2082,7 +2091,7 @@ impl eval {
 	fn callBuiltinFunc(mut &self, mut fc: &ast::CallExpr, mut &v: *&Value) {
 		if !fc.Unhandled() { // Exceptional handled?
 			// Built-in functions are not exceptional.
-			self.pushErr(fc.Token, log::HandledUnexceptional)
+			self.pushErr(fc.Token, "non-exceptionals cannot be handled like exceptionals")
 		}
 		*v = (*v).Type.Func().caller(self, fc, *v)
 		if *v == nil {
@@ -2098,13 +2107,12 @@ impl eval {
 		for _, p in f.Params {
 			if p.Decl.IsSelf() {
 				if !p.Decl.IsSmartptr() {
-					self.pushErr(errorToken, log::ConcurrentCallWithSelfParam)
-					self.pushSuggestion(log::UseUnsafeJuleToCallCoSelf)
+					self.pushErr(errorToken, `concurrent calls with methods having a "self" receiver parameter are not allowed in safe Jule`)
+					self.pushSuggestion(`use "&self" receiver parameter instead, or unsafe Jule with "unsafe { ... }" to make concurrent calls`)
 				}
-			}
-			if p.Decl.Reference {
-				self.pushErr(errorToken, log::ConcurrentCallWithRefParam)
-				self.pushSuggestion(log::UseUnsafeJuleToCallCo)
+			} else if p.Decl.Reference {
+				self.pushErr(errorToken, "concurrent calls with functions with reference parameter(s) are not allowed in safe Jule")
+				self.pushSuggestion(`use unsafe Jule with "unsafe { ... }" to make concurrent calls`)
 				ret
 			}
 		}
@@ -2137,7 +2145,8 @@ impl eval {
 		fcValue.Except = ch
 
 		if resultNeeded && csc.result != nil {
-			self.pushErr(fc.Token, log::MissingAssignRet)
+			self.pushErr(fc.Token, "exceptional returns an expression, therefore else block should return an expression")
+			self.pushSuggestion("write an use expression end of the scope, like; use value")
 		}
 	}
 
@@ -2149,14 +2158,14 @@ impl eval {
 		}
 
 		if !f.Decl.IsMethod() && hasDirective(f.Decl.Directives, directive::Test) {
-			self.pushErr(fc.Token, log::TestCalled)
+			self.pushErr(fc.Token, "cannot call test function")
 			*v = nil
 			ret
 		}
 
 		if !(*v).Mutable && f.Decl.IsMethod() && !f.Decl.Static && f.Decl.Params[0].Mutable {
 			if self.target.mutable {
-				self.pushErr(fc.Token, log::MutOperationOnImmut)
+				self.pushErr(fc.Token, "cannot call method with mutable receiver on immutable memory")
 			} else {
 				// Caught mutability risk of immutable literals.
 				// Literal will not be assigned to immutable memory,
@@ -2165,14 +2174,14 @@ impl eval {
 				lit := isLitBased((*v).Model)
 				if lit == nil {
 					// Expression is not literal based, so data is strictly immutable.
-					self.pushErr(fc.Token, log::MutOperationOnImmut)
+					self.pushErr(fc.Token, "cannot call method with mutable receiver on immutable memory")
 				} else {
 					checkMutRiskOfStructLit(self.s, lit)
 				}
 			}
 		} else if !self.isUnsafe() && f.Decl.Unsafe {
-			self.pushErr(fc.Token, log::UnsafeBehaviorAtOutOfUnsafeScope)
-			self.pushSuggestion(log::WriteYourCodeInUnsafeJule)
+			self.pushErr(fc.Token, "calling unsafe function cannot be done without Unsafe Jule")
+			self.pushSuggestion(`use unsafe Jule with "unsafe { ... }"`)
 		}
 
 		mut dynamicAnnotation := len(f.Decl.Generics) > 0 && len(f.Generics) == 0 && len(f.Params) > 0
@@ -2284,13 +2293,13 @@ impl eval {
 
 		if f.Decl.Exceptional {
 			if fc.IsCo {
-				self.s.pushErr(fc.Token, log::CoForExceptional)
-				self.s.pushSuggestion(log::HandleInFunc)
+				self.s.pushErr(fc.Token, "concurrent calls are not allowed to exceptional functions")
+				self.s.pushSuggestion("handle the exceptional function in a separate function or anonymous function")
 			}
 			match {
 			| fc.Unhandled():
-				self.pushErr(fc.Token, log::UnhandledExceptional)
-				self.pushSuggestion(log::HandleExceptional)
+				self.pushErr(fc.Token, "exceptionals must be handled")
+				self.pushSuggestion(`use the "!" operator after an calling exceptional to handle it automatically`)
 			| fc.Exception == ast::Ignored:
 				model.Except = nil
 			| fc.Exception == ast::Forwarded:
@@ -2319,7 +2328,7 @@ impl eval {
 				self.processExceptionalHandler(f, fc, *v)
 			}
 		} else if !fc.Unhandled() {
-			self.pushErr(fc.Token, log::HandledUnexceptional)
+			self.pushErr(fc.Token, "non-exceptionals cannot be handled like exceptionals")
 		}
 
 		if fc.IsCo {
@@ -2354,7 +2363,7 @@ impl eval {
 		}
 
 		if _func.Type.Func() == nil {
-			self.pushErr(fc.Token, log::CallingNonFunc)
+			self.pushErr(fc.Token, "attempt to call non-function")
 			ret nil
 		}
 
@@ -2365,7 +2374,7 @@ impl eval {
 	fn evalEnumStatic(mut *self, mut enm: &Enum, mut name: &token::Token): &Value {
 		mut item := enm.FindItem(name.Kind)
 		if item == nil {
-			self.pushErr(name, log::ObjHaveNotIdent, enm.Name, name.Kind)
+			self.pushErr(name, "type @ has no field or method: @", enm.Name, name.Kind)
 			ret nil
 		}
 		mut v := self.evalVar(item, name)
@@ -2381,8 +2390,8 @@ impl eval {
 		mut method := s.FindMethod(name.Kind, Static)
 		if method != nil {
 			if !self.s.isAccessibleDefine(method.Public, method.Token) {
-				self.pushErr(name, log::IdentIsNotAccessible, name.Kind)
-				self.pushSuggestion(log::MakePubToAccess)
+				self.pushErr(name, "define is private and could not be accessed: "+name.Kind)
+				self.pushSuggestion("make it public by starting with a capital letter")
 			}
 
 			mut ins := method.instance()
@@ -2398,14 +2407,14 @@ impl eval {
 			}
 			ret v
 		}
-		self.pushErr(name, log::ObjHaveNotIdent, s.Decl.Name, name.Kind)
+		self.pushErr(name, "type @ has no field or method: @", s.Decl.Name, name.Kind)
 		ret nil
 	}
 
 	fn evalTraitSelector(mut *self, mut v: &Value, mut trt: &Trait, mut name: &token::Token): &Value {
 		mut f := trt.FindMethod(name.Kind)
 		if f == nil {
-			self.pushErr(name, log::ObjHaveNotIdent, trt.Name, name.Kind)
+			self.pushErr(name, "type @ has no field or method: @", trt.Name, name.Kind)
 			ret nil
 		}
 		ret &Value{
@@ -2452,8 +2461,8 @@ impl eval {
 		mut f := s.FindField(si.Name.Kind)
 		if f != nil {
 			if !self.s.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
-				self.pushErr(si.Name, log::IdentIsNotAccessible, f.Decl.Name)
-				self.pushSuggestion(log::MakePubToAccess)
+				self.pushErr(si.Name, "define is private and could not be accessed: "+f.Decl.Name)
+				self.pushSuggestion("make it public by starting with a capital letter")
 			}
 			ret self.evalStructSelectorField(v, s, si.Name, f), true
 		}
@@ -2464,7 +2473,7 @@ impl eval {
 	// The tok parameter should be identifier to accessed.
 	fn evalStructSelectorMethod(mut *self, mut v: &Value, mut s: &StructIns, mut tok: &token::Token, mut m: &Func, ref: bool): &Value {
 		if m.Params[0].IsSmartptr() && !ref {
-			self.pushErr(tok, log::RefMethodUsedWithNotRefInstance)
+			self.pushErr(tok, "method with smart-pointer receiver cannot be used without a smart-pointer instance")
 		}
 
 		mut ins := m.instance()
@@ -2498,12 +2507,12 @@ impl eval {
 		const Static = false
 		mut m := s.FindMethod(si.Name.Kind, Static)
 		if m == nil {
-			self.pushErr(si.Name, log::ObjHaveNotIdent, s.Decl.Name, si.Name.Kind)
+			self.pushErr(si.Name, "type @ has no field or method: @", s.Decl.Name, si.Name.Kind)
 			ret nil
 		}
 		if !self.s.isAccessibleDefine(m.Public, m.Token) {
-			self.pushErr(si.Name, log::IdentIsNotAccessible, m.Name)
-			self.pushSuggestion(log::MakePubToAccess)
+			self.pushErr(si.Name, "define is private and could not be accessed: "+m.Name)
+			self.pushSuggestion("make it public by starting with a capital letter")
 		}
 
 		ret self.evalStructSelectorMethod(v, s, si.Name, m, ref)
@@ -2531,7 +2540,7 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
+			self.pushErr(name, "undefined type int member: "+conv::Quote(name.Kind))
 			ret nil
 		}
 	}
@@ -2549,7 +2558,7 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
+			self.pushErr(name, "undefined type uint member: "+conv::Quote(name.Kind))
 			ret nil
 		}
 	}
@@ -2580,7 +2589,7 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
+			self.pushErr(name, "undefined type i8 member: @"+conv::Quote(name.Kind))
 			ret nil
 		}
 	}
@@ -2611,7 +2620,7 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
+			self.pushErr(name, "undefined type i16 member: "+conv::Quote(name.Kind))
 			ret nil
 		}
 	}
@@ -2642,7 +2651,7 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
+			self.pushErr(name, "undefined type i32 member: "+conv::Quote(name.Kind))
 			ret nil
 		}
 	}
@@ -2673,7 +2682,7 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
+			self.pushErr(name, "undefined type i64 member: "+conv::Quote(name.Kind))
 			ret nil
 		}
 	}
@@ -2694,7 +2703,7 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
+			self.pushErr(name, "undefined type u8 member: "+conv::Quote(name.Kind))
 			ret nil
 		}
 	}
@@ -2715,7 +2724,7 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
+			self.pushErr(name, "undefined type u16 member: "+conv::Quote(name.Kind))
 			ret nil
 		}
 	}
@@ -2736,7 +2745,7 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
+			self.pushErr(name, "undefined type u32 member: "+conv::Quote(name.Kind))
 			ret nil
 		}
 	}
@@ -2757,7 +2766,7 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
+			self.pushErr(name, "undefined type u64 member: "+conv::Quote(name.Kind))
 			ret nil
 		}
 	}
@@ -2798,7 +2807,7 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
+			self.pushErr(name, "undefined type f32 member: "+conv::Quote(name.Kind))
 			ret nil
 		}
 	}
@@ -2839,7 +2848,7 @@ impl eval {
 				untyped: true,
 			}
 		|:
-			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
+			self.pushErr(name, "undefined type f64 member: "+conv::Quote(name.Kind))
 			ret nil
 		}
 	}
@@ -2872,7 +2881,7 @@ impl eval {
 		| types::F64:
 			v = self.evalF64TypeStatic(name)
 		|:
-			self.pushErr(name, log::TypeHaveNotIdent, kind, name.Kind)
+			self.pushErr(name, "undefined type @ member: @", kind, conv::Quote(name.Kind))
 			ret nil
 		}
 		if v != nil && t.Kind != t.ActualKind() {
@@ -2893,7 +2902,7 @@ impl eval {
 		| v.Type.Enum() != nil:
 			ret self.evalEnumStatic(v.Type.Enum(), si.Name)
 		|:
-			self.pushErr(si.Name, log::TypeNotSupportSubFields, v.Type.Str())
+			self.pushErr(si.Name, "type @ does not supports selector expressions", v.Type.Str())
 			ret nil
 		}
 	}
@@ -2901,7 +2910,7 @@ impl eval {
 	fn comptimeObjSelector[ComptimeType](mut *self, mut ct: &ComptimeType, v: &Value, si: &ast::SelectorExpr): &Value {
 		mut cd := ct.subIdent(si.Name.Kind)
 		if cd == nil {
-			self.pushErr(si.Name, log::ObjHaveNotIdent, v.Type.Str(), si.Name.Kind)
+			self.pushErr(si.Name, "type @ has no field or method: @", v.Type.Str(), si.Name.Kind)
 		}
 		ret cd
 	}
@@ -2939,7 +2948,7 @@ impl eval {
 
 	fn evalObjSelector(mut *self, mut v: &Value, mut si: &ast::SelectorExpr): &Value {
 		if jule::IsBlank(si.Name.Kind) {
-			self.pushErr(si.Name, log::InvalidSyntax)
+			self.pushErr(si.Name, "invalid syntax")
 			ret nil
 		}
 		{
@@ -2956,8 +2965,8 @@ impl eval {
 				break
 			}
 			if !isRef(v) && !self.isUnsafe() {
-				self.pushErr(si.Name, log::UnsafeBehaviorAtOutOfUnsafeScope)
-				self.pushSuggestion(log::WriteYourCodeInUnsafeJule)
+				self.pushErr(si.Name, "dereferencing raw-pointer cannot be done without Unsafe Jule")
+				self.pushSuggestion(`use unsafe Jule with "unsafe { ... }"`)
 			}
 			kind = ptr.Value
 			makeImplicitDeref(v, si.Name)
@@ -2982,7 +2991,7 @@ impl eval {
 		if v.Type.Trait() != nil {
 			ret self.evalTraitSelector(v, v.Type.Trait(), si.Name)
 		}
-		self.pushErr(si.Name, log::ObjNotSupportSubFields, v.Type.Str())
+		self.pushErr(si.Name, "type @ does not supports selector expressions", v.Type.Str())
 		ret nil
 	}
 
@@ -3045,7 +3054,7 @@ impl eval {
 		for (_, mut expr) in lit.X {
 			mut pair, ok := expr.Data.(&ast::KeyValueExpr)
 			if !ok {
-				self.pushErr(lit.Token, log::InvalidSyntax)
+				self.pushErr(lit.Token, "invalid syntax")
 				ret nil
 			}
 
@@ -3090,14 +3099,14 @@ impl eval {
 	fn evalBraceLit(mut &self, mut lit: &ast::BraceLit): &Value {
 		match {
 		| self.prefix == nil:
-			self.pushErr(lit.Token, log::InvalidSyntax)
+			self.pushErr(lit.Token, "invalid syntax")
 			ret nil
 		| self.prefix.Map() != nil:
 			ret self.evalMap(self.prefix.Map(), self.prefix, lit)
 		| self.prefix.Struct() != nil:
 			ret self.evalStructLitExplicit(self.prefix.Struct(), self.prefix, lit, lit.Token)
 		}
-		self.pushErr(lit.Token, log::InvalidSyntax)
+		self.pushErr(lit.Token, "invalid syntax")
 		ret nil
 	}
 
@@ -3215,12 +3224,11 @@ impl eval {
 		}
 		mut ch := l.Type.Chan()
 		if ch == nil {
-			self.s.pushErr(chs.Chan.Token, log::ExprNotChan)
-			self.s.pushSuggestion(log::RArrowOpExpectsChan)
+			self.s.pushErr(chs.Chan.Token, "send expression on non-channel type")
 			ret nil
 		}
 		if !ch.Send {
-			self.s.pushErr(chs.Chan.Token, log::SendToRecvOnlyChan)
+			self.s.pushErr(chs.Chan.Token, "send expression on receive-only channel")
 		}
 		mut prefix := self.prefix
 		mut mutable := self.target.mutable
@@ -3242,7 +3250,7 @@ impl eval {
 			sc.removeInteriorMutRisk(r)
 		}
 		if l.Mutable && !r.Mutable && r.Type.Mutable() {
-			self.s.pushErr(chs.X.Token, log::ImmutDataSendViaMutChan, r.Type.Str())
+			self.s.pushErr(chs.X.Token, "immutable data with type @ (which is mutable) cannot be sent via a mutable channel", r.Type.Str())
 		}
 		// Check assignment types and return.
 		mut checker := assignTypeChecker{
@@ -3279,19 +3287,19 @@ impl eval {
 		}
 		mut errorToken := tae.X.Token
 		if v != nil && v.Decl {
-			self.pushErr(errorToken, log::InvalidExpr)
+			self.pushErr(errorToken, "invalid expression")
 			ret nil
 		}
 		if v.Type.Prim() != nil && v.Type.Prim().IsAny() {
 			if t.SoftStruct() == nil && t.TypeEnum() != nil {
-				self.pushErr(errorToken, log::TypeEnumAssertedFromAny)
+				self.pushErr(errorToken, "type-enum cannot be asserted from type any")
 				ret nil
 			}
 		} else if v.Type.TypeEnum() != nil {
 			n := len(self.s.errors)
 			if !self.s.checkTypeCompatibility(v.Type, t, errorToken, typeCompDefault) {
 				self.s.errors = self.s.errors[:n] // Remove logged errors by checkTypeCompatibility.
-				self.pushErr(errorToken, log::TypeNotSupportsTypeAssertionTo, v.Type.Str(), t.Str())
+				self.pushErr(errorToken, "type @ not supports type assertion to type @", v.Type.Str(), t.Str())
 				ret nil
 			}
 		} else if v.Type.Trait() != nil {
@@ -3302,14 +3310,14 @@ impl eval {
 				}
 			}
 			if ts == nil {
-				self.pushErr(errorToken, log::TypeNotSupportsTypeAssertionTo, v.Type.Str(), t.Str())
+				self.pushErr(errorToken, "type @ not supports type assertion to type @", v.Type.Str(), t.Str())
 				ret nil
 			} else {
 				const PreStrict = false
 				self.castStruct(t, ts, v, errorToken, PreStrict)
 			}
 		} else {
-			self.pushErr(errorToken, log::TypeNotSupportsTypeAssertion, v.Type.Str())
+			self.pushErr(errorToken, "type @ not supports type assertion", v.Type.Str())
 			ret nil
 		}
 		mut r := new(Value)
@@ -3414,7 +3422,7 @@ impl eval {
 			// Check special cases for functions.
 			mut f := v.Type.Func()
 			if f.IsBuiltin() {
-				self.s.pushErr(expr.Token, log::BuiltinNotInvoked)
+				self.s.pushErr(expr.Token, "built-in functions must be invoked")
 				break
 			}
 			required := len(f.Decl.Generics)
@@ -3423,9 +3431,9 @@ impl eval {
 				ret nil
 			}
 			if !f.Decl.Static && f.Decl.IsMethod() {
-				self.s.pushErr(expr.Token, log::MethodNotInvoked)
+				self.s.pushErr(expr.Token, "methods must be invoked")
 			} else if findDirective(f.Decl.Directives, directive::Export) != nil {
-				self.s.pushErr(expr.Token, log::ExportedUsedAsAnonymous, f.Decl.Name)
+				self.s.pushErr(expr.Token, "define @ is exported for backend and cannot used as anonymous", conv::Quote(f.Decl.Name))
 			} else {
 				f.AsAnon = true
 			}
@@ -3459,7 +3467,7 @@ impl eval {
 			ret nil
 		}
 		if (self.owner == nil || !self.owner.Constant) && v.Type.comptime() {
-			self.s.pushErr(expr.Token, log::ComptimeAsExpr)
+			self.s.pushErr(expr.Token, "comptime specific types cannot be used as runtime expressions")
 			ret nil
 		}
 		ret v
@@ -3474,7 +3482,8 @@ impl eval {
 		| v == nil:
 			ret nil
 		| v.Decl:
-			self.pushErr(expr.Token, log::InvalidExpr)
+			self.pushErr(expr.Token, "invalid expression")
+			self.pushSuggestion("expected value, found type declaration")
 			ret nil
 		|:
 			ret v
@@ -3490,7 +3499,8 @@ impl eval {
 		| v == nil:
 			ret nil
 		| v.Decl:
-			self.pushErr(expr.Token, log::InvalidExpr)
+			self.pushErr(expr.Token, "invalid expression")
+			self.pushSuggestion("expected value, found type declaration")
 			ret nil
 		|:
 			ret v
@@ -3618,7 +3628,8 @@ impl unaryEval {
 				panic("sema: unimplemented constant type for unaryEval.minus, this panic call should be unreachable")
 			}
 			if self.v.Constant.IsInt() && self.v.Constant.ReadInt().BitLen() > bitLimit {
-				self.e.pushErr(self.u.Op, log::ConstantOverflowResult)
+				self.e.pushErr(self.u.Op, "computation result is overflows compiler limits")
+				self.e.pushSuggestion("your big-integer is too big and reached to safety limit of compiler, try to compute at runtime")
 				self.v.Decl = true // Do not log error.
 				ret
 			}
@@ -3768,7 +3779,8 @@ impl unaryEval {
 				}
 			}
 			if self.v.Constant.IsInt() && self.v.Constant.ReadInt().BitLen() > bitLimit {
-				self.e.pushErr(self.u.Op, log::ConstantOverflowResult)
+				self.e.pushErr(self.u.Op, "computation result is overflows compiler limits")
+				self.e.pushSuggestion("your big-integer is too big and reached to safety limit of compiler, try to compute at runtime")
 				self.v.Decl = true // Do not log error.
 				ret
 			}
@@ -3821,8 +3833,8 @@ impl unaryEval {
 		match {
 		| self.v.Type.Ptr() != nil:
 			if !isRef && !self.e.isUnsafe() {
-				self.e.pushErr(self.u.Op, log::UnsafeBehaviorAtOutOfUnsafeScope)
-				self.e.pushSuggestion(log::WriteYourCodeInUnsafeJule)
+				self.e.pushErr(self.u.Op, "dereferencing raw-pointer cannot be done without Unsafe Jule")
+				self.e.pushSuggestion(`use unsafe Jule with "unsafe { ... }"`)
 			}
 
 			mut t := self.v.Type.Ptr()
@@ -3885,12 +3897,11 @@ impl unaryEval {
 		mut ch := v.Type.Chan()
 		if ch == nil {
 			// Expression type is not channel.
-			self.e.pushErr(self.u.X.Token, log::ExprNotChan)
-			self.e.pushSuggestion(log::RArrowOpExpectsChan)
+			self.e.pushErr(self.u.X.Token, "receive expression on non-channel type")
 			ret nil
 		}
 		if !ch.Recv {
-			self.e.pushErr(self.u.X.Token, log::RecvFromSendOnlyChan)
+			self.e.pushErr(self.u.X.Token, "receive expression on send-only channel")
 		}
 		v.Model = &ChanRecv{
 			Token: self.u.X.Token,
@@ -3910,7 +3921,7 @@ impl unaryEval {
 			self.v.Type = &Type{Kind: tc.buildSptrFromType(self.v.Type)}
 			self.v.Model = self.v.Type
 		|:
-			self.e.pushErr(self.u.Op, log::InvalidExprForUnary, self.u.Op.Kind, self.v.Type.Str())
+			self.e.pushErr(self.u.Op, "unary operator @ not defined for type @", self.u.Op.Kind, self.v.Type.Str())
 			self.v = nil
 			ret
 		}
@@ -3970,7 +3981,7 @@ impl unaryEval {
 
 		match {
 		| self.v == nil:
-			self.e.pushErr(self.u.Op, log::InvalidExprForUnary, self.u.Op.Kind, kind.Str())
+			self.e.pushErr(self.u.Op, "unary operator @ not defined for type @", self.u.Op.Kind, kind.Str())
 			ret nil
 		| self.v.Decl:
 			self.v = nil
@@ -4027,7 +4038,7 @@ impl binaryEval {
 	fn evalComptimeTypeInfo(mut *self): &Value {
 		mut r := self.r.Type.comptimeTypeInfo()
 		if r == nil {
-			self.e.pushErr(self.op, log::IncompatibleTypes, "comptimeTypeInfo", self.r.Type.Str())
+			self.e.pushErr(self.op, "mismatched types: @ and @", "comptimeTypeInfo", self.r.Type.Str())
 			ret nil
 		}
 		mut l := self.l.Type.comptimeTypeInfo()
@@ -4049,14 +4060,14 @@ impl binaryEval {
 				Model: constant,
 			}
 		|:
-			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
+			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
 
 	fn evalNil(mut *self): &Value {
 		if !self.r.Type.NilCompatible() {
-			self.e.pushErr(self.op, log::IncompatibleTypes, "nil", self.r.Type.Str())
+			self.e.pushErr(self.op, "mismatched types: @ and @", "nil", self.r.Type.Str())
 			ret nil
 		}
 
@@ -4068,7 +4079,7 @@ impl binaryEval {
 				Type: primBool,
 			}
 		|:
-			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, "nil")
+			self.e.pushErr(self.op, "operator @ is not defined for type nil", self.op.Kind)
 			ret nil
 		}
 	}
@@ -4101,7 +4112,7 @@ impl binaryEval {
 		| token::GEQ
 		| token::LEQ:
 			if !types::IsNum(self.l.Type.Enum().TypeSym.Type.Prim().Str()) {
-				self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
+				self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
 				ret nil
 			}
 			ret &Value{
@@ -4126,19 +4137,19 @@ impl binaryEval {
 				panic("sema: unimplemented enum type, this panic call should be unreachable")
 			}
 		err:
-			self.e.pushErr(self.op, log::AmperOpForEnum, self.l.Type.Str(), self.op.Kind)
-			self.e.pushSuggestion(log::DefineZeroDefaultToUseAmper)
+			self.e.pushErr(self.op, " enum type @ does not support @ operator", self.l.Type.Str(), self.op.Kind)
+			self.e.pushSuggestion(`define default enum field (the first one is default) with zero value to use "&"`)
 		next:
 			fall
 		| token::OR
 		| token::XOR:
 			mut enm := self.l.Type.Enum()
 			if enm.TypeSym.Type.Prim() == nil || !types::IsInt(enm.TypeSym.Type.Prim().Str()) {
-				self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
+				self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
 			}
 			ret self.l
 		|:
-			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
+			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -4156,7 +4167,7 @@ impl binaryEval {
 				Type: primBool,
 			}
 		|:
-			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
+			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -4174,7 +4185,7 @@ impl binaryEval {
 				Type: primBool,
 			}
 		|:
-			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
+			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -4192,7 +4203,7 @@ impl binaryEval {
 				Type: primBool,
 			}
 		|:
-			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
+			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -4235,15 +4246,15 @@ impl binaryEval {
 				self.l, self.r = self.r, self.l
 			}
 			if self.l.Type.Ptr().IsUnsafe() {
-				self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
+				self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
 			}
 			if !isPtrArithmeticCompatible(self.l, self.r) {
-				self.e.pushErr(self.op, log::IncompatibleTypeForPtrArithmetic, self.r.Type.Str())
+				self.e.pushErr(self.op, "type @ does not supports pointer arithmetic", self.r.Type.Str())
 				ret nil
 			}
 			ret self.l
 		|:
-			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
+			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -4273,7 +4284,7 @@ impl binaryEval {
 				Type: primBool,
 			}
 		|:
-			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
+			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -4290,7 +4301,7 @@ impl binaryEval {
 				Type: primBool,
 			}
 		|:
-			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
+			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -4308,7 +4319,7 @@ impl binaryEval {
 				Type: primBool,
 			}
 		|:
-			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
+			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -4323,7 +4334,7 @@ impl binaryEval {
 				Type: primBool,
 			}
 		|:
-			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
+			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -4340,7 +4351,7 @@ impl binaryEval {
 		| token::LOR:
 			ret self.l
 		|:
-			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
+			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -4364,7 +4375,7 @@ impl binaryEval {
 				Type: primBool,
 			}
 		|:
-			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
+			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -4417,7 +4428,7 @@ impl binaryEval {
 	fn checkModData(mut *self, mut v: &Value) {
 		if !v.IsConst() {
 			if v.Type.Prim() == nil || !types::IsInt(v.Type.Prim().Kind) {
-				self.e.pushErr(self.op, log::ModuloWithNotInt)
+				self.e.pushErr(self.op, "modulo operator must be used with integer type")
 			}
 			ret
 		}
@@ -4427,7 +4438,7 @@ impl binaryEval {
 		| unsigAssignable(types::U64, v):
 			v.Constant.SetU64(v.Constant.AsU64())
 		|:
-			self.e.pushErr(self.op, log::ModuloWithNotInt)
+			self.e.pushErr(self.op, "modulo operator must be used with integer type")
 		}
 	}
 
@@ -4504,12 +4515,12 @@ impl binaryEval {
 	fn shift(mut *self): &Value {
 		lk := self.l.Type.Prim()
 		if lk == nil {
-			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
+			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 		rk := self.r.Type.Prim()
 		if rk == nil {
-			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.r.Type.Str())
+			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.r.Type.Str())
 			ret nil
 		}
 		// primitive guaranteed
@@ -4523,7 +4534,7 @@ impl binaryEval {
 		if !types::IsInt(lk.Kind) {
 			// should be floating-point
 			if !self.l.IsConst() || !self.l.untyped {
-				self.e.pushErr(self.op, log::IncompatibleTypes, self.l.Type.Str(), self.r.Type.Str())
+				self.e.pushErr(self.op, "mismatched types: @ and @", self.l.Type.Str(), self.r.Type.Str())
 				ret nil
 			} else if intAssignable(types::I64, self.l) {
 				self.l.Constant.SetI64(self.l.Constant.AsI64())
@@ -4536,7 +4547,7 @@ impl binaryEval {
 		if !types::IsInt(rk.Kind) {
 			// should be floating-point
 			if !self.r.IsConst() || !self.l.untyped {
-				self.e.pushErr(self.op, log::IncompatibleTypes, self.l.Type.Str(), self.r.Type.Str())
+				self.e.pushErr(self.op, "mismatched types: @ and @", self.l.Type.Str(), self.r.Type.Str())
 				ret nil
 			} else if intAssignable(types::I64, self.r) {
 				self.r.Constant.SetI64(self.r.Constant.AsI64())
@@ -4552,7 +4563,7 @@ impl binaryEval {
 			if self.r.untyped {
 				self.e.s.pushCompatibilityError(primUint, self.r, self.rt)
 			} else {
-				self.e.pushErr(self.rt, log::BitShiftMustUnsigned)
+				self.e.pushErr(self.rt, "shift value must be unsigned integer")
 			}
 			ret nil
 		}
@@ -4564,11 +4575,11 @@ impl binaryEval {
 				i := self.r.Constant.ReadInt()
 				if i.IsI64() && i.I64() > maxShiftCount ||
 					i.IsU64() && i.U64() > maxShiftCount {
-					self.e.pushErr(self.rt, log::InvalidShiftCount, i.Str())
+					self.e.pushErr(self.rt, "invalid shift count: "+i.Str())
 					ret nil
 				}
 			} else if self.r.Constant.IsF64() && self.r.Constant.ReadF64() > maxShiftCount {
-				self.e.pushErr(self.rt, log::InvalidShiftCount, self.r.Constant.Str())
+				self.e.pushErr(self.rt, "invalid shift count: "+self.r.Constant.Str())
 				ret nil
 			}
 		}
@@ -4605,7 +4616,7 @@ impl binaryEval {
 			self.setTypeToGreater()
 			ret self.l
 		|:
-			self.e.pushErr(self.op, log::OperatorNotForFloat, self.op.Kind)
+			self.e.pushErr(self.op, "operator @ is not defined for floating-point types", self.op.Kind)
 			ret nil
 		}
 	}
@@ -4645,14 +4656,14 @@ impl binaryEval {
 			ret self.l
 		| token::REM:
 			if !types::IsInt(self.r.Type.Prim().Kind) {
-				self.e.pushErr(self.op, log::IncompatibleTypes, self.l.Type.Str(), self.r.Type.Str())
+				self.e.pushErr(self.op, "mismatched types: @ and @", self.l.Type.Str(), self.r.Type.Str())
 				ret nil
 			}
 			self.mod()
 			self.setTypeToGreater()
 			ret self.r
 		|:
-			self.e.pushErr(self.op, log::OperatorNotForFloat, self.op.Kind)
+			self.e.pushErr(self.op, "operator @ is not defined for floating-point types", self.op.Kind)
 			ret nil
 		}
 	}
@@ -4697,7 +4708,7 @@ impl binaryEval {
 			self.setTypeToGreater()
 			ret self.l
 		|:
-			self.e.pushErr(self.op, log::OperatorNotForInt, self.op.Kind)
+			self.e.pushErr(self.op, "operator @ is not defined for integer types", self.op.Kind)
 			ret nil
 		}
 	}
@@ -4713,7 +4724,7 @@ impl binaryEval {
 
 		rp := self.r.Type.Prim()
 		if rp == nil {
-			self.e.pushErr(self.op, log::IncompatibleTypes, prim.Str(), self.r.Type.Str())
+			self.e.pushErr(self.op, "mismatched types: @ and @", prim.Str(), self.r.Type.Str())
 			ret nil
 		}
 
@@ -4746,10 +4757,10 @@ impl binaryEval {
 			ret
 		}
 		if !self.l.Type.Comparable() && !self.r.Type.IsNil() {
-			self.e.pushErr(self.op, log::TypeIsNotComparable, self.l.Type.Str())
+			self.e.pushErr(self.op, "type @ is not comparable", self.l.Type.Str())
 			ok = false
 		} else if !self.r.Type.Comparable() && !self.l.Type.IsNil() {
-			self.e.pushErr(self.op, log::TypeIsNotComparable, self.r.Type.Str())
+			self.e.pushErr(self.op, "type @ is not comparable", self.r.Type.Str())
 			ok = false
 		}
 		ret ok
@@ -4768,7 +4779,7 @@ impl binaryEval {
 
 		match {
 		| self.l.Type.Void():
-			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, "void")
+			self.e.pushErr(self.op, "operator @ is not defined for type void", self.op.Kind)
 			ret nil
 		| self.r.Type.comptimeTypeInfo() != nil:
 			self.l, self.r = self.r, self.l
@@ -4822,7 +4833,7 @@ impl binaryEval {
 		| self.l.Type.Struct() != nil:
 			ret self.evalStruct()
 		|:
-			self.e.pushErr(self.op, log::OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
+			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -4871,13 +4882,13 @@ impl binaryEval {
 		| token::QUO:
 			ok := self.l.Constant.Div(*self.r.Constant)
 			if !ok && self.r.Constant.AsF64() == 0 {
-				self.e.pushErr(self.op, log::DivByZero)
+				self.e.pushErr(self.op, "divide by zero")
 			}
 			(*v).Constant = self.l.Constant
 		| token::REM:
 			ok := self.l.Constant.Mod(*self.r.Constant)
 			if !ok && self.r.Constant.AsF64() == 0 {
-				self.e.pushErr(self.op, log::DivByZero)
+				self.e.pushErr(self.op, "divide (modulo) by zero")
 			}
 			(*v).Constant = self.l.Constant
 		| token::OR:
@@ -4903,7 +4914,8 @@ impl binaryEval {
 			// and return nil value.
 			i := (*v).Constant.ReadInt()
 			if i.BitLen() > bitLimit {
-				self.e.pushErr(self.op, log::ConstantOverflowResult)
+				self.e.pushErr(self.op, "computation result is overflows compiler limits")
+				self.e.pushSuggestion("your big-integer is too big and reached to safety limit of compiler, try to compute at runtime")
 				*v = nil
 				ret
 			}
@@ -4985,7 +4997,7 @@ impl binaryEval {
 	fn checkValue(mut *self, mut v: &Value, token: &token::Token) {
 		f := v.Type.Func()
 		if f != nil && f.Decl != nil && f.Decl.IsMethod() {
-			self.e.pushErr(token, log::InvalidExprForBinary)
+			self.e.pushErr(token, "methods cannot be used in binary expression")
 		}
 	}
 
@@ -5050,8 +5062,8 @@ impl binaryEval {
 
 	fn eval(mut *self, mut op: &ast::BinaryExpr): &Value {
 		if op.Op.ID == token::ASSIGN {
-			self.e.pushErr(op.Op, log::AssignInExpr)
-			self.e.pushSuggestion(log::UseImperative)
+			self.e.pushErr(op.Op, "assignments are not available for expressions")
+			self.e.pushSuggestion("use clear imperative approach, comes relevant assignment statement before the expression")
 			ret nil
 		}
 
@@ -5293,12 +5305,12 @@ fn checkDataForIntegerIndex(mut s: &sema, mut v: &Value,
 
 	match {
 	| v.Type.Prim() == nil:
-		ret log::InvalidTypeForIndexing
+		ret "invalid type for index"
 	| !types::IsInt(v.Type.Prim().Str()):
-		ret log::InvalidTypeForIndexing
+		ret "invalid type for index"
 	| v.IsConst():
 		if v.Constant.AsF64() < 0 {
-			ret log::OverflowLimits
+			ret "negative index value is illegal"
 		}
 	| v.Type.Prim() == nil
 	| v.IsConst()
@@ -5329,7 +5341,7 @@ fn castConstByType(mut s: &sema, token: &token::Token, mut t: &Type, mut v: &Val
 	match {
 	| types::IsSigInt(kind):
 		if v.untyped && token != nil && !sigAssignable(kind, v) {
-			s.pushErr(token, log::ConstantOverflowType, v.Constant.Str(), t.Str())
+			s.pushErr(token, "untyped value @ overflows @", v.Constant.Str(), t.Str())
 			ret false
 		}
 		match types::BitSizeOf(types::RealKindOf(kind)) {
@@ -5345,7 +5357,7 @@ fn castConstByType(mut s: &sema, token: &token::Token, mut t: &Type, mut v: &Val
 		v.Constant.Kind = kind
 	| types::IsUnsigInt(kind):
 		if v.untyped && token != nil && !unsigAssignable(kind, v) {
-			s.pushErr(token, log::ConstantOverflowType, v.Constant.Str(), t.Str())
+			s.pushErr(token, "untyped value @ overflows @", v.Constant.Str(), t.Str())
 			ret false
 		}
 		match types::BitSizeOf(types::RealKindOf(kind)) {
@@ -5361,7 +5373,7 @@ fn castConstByType(mut s: &sema, token: &token::Token, mut t: &Type, mut v: &Val
 		v.Constant.Kind = kind
 	| types::IsFloat(kind):
 		if v.untyped && token != nil && !floatAssignable(kind, v) {
-			s.pushErr(token, log::ConstantOverflowType, v.Constant.Str(), t.Str())
+			s.pushErr(token, "untyped value @ overflows @", v.Constant.Str(), t.Str())
 			ret false
 		}
 		match types::BitSizeOf(types::RealKindOf(kind)) {
@@ -5373,7 +5385,7 @@ fn castConstByType(mut s: &sema, token: &token::Token, mut t: &Type, mut v: &Val
 		v.Constant.Kind = kind
 	| types::IsCmplx(kind):
 		if v.untyped && token != nil && !cmplxAssignable(kind, v) {
-			s.pushErr(token, log::ConstantOverflowType, v.Constant.Str(), t.Str())
+			s.pushErr(token, "untyped value @ overflows @", v.Constant.Str(), t.Str())
 			ret false
 		}
 		if !v.Constant.IsCmplx128() {
@@ -5480,8 +5492,8 @@ fn checkValue(mut v: &Value, mut s: &sema, mut token: &token::Token, flags: int)
 	if flags&evalExceptional != evalExceptional {
 		fc, (ok) := v.Model.(&FuncCallExpr)
 		if ok && fc.Func.Decl.Exceptional {
-			s.pushErr(token, log::ExceptionalNotPlain)
-			s.pushSuggestion(log::AssignExceptionalResultToVariable)
+			s.pushErr(token, "exceptionals must be used alone, not in binary expression or etc.")
+			s.pushSuggestion("consider assign result of exceptional to variable and then use it")
 			ret false
 		}
 	}
@@ -5493,17 +5505,17 @@ fn checkValue(mut v: &Value, mut s: &sema, mut token: &token::Token, flags: int)
 			min := types::MinI(types::RealKindOf(types::Int))
 			if i.IsU64() {
 				if u64(max) < i.U64() {
-					s.pushErr(token, log::ConstantOverflowType, v.Constant.Str(), primInt.Str())
+					s.pushErr(token, "untyped value @ overflows @", v.Constant.Str(), primInt.Str())
 					ret false
 				}
 			} else if i.IsI64() {
 				x := i.I64()
 				if x < min || max < x {
-					s.pushErr(token, log::ConstantOverflowType, v.Constant.Str(), primInt.Str())
+					s.pushErr(token, "untyped value @ overflows @", v.Constant.Str(), primInt.Str())
 					ret false
 				}
 			} else {
-				s.pushErr(token, log::ConstantOverflowType, v.Constant.Str(), primInt.Str())
+				s.pushErr(token, "untyped value @ overflows @", v.Constant.Str(), primInt.Str())
 				ret false
 			}
 		}
@@ -5515,7 +5527,7 @@ fn checkValue(mut v: &Value, mut s: &sema, mut token: &token::Token, flags: int)
 		if v.IsConst() && v.Constant.IsInt() {
 			i := v.Constant.ReadInt()
 			if !i.IsI64() && !i.IsU64() {
-				s.pushErr(token, log::UntypedNumericForPhysical, i.Str())
+				s.pushErr(token, "cannot use untyped value @ for the actual program, it is too large for any integer type", i.Str())
 				ret false
 			}
 		}

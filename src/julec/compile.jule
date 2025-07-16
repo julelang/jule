@@ -8,6 +8,7 @@ use "julec/obj"
 use "julec/obj/cxx"
 use "julec/obj/meta"
 use "julec/opt"
+use "std/conv"
 use "std/flag"
 use "std/fmt"
 use "std/jule"
@@ -405,7 +406,7 @@ fn buildIR(&args: *[]str): &obj::IR {
 	setupSemaFlags(&semaFlags)
 
 	if len(content) == 0 {
-		handle::Throw(log::Logf(log::MissingCompilePath))
+		handle::Throw("missing compile path")
 	} else if len(content) > 1 {
 		handle::Throw("undefined content: " + content[1])
 	}
@@ -416,17 +417,17 @@ fn buildIR(&args: *[]str): &obj::IR {
 
 	// Check standard library.
 	inf := os::Stat(build::PathStdlib()) else {
-		handle::Throw(log::Logf(log::StdlibNotExist))
+		handle::Throw("standard library is not exist")
 		ret nil // Avoid error.
 	}
 	if !inf.IsDir() {
-		handle::Throw(log::Logf(log::StdlibNotExist))
+		handle::Throw("standard library is not exist")
 	}
 
 	mut ir, logs := obj::IR.Build(path, semaFlags)
 
 	if ir == nil && logs == nil {
-		handle::Throw(log::Logf(log::NoFileInEntryPackage, path))
+		handle::Throw("no file in entry package: " + conv::Quote(path))
 	}
 
 	if logs != nil {
@@ -453,7 +454,7 @@ fn compileCommand(mut &args: *[]str) {
 		const Bind = false
 		meta::Program.EntryPoint = ir.Main.FindFunc(jule::EntryPoint, Bind)
 		if meta::Program.EntryPoint == nil {
-			handle::Throw(log::Logf(log::NoEntryPoint))
+			handle::Throw("entry point missing")
 		}
 	}
 

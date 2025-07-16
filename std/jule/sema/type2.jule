@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-// This file reserved for type compatibility checking.
+// This file reserved for type compatibility analysis.
 
+use "std/conv"
 use "std/jule"
 use "std/jule/ast"
 use "std/jule/build"
@@ -233,7 +234,7 @@ impl typeCompatibilityChecker {
 			ret false
 		}
 		if !ref && traitHasReferenceReceiver(trt) {
-			self.pushErr(log::TraitHasRefParamFunc)
+			self.pushErr("trait uses a reference receiver parameter method, cannot assign non-reference instance")
 			ret false
 		}
 		ret true
@@ -333,10 +334,6 @@ struct assignTypeChecker {
 }
 
 impl assignTypeChecker {
-	fn pushErr(mut *self, fmt: str, args: ...any) {
-		self.s.pushErr(self.errorToken, fmt, args...)
-	}
-
 	fn checkValidity(mut *self): bool {
 		mut valid := true
 		match {
@@ -344,21 +341,21 @@ impl assignTypeChecker {
 			f := self.v.Type.Func()
 			match {
 			| f.IsBuiltin():
-				self.pushErr(log::BuiltinAsNonFunc)
+				self.s.pushErr(self.errorToken, "built-in functions cannot be anonymous")
 				valid = false
 			| f.Decl.Bind:
-				self.pushErr(log::BindedFuncAsAnonFunc)
+				self.s.pushErr(self.errorToken, "bind functions cannot be anonymous")
 				valid = false
 			| !f.Decl.Static && f.Decl.IsMethod():
-				self.pushErr(log::MethodAsAnonFunc)
+				self.s.pushErr(self.errorToken, "methods cannot be anonymous")
 				valid = false
 			| len(f.Decl.Generics) > 0 && len(f.Generics) == 0:
-				self.pushErr(log::GenericedFuncAsAnonFunc)
-				self.s.pushSuggestion(log::InstantiateGenericFuncToUseAsAnon)
+				self.s.pushErr(self.errorToken, "generic functions cannot be anonymous")
+				self.s.pushSuggestion("instantiate generic function to use it as ananoymous with explicit types")
 				valid = false
 			}
 		| self.v.Type.Tuple() != nil:
-			self.pushErr(log::TupleAssignToSingle)
+			self.s.pushErr(self.errorToken, "tuples cannot assign to single define in the same time")
 			valid = false
 		}
 		ret valid
@@ -403,7 +400,7 @@ impl assignTypeChecker {
 		match {
 		| types::IsCmplx(kind):
 			if !cmplxAssignable(kind, self.v) {
-				self.s.pushErr(self.errorToken, log::ConstantOverflowType, self.v.Constant.Str(), self.dest.Str())
+				self.s.pushErr(self.errorToken, "untyped value @ overflows @", self.v.Constant.Str(), self.dest.Str())
 				ret true // Return true to avoid more errors.
 			}
 			// We have to do implicit casting if needed.
@@ -414,7 +411,7 @@ impl assignTypeChecker {
 			self.v.untyped = false
 		| types::IsFloat(kind):
 			if !floatAssignable(kind, self.v) {
-				self.s.pushErr(self.errorToken, log::ConstantOverflowType, self.v.Constant.Str(), self.dest.Str())
+				self.s.pushErr(self.errorToken, "untyped value @ overflows @", self.v.Constant.Str(), self.dest.Str())
 				ret true // Return true to avoid more errors.
 			}
 			self.v.Constant.Kind = kind
@@ -422,7 +419,7 @@ impl assignTypeChecker {
 			self.v.untyped = false
 		| types::IsInt(kind):
 			if !intAssignable(kind, self.v) {
-				self.s.pushErr(self.errorToken, log::ConstantOverflowType, self.v.Constant.Str(), self.dest.Str())
+				self.s.pushErr(self.errorToken, "untyped value @ overflows @", self.v.Constant.Str(), self.dest.Str())
 				ret true // Return true to avoid more errors.
 			}
 			self.v.Constant.Kind = kind
@@ -547,7 +544,7 @@ impl dynamicTypeAnnotation {
 					ret false
 				}
 				if p.IsUnsafe() {
-					self.e.pushErr(self.errorToken, log::UnsafePointerForAnnotation)
+					self.e.pushErr(self.errorToken, "unsafe pointer (*unsafe) type cannot be type inferred")
 					ret false
 				}
 				elem = p.Value
@@ -630,7 +627,7 @@ impl dynamicTypeAnnotation {
 				}
 				p := k.Ptr()
 				if p != nil && p.IsUnsafe() {
-					self.e.pushErr(self.errorToken, log::UnsafePointerForAnnotation)
+					self.e.pushErr(self.errorToken, "unsafe pointer (*unsafe) type cannot be type inferred")
 					ret false
 				}
 				self.pushGeneric(k, i)
@@ -785,7 +782,7 @@ impl dynamicTypeAnnotation {
 		}
 		mut ptr := k.Ptr()
 		if ptr.IsUnsafe() {
-			self.e.pushErr(self.errorToken, log::UnsafePointerForAnnotation)
+			self.e.pushErr(self.errorToken, "unsafe pointer (*unsafe) type cannot be type inferred")
 			ret false
 		}
 		self.k = &pptr.Value
@@ -913,14 +910,6 @@ struct fnCallArgChecker {
 }
 
 impl fnCallArgChecker {
-	fn pushErrToken(mut *self, token: &token::Token, fmt: str, args: ...any) {
-		self.e.s.pushErr(token, fmt, args...)
-	}
-
-	fn pushErr(mut *self, fmt: str, args: ...any) {
-		self.pushErrToken(self.errorToken, fmt, args...)
-	}
-
 	fn getParams(mut *self): []&ParamIns {
 		if len(self.f.Params) > 0 &&
 			self.f.Params[0].Decl != nil &&
@@ -951,9 +940,9 @@ impl fnCallArgChecker {
 			}
 			fall
 		| diff > n:
-			log = log::ArgumentOverflow
+			log = "passed more argument than expected to call @"
 		|:
-			log = log::MissingArgs
+			log = "missing arguments to call @"
 		}
 		mut err := strings::Builder{}
 		err.Grow(1 << 5)
@@ -966,7 +955,7 @@ impl fnCallArgChecker {
 			}
 		}
 		err.WriteByte(')')!
-		self.pushErr(log, err.Str())
+		self.e.s.pushErr(self.errorToken, log, err.Str())
 		ret false
 	}
 
@@ -985,7 +974,8 @@ impl fnCallArgChecker {
 				ok = unsafe { dta.annotate() }
 			}
 			if !ok {
-				self.pushErrToken(errorToken, log::DynamicTypeAnnotationFailed)
+				self.e.s.pushErr(errorToken, "dynamic type annotation failed")
+				self.e.s.pushSuggestion("push generic types explicitly, like; myFunc[Type1, Type2, ...](args)")
 				ret false
 			}
 		}
@@ -1134,7 +1124,7 @@ impl fnCallArgChecker {
 			// Use variable i because when variadic argument appears iteral will break.
 			// And it will increase variable i for point to following argument.
 			// Therefore, variable i always points to problematic argument.
-			self.pushErrToken(self.args[i].Token, log::MoreArgsWithVariadiced)
+			self.e.s.pushErr(self.args[i].Token, "variadic argument cannot be used with plain arguments")
 		}
 
 		if model != nil {
@@ -1177,7 +1167,8 @@ impl fnCallArgChecker {
 	fn checkDynamicTypeAnnotation(mut *self): (ok: bool) {
 		for _, g in self.f.Generics {
 			if g == nil {
-				self.pushErr(log::DynamicTypeAnnotationFailed)
+				self.e.s.pushErr(self.errorToken, "dynamic type annotation failed")
+				self.e.s.pushSuggestion("push generic types explicitly, like; myFunc[Type1, Type2, ...](args)")
 				ret false
 			}
 		}
@@ -1210,7 +1201,7 @@ fn checkMutRiskOfStructLit(mut s: &sema, m: &StructLitExpr) {
 			continue
 		}
 		if !arg.Expr.Mutable && arg.Expr.Type.Mutable() {
-			s.pushErr(arg.Token, log::AssignNonMutToMut, arg.Expr.Type.Str())
+			s.pushErr(arg.Token, "immutable data cannot be assigned to a mutable memory because of type @, which is mutable", arg.Expr.Type.Str())
 		}
 	}
 }
@@ -1257,12 +1248,12 @@ impl structLitChecker {
 		// Check existing.
 		mut f := self.s.FindField(name.Name)
 		if f == nil {
-			self.pushErr(pair.Key.Token, log::IdentNotExist, name.Name)
+			self.pushErr(pair.Key.Token, "undefined: "+name.Name)
 			ret
 		}
 
 		if jule::IsBlank(name.Name) {
-			self.pushErr(pair.Key.Token, log::IgnoreIdent)
+			self.pushErr(pair.Key.Token, "blank identifier cannot be used as an identifier for this declaration")
 			ret
 		}
 
@@ -1275,15 +1266,15 @@ impl structLitChecker {
 				| pair == dpair:
 					break dupLookup
 				| name.Name == dpair.Key.Data.(&ast::NameExpr).Name:
-					self.pushErr(pair.Key.Token, log::AlreadyHasExpr, name.Name)
+					self.pushErr(pair.Key.Token, "field @ is already initialized", conv::Quote(name.Name))
 					ret
 				}
 			}
 		}
 
 		if !self.e.s.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
-			self.pushErr(pair.Key.Token, log::IdentIsNotAccessible, name.Name)
-			self.pushSuggestion(log::MakePubToAccess)
+			self.pushErr(pair.Key.Token, "define is private and could not be accessed: "+name.Name)
+			self.pushSuggestion("make it public by starting with a capital letter")
 			ret
 		}
 
@@ -1306,7 +1297,7 @@ impl structLitChecker {
 			if isPair {
 				_, isName := pair.Key.Data.(&ast::NameExpr)
 				if !isName {
-					self.pushErr(pair.Colon, log::InvalidSyntax)
+					self.pushErr(pair.Colon, "invalid syntax")
 					ok = false
 				}
 			}
@@ -1327,24 +1318,25 @@ impl structLitChecker {
 			| &ast::KeyValueExpr:
 				mut pair := expr.Data.(&ast::KeyValueExpr)
 				if i > 0 && !paired {
-					self.pushErr(pair.Key.Token, log::InvalidSyntax)
+					self.pushErr(pair.Key.Token, "invalid syntax")
 				}
 				paired = true
 				self.checkPair(pair, exprs)
 			|:
 				if paired {
-					self.pushErr(expr.Token, log::ArgMustTargetToField)
+					self.pushErr(expr.Token, "argument must target a field")
+					self.pushSuggestion("like; field:value")
 				}
 				if i >= len(self.s.Fields) {
-					self.pushErr(expr.Token, log::FieldOverflow)
+					self.pushErr(expr.Token, "expression exceeded field count of type")
 					continue
 				}
 
 				mut field := self.s.Fields[i]
 
 				if !self.e.s.isAccessibleDefine(field.Decl.Public, field.Decl.Token) {
-					self.pushErr(self.errorToken, log::StructureLitWithPrivFields)
-					self.pushSuggestion(log::UseFieldPairToInstantiate)
+					self.pushErr(self.errorToken, "structure cannot be instantiated because it has both public and private fields")
+					self.pushSuggestion("use label-expression pairs to instantiate (e.g. Struct{x:foo, y:bar})")
 					ret
 				}
 
@@ -1377,8 +1369,8 @@ impl structLitChecker {
 				idents.WriteStr(", ")!
 				idents.WriteStr(self.s.Fields[n-diff].Decl.Name)!
 			}
-			self.pushErr(self.errorToken, log::MissingExprFor,
-				str(unsafe { idents.Buf() }[2:])) /* Remove first separator. */
+			self.pushErr(self.errorToken, "missing expression for @",
+				idents.Str()[2:]) /* Remove first separator. */
 		}
 	}
 }
@@ -1497,10 +1489,10 @@ impl rangeChecker {
 	fn checkChan(mut *self) {
 		mut c := self.v.Type.Chan()
 		if !c.Recv {
-			self.sc.s.pushErr(self.rang.InToken, log::RecvFromSendOnlyChan)
+			self.sc.s.pushErr(self.rang.InToken, "received from send-only channel")
 		}
 		if self.rang.B != nil && !jule::IsBlank(self.rang.B.Name) {
-			self.sc.s.pushErr(self.rang.B.Token, log::IterPermitsNVar, c.Str(), "1")
+			self.sc.s.pushErr(self.rang.B.Token, "iteration for type @ allows only 1 iteration variable", c.Str())
 		}
 		if self.rang.A == nil || jule::IsBlank(self.rang.A.Name) {
 			ret
@@ -1515,10 +1507,10 @@ impl rangeChecker {
 	fn checkComptime(mut *self) {
 		self.setSizeKey()
 		if self.rang.A != nil && self.rang.A.Mutable {
-			self.sc.s.pushErr(self.rang.A.Token, log::CannotBeMut, self.rang.A.Name)
+			self.sc.s.pushErr(self.rang.A.Token, "variable of comptime iteration cannot be mutable", self.rang.A.Name)
 		}
 		if self.rang.B != nil && self.rang.B.Mutable {
-			self.sc.s.pushErr(self.rang.B.Token, log::CannotBeMut, self.rang.B.Name)
+			self.sc.s.pushErr(self.rang.B.Token, "variable of comptime iteration cannot be mutable", self.rang.B.Name)
 		}
 		if self.rang.B == nil || jule::IsBlank(self.rang.B.Name) {
 			ret
@@ -1540,7 +1532,8 @@ impl rangeChecker {
 			self.checkComptime()
 			ret true
 		|:
-			self.sc.s.pushErr(self.rang.InToken, log::IterRangeRequireEnumerableExpr)
+			self.sc.s.pushErr(self.rang.InToken, "expected enumerable expression for range iteration")
+			self.sc.s.pushSuggestion("such as slice, array, or string type")
 			ret false
 		}
 	}
@@ -1570,7 +1563,8 @@ impl rangeChecker {
 				ret true
 			}
 		}
-		self.sc.s.pushErr(self.rang.InToken, log::IterRangeRequireEnumerableExpr)
+		self.sc.s.pushErr(self.rang.InToken, "expected enumerable expression for range iteration")
+		self.sc.s.pushSuggestion("such as slice, array, or string type")
 		ret false
 	}
 }
@@ -1688,7 +1682,7 @@ impl retTypeChecker {
 			// which is might be confusing.
 			if ac.check() {
 				if self.mutable && !v.Mutable && typMutable {
-					self.sc.s.pushErr(expr.Token, log::RetWithMutTypedNonMut)
+					self.sc.s.pushErr(expr.Token, "return expressions should be mutable")
 				}
 			}
 		}
@@ -1730,9 +1724,13 @@ impl retTypeChecker {
 			}
 		}
 		if len(self.exprs) < len(self.types) {
-			self.sc.s.pushErr(self.errorToken, log::NotEnoughVariablesForRet, wanted.Str(), given.Str())
+			self.sc.s.pushErr(self.errorToken,
+				"not enough variables to return\n       @ required\n       @ provided",
+				wanted.Str(), given.Str())
 		} else {
-			self.sc.s.pushErr(self.errorToken, log::TooManyVariablesForRet, wanted.Str(), given.Str())
+			self.sc.s.pushErr(self.errorToken,
+				"too many variables to return\n       @ required\n       @ provided",
+				wanted.Str(), given.Str())
 		}
 	}
 

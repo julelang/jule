@@ -23,11 +23,11 @@ impl directiveChecker {
 			}
 			fall
 		|:
-			self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
 		}
 
 		if len(d.Args) > 0 {
-			self.s.pushErr(d.Args[0], log::InvalidSyntax)
+			self.s.pushErr(d.Args[0], "invalid syntax")
 		}
 	}
 
@@ -39,11 +39,11 @@ impl directiveChecker {
 			}
 			fall
 		|:
-			self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
 		}
 
 		if len(d.Args) > 0 {
-			self.s.pushErr(d.Args[0], log::InvalidSyntax)
+			self.s.pushErr(d.Args[0], "invalid syntax")
 		}
 	}
 
@@ -51,30 +51,31 @@ impl directiveChecker {
 		match type self.o {
 		| &Struct:
 			if !self.o.(&Struct).Bind {
-				self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
 			}
 		| &Func:
 			if !self.o.(&Func).Bind {
-				self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
 			}
 		| &Var:
 			if !self.o.(&Var).Bind {
-				self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
 			}
 		|:
-			self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
 		}
 
 		if len(d.Args) == 0 {
-			self.s.pushErr(d.Tag, log::MissingExpr)
+			self.s.pushErr(d.Tag, "missing expression")
 			ret
 		} else if len(d.Args) > 1 {
-			self.s.pushErr(d.Args[1], log::ArgumentOverflow, d.Tag.Kind)
+			self.s.pushErr(d.Args[1], `passed more argument than expected to directive #namespace`)
+			self.s.pushSuggestion(`use like; #namespace "namespace"`)
 		}
 
 		arg := d.Args[0]
 		if arg.ID != token::STR || arg.Kind[0] != '"' {
-			self.s.pushErr(arg, log::InvalidSyntax)
+			self.s.pushErr(arg, "invalid syntax")
 			ret
 		}
 
@@ -102,16 +103,16 @@ impl directiveChecker {
 				break
 			}
 			if f.IsMethod() {
-				self.s.pushErr(f.Token, log::TestMethod)
+				self.s.pushErr(f.Token, "methods cannot be test function")
 				break
 			}
 			fall
 		|:
-			self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
 		}
 
 		if len(d.Args) > 0 {
-			self.s.pushErr(d.Args[0], log::InvalidSyntax)
+			self.s.pushErr(d.Args[0], "invalid syntax")
 		}
 	}
 
@@ -120,29 +121,30 @@ impl directiveChecker {
 		| &Func:
 			f := self.o.(&Func)
 			if f.Bind || f.IsInit() || f.IsEntryPoint() || f.IsMethod() || len(f.Generics) > 0 {
-				self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
 				ret
 			}
 		| &Var:
 			v := self.o.(&Var)
 			if v.Bind || v.Constant {
-				self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
 			}
 		|:
-			self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
 			ret
 		}
 		if len(d.Args) > 1 {
-			self.s.pushErr(d.Args[1], log::ArgumentOverflow, d.Tag.Kind)
+			self.s.pushErr(d.Args[1], `passed more argument than expected to directive #export`)
+			self.s.pushSuggestion(`use like; #export "name"`)
 			ret
 		}
 		if len(d.Args) < 1 {
-			self.s.pushErr(d.Tag, log::MissingExpr)
+			self.s.pushErr(d.Tag, "missing expression")
 			ret
 		}
 		arg := d.Args[0]
 		if arg.ID != token::STR || arg.Kind[0] != '"' {
-			self.s.pushErr(arg, log::InvalidSyntax)
+			self.s.pushErr(arg, "invalid syntax")
 			ret
 		}
 		// remove quotes
@@ -154,11 +156,11 @@ impl directiveChecker {
 		| &Func:
 			f := self.o.(&Func)
 			if f.Bind {
-				self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
 				ret
 			}
 		|:
-			self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
 			ret
 		}
 		if len(d.Args) == 0 {
@@ -193,11 +195,11 @@ impl directiveChecker {
 			self.checkExport(d)
 		| directive::Build
 		| directive::Pass:
-			self.s.pushErr(d.Tag, log::UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
 		| directive::Disable:
 			self.checkDisable(d)
 		|:
-			self.s.pushErr(d.Tag, log::InvalidLabel, d.Tag.Kind)
+			self.s.pushErr(d.Tag, "invalid label: "+d.Tag.Kind)
 		}
 	}
 

@@ -323,17 +323,17 @@ impl symBuilder {
 	fn checkCppUseDeclPath(mut *self, decl: &ast::Use, path: str): (ok: bool) {
 		ext := filepath::Ext(path)
 		if !build::IsValidHeaderExt(ext) && !build::IsValidCppExt(ext) {
-			self.pushErr(decl.Token, log::InvalidCppExt, ext)
+			self.pushErr(decl.Token, "invalid C/C++ extension: "+conv::Quote(ext))
 			ret false
 		}
 
 		// Exist?
 		info := os::Stat(path) else {
-			self.pushErr(decl.Token, log::UseNotFound, decl.Path.Kind)
+			self.pushErr(decl.Token, "path not found or cannot be accessed: "+decl.Path.Kind)
 			ret false
 		}
 		if !info.Mode().IsRegular() {
-			self.pushErr(decl.Token, log::UseNotFound, decl.Path.Kind)
+			self.pushErr(decl.Token, "path not found or cannot be accessed: "+decl.Path.Kind)
 			ret false
 		}
 
@@ -352,7 +352,7 @@ impl symBuilder {
 
 			// Set to absolute path for correct include path.
 			path = filepath::Abs(path) else {
-				self.pushErr(decl.Token, log::UseNotFound, decl.Path.Kind)
+				self.pushErr(decl.Token, "path not found or cannot be accessed: "+decl.Path.Kind)
 				use ""
 			}
 		}
@@ -375,8 +375,8 @@ impl symBuilder {
 		// For the local packages, the root package needs a module.
 		mut modPath := self.importer.GetModPath()
 		if len(modPath) == 0 {
-			self.pushErr(decl.Path, log::ModuleNotFound)
-			self.pushSuggestion(log::UseModInit)
+			self.pushErr(decl.Path, "module not found")
+			self.pushSuggestion(`run "julec mod init" to initialize a module in the current directory`)
 			ret ""
 		}
 
@@ -406,17 +406,17 @@ impl symBuilder {
 		// make sure we have an absolute path to the package.
 		filepath = filepath::Join(modPath, filepath)
 		filepath = filepath::Abs(filepath) else {
-			self.pushErr(decl.Path, log::UseNotFound, decl.Path.Kind)
+			self.pushErr(decl.Path, "path not found or cannot be accessed: "+decl.Path.Kind)
 			ret ""
 		}
 
 		// Check the absolute path is exist and a directory (package).
 		info := os::Stat(filepath) else {
-			self.pushErr(decl.Path, log::UseNotFound, decl.Path.Kind)
+			self.pushErr(decl.Path, "path not found or cannot be accessed: "+decl.Path.Kind)
 			ret ""
 		}
 		if !info.IsDir() {
-			self.pushErr(decl.Path, log::UseNotFound, decl.Path.Kind)
+			self.pushErr(decl.Path, "path not found or cannot be accessed: "+decl.Path.Kind)
 			ret ""
 		}
 
@@ -426,23 +426,23 @@ impl symBuilder {
 	// Same as the [checkAbsPath] method but designed for std package paths.
 	fn checkStdAbsPath(mut &self, mut filepath: str, mut decl: &ast::Use): str {
 		if filepath == "std" {
-			self.pushErr(decl.Path, log::InvalidImportPath, decl.Path.Kind)
+			self.pushErr(decl.Path, "invalid import path: "+decl.Path.Kind)
 			ret ""
 		}
 		filepath = filepath[len("std")+1:] // cut "std" + pathsep prefix
 		filepath = filepath::Join(build::PathStdlib(), filepath)
 		filepath = filepath::Abs(filepath) else {
-			self.pushErr(decl.Path, log::UseNotFound, decl.Path.Kind)
+			self.pushErr(decl.Path, "path not found or cannot be accessed: "+decl.Path.Kind)
 			ret ""
 		}
 
 		// Exist?
 		info := os::Stat(filepath) else {
-			self.pushErr(decl.Path, log::UseNotFound, decl.Path.Kind)
+			self.pushErr(decl.Path, "path not found or cannot be accessed: "+decl.Path.Kind)
 			ret ""
 		}
 		if !info.IsDir() {
-			self.pushErr(decl.Path, log::UseNotFound, decl.Path.Kind)
+			self.pushErr(decl.Path, "path not found or cannot be accessed: "+decl.Path.Kind)
 			ret ""
 		}
 
@@ -453,18 +453,18 @@ impl symBuilder {
 	fn checkImpPath(mut &self, mut decl: &ast::Use): (std: bool, filepath: str) {
 		path := decl.Path.Kind[1 : len(decl.Path.Kind)-1] // remove quotes
 		if strings::HasSuffix(path, jule::ImportPathSep) {
-			self.pushErr(decl.Path, log::InvalidImportPath, decl.Path.Kind)
+			self.pushErr(decl.Path, "invalid import path: "+decl.Path.Kind)
 			ret
 		}
 		parts := strings::Split(path, jule::ImportPathSep)
 		if len(parts) == 0 {
-			self.pushErr(decl.Path, log::InvalidImportPath, decl.Path.Kind)
+			self.pushErr(decl.Path, "invalid import path: "+decl.Path.Kind)
 			ret
 		}
 		std = parts[0] == "std"
 		for _, part in parts {
 			if part == "" || jule::IsBlank(part) || strings::ContainsRune(part, '.') {
-				self.pushErr(decl.Path, log::InvalidImportPath, decl.Path.Kind)
+				self.pushErr(decl.Path, "invalid import path: "+decl.Path.Kind)
 				ret false, ""
 			}
 			filepath = filepath::Join(filepath, part)
@@ -525,16 +525,14 @@ impl symBuilder {
 		if lpkg == nil {
 			ret true
 		}
-		self.pushErr(pkg.Decl.Token, log::DuplicateUseDecl, pkg.LinkPath)
-		self.pushSuggestion(log::RemoveUseDeclAvoidDuplication)
+		self.pushErr(pkg.Decl.Token, "package @ is already imported", pkg.LinkPath)
+		self.pushSuggestion("remove dupliate use declarations for to the same package")
 		ret false
 	}
 
 	fn pushCycleError(mut &self, sb: &symBuilder, path: str, mut &message: *strings::Builder) {
 		const Padding = 7
-		refersTo := log::Logf(log::RefersTo,
-			"\""+sb.importPath+"\"",
-			"\""+path+"\"")
+		refersTo := log::Logf("@ refers to @", conv::Quote(sb.importPath), conv::Quote(path))
 		message.WriteStr(strings::Repeat(" ", Padding))!
 		message.WriteStr(refersTo)!
 		message.WriteByte('\n')!
@@ -550,12 +548,12 @@ impl symBuilder {
 				break
 			}
 		}
-		self.pushErr(errorToken, log::PkgIllegalCrossCycle, message.Str())
+		self.pushErr(errorToken, "illegal cross cycle in use declarations:\n"+message.Str())
 	}
 
 	fn checkImportCycles(mut &self, imp: &ImportInfo, decl: &ast::Use): bool {
 		if imp.Path == self.table.File.Dir() {
-			self.pushErr(decl.Token, log::PkgIllegalCycleRefersItself, imp.LinkPath)
+			self.pushErr(decl.Token, "package @ cannot refer to itself", imp.LinkPath)
 			ret false
 		}
 		if self.owner == nil {
@@ -590,19 +588,19 @@ impl symBuilder {
 			// "internal" or "internal/" ?
 			if len(path)-len(InternalName) == 0 ||
 				strings::HasPrefix(path, InternalName+jule::ImportPathSep) {
-				self.pushErr(decl.Token, log::UseDeclForInternal)
+				self.pushErr(decl.Token, "internal packages cannot be accessed")
 			}
 			ret
 		}
 		// "/internal" ?
 		if path[i-1:] == jule::ImportPathSep+InternalName {
-			self.pushErr(decl.Token, log::UseDeclForInternal)
+			self.pushErr(decl.Token, "internal packages cannot be accessed")
 			ret
 		}
 		// "/internal/" ?
 		n := i + len(InternalName) + 1
 		if n < len(path) && path[i-1:n] == jule::ImportPathSep+InternalName+jule::ImportPathSep {
-			self.pushErr(decl.Token, log::UseDeclForInternal)
+			self.pushErr(decl.Token, "internal packages cannot be accessed")
 			ret
 		}
 	}
@@ -725,7 +723,7 @@ impl symBuilder {
 			mut e := buildTypeEnum(node.Data.(&ast::TypeEnum))
 			self.table.TypeEnums = append(self.table.TypeEnums, e)
 		|:
-			self.pushErr(node.Token, log::InvalidSyntax)
+			self.pushErr(node.Token, "invalid syntax")
 		}
 	}
 
@@ -737,16 +735,18 @@ impl symBuilder {
 
 	fn pushDirectivePass(mut *self, mut d: &ast::Directive) {
 		if len(d.Args) == 0 {
-			self.pushErr(d.Tag, log::MissingExpr)
+			self.pushErr(d.Tag, "missing expression")
+			self.pushSuggestion(`use like; #pass "-arg"`)
 			ret
 		} else if len(d.Args) > 1 {
 			arg := d.Args[1]
-			self.pushErr(arg, log::ArgumentOverflow, d.Tag.Kind)
+			self.pushErr(arg, `passed more argument than expected to directive #pass`)
+			self.pushSuggestion(`use like; #pass "-arg"`)
 		}
 
 		arg := d.Args[0]
 		if arg.ID != token::STR || arg.Kind[0] != '"' {
-			self.pushErr(arg, log::InvalidSyntax)
+			self.pushErr(arg, "invalid syntax")
 			ret
 		}
 

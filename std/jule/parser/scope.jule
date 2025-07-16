@@ -213,7 +213,7 @@ impl scopeParser {
 		}
 
 		if self.isLastSt() {
-			self.pushErr(it.Token, log::InvalidSyntax)
+			self.pushErr(it.Token, "invalid syntax")
 			ret nil
 		}
 
@@ -232,12 +232,11 @@ impl scopeParser {
 		mut blockTokens := range(&i, token::LBRACE, token::RBRACE, tokens)
 		if blockTokens == nil {
 			self.stop()
-			self.pushErr(it.Token, log::BodyNotExist)
-			self.pushSuggestion(log::ExpectedBody)
+			self.pushErr(it.Token, "missing iteration body")
 			ret nil
 		}
 		if i < len(tokens) {
-			self.pushErr(tokens[i], log::InvalidSyntax)
+			self.pushErr(tokens[i], "invalid syntax")
 		}
 
 		it.Scope = self.buildScope(blockTokens, tokens[i-1])
@@ -269,15 +268,15 @@ impl scopeParser {
 		if key.Token.ID == token::MUT {
 			key.Mutable = true
 			if len(tokens) == 1 {
-				self.pushErr(key.Token, log::InvalidSyntax)
+				self.pushErr(key.Token, "invalid syntax")
 			}
 			key.Token = tokens[1]
 		} else if len(tokens) > 1 {
-			self.pushErr(tokens[1], log::InvalidSyntax)
+			self.pushErr(tokens[1], "invalid syntax")
 		}
 		if key.Token.ID != token::NAME {
-			self.pushErr(key.Token, log::InvalidSyntax)
-			self.pushSuggestion(log::ExpectedIdentifier)
+			self.pushErr(key.Token, "invalid syntax")
+			self.pushSuggestion("give an identifier because identifier expected")
 			ret nil
 		}
 		key.Name = key.Token.Kind
@@ -298,7 +297,8 @@ impl scopeParser {
 			ret
 		}
 		if len(keyTokens) > 2 {
-			self.pushErr(rng.InToken, log::MuchRangeVars)
+			self.pushErr(rng.InToken, "range variables out of range (ironically)")
+			self.pushSuggestion("most iterations takes (0, 2) variables")
 		}
 		mut keys := self.buildRangeKindKeys(keyTokens)
 		rng.A = keys[0]
@@ -311,7 +311,7 @@ impl scopeParser {
 		mut i := 0
 		mut rang := range(&i, token::LPAREN, token::RPAREN, tokens)
 		if i < len(tokens) {
-			self.pushErr(rng.InToken, log::InvalidSyntax)
+			self.pushErr(rng.InToken, "invalid syntax")
 		}
 		self.setupRangeKindKeysPlain(rng, rang)
 	}
@@ -330,7 +330,7 @@ impl scopeParser {
 			InToken: inToken,
 		}
 		if len(exprTokens) == 0 {
-			self.pushErr(rng.InToken, log::MissingExpr)
+			self.pushErr(rng.InToken, "missing iteration expression")
 			ret rng
 		}
 		rng.X = self.p.buildExpr(exprTokens)
@@ -374,8 +374,7 @@ impl scopeParser {
 		tokens = tokens[1:] // Skip "iter" keyword.
 		if len(tokens) == 0 {
 			self.stop()
-			self.pushErr(it.Token, log::BodyNotExist)
-			self.pushSuggestion(log::ExpectedBody)
+			self.pushErr(it.Token, "missing iteration body")
 			ret nil
 		}
 		mut exprTokens := getBlockExpr(tokens)
@@ -386,12 +385,11 @@ impl scopeParser {
 		mut scopeTokens := range(&i, token::LBRACE, token::RBRACE, tokens)
 		if scopeTokens == nil {
 			self.stop()
-			self.pushErr(it.Token, log::BodyNotExist)
-			self.pushSuggestion(log::ExpectedBody)
+			self.pushErr(it.Token, "missing iteration body")
 			ret nil
 		}
 		if i < len(tokens) {
-			self.pushErr(tokens[i], log::InvalidSyntax)
+			self.pushErr(tokens[i], "invalid syntax")
 		}
 		it.Scope = self.buildScope(scopeTokens, tokens[i-1])
 		ret it
@@ -410,12 +408,12 @@ impl scopeParser {
 		}
 		if len(tokens) > 1 {
 			if tokens[1].ID != token::NAME {
-				self.pushErr(tokens[1], log::InvalidSyntax)
-				self.pushSuggestion(log::ExpectedLabelIdent)
+				self.pushErr(tokens[1], "invalid syntax")
+				self.pushSuggestion("give a label identifier because label expected")
 			} else {
 				brk.Label = tokens[1]
 				if len(tokens) > 2 {
-					self.pushErr(tokens[1], log::InvalidSyntax)
+					self.pushErr(tokens[1], "invalid syntax")
 				}
 			}
 		}
@@ -428,12 +426,12 @@ impl scopeParser {
 		}
 		if len(tokens) > 1 {
 			if tokens[1].ID != token::NAME {
-				self.pushErr(tokens[1], log::InvalidSyntax)
-				self.pushSuggestion(log::ExpectedLabelIdent)
+				self.pushErr(tokens[1], "invalid syntax")
+				self.pushSuggestion("give a label identifier because label expected")
 			} else {
 				cont.Label = tokens[1]
 				if len(tokens) > 2 {
-					self.pushErr(tokens[1], log::InvalidSyntax)
+					self.pushErr(tokens[1], "invalid syntax")
 				}
 			}
 		}
@@ -448,15 +446,14 @@ impl scopeParser {
 		mut exprTokens := getBlockExpr(*tokens)
 		mut i := 0
 		if len(exprTokens) == 0 {
-			self.pushErr(model.Token, log::MissingExpr)
+			self.pushErr(model.Token, "missing condition expression of if statement")
 		} else {
 			i = len(exprTokens)
 		}
 		mut scopeTokens := range(&i, token::LBRACE, token::RBRACE, *tokens)
 		if scopeTokens == nil {
 			self.stop()
-			self.pushErr(model.Token, log::BodyNotExist)
-			self.pushSuggestion(log::ExpectedBody)
+			self.pushErr(model.Token, "missing if statement body")
 			ret nil
 		}
 		mut end := (*tokens)[i-1]
@@ -464,7 +461,7 @@ impl scopeParser {
 			if (*tokens)[i].ID == token::ELSE {
 				*tokens = (*tokens)[i:]
 			} else {
-				self.pushErr((*tokens)[i], log::InvalidSyntax)
+				self.pushErr((*tokens)[i], "invalid syntax")
 				*tokens = nil
 			}
 		}
@@ -482,16 +479,15 @@ impl scopeParser {
 		mut scopeTokens := range(&i, token::LBRACE, token::RBRACE, *tokens)
 		if scopeTokens == nil {
 			if i < len(*tokens) {
-				self.pushErr(els.Token, log::ElseHaveExpr)
+				self.pushErr(els.Token, "else statement cannot have expression")
 			} else {
 				self.stop()
-				self.pushErr(els.Token, log::BodyNotExist)
-				self.pushSuggestion(log::ExpectedBody)
+				self.pushErr(els.Token, "missing else statement body")
 			}
 			ret nil
 		}
 		if i < len(*tokens) {
-			self.pushErr((*tokens)[i], log::InvalidSyntax)
+			self.pushErr((*tokens)[i], "invalid syntax")
 		}
 		els.Scope = self.buildScope(scopeTokens, (*tokens)[i-1])
 		ret els
@@ -523,7 +519,7 @@ impl scopeParser {
 		token := tokens[0]
 		tokens = tokens[1:] // Start 1 to skip "co" token.
 		if len(tokens) == 0 {
-			self.pushErr(token, log::InvalidSyntax)
+			self.pushErr(token, "invalid syntax")
 			ret nil
 		}
 		mut e := self.p.buildExpr(tokens)
@@ -534,7 +530,7 @@ impl scopeParser {
 		| &ast::CallExpr:
 			e.Data.(&ast::CallExpr).IsCo = true
 		|:
-			self.pushErr(token, log::ExprNotFuncCall)
+			self.pushErr(token, "co statement must have function call expression")
 		}
 		ret e
 	}
@@ -544,15 +540,15 @@ impl scopeParser {
 			Token: tokens[0],
 		}
 		if len(tokens) == 1 {
-			self.pushErr(gt.Token, log::MissingGotoLabel)
+			self.pushErr(gt.Token, "missing label identifier for goto statement")
 			ret nil
 		} else if len(tokens) > 2 {
-			self.pushErr(tokens[2], log::InvalidSyntax)
+			self.pushErr(tokens[2], "invalid syntax")
 		}
 		mut identToken := tokens[1]
 		if identToken.ID != token::NAME {
-			self.pushErr(identToken, log::InvalidSyntax)
-			self.pushSuggestion(log::ExpectedIdentifier)
+			self.pushErr(identToken, "invalid syntax")
+			self.pushSuggestion("give an identifier because identifier expected")
 			ret gt
 		}
 		gt.Label = identToken
@@ -564,7 +560,7 @@ impl scopeParser {
 			Token: tokens[0],
 		}
 		if len(tokens) > 1 {
-			self.pushErr(tokens[1], log::InvalidSyntax)
+			self.pushErr(tokens[1], "invalid syntax")
 		}
 		ret fll
 	}
@@ -586,7 +582,7 @@ impl scopeParser {
 			if ok {
 				*exprs = append(*exprs, t)
 				if i < len(tokens) {
-					self.pushErr(tokens[i], log::InvalidSyntax)
+					self.pushErr(tokens[i], "invalid syntax")
 				}
 			}
 			ret
@@ -619,7 +615,7 @@ impl scopeParser {
 			| tok.ID == token::OR:
 				mut exprTokens := (*tokens)[j:i]
 				if len(exprTokens) == 0 {
-					self.pushErr(tok, log::MissingExpr)
+					self.pushErr(tok, "missing case expression for match statement")
 				} else {
 					self.pushCaseExpr(exprTokens, tok, typeMatch, &exprs)
 				}
@@ -631,14 +627,14 @@ impl scopeParser {
 					// If we have expression already for this case,
 					// disallow expressionless case. For default case,
 					// allow this, if case is just completely empty.
-					self.pushErr(tok, log::MissingExpr)
+					self.pushErr(tok, "missing case expression for match statement")
 				}
 				self.pushCaseExpr(exprTokens, tok, typeMatch, &exprs)
 				*tokens = (*tokens)[i+1:]
 				ret exprs, i-j == 0 || len(exprs) != 0
 			}
 		}
-		self.pushErr((*tokens)[0], log::InvalidSyntax)
+		self.pushErr((*tokens)[0], "invalid syntax")
 		*tokens = nil
 		ret nil, false
 	}
@@ -677,7 +673,7 @@ impl scopeParser {
 		*tokens = (*tokens)[1:] // Remove case prefix.
 		let mut colon: &token::Token = nil
 		if len(*tokens) == 0 {
-			self.pushErr(c.Token, log::InvalidSyntax)
+			self.pushErr(c.Token, "invalid syntax")
 			ret nil, false
 		}
 		c.X, ok := self.buildCaseExprs(tokens, &colon, typeMatch)
@@ -696,7 +692,7 @@ impl scopeParser {
 		for len(tokens) > 0 {
 			mut tok := tokens[0]
 			if tok.ID != token::OR {
-				self.pushErr(tok, log::InvalidSyntax)
+				self.pushErr(tok, "invalid syntax")
 				break
 			}
 			mut c, isDefault := self.buildCase(&tokens, typeMatch)
@@ -708,7 +704,7 @@ impl scopeParser {
 						Scope: c.Scope,
 					}
 				} else {
-					self.pushErr(tok, log::InvalidSyntax)
+					self.pushErr(tok, "invalid syntax")
 				}
 			} else {
 				defNotLast = defNotLast || def != nil
@@ -717,7 +713,7 @@ impl scopeParser {
 		}
 
 		if defNotLast {
-			self.pushErr(def.Token, log::DefaultNotLast)
+			self.pushErr(def.Token, "default case of math statement must be the last case")
 		}
 
 		ret cases, def
@@ -738,18 +734,17 @@ impl scopeParser {
 		if len(exprTokens) > 0 {
 			m.X = self.p.buildExpr(exprTokens)
 		} else if m.Type {
-			self.pushErr(m.Token, log::MissingExpr)
+			self.pushErr(m.Token, "missing type-match statement expression")
 		}
 
 		mut i := len(exprTokens)
 		mut blockToks := range(&i, token::LBRACE, token::RBRACE, tokens)
 		if blockToks == nil {
 			self.stop()
-			self.pushErr(m.Token, log::BodyNotExist)
-			self.pushSuggestion(log::ExpectedBody)
+			self.pushErr(m.Token, "missing type-match statement body")
 			ret nil
 		} else if i < len(tokens) {
-			self.pushErr(tokens[i], log::InvalidSyntax)
+			self.pushErr(tokens[i], "invalid syntax")
 		}
 		m.End = tokens[i-1]
 		m.Cases, m.Default = self.buildCases(blockToks, m.Type)
@@ -779,7 +774,7 @@ impl scopeParser {
 			}
 			match {
 			| tok.ID == token::OR:
-				self.pushErr(tok, log::ExpectedNExpr, "1")
+				self.pushErr(tok, "missing expression after |")
 				*tokens = nil
 				ret nil, false
 			| tok.ID == token::COLON:
@@ -804,7 +799,7 @@ impl scopeParser {
 				ret exprs, i-j == 0 || len(exprs) != 0
 			}
 		}
-		self.pushErr((*tokens)[0], log::InvalidSyntax)
+		self.pushErr((*tokens)[0], "invalid syntax")
 		*tokens = nil
 		ret nil, false
 	}
@@ -816,7 +811,7 @@ impl scopeParser {
 		*tokens = (*tokens)[1:] // Remove case prefix.
 		let mut colon: &token::Token = nil
 		if len(*tokens) == 0 {
-			self.pushErr(c.Token, log::InvalidSyntax)
+			self.pushErr(c.Token, "invalid syntax")
 			ret nil, false
 		}
 		c.X, ok := self.buildSelectCaseExpr(tokens, &colon)
@@ -835,7 +830,7 @@ impl scopeParser {
 		for len(tokens) > 0 {
 			mut tok := tokens[0]
 			if tok.ID != token::OR {
-				self.pushErr(tok, log::InvalidSyntax)
+				self.pushErr(tok, "invalid syntax")
 				break
 			}
 			mut c, isDefault := self.buildSelectCase(&tokens)
@@ -847,7 +842,7 @@ impl scopeParser {
 						Scope: c.Scope,
 					}
 				} else {
-					self.pushErr(tok, log::InvalidSyntax)
+					self.pushErr(tok, "invalid syntax")
 				}
 			} else {
 				defNotLast = defNotLast || def != nil
@@ -855,7 +850,7 @@ impl scopeParser {
 			}
 		}
 		if defNotLast {
-			self.pushErr(def.Token, log::DefaultNotLast)
+			self.pushErr(def.Token, "default case of select statement must be the last case")
 		}
 		ret cases, def
 	}
@@ -868,11 +863,10 @@ impl scopeParser {
 		mut blockToks := range(&i, token::LBRACE, token::RBRACE, tokens)
 		if blockToks == nil {
 			self.stop()
-			self.pushErr(m.Token, log::BodyNotExist)
-			self.pushSuggestion(log::ExpectedBody)
+			self.pushErr(m.Token, "missing select statement body")
 			ret nil
 		} else if i < len(tokens) {
-			self.pushErr(tokens[i], log::InvalidSyntax)
+			self.pushErr(tokens[i], "invalid syntax")
 		}
 		m.End = tokens[i-1]
 		m.Cases, m.Default = self.buildSelectCases(blockToks)
@@ -887,7 +881,7 @@ impl scopeParser {
 			isUnsafe = true
 			tokens = tokens[1:]
 			if len(tokens) == 0 {
-				self.pushErr(token, log::InvalidSyntax)
+				self.pushErr(token, "invalid syntax")
 				ret nil
 			}
 			token = tokens[0]
@@ -895,7 +889,7 @@ impl scopeParser {
 				isDeferred = true
 				tokens = tokens[1:]
 				if len(tokens) == 0 {
-					self.pushErr(token, log::InvalidSyntax)
+					self.pushErr(token, "invalid syntax")
 					ret nil
 				}
 			}
@@ -903,7 +897,7 @@ impl scopeParser {
 			isDeferred = true
 			tokens = tokens[1:]
 			if len(tokens) == 0 {
-				self.pushErr(token, log::InvalidSyntax)
+				self.pushErr(token, "invalid syntax")
 				ret nil
 			}
 		}
@@ -911,10 +905,10 @@ impl scopeParser {
 		mut i := 0
 		mut scopeTokens := range(&i, token::LBRACE, token::RBRACE, tokens)
 		if scopeTokens == nil {
-			self.pushErr(token, log::InvalidSyntax)
+			self.pushErr(token, "invalid syntax")
 			ret nil
 		} else if i < len(tokens) {
-			self.pushErr(tokens[i], log::InvalidSyntax)
+			self.pushErr(tokens[i], "invalid syntax")
 		}
 		mut scope := self.buildScope(scopeTokens, tokens[i-1])
 		scope.Unsafe = isUnsafe
@@ -988,7 +982,7 @@ impl scopeParser {
 			info.r = tokens[i+1:]
 			if token::IsPostfix(info.setter.ID) {
 				if len(info.r) > 0 {
-					self.pushErr(info.r[0], log::InvalidSyntax)
+					self.pushErr(info.r[0], "invalid syntax")
 					info.r = nil
 				}
 			}
@@ -1109,7 +1103,7 @@ impl scopeParser {
 				isMut = true
 				part = part[1:]
 				if len(part) == 0 {
-					self.pushErr(token, log::InvalidSyntax)
+					self.pushErr(token, "invalid syntax")
 					ret false
 				}
 			}
@@ -1118,13 +1112,13 @@ impl scopeParser {
 				isRef = true
 				part = part[1:]
 				if len(part) == 0 {
-					self.pushErr(token, log::InvalidSyntax)
+					self.pushErr(token, "invalid syntax")
 					ret false
 				}
 			}
 
 			if part[0].ID != token::NAME && part[0].ID != token::LPAREN {
-				self.pushErr(token, log::InvalidSyntax)
+				self.pushErr(token, "invalid syntax")
 				ret false
 			}
 
@@ -1158,12 +1152,12 @@ impl scopeParser {
 		mut i := 0
 		mut rang := range(&i, token::LPAREN, token::RPAREN, tokens)
 		if rang == nil {
-			self.pushErr(token, log::InvalidSyntax)
+			self.pushErr(token, "invalid syntax")
 			ret nil, false
 		} else if i+1 < len(tokens) {
 			assign.Op = tokens[i]
 			if assign.Op.ID != token::ASSIGN {
-				self.pushErr(assign.Op, log::InvalidSyntax)
+				self.pushErr(assign.Op, "invalid syntax")
 			}
 			i++
 			mut exprTokens := tokens[i:]
@@ -1189,7 +1183,7 @@ impl scopeParser {
 
 	fn buildUseExpr(mut *self, mut tokens: []&token::Token): &ast::UseExpr {
 		if len(tokens) == 1 {
-			self.pushErr(tokens[0], log::MissingExpr)
+			self.pushErr(tokens[0], "missing use statement expression")
 			ret nil
 		}
 		mut ue := &ast::UseExpr{
@@ -1202,7 +1196,7 @@ impl scopeParser {
 
 	fn buildConstSt(mut *self, mut st: &stmt): ast::StmtData {
 		if len(st.tokens) == 1 {
-			self.pushErr(st.tokens[0], log::InvalidSyntax)
+			self.pushErr(st.tokens[0], "invalid syntax")
 			ret nil
 		}
 		match st.tokens[1].ID {

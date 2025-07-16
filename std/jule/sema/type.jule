@@ -910,7 +910,7 @@ impl typeChecker {
 
 	fn pushCycleError(*self, def1: str, def2: str, mut &message: *strings::Builder) {
 		const Padding = 7
-		refersTo := log::Logf(log::RefersTo, def1, def2)
+		refersTo := log::Logf("@ refers to @", def1, def2)
 		message.WriteStr(strings::Repeat(" ", Padding))!
 		message.WriteStr(refersTo)!
 		message.WriteByte('\n')!
@@ -1006,7 +1006,7 @@ impl typeChecker {
 			}
 			if itself {
 				if err {
-					self.pushErr(name, log::IllegalCycleRefersItself, self.referencer.name)
+					self.pushErr(name, "illegal cycle in declaration: @ refers to itself", self.referencer.name)
 				}
 				self.cycleErr |= cycleErrFail
 				ret false
@@ -1017,7 +1017,7 @@ impl typeChecker {
 		ok, oselfExist := self.checkCrossCycle(decl, &message)
 		if !ok {
 			if err {
-				self.pushErr(name, log::IllegalCrossCycle, message.Str())
+				self.pushErr(name, "illegal cross cycle in declaration:\n"+message.Str())
 			}
 			self.cycleErr |= cycleErrFail
 			ret false
@@ -1041,7 +1041,7 @@ impl typeChecker {
 
 	fn fromTypeAlias(mut *self, mut decl: &token::Token, mut ta: &TypeAlias): Kind {
 		if !self.s.isAccessibleDefine(ta.Public, ta.Token) {
-			self.pushErr(decl, log::IdentNotExist, decl.Kind)
+			self.pushErr(decl, "undefined: "+decl.Kind)
 			ret nil
 		}
 
@@ -1098,7 +1098,7 @@ impl typeChecker {
 
 	fn fromEnum(mut *self, decl: &token::Token, mut e: &Enum): &Enum {
 		if !self.s.isAccessibleDefine(e.Public, e.Token) {
-			self.pushErr(decl, log::IdentNotExist, decl.Kind)
+			self.pushErr(decl, "undefined: "+decl.Kind)
 			ret nil
 		}
 		ret e
@@ -1106,7 +1106,7 @@ impl typeChecker {
 
 	fn fromTypeEnum(mut *self, decl: &token::Token, mut e: &TypeEnum): &TypeEnum {
 		if !self.s.isAccessibleDefine(e.Public, e.Token) {
-			self.pushErr(decl, log::IdentNotExist, decl.Kind)
+			self.pushErr(decl, "undefined: "+decl.Kind)
 			ret nil
 		}
 		ret e
@@ -1114,7 +1114,7 @@ impl typeChecker {
 
 	fn fromTrait(mut *self, decl: &token::Token, mut t: &Trait): &Trait {
 		if !self.s.isAccessibleDefine(t.Public, t.Token) {
-			self.pushErr(decl, log::IdentNotExist, decl.Kind)
+			self.pushErr(decl, "undefined: "+decl.Kind)
 			ret nil
 		}
 		self.pushTA(taMutable)
@@ -1284,7 +1284,7 @@ impl typeChecker {
 							}
 						}
 					}
-					unsafe { self.pushErr(typDecl.Token, log::InitiationCycle, ks.Decl.Name) }
+					unsafe { self.pushErr(typDecl.Token, "initiation cycle caused by a type declaration") }
 					ret false
 				}
 			Ok:
@@ -1403,7 +1403,7 @@ impl typeChecker {
 
 	fn fromStruct(mut *self, mut decl: &token::Token, mut s: &Struct): &StructIns {
 		if !self.s.isAccessibleDefine(s.Public, s.Token) {
-			self.pushErr(decl, log::IdentNotExist, decl.Kind)
+			self.pushErr(decl, "undefined: "+decl.Kind)
 			ret nil
 		}
 
@@ -1468,7 +1468,7 @@ impl typeChecker {
 				ret self.fromTrait(decl, t)
 			}
 		} else if self.selection {
-			self.pushErr(decl, log::BindedTypeNotAllowed)
+			self.pushErr(decl, "bind types are not allowed in this scope")
 			ret nil
 		}
 
@@ -1488,7 +1488,7 @@ impl typeChecker {
 			ret self.fromTypeAlias(decl, ta)
 		}
 
-		self.pushErr(decl, log::IdentNotExist, decl.Kind)
+		self.pushErr(decl, "undefined: "+decl.Kind)
 		ret nil
 	}
 
@@ -1502,7 +1502,7 @@ impl typeChecker {
 		| valueTyp == nil:
 			ret nil
 		| valueTyp.Array() != nil && valueTyp.Array().Auto:
-			self.pushErr(self.errorToken, log::ArrayAutoSized)
+			self.pushErr(self.errorToken, "auto-sized arrays are not allowed as value type")
 			ret nil
 		}
 		ret &Sptr{
@@ -1561,7 +1561,7 @@ impl typeChecker {
 		| valueTyp == nil:
 			ret nil
 		| valueTyp.Array() != nil && valueTyp.Array().Auto:
-			self.pushErr(self.errorToken, log::ArrayAutoSized)
+			self.pushErr(self.errorToken, "auto-sized arrays are not allowed as value type")
 			ret new(Ptr)
 		}
 
@@ -1615,7 +1615,7 @@ impl typeChecker {
 		| valueTyp == nil:
 			ret nil
 		| valueTyp.Array() != nil && valueTyp.Array().Auto:
-			self.pushErr(decl.Value.Token, log::ArrayAutoSized)
+			self.pushErr(decl.Value.Token, "auto-sized arrays are not allowed as value type")
 			ret nil
 		}
 
@@ -1633,21 +1633,21 @@ impl typeChecker {
 			}
 
 			if !size.IsConst() {
-				self.pushErr(decl.Size.Token, log::ExprNotConst)
+				self.pushErr(decl.Size.Token, "expression must be constant")
 				ret nil
 			} else if size.Type.Prim() == nil || !types::IsInt(size.Type.Prim().Kind) {
-				self.pushErr(decl.Size.Token, log::ArraySizeIsNotInt)
+				self.pushErr(decl.Size.Token, "array size must be integer")
 				ret nil
 			}
 
 			n = int(size.Constant.AsI64())
 			if n < 0 {
-				self.pushErr(decl.Value.Token, log::ArraySizeIsNeg)
+				self.pushErr(decl.Value.Token, "array size must be positive")
 				ret nil
 			} else {
 				max := types::MaxI(types::Int)
 				if types::BitSize != 64 && i64(n) > max {
-					self.pushErr(decl.Size.Token, log::ArraySizeOverflow,
+					self.pushErr(decl.Size.Token, "array size @ overflows the comptime-defined limit of @",
 						size.Constant.Str(), conv::FormatInt(max, 10))
 					ret nil
 				}
@@ -1663,7 +1663,7 @@ impl typeChecker {
 		| valueTyp == nil:
 			ret nil
 		| valueTyp.Array() != nil && valueTyp.Array().Auto:
-			self.pushErr(decl.Value.Token, log::ArrayAutoSized)
+			self.pushErr(decl.Value.Token, "auto-sized arrays are not allowed as value type")
 			ret nil
 		}
 
@@ -1712,7 +1712,7 @@ impl typeChecker {
 		// so we have a map type (this type, actually), so it is not comparable.
 		if self.cycleErr&cycleErrFail == cycleErrFail || !keyTyp.Comparable() {
 			self.cycleErr = cycleErr
-			self.s.pushErr(decl.Key.Token, log::ConstraintFailed, keyTyp.Str(), "Key", constraintComparable)
+			self.s.pushErr(decl.Key.Token, "type @ does not math constraint of Key: @", keyTyp.Str(), constraintComparable)
 			ret nil
 		}
 		self.cycleErr = cycleErr
@@ -1723,7 +1723,7 @@ impl typeChecker {
 			ret nil
 		}
 		if valueTyp.Enum() != nil {
-			self.pushErr(decl.Value.Token, log::EnumAsMapVal)
+			self.pushErr(decl.Value.Token, "enum types are not supported as map-key")
 		}
 
 		self.pushRuntimeImpl("_Map", decl.Key.Token, keyTyp, valueTyp)
@@ -1783,7 +1783,7 @@ impl typeChecker {
 		defer { self.disableTA = disableTA }
 
 		if len(decl.Generics) > 0 {
-			self.pushErr(decl.Token, log::GenericedFuncAsAnonFunc)
+			self.pushErr(decl.Token, "genericed functions cannot be anonymous")
 			ret nil
 		}
 
@@ -1811,7 +1811,7 @@ impl typeChecker {
 	fn buildNamespace(mut *self, mut ns: &ast::NamespaceExpr): Kind {
 		mut imp := findNamespace(self.lookup, ns.Namespace.Kind)
 		if imp == nil || !imp.isLookupable() {
-			self.pushErr(ns.Namespace, log::NamespaceNotExist, ns.Namespace.Kind)
+			self.pushErr(ns.Namespace, "undefined namespace:"+ns.Namespace.Kind)
 			ret nil
 		}
 
@@ -1835,11 +1835,11 @@ impl typeChecker {
 		}
 		mut s := typ.SoftStruct()
 		if self.selection {
-			self.pushErr(indx.X.Token, log::GenericsNotAllowed)
+			self.pushErr(indx.X.Token, "generics are not allowed in this scope")
 			ret nil, false
 		}
 		if s == nil || s.Source != nil || len(s.Generics) > 0 {
-			self.pushErr(indx.X.Token, log::TypeNotSupportsGenerics, typ.Str())
+			self.pushErr(indx.X.Token, "type @ does not supports generics or already instantiated", typ.Str())
 			ret nil, false
 		}
 		ret self.buildStructInsWithGenerics(s, indx)
@@ -1877,7 +1877,7 @@ impl typeChecker {
 					kind = t
 				}
 			|:
-				self.pushErr(self.errorToken, log::InvalidType)
+				self.pushErr(self.errorToken, "invalid type")
 				ret nil
 			}
 		| &ast::SliceType:
@@ -1916,7 +1916,7 @@ impl typeChecker {
 				kind = t
 			}
 		|:
-			self.pushErr(self.errorToken, log::InvalidType)
+			self.pushErr(self.errorToken, "invalid type")
 			ret nil
 		}
 		if kind == nil {
