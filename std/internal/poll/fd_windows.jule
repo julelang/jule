@@ -184,6 +184,7 @@ impl FD {
 		|:
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Read")
 		}
+		n = self.statEOF(n)
 		ret
 	}
 
@@ -201,7 +202,9 @@ impl FD {
 		if len(buf) > maxRW {
 			buf = buf[:maxRW]
 		}
-		ret sys::Recvfrom(NetHandle(self.File), buf, 0, addr, addrLen) else { error(error) }
+		n = sys::Recvfrom(NetHandle(self.File), buf, 0, addr, addrLen) else { error(error) }
+		n = self.statEOF(n)
+		ret n
 	}
 
 	// Reads from file handle into buf, returns read byte count.

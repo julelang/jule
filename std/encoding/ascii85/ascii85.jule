@@ -277,6 +277,7 @@ impl encoder {
 
 struct decoder {
 	r:      io::Reader
+	eof:    bool
 	buf:    []byte // leftover input
 	nbuf:   int
 	out:    []byte // leftover decoded output
@@ -287,6 +288,9 @@ impl io::Reader for decoder {
 	fn Read(mut *self, mut p: []byte)!: (n: int) {
 		if len(p) == 0 {
 			ret 0
+		}
+		if self.eof {
+			ret io::EOF
 		}
 		for {
 			// Copy leftover output from last decode.
@@ -319,10 +323,17 @@ impl io::Reader for decoder {
 					self.nbuf = off
 				}
 			}
+			if self.eof {
+				ret io::EOF
+			}
 
 			// Read more data.
 			nn = self.r.Read(self.buf[self.nbuf:]) else { error(error) }
-			self.nbuf += nn
+			if nn == io::EOF {
+				self.eof = true
+			} else {
+				self.nbuf += nn
+			}
 		}
 	}
 }

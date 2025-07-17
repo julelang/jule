@@ -220,10 +220,7 @@ impl Scanner {
 			}
 			// Finally we can read some input
 			n := self.r.Read(self.buf[self.end:]) else { error(error) }
-			if n < 0 || len(self.buf)-self.end < n {
-				error(ErrBadReadCount)
-			}
-			if n == 0 {
+			if n == io::EOF {
 				// Read buffer should not be empty.
 				// So, by documentation of the io::Reader,
 				// the zero read count means EOF.
@@ -232,6 +229,9 @@ impl Scanner {
 				// a chance to handle data with EOF state. So, do not return here.
 				// Let next iteration step handle this case.
 				continue
+			}
+			if n < 0 || len(self.buf)-self.end < n {
+				error(ErrBadReadCount)
 			}
 			self.end += n
 		}

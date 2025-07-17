@@ -52,9 +52,12 @@ fn testReader(t: &testing::T) {
 		}
 		mut buf := make([]byte, tt.n)
 		err = nil
-		n := r.Read(buf) else {
+		mut n := r.Read(buf) else {
 			err = error
 			use 0
+		}
+		if n == io::EOF {
+			n = 0
 		}
 		if err != tt.readerr {
 			t.Errorf("{}. read = {}; want {}", i, err, tt.readerr)
@@ -80,14 +83,14 @@ fn testReadAfterBigSeek(t: &testing::T) {
 	err = nil
 	n := r.Read(make([]byte, 10)) else {
 		err = error
-		use 0
+		use io::EOF
 	}
-	if n != 0 {
-		t.Errorf("Read = {}, {}; want 0, EOF", n, err)
+	if n != io::EOF {
+		t.Errorf("Read = {}, {}; want EOF", n, err)
 	} else {
-		z := r.Read(make([]byte, 10)) else { use 0 }
-		if z != 0 {
-			t.Errorf("Read = {}, {}; want 0, EOF", n, err)
+		z := r.Read(make([]byte, 10)) else { use io::EOF }
+		if z != io::EOF {
+			t.Errorf("Read = {}, {}; want EOF", n, err)
 		}
 	}
 }
@@ -113,9 +116,12 @@ fn testReaderAt(t: &testing::T) {
 	for i, tt in tests {
 		mut b := make([]byte, tt.n)
 		let mut err: any
-		rn := r.ReadAt(b, tt.off) else {
+		mut rn := r.ReadAt(b, tt.off) else {
 			err = error
 			use 0
+		}
+		if rn == io::EOF {
+			rn = 0
 		}
 		got := str(b[:rn])
 		if got != tt.want {

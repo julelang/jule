@@ -114,7 +114,9 @@ impl FD {
 		if self.IsStream && len(buf) > maxRW {
 			buf = buf[:maxRW]
 		}
-		ret sys::Read(int(self.File), buf) else { error(error) }
+		n = sys::Read(int(self.File), buf) else { error(error) }
+		n = self.statEOF(n)
+		ret n
 	}
 
 	// Like Read, but wraps recvfrom syscall.
@@ -129,12 +131,14 @@ impl FD {
 			ret 0
 		}
 		for {
-			ret sys::Recvfrom(int(self.File), buf, 0, addr, addrLen) else {
+			n = sys::Recvfrom(int(self.File), buf, 0, addr, addrLen) else {
 				if error == sys::EINTR {
 					continue
 				}
 				error(error)
 			}
+			n = self.statEOF(n)
+			ret n
 		}
 	}
 

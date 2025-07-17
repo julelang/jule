@@ -11,6 +11,9 @@ const (
 	SeekEnd     = 2 // seek relative to the end
 )
 
+// EOF read count for the Reader trait.
+const EOF = -1
+
 // Implements the basic Read method.
 //
 // Reads up to len(buf) bytes into buf. It returns the number of bytes
@@ -20,8 +23,9 @@ const (
 // returns what is available instead of waiting for more.
 //
 // If len(buf) == 0, Read should always return n == 0.
-// Implementations of Read are should return zero byte count for EOF.
-// If len(buf) != 0 and EOF reached, should return zero byte count to represent EOF.
+// Implementations of Read are should return io::EOF for EOF.
+// If len(buf) != 0 and EOF reached, should return io::EOF to represent EOF.
+// Negative read count values are undefined, but io::EOF may be negative.
 //
 // The Read method mutable because implementation may should do mutable operations,
 // or this method may called needed from the mutable method, which is not cannot be internally mutable.
@@ -60,7 +64,7 @@ trait StrWriter {
 // Implements the basic ReadByte method.
 //
 // It should read byte and return one for n without throwing exceptional if success.
-// It should return zero n for EOF, the EOF byte is implementation-dependent.
+// It should return n as io:EOF for EOF, the EOF byte is implementation-dependent.
 // If read failed, should throw exceptional.
 //
 // The ReadByte method mutable because of same reasons of the `Reader` trait.
@@ -84,7 +88,7 @@ trait ByteWriter {
 //
 // It reads a single encoded Unicode character
 // and returns the rune and its size in bytes.
-// It should return zero size for EOF, the EOF rune is implementation-dependent.
+// It should return size as io::EOF for EOF, the EOF rune is implementation-dependent.
 //
 // The ReadRune method mutable because of same reasons of the `Reader` trait.
 //
@@ -135,7 +139,7 @@ trait Closer {
 // the data is available or an error occurs.
 // In this respect ReadAt is different from Read.
 //
-// It should return zero n for EOF.
+// It should return io::EOF for EOF.
 //
 // If it is reading from an input source with a seek offset,
 // it should not affect nor be affected by the underlying
@@ -242,13 +246,15 @@ struct limitedReader {
 impl Reader for limitedReader {
 	fn Read(mut *self, mut p: []byte)!: (n: int) {
 		if self.n <= 0 {
-			ret 0
+			ret EOF
 		}
 		if i64(len(p)) > self.n {
 			p = p[0:self.n]
 		}
 		n = self.r.Read(p) else { error(error) }
-		self.n -= i64(n)
+		if n != EOF {
+			self.n -= i64(n)
+		}
 		ret
 	}
 }
@@ -296,7 +302,7 @@ fn copyBuffer(mut dst: Writer, mut src: Reader, mut buf: []byte)!: (written: i64
 	}
 	for {
 		nr := src.Read(buf) else { error(error) }
-		if nr == 0 { // EOF
+		if nr == EOF {
 			break
 		}
 		if nr > 0 {
@@ -331,7 +337,7 @@ fn ReadAll(mut r: Reader)!: []byte {
 	mut b := make([]byte, 0, 512)
 	for {
 		n := r.Read(b[len(b):cap(b)]) else { error(error) }
-		if n == 0 {
+		if n == EOF {
 			ret b
 		}
 		b = b[:len(b)+n]
