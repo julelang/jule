@@ -56,7 +56,7 @@ impl FD {
 				max = n + maxRW
 			}
 			part := buf[n:max]
-			nn := sys::Write(int(self.File), part) else { error(error) }
+			nn := ignoringEINTRIO2(sys::Write, int(self.File), part) else { error(error) }
 			if n > max-nn {
 				// This can reportedly happen when using
 				// some VPN software. Go's issue #61060.
@@ -114,9 +114,11 @@ impl FD {
 		if self.IsStream && len(buf) > maxRW {
 			buf = buf[:maxRW]
 		}
-		n = sys::Read(int(self.File), buf) else { error(error) }
-		n = self.statEOF(n)
-		ret n
+		for {
+			n = ignoringEINTRIO(sys::Read, int(self.File), buf) else { error(error) }
+			n = self.statEOF(n)
+			ret n
+		}
 	}
 
 	// Like Read, but wraps recvfrom syscall.
@@ -158,5 +160,29 @@ impl FD {
 	fn Close(mut *self)! {
 		// All kinds are supports the Close function.
 		sys::Close(int(self.File)) else { error(error) }
+	}
+}
+
+// It is like ignoringEINTR, but just for IO calls.
+fn ignoringEINTRIO(f: fn(fd: int, mut p: []byte)!: int, fd: int, mut p: []byte)!: int {
+	for {
+		ret f(fd, p) else {
+			if error != sys::EINTR {
+				error(error)
+			}
+			continue
+		}
+	}
+}
+
+// It is like ignoringEINTRIO, but immutable.
+fn ignoringEINTRIO2(f: fn(fd: int, p: []byte)!: int, fd: int, p: []byte)!: int {
+	for {
+		ret f(fd, p) else {
+			if error != sys::EINTR {
+				error(error)
+			}
+			continue
+		}
 	}
 }
