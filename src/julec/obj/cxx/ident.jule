@@ -180,6 +180,11 @@ impl identCoder {
 			fall
 		| NA:
 			// Use the common identifier coder.
+			if v.Name == "error" {
+				// The error variable captured, handle it as "__jule_error".
+				buf.WriteStr("__jule_error")!
+				ret
+			}
 			identCoder.var(buf, v)
 		}
 	}
@@ -203,7 +208,9 @@ impl identCoder {
 		| v.Bind:
 			buf.WriteStr(v.Name)!
 		| v.Name == "error":
-			buf.WriteStr("except.error")!
+			buf.WriteStr("__jule_except_")!
+			buf.WriteStr(conv::FormatUint(u64(uintptr(v.Scope)), 16))!
+			buf.WriteStr(".error")!
 		| v.Name == "self":
 			buf.WriteStr(identSelf)!
 		| v.Scope != nil:

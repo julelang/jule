@@ -1235,26 +1235,46 @@ impl exprCoder {
 	}
 
 	fn handleExceptionalCallWithData(mut &self, mut m: &sema::FuncCallExpr, mut dest: useExprMemory) {
-		let mut destData: sema::Expr = &sema::Var{
-			Bind: true, // to use identifier directly
-			Name: "except.result",
+		// Use unique identifier to handle each call with explicit variable.
+		// Otherwise back-end compiler may use wrong variable, which is may lead even segfault.
+		// To generate unique identifier, use the memory address of function call.
+		// But the error variable is not have associated function data, but scope.
+		// Therefore, if exceptional handler scope exist, use the scope address.
+		mut exceptName := "__jule_except_"
+		if m.Except != nil {
+			exceptName += conv::FormatUint(u64(uintptr(m.Except)), 16)
+		} else {
+			exceptName += conv::FormatUint(u64(uintptr(m)), 16)
 		}
 
-		// Generate code for exceptional.
+		let mut destData: sema::Expr = &sema::Var{
+			Bind: true, // to use identifier directly
+			Name: exceptName + ".result",
+		}
+
 		self.oc.write("{\n")
+		// Generate code for exceptional.
+
 		self.oc.addIndent()
 		self.oc.indent()
-		self.oc.write("auto except = ")
+		self.oc.tc.funcInsResult(&self.oc.Buf, m.Func)
+		self.oc.write(" ")
+		self.oc.write(exceptName)
+		self.oc.write(" = ")
 		self.pureFuncCall(m)
 		self.oc.write(";\n")
 		self.oc.indent()
 		if m.Except != nil {
 			if m.Func.Result == nil || dest.Model == nil {
-				self.oc.write("if (!except.ok()) ")
+				self.oc.write("if (!")
+				self.oc.write(exceptName)
+				self.oc.write(".ok()) ")
 				self.oc.sc.scope(m.Except)
 				self.oc.write("\n")
 			} else {
-				self.oc.write("if (except.ok()) { ")
+				self.oc.write("if (")
+				self.oc.write(exceptName)
+				self.oc.write(".ok()) { ")
 				dest.write(self, destData, m.Func.Result)
 				self.oc.write("; }\n")
 				self.oc.indent()
@@ -1280,9 +1300,15 @@ impl exprCoder {
 			}
 			self.oc.doneIndent()
 		} else {
-			self.oc.write(`if (!except.ok()) __jule_panicStr(`)
+			self.oc.write("if (!")
+			self.oc.write(exceptName)
+			self.oc.write(".ok()) __jule_panicStr(")
 			strLit(&self.oc.Buf, "unhandled exceptional: ", "23")
-			self.oc.write(" + except.error.type->to_str(except.error.data) + ")
+			self.oc.write(" + ")
+			self.oc.write(exceptName)
+			self.oc.write(".error.type->to_str(")
+			self.oc.write(exceptName)
+			self.oc.write(".error.data) + ")
 			strLitF(&self.oc.Buf, fn|| {
 				self.oc.write("\"\\nlocation: ")
 				mut len := 11 // \nlocation:
@@ -1661,22 +1687,30 @@ impl exprCoder {
 	fn errorCall(mut &self, mut m: &sema::BuiltinErrorCallExpr) {
 		hasDefer := m.Func.Decl != nil && m.Func.Decl.HasDefer
 		if m.Func.Decl.IsVoid() {
-			v, _ := m.Err.Model.(&sema::Var)
+			mut v, _ := m.Err.Model.(&sema::Var)
 			if v != nil && v.Name == "error" {
 				if hasDefer {
 					self.oc.write(deferStackName + ".call();\n")
 					self.oc.indent()
 				}
-				self.oc.write("return jule::VoidExceptional{.error=std::move(except.error)}")
+				self.oc.write("return jule::VoidExceptional{.error=std::move(")
+				// Handle error variable like ordinary variable.
+				// Because it may be captured, use captured variable handler.
+				self.var(v)
+				self.oc.write(")}")
 				ret
 			}
 			self.oc.write("return jule::VoidExceptional{.error=")
 		} else {
 			self.oc.write("return jule::Exceptional<")
 			self.oc.tc.rc.codeMut1(&self.oc.Buf, m.Func.Result)
-			v, _ := m.Err.Model.(&sema::Var)
+			mut v, _ := m.Err.Model.(&sema::Var)
 			if v != nil && v.Name == "error" {
-				self.oc.write(">{.error=except.error}")
+				self.oc.write(">{.error=")
+				// Handle error variable like ordinary variable.
+				// Because it may be captured, use captured variable handler.
+				self.var(v)
+				self.oc.write("}")
 				ret
 			}
 			self.oc.write(">{.error=")
