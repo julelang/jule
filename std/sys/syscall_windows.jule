@@ -358,14 +358,14 @@ fn Seek(h: Handle, offset: i64, whence: int)!: (newoffset: i64) {
 	| 2: // io::SeekEnd
 		w = FILE_END
 	}
-	setFilePointerEx(h, offset, &newoffset, w) else { error(error) }
+	setFilePointerEx(h, offset, &newoffset, w)?
 	ret
 }
 
 // Imitates the POSIX ftruncate function.
 fn Ftruncate(h: Handle, size: i64)! {
-	Seek(h, size, 0) else { error(error) }
-	SetEndOfFile(h) else { error(error) }
+	Seek(h, size, 0)?
+	SetEndOfFile(h)?
 }
 
 fn makeInheritSa(mut &sa: *SecurityAttributes) {
@@ -462,7 +462,7 @@ fn Open(path: str, flag: int, perm: u32)!: Handle {
 	if flag&O_TRUNC == O_TRUNC &&
 		(createmode == OPEN_EXISTING || (createmode == OPEN_ALWAYS && GetLastErrno() == ERROR_ALREADY_EXISTS)) {
 		Ftruncate(h, 0) else {
-			CloseHandle(h) else { error(error) }
+			CloseHandle(h)?
 			error(error)
 		}
 	}

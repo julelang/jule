@@ -24,16 +24,16 @@ fn setSocketBlockingMode(handle: poll::NetHandle, mode: integ::UnsignedLong)! {
 }
 
 fn closeSocketBlockingMode(handle: poll::NetHandle)! {
-	setSocketBlockingMode(handle, 1) else { error(error) }
+	setSocketBlockingMode(handle, 1)?
 }
 
 fn openSocketBlockingMode(handle: poll::NetHandle)! {
-	setSocketBlockingMode(handle, 0) else { error(error) }
+	setSocketBlockingMode(handle, 0)?
 }
 
 fn connectSocket(handle: poll::NetHandle, sockAddr: uintptr, sockLen: sys::Socklen, timeout: time::Duration)! {
 	if timeout == 0 {
-		connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
+		connectSocketNoTimeout(handle, sockAddr, sockLen)?
 		ret
 	}
 	mut tv, ok := timevalFromDuration(timeout)
@@ -41,10 +41,10 @@ fn connectSocket(handle: poll::NetHandle, sockAddr: uintptr, sockLen: sys::Sockl
 		error(ErrInvalidTimeout)
 	}
 	if tv.Sec == 0 && tv.Usec == 0 {
-		connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
+		connectSocketNoTimeout(handle, sockAddr, sockLen)?
 		ret
 	}
-	closeSocketBlockingMode(handle) else { error(error) }
+	closeSocketBlockingMode(handle)?
 	sys::Connect(handle, sockAddr, sockLen) else {
 		if error != sys::WSAEWOULDBLOCK {
 			error(error)
@@ -59,7 +59,7 @@ Select:
 	fdW.Set(handle)
 	fdE.Zero()
 	fdE.Set(handle)
-	res := sys::Select(0, nil, &fdW, &fdE, &tv) else { error(error) }
+	res := sys::Select(0, nil, &fdW, &fdE, &tv)?
 	if res == 0 {
 		// Timeout.
 		error(ErrTimeout)
@@ -70,7 +70,7 @@ Select:
 		sys::Getsockopt(handle, sys::SOL_SOCKET, sys::SO_ERROR, uintptr(&opt), optLen)!
 		error(int(opt))
 	}
-	openSocketBlockingMode(handle) else { error(error) }
+	openSocketBlockingMode(handle)?
 }
 
 fn setSocketTimeout(handle: poll::NetHandle, scope: int, timeout: time::Duration)! {
@@ -78,7 +78,7 @@ fn setSocketTimeout(handle: poll::NetHandle, scope: int, timeout: time::Duration
 	if !ok {
 		error(ErrInvalidTimeout)
 	}
-	sys::Setsockopt(handle, sys::SOL_SOCKET, scope, uintptr(&tv), sys::Socklen(mem::SizeOf(tv))) else { error(error) }
+	sys::Setsockopt(handle, sys::SOL_SOCKET, scope, uintptr(&tv), sys::Socklen(mem::SizeOf(tv)))?
 }
 
 fn accept(h: poll::NetHandle, addr: uintptr, addrlen: sys::Socklen)!: poll::NetHandle {

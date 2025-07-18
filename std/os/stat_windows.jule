@@ -63,8 +63,8 @@ fn winstat(path: str, followSurrogates: bool)!: FileInfo {
 		// FileInfo with a known-accurate Mode, we must return an error.
 		error(sys::GetLastErrno())
 	}
-	mut fs, mut d, mut info := statHandle(h) else { error(error) }
-	sys::CloseHandle(h) else { error(error) }
+	mut fs, mut d, mut info := statHandle(h)?
+	sys::CloseHandle(h)?
 	if followSurrogates && win32FileAttributeDataIsReparseTagNameSurrogate(d, info) {
 		// To obtain information about the link target, we reopen the file without
 		// FILE_FLAG_OPEN_REPARSE_POINT and examine the resulting handle.
@@ -73,8 +73,8 @@ fn winstat(path: str, followSurrogates: bool)!: FileInfo {
 		if h == sys::InvalidHandle {
 			error(sys::GetLastErrno())
 		}
-		fs, _, _ = statHandle(h) else { error(error) }
-		sys::CloseHandle(h) else { error(error) }
+		fs, _, _ = statHandle(h)?
+		sys::CloseHandle(h)?
 	}
 	ret fs
 }
@@ -88,13 +88,13 @@ fn statHandle(h: sys::Handle)!: (fs: FileInfo, fi: sys::Win32FileAttributeData, 
 		info.filetype = ft
 		ret
 	}
-	fs, fi, info = newFileInfoFromGetFileInformationByHandle(h) else { error(error) }
+	fs, fi, info = newFileInfoFromGetFileInformationByHandle(h)?
 	info.filetype = ft
 	ret
 }
 
 fn stat(path: str)!: FileInfo {
-	mut fi := winstat(path, true) else { error(error) }
+	mut fi := winstat(path, true)?
 	// Assign path if it is not resolved.
 	if fi.sys.vol == 0 {
 		fi.sys.path = path
@@ -112,7 +112,7 @@ fn lstat(path: str)!: FileInfo {
 		// follow symlinks in the last path element.
 		followSurrogates = true
 	}
-	mut fi := winstat(path, followSurrogates) else { error(error) }
+	mut fi := winstat(path, followSurrogates)?
 	// Assign path if it is not resolved.
 	if fi.sys.vol == 0 {
 		fi.sys.path = path

@@ -151,7 +151,7 @@ impl Cmd {
 		if atomic::Load(&self.started, atomic::Acquire) == 1 {
 			error(errors::New("std/os: Cmd.StdinPipe after process started"))
 		}
-		mut r, mut w := Pipe() else { error(error) }
+		mut r, mut w := Pipe()?
 		self.stdin = r
 		self.childIOFiles = append(self.childIOFiles, r)
 		self.parentIOFiles = append(self.parentIOFiles, w)
@@ -172,7 +172,7 @@ impl Cmd {
 		if atomic::Load(&self.started, atomic::Acquire) == 1 {
 			error(errors::New("std/os: Cmd.StdoutPipe after process started"))
 		}
-		mut r, mut w := Pipe() else { error(error) }
+		mut r, mut w := Pipe()?
 		self.stdout = w
 		self.childIOFiles = append(self.childIOFiles, w)
 		self.parentIOFiles = append(self.parentIOFiles, r)
@@ -193,7 +193,7 @@ impl Cmd {
 		if atomic::Load(&self.started, atomic::Acquire) == 1 {
 			error(errors::New("std/os: Cmd.StderrPipe after process started"))
 		}
-		mut r, mut w := Pipe() else { error(error) }
+		mut r, mut w := Pipe()?
 		self.stderr = w
 		self.childIOFiles = append(self.childIOFiles, w)
 		self.parentIOFiles = append(self.parentIOFiles, r)
@@ -202,7 +202,7 @@ impl Cmd {
 
 	fn childStdin(*self)!: &File {
 		if self.stdin == nil {
-			mut f := Open(DevNull) else { error(error) }
+			mut f := Open(DevNull)?
 			self.childIOFiles = append(self.childIOFiles, f)
 			ret f
 		}
@@ -210,19 +210,19 @@ impl Cmd {
 	}
 
 	fn childStdout(*self)!: &File {
-		ret self.writerDescriptor(self.stdout) else { error(error) }
+		ret self.writerDescriptor(self.stdout)?
 	}
 
 	fn childStderr(*self)!: &File {
 		if self.stdout != nil && self.stderr != nil && self.stdout.fd.File == self.stderr.fd.File {
 			ret self.stdout
 		}
-		ret self.writerDescriptor(self.stdout) else { error(error) }
+		ret self.writerDescriptor(self.stdout)?
 	}
 
 	fn writerDescriptor(*self, mut f: &File)!: &File {
 		if f == nil {
-			f = OpenFile(DevNull, O_WRONLY, 0) else { error(error) }
+			f = OpenFile(DevNull, O_WRONLY, 0)?
 			self.childIOFiles = append(self.childIOFiles, f)
 			ret f
 		}
@@ -254,13 +254,13 @@ impl Cmd {
 		}
 		mut path := self.Path
 		if filepathlite::Base(path) == path {
-			path = lookPath(self.Path) else { error(error) }
+			path = lookPath(self.Path)?
 		} else if runtime::OS == "windows" {
 			// We may need to add a filename extension from PATHEXT
 			// or verify an extension that is already present.
 			// Since the path is absolute, its extension should be unambiguous
 			// and independent of self.Dir, and we can go the lookup now.
-			path = lookExtensions(path, self.Dir) else { error(error) }
+			path = lookExtensions(path, self.Dir)?
 		}
 		// Double-check existence of the directory we want
 		// to chdir into. We can make the error clearer this way.
@@ -269,25 +269,25 @@ impl Cmd {
 				error(errors::New("std/os: Cmd.Start: Dir is not empty and specified path is not exist: \"" + self.Dir + "\""))
 			}
 		}
-		stdin := self.childStdin() else { error(error) }
-		stdout := self.childStdout() else { error(error) }
-		stderr := self.childStderr() else { error(error) }
-		self.spawn(path, stdin, stdout, stderr) else { error(error) }
+		stdin := self.childStdin()?
+		stdout := self.childStdout()?
+		stderr := self.childStderr()?
+		self.spawn(path, stdin, stdout, stderr)?
 		atomic::Store(&self.started, 1, atomic::Relaxed)
 		started = true
 	}
 
 	// Starts the specified command and waits for it to complete.
 	fn Run(*self)! {
-		self.Start() else { error(error) }
-		self.Wait() else { error(error) }
+		self.Start()?
+		self.Wait()?
 	}
 
 	// Clean should call after process completed.
 	// It cleans resources and Cmd will be ready to reuse.
 	fn clean(*self)! {
 		for (_, mut f) in self.parentIOFiles {
-			f.Close() else { error(error) }
+			f.Close()?
 		}
 		self.parentIOFiles = nil
 		self.stdin, self.stdout, self.stderr = nil, nil, nil
@@ -302,8 +302,8 @@ impl Cmd {
 		if atomic::Load(&self.started, atomic::Acquire) == 0 {
 			panic("std/os: Cmd.Wait: command is not started")
 		}
-		c := self.wait() else { error(error) }
-		self.clean() else { error(error) }
+		c := self.wait()?
+		self.clean()?
 		ret c
 	}
 
@@ -334,12 +334,12 @@ impl Cmd {
 					// https://go.dev/issue/50599) to avoid unintended collateral damage we
 					// only implicitly update PWD when Env is nil. That way, we're much
 					// less likely to override an intentional change to the variable.
-					pwd := filepathlite::Abs(self.Dir) else { error(error) }
+					pwd := filepathlite::Abs(self.Dir)?
 					env = append(env, "PWD="+pwd)
 				}
 			}
 		}
-		env = dedupEnv(env) else { error(error) }
+		env = dedupEnv(env)?
 		env = addCriticalEnv(env)
 		ret env
 	}
@@ -348,7 +348,7 @@ impl Cmd {
 // Returns a copy of env with any duplicates removed, in favor of later values.
 // Items not of the normal environment "key=value" form are preserved unchanged.
 fn dedupEnv(mut env: []str)!: []str {
-	ret dedupEnvCase(runtime::OS == "windows", false, env) else { error(error) }
+	ret dedupEnvCase(runtime::OS == "windows", false, env)?
 }
 
 // This is dedupEnv with a case option.

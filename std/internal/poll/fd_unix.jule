@@ -56,7 +56,7 @@ impl FD {
 				max = n + maxRW
 			}
 			part := buf[n:max]
-			nn := ignoringEINTRIO2(sys::Write, int(self.File), part) else { error(error) }
+			nn := ignoringEINTRIO2(sys::Write, int(self.File), part)?
 			if n > max-nn {
 				// This can reportedly happen when using
 				// some VPN software. Go's issue #61060.
@@ -115,7 +115,7 @@ impl FD {
 			buf = buf[:maxRW]
 		}
 		for {
-			n = ignoringEINTRIO(sys::Read, int(self.File), buf) else { error(error) }
+			n = ignoringEINTRIO(sys::Read, int(self.File), buf)?
 			n = self.statEOF(n)
 			ret n
 		}
@@ -148,18 +148,18 @@ impl FD {
 	// whence: 0 (Seek.Set) means, relative to the whence of the file, 1 (Seek.Cur)
 	// means relative to the current offset, and 2 (Seek.End) means relative to end.
 	fn Seek(mut *self, offset: i64, whence: int)!: (pos: i64) {
-		ret sys::Seek(int(self.File), offset, whence) else { error(error) }
+		ret sys::Seek(int(self.File), offset, whence)?
 	}
 
 	// Wraps sys::Ftruncate.
 	fn Ftruncate(mut *self, size: i64)! {
-		sys::Ftruncate(int(self.File), size) else { error(error) }
+		sys::Ftruncate(int(self.File), size)?
 	}
 
 	// Closes file descriptor.
 	fn Close(mut *self)! {
 		// All kinds are supports the Close function.
-		sys::Close(int(self.File)) else { error(error) }
+		sys::Close(int(self.File))?
 	}
 }
 

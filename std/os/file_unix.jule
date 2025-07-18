@@ -11,8 +11,8 @@ fn openFile(path: str, flag: int, perm: FileMode)!: &File {
 	if path == "" {
 		error(sys::ENOENT)
 	}
-	fd := sys::Open(path, flag|sys::O_CLOEXEC, syscallMode(perm)) else { error(error) }
-	ret newFile(u64(fd), poll::File) else { error(error) }
+	fd := sys::Open(path, flag|sys::O_CLOEXEC, syscallMode(perm))?
+	ret newFile(u64(fd), poll::File)?
 }
 
 fn newFile(h: u64, mut flags: int)!: &File {
@@ -22,10 +22,10 @@ fn newFile(h: u64, mut flags: int)!: &File {
 		IsStream: true,
 		ZeroReadIsEOF: true,
 	}
-	fd.Init() else { error(error) }
+	fd.Init()?
 	ret &File{fd: fd}
 }
 
 fn remove(path: str)! {
-	sys::Unlink(path) else { error(error) }
+	sys::Unlink(path)?
 }

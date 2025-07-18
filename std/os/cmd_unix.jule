@@ -35,7 +35,7 @@ impl Cmd {
 	fn spawn(*self, path: str, stdin: &File, stdout: &File, stderr: &File)! {
 		// Setup all environment data.
 		args := self.args()
-		mut env := self.env() else { error(error) }
+		mut env := self.env()?
 
 		// Create communication pipe for error handling.
 		// Error codes will be sent using this pipe from child to parent.
@@ -44,7 +44,7 @@ impl Cmd {
 		pipe0, pipe1 := ipipe()!
 
 		// Get fork and dive into parent and child process.
-		self.attrs.pid = sys::Fork() else { error(error) }
+		self.attrs.pid = sys::Fork()?
 		if self.attrs.pid == 0 {
 			// We are in the child process.
 			sys::Close(pipe0)!
@@ -111,16 +111,16 @@ impl Cmd {
 		pid := self.attrs.pid
 		stat := ignoringEINTR2(fn()!: i32 {
 			mut stat := i32(0)
-			sys::Waitpid(pid, &stat, 0) else { error(error) }
+			sys::Waitpid(pid, &stat, 0)?
 			ret stat
-		}) else { error(error) }
+		})?
 		self.attrs.pid = invalidPid
 		ret cpp.WEXITSTATUS(stat)
 	}
 }
 
 fn findExecutable(file: str)! {
-	d := Stat(file) else { error(error) }
+	d := Stat(file)?
 	m := d.Mode()
 	if m.IsDir() {
 		error(sys::Errno(sys::EISDIR))

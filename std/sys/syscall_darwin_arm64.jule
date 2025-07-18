@@ -1679,11 +1679,11 @@ fn unlinkat(dirfd: int, path: []byte, flags: int)! {
 
 fn Unlinkat(dirfd: int, path: str, flags: int)! {
 	cpath := integ::StrToBytes(path)
-	unlinkat(dirfd, cpath, flags) else { error(error) }
+	unlinkat(dirfd, cpath, flags)?
 }
 
 fn Unlink(path: str)! {
-	Unlinkat(AT_FDCWD, path, 0) else { error(error) }
+	Unlinkat(AT_FDCWD, path, 0)?
 }
 
 // Path should be NUL-terminated if it is not empty.
@@ -1703,11 +1703,11 @@ fn mkdirat(dirfd: int, path: []byte, mode: u32)! {
 // Path should be NUL-terminated if it is not empty.
 fn Mkdirat(dirfd: int, path: str, mode: u32)! {
 	cpath := integ::StrToBytes(path)
-	mkdirat(dirfd, cpath, mode) else { error(error) }
+	mkdirat(dirfd, cpath, mode)?
 }
 
 fn Mkdir(path: str, mode: u32)! {
-	Mkdirat(AT_FDCWD, path, mode) else { error(error) }
+	Mkdirat(AT_FDCWD, path, mode)?
 }
 
 fn Openat(dirfd: int, path: str, mode: int, perm: u32)!: (fd: int) {
@@ -1723,9 +1723,9 @@ fn Getcwd(mut buf: []byte)!: (n: int) {
 	let mut tmp: [PATH_MAX]byte
 	tmp[0] = '.'
 	tmp[1] = 0
-	fd := Openat(AT_FDCWD, ".", 0, 0) else { error(error) }
-	Fcntl(int(fd), F_GETPATH, int(uintptr(&tmp[0]))) else { error(error) }
-	Close(int(fd)) else { error(error) }
+	fd := Openat(AT_FDCWD, ".", 0, 0)?
+	Fcntl(int(fd), F_GETPATH, int(uintptr(&tmp[0])))?
+	Close(int(fd))?
 	for n < len(tmp); n++ {
 		if tmp[n] == 0 {
 			break
@@ -1760,11 +1760,11 @@ fn Fstatat(fd: int, path: str, mut &stat: *SysStat, flags: int)! {
 }
 
 fn Stat(path: str, mut &stat: *SysStat)! {
-	Fstatat(AT_FDCWD, path, stat, 0) else { error(error) }
+	Fstatat(AT_FDCWD, path, stat, 0)?
 }
 
 fn Lstat(path: str, mut &stat: *SysStat)! {
-	Fstatat(AT_FDCWD, path, stat, AT_SYMLINK_NOFOLLOW) else { error(error) }
+	Fstatat(AT_FDCWD, path, stat, AT_SYMLINK_NOFOLLOW)?
 }
 
 fn Ftruncate(fd: int, length: i64)! {

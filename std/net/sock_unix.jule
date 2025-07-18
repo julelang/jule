@@ -8,20 +8,20 @@ use "std/sys"
 use "std/time"
 
 fn closeSocketBlockingMode(handle: poll::NetHandle)! {
-	mut arg := sys::Fcntl(handle, sys::F_GETFL, 0) else { error(error) }
+	mut arg := sys::Fcntl(handle, sys::F_GETFL, 0)?
 	arg |= sys::O_NONBLOCK
-	sys::Fcntl(handle, sys::F_SETFL, arg) else { error(error) }
+	sys::Fcntl(handle, sys::F_SETFL, arg)?
 }
 
 fn openSocketBlockingMode(handle: poll::NetHandle)! {
-	mut arg := sys::Fcntl(handle, sys::F_GETFL, 0) else { error(error) }
+	mut arg := sys::Fcntl(handle, sys::F_GETFL, 0)?
 	arg &= ^sys::O_NONBLOCK
-	sys::Fcntl(handle, sys::F_SETFL, arg) else { error(error) }
+	sys::Fcntl(handle, sys::F_SETFL, arg)?
 }
 
 fn connectSocket(handle: poll::NetHandle, sockAddr: uintptr, sockLen: sys::Socklen, timeout: time::Duration)! {
 	if timeout == 0 {
-		connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
+		connectSocketNoTimeout(handle, sockAddr, sockLen)?
 		ret
 	}
 	mut tv, ok := timevalFromDuration(timeout)
@@ -29,10 +29,10 @@ fn connectSocket(handle: poll::NetHandle, sockAddr: uintptr, sockLen: sys::Sockl
 		error(ErrInvalidTimeout)
 	}
 	if tv.Sec == 0 && tv.Usec == 0 {
-		connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
+		connectSocketNoTimeout(handle, sockAddr, sockLen)?
 		ret
 	}
-	closeSocketBlockingMode(handle) else { error(error) }
+	closeSocketBlockingMode(handle)?
 	sys::Connect(handle, sockAddr, sockLen) else {
 		if error != sys::EINPROGRESS {
 			error(error)
@@ -54,7 +54,7 @@ Select:
 		if res > 0 {
 			len2 := sys::Socklen(mem::SizeOf(int))
 			opt := 0
-			sys::Getsockopt(handle, sys::SOL_SOCKET, sys::SO_ERROR, uintptr(&opt), len2) else { error(error) }
+			sys::Getsockopt(handle, sys::SOL_SOCKET, sys::SO_ERROR, uintptr(&opt), len2)?
 			if opt != 0 {
 				error(sys::Errno(opt))
 			}
@@ -64,7 +64,7 @@ Select:
 			error(ErrTimeout)
 		}
 	}
-	openSocketBlockingMode(handle) else { error(error) }
+	openSocketBlockingMode(handle)?
 }
 
 fn setSocketTimeout(handle: poll::NetHandle, scope: int, timeout: time::Duration)! {

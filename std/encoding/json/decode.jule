@@ -50,7 +50,7 @@ impl jsonDecoder {
 	fn scanValidValue(*self)!: []byte {
 		mut b := self.data.Get(self.i)
 		if b != '[' && b != '{' { // Literal.
-			ret self.scanValidLit() else { error(error) }
+			ret self.scanValidLit()?
 		}
 		i := self.i
 		depth := len(self.parseState)
@@ -66,9 +66,9 @@ impl jsonDecoder {
 			match b {
 			| '{':
 				self.i++
-				self.pushParseState(parseObject) else { error(error) }
+				self.pushParseState(parseObject)?
 			| '[':
-				self.pushParseState(parseArray) else { error(error) }
+				self.pushParseState(parseArray)?
 				self.i++
 			| '}':
 				if colon || self.parseState[len(self.parseState)-1] != parseObject {
@@ -103,7 +103,7 @@ impl jsonDecoder {
 					if self.data.Get(self.i) != '"' {
 						error(errors::New("json: invalid character " + quoteChar(self.data.Get(self.i)) + " looking for beginning of object key string"))
 					}
-					self.scanValidLit() else { error(error) }
+					self.scanValidLit()?
 					self.skipSpace()
 					if self.eof() {
 						continue // Error will be handled by next iteration step.
@@ -127,7 +127,7 @@ impl jsonDecoder {
 				}
 			| '-' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
 			| '"' | 't' | 'f' | 'n':
-				self.scanValidLit() else { error(error) }
+				self.scanValidLit()?
 				// Internal handling of literal sequences.
 				// See the checkScanValidLit.
 				j = self.i - 1
@@ -164,7 +164,7 @@ impl jsonDecoder {
 
 	// Calls the [scanLit] and checks it with the [isValidLit] function.
 	fn scanValidLit(*self)!: []byte {
-		mut lit := self.scanLit() else { error(error) }
+		mut lit := self.scanLit()?
 		if !isValidLit(lit) {
 			error(errors::New("json: invalid character " + quoteChar(lit[0]) + " looking for beginning of value"))
 		}
@@ -245,7 +245,7 @@ impl jsonDecoder {
 			| comptime::Slice:
 				*a = (*a)[:0] // Keep capacity, but clear current elements.
 			}
-			self.pushParseState(parseArray) else { error(error) }
+			self.pushParseState(parseArray)?
 			for {
 				// Look ahead for ] - can only happen on first iteration.
 				self.skipSpace()
@@ -258,10 +258,10 @@ impl jsonDecoder {
 						// Ran out of fixed array.
 						error(errors::New("json: array exceeds length of fixed array of type :" + t.Str() + ", got " + conv::Itoa(i)))
 					}
-					self.value(&(*a)[i]) else { error(error) }
+					self.value(&(*a)[i])?
 				| comptime::Slice:
 					let mut v: valueTyp
-					self.value(&v) else { error(error) }
+					self.value(&v)?
 					*a = append(*a, v)
 				|:
 					panic("json: unimplemented type, this panic call should be unreachable")
@@ -330,7 +330,7 @@ impl jsonDecoder {
 			self.i++
 			ret
 		}
-		self.pushParseState(parseObject) else { error(error) }
+		self.pushParseState(parseObject)?
 		// Consider string and dynamic JSON value types as quoted. Directly assign string as key.
 		const quoted = keyT.Kind() == comptime::Str || keyT == valueT || keyT == stringT
 		for {
@@ -342,7 +342,7 @@ impl jsonDecoder {
 				error(errors::New("json: invalid character " + quoteChar(self.data.Get(self.i)) + " looking for beginning of object key string"))
 			}
 			// Don't check validity for literal, following algorithms will check it.
-			lit := self.scanLit() else { error(error) }
+			lit := self.scanLit()?
 			self.skipSpace()
 			if self.eof() {
 				error(errors::New("json: object is not ended"))
@@ -356,7 +356,7 @@ impl jsonDecoder {
 				error(errors::New("json: object is not ended"))
 			}
 			let mut value: V
-			self.value(&value) else { error(error) }
+			self.value(&value)?
 			const match {
 			| quoted:
 				// String type, assign directly to the key.
@@ -384,9 +384,9 @@ impl jsonDecoder {
 				let mut keyV: K
 				const match keyT.Kind() {
 				| comptime::Int | comptime::I8 | comptime::I16 | comptime::I32 | comptime::I64:
-					decodeInt(&keyV, key) else { error(error) }
+					decodeInt(&keyV, key)?
 				| comptime::Uint | comptime::Uintptr | comptime::U8 | comptime::U16 | comptime::U32 | comptime::U64:
-					decodeUint(&keyV, key) else { error(error) }
+					decodeUint(&keyV, key)?
 				|:
 					panic("json: unimplemented type, this panic call should be unreachable")
 				}
@@ -421,7 +421,7 @@ impl jsonDecoder {
 			self.i++
 			ret
 		}
-		self.pushParseState(parseObject) else { error(error) }
+		self.pushParseState(parseObject)?
 		cache := cachedFields[T]()
 		p := uintptr(t)
 		for {
@@ -437,7 +437,7 @@ impl jsonDecoder {
 			j := self.i
 			// Scan literal with validity control.
 			// Because we will not unquote it, it should be checked here.
-			self.scanValidLit() else { error(error) }
+			self.scanValidLit()?
 			self.skipSpace()
 			if self.eof() {
 				error(errors::New("json: object is not ended"))
@@ -461,20 +461,20 @@ impl jsonDecoder {
 			if strings::ContainsRune(lit, '\\') {
 				for _, f in cache {
 					if f.nameEscHTML == lit {
-						f.decode(self, p+f.offset) else { error(error) }
+						f.decode(self, p+f.offset)?
 						goto FieldDecoded
 					}
 				}
 			} else {
 				for _, f in cache {
 					if f.nameNonEsc == lit {
-						f.decode(self, p+f.offset) else { error(error) }
+						f.decode(self, p+f.offset)?
 						goto FieldDecoded
 					}
 				}
 			}
 			// Skip JSON object field if is not decoded for struct.
-			self.scanValidValue() else { error(error) }
+			self.scanValidValue()?
 		FieldDecoded:
 			self.skipSpace()
 			if self.eof() {
@@ -548,12 +548,12 @@ impl jsonDecoder {
 											if b == '"' {
 												// Next literal is a string literal.
 												// DecodeText is suitable.
-												mut lit := self.scanLit() else { error(error) }
+												mut lit := self.scanLit()?
 												lit = unquoteBytes(lit)
 												if lit == nil {
 													error(errors::New("json: invalid value for DecodeText function:" + str(lit)))
 												}
-												m.Unwrap()(lit) else { error(error) }
+												m.Unwrap()(lit)?
 												ret true
 											}
 										|:
@@ -574,7 +574,7 @@ impl jsonDecoder {
 		// Before using the default decoding strategy, look for the custom decoder
 		// methods and use it, if any. If not exist any custom decoder method,
 		// fallback to default decoding.
-		mut ok := self.tryCustomDecode(t) else { error(error) }
+		mut ok := self.tryCustomDecode(t)?
 		if ok {
 			ret
 		}
@@ -585,14 +585,14 @@ impl jsonDecoder {
 			const match {
 			| tt == valueT | tt == objectT:
 				mut m := Object{}
-				self.objectMap(&m) else { error(error) }
+				self.objectMap(&m)?
 				*t = m
 				ret
 			| tt.Kind() == comptime::Map:
-				self.objectMap(t) else { error(error) }
+				self.objectMap(t)?
 				ret
 			| tt.Kind() == comptime::Struct:
-				self.objectStruct(t) else { error(error) }
+				self.objectStruct(t)?
 				ret
 			|:
 				error(errors::New("json: invalid value for type " + tt.Str() + ": object"))
@@ -601,12 +601,12 @@ impl jsonDecoder {
 			const match {
 			| tt == valueT | tt == arrayT:
 				mut array := Array(nil)
-				self.array(&array) else { error(error) }
+				self.array(&array)?
 				*t = array
 				ret
 			| tt.Kind() == comptime::Array
 			| tt.Kind() == comptime::Slice:
-				self.array(t) else { error(error) }
+				self.array(t)?
 				ret
 			|:
 				error(errors::New("json: invalid value for type " + tt.Str() + ": array"))
@@ -615,7 +615,7 @@ impl jsonDecoder {
 			const match {
 			| tt == valueT | tt == stringT:
 				// Don't check validity for literal, following algorithms will check it.
-				lit := self.scanLit() else { error(error) }
+				lit := self.scanLit()?
 				mut s := ""
 				ok = decodeString(&s, lit)
 				if !ok {
@@ -625,7 +625,7 @@ impl jsonDecoder {
 				ret
 			| tt.Kind() == comptime::Str:
 				// Don't check validity for literal, following algorithms will check it.
-				lit := self.scanLit() else { error(error) }
+				lit := self.scanLit()?
 				ok = decodeString(unsafe { &(*(*str)(t)) }, lit)
 				if !ok {
 					error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
@@ -634,7 +634,7 @@ impl jsonDecoder {
 			| tt.Kind() == comptime::Slice:
 				const match tt.Value().Kind() {
 				| comptime::U8:
-					lit := self.scanLit() else { error(error) }
+					lit := self.scanLit()?
 					mut s2 := unquoteBytes(lit)
 					if s2 == nil {
 						error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
@@ -646,7 +646,7 @@ impl jsonDecoder {
 			}
 			error(errors::New("json: invalid value for type " + tt.Str() + ": string"))
 		| 'n': // Null literal.
-			self.scanValidLit() else { error(error) }
+			self.scanValidLit()?
 			const match {
 			| tt.CanNil():
 				*t = nil
@@ -655,7 +655,7 @@ impl jsonDecoder {
 				error(errors::New("json: invalid value for type " + tt.Str() + ": null"))
 			}
 		| 't' | 'f': // Boolean literal.
-			self.scanValidLit() else { error(error) }
+			self.scanValidLit()?
 			const match {
 			| tt == valueT | tt == boolT:
 				*t = Bool(b == 't')
@@ -669,12 +669,12 @@ impl jsonDecoder {
 		}
 		if b == '-' || b == '0' || '1' <= b && b <= '9' {
 			// Don't check validity for literal, following algorithms will check it.
-			lit := self.scanLit() else { error(error) }
+			lit := self.scanLit()?
 			_ = lit // Avoid unused error.
 			const match {
 			| tt == valueT | tt == numberT:
 				mut f := f64(0)
-				decodeFloat(&f, lit) else { error(error) }
+				decodeFloat(&f, lit)?
 				*t = Number(f)
 				ret
 			| tt.Kind() == comptime::Int
@@ -682,7 +682,7 @@ impl jsonDecoder {
 			| tt.Kind() == comptime::I16
 			| tt.Kind() == comptime::I32
 			| tt.Kind() == comptime::I64:
-				decodeInt(t, lit) else { error(error) }
+				decodeInt(t, lit)?
 				ret
 			| tt.Kind() == comptime::Uint
 			| tt.Kind() == comptime::Uintptr
@@ -690,11 +690,11 @@ impl jsonDecoder {
 			| tt.Kind() == comptime::U16
 			| tt.Kind() == comptime::U32
 			| tt.Kind() == comptime::U64:
-				decodeUInt(t, lit) else { error(error) }
+				decodeUInt(t, lit)?
 				ret
 			| tt.Kind() == comptime::F32
 			| tt.Kind() == comptime::F64:
-				decodeFloat(t, lit) else { error(error) }
+				decodeFloat(t, lit)?
 				ret
 			|:
 				error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
@@ -707,7 +707,7 @@ impl jsonDecoder {
 		// Before using the default decoding strategy, look for the custom decoder
 		// methods and use it, if any. If not exist any custom decoder method,
 		// fallback to default decoding.
-		ok := self.tryCustomDecode(t) else { error(error) }
+		ok := self.tryCustomDecode(t)?
 		if ok {
 			ret
 		}
@@ -716,7 +716,7 @@ impl jsonDecoder {
 		| comptime::Smartptr:
 			b := self.data.Get(self.i)
 			if b == 'n' { // Null literal.
-				self.scanValidLit() else { error(error) }
+				self.scanValidLit()?
 				*t = nil
 				ret
 			}
@@ -724,16 +724,16 @@ impl jsonDecoder {
 				comptime::TypeAlias(valueTyp, tt.Value())
 				*t = T(new(valueTyp))
 			}
-			self.value1(&(**t)) else { error(error) }
+			self.value1(&(**t))?
 		|:
-			self.value1(t) else { error(error) }
+			self.value1(t)?
 		}
 	}
 
 	fn decode[T](*self, mut &t: *T)! {
 		self.skipSpace()
 		if !self.eof() {
-			self.value(t) else { error(error) }
+			self.value(t)?
 		}
 		self.skipSpace()
 		if self.data.Len()-self.i > 0 {
@@ -828,7 +828,7 @@ fn Decode[T](data: []byte, mut &t: *T)! {
 	}
 	decoder := jsonDecoder{}
 	decoder.data.SetData(data)
-	decoder.decode(t) else { error(error) }
+	decoder.decode(t)?
 }
 
 fn isSpace(c: byte): bool {

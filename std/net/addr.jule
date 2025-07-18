@@ -109,9 +109,9 @@ fn parseAddr(addr: str)!: ipAddr {
 	for _, r in addr {
 		match r {
 		| '.':
-			ret parseIPv4(addr) else { error(error) }
+			ret parseIPv4(addr)?
 		| ':':
-			ret parseIPv6(addr) else { error(error) }
+			ret parseIPv6(addr)?
 		| '%':
 			// Assume that this was trying to be an IPv6 address with
 			// a zone specifier, but the address is missing.
@@ -131,7 +131,7 @@ fn resolveInternetAddr(net: Network, addr: str)!: Addr {
 	match net {
 	| TCP | TCP4 | TCP6
 	| UDP | UDP4 | UDP6:
-		host, port = SplitHostPort(addr) else { error(error) }
+		host, port = SplitHostPort(addr)?
 		(portnum), ok := conv::Atoi(port)
 		if !ok {
 			error(&AddrError{Err: "invalid port: " + port})
@@ -145,7 +145,7 @@ fn resolveInternetAddr(net: Network, addr: str)!: Addr {
 	if host == localhost {
 		ret buildLocalhostAddr(net, portnum)
 	}
-	mut ip := parseAddr(host) else { error(error) }
+	mut ip := parseAddr(host)?
 	match type ip {
 	| IP:
 		match net {

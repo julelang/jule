@@ -71,12 +71,12 @@ impl FD {
 			mut nn := 0
 			match {
 			| self.Flags&Console == Console:
-				nn = self.writeConsole(b) else { error(error) }
+				nn = self.writeConsole(b)?
 			| self.Flags&File == File | self.Flags&Pipe == Pipe:
-				nn = self.writeFile(b) else { error(error) }
+				nn = self.writeFile(b)?
 			| self.Flags&Socket == Socket:
 				nn = len(b)
-				sys::Send(NetHandle(self.File), b, 0) else { error(error) }
+				sys::Send(NetHandle(self.File), b, 0)?
 			|:
 				panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Write")
 			}
@@ -103,7 +103,7 @@ impl FD {
 				max = n + maxRW
 			}
 			part := buf[n:max]
-			sys::Sendto(NetHandle(self.File), part, 0, addr, addrLen) else { error(error) }
+			sys::Sendto(NetHandle(self.File), part, 0, addr, addrLen)?
 			n += len(part)
 			if n == len(buf) {
 				ret
@@ -114,7 +114,7 @@ impl FD {
 	// Writes buf to file handle, returns written byte count.
 	// Returns -1 if error occurred.
 	fn writeFile(mut *self, mut buf: []byte)!: (n: int) {
-		ret sys::WriteFile(sys::Handle(self.File), buf) else { error(error) }
+		ret sys::WriteFile(sys::Handle(self.File), buf)?
 	}
 
 	// Writes buf to console handle, returns written byte count.
@@ -151,7 +151,7 @@ impl FD {
 			mut u16s := utf16::Encode(chunk)
 			for len(u16s) > 0 {
 				mut written := u32(0)
-				unsafe { sys::WriteConsole(sys::Handle(self.File), &u16s[0], u32(len(u16s)), &written, nil) else { error(error) } }
+				unsafe { sys::WriteConsole(sys::Handle(self.File), &u16s[0], u32(len(u16s)), &written, nil)? }
 				u16s = u16s[written:]
 			}
 		}
@@ -176,11 +176,11 @@ impl FD {
 
 		match {
 		| self.Flags&Console == Console:
-			n = self.readConsole(buf) else { error(error) }
+			n = self.readConsole(buf)?
 		| self.Flags&File == File | self.Flags&Pipe == Pipe:
-			n = self.readFile(buf) else { error(error) }
+			n = self.readFile(buf)?
 		| self.Flags&Socket == Socket:
-			n = sys::Recv(NetHandle(self.File), buf, 0) else { error(error) }
+			n = sys::Recv(NetHandle(self.File), buf, 0)?
 		|:
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Read")
 		}
@@ -202,7 +202,7 @@ impl FD {
 		if len(buf) > maxRW {
 			buf = buf[:maxRW]
 		}
-		n = sys::Recvfrom(NetHandle(self.File), buf, 0, addr, addrLen) else { error(error) }
+		n = sys::Recvfrom(NetHandle(self.File), buf, 0, addr, addrLen)?
 		n = self.statEOF(n)
 		ret n
 	}
@@ -241,7 +241,7 @@ impl FD {
 					sys::Handle(self.File),
 					&self.readu16[:len(self.readu16)+1][len(self.readu16)],
 					u32(n),
-					&nw) else { error(error) }
+					&nw)?
 			}
 			u16s := self.readu16[:len(self.readu16)+int(nw)]
 			self.readu16 = self.readu16[:0]
@@ -294,26 +294,26 @@ impl FD {
 	// whence: 0 (Seek.Set) means, relative to the whence of the file, 1 (Seek.Cur)
 	// means relative to the current offset, and 2 (Seek.End) means relative to end.
 	fn Seek(mut *self, offset: i64, whence: int)!: (newoffset: i64) {
-		ret sys::Seek(sys::Handle(self.File), offset, whence) else { error(error) }
+		ret sys::Seek(sys::Handle(self.File), offset, whence)?
 	}
 
 	// Imitates the POSIX ftruncate function.
 	fn Ftruncate(mut *self, size: i64)! {
-		sys::Ftruncate(sys::Handle(self.File), size) else { error(error) }
+		sys::Ftruncate(sys::Handle(self.File), size)?
 	}
 
 	// Wraps sys::FlushFileBuffers.
 	fn Fsync(mut *self)! {
-		sys::FlushFileBuffers(sys::Handle(self.File)) else { error(error) }
+		sys::FlushFileBuffers(sys::Handle(self.File))?
 	}
 
 	// Closes file descriptor.
 	fn Close(mut *self)! {
 		match {
 		| self.Flags&File == File | self.Flags&Pipe == Pipe | self.Flags&Pipe == Pipe | self.Flags&Console == Console:
-			sys::CloseHandle(sys::Handle(self.File)) else { error(error) }
+			sys::CloseHandle(sys::Handle(self.File))?
 		| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
-			sys::CloseSocket(NetHandle(self.File)) else { error(error) }
+			sys::CloseSocket(NetHandle(self.File))?
 		|:
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Close")
 		}

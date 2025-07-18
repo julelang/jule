@@ -53,7 +53,7 @@ impl io::StrWriter for File {}
 // the returned file can be used for reading; the associated file
 // descriptor has mode O_RDONLY.
 fn Open(path: str)!: &File {
-	ret OpenFile(path, O_RDONLY, 0) else { error(error) }
+	ret OpenFile(path, O_RDONLY, 0)?
 }
 
 // Opens file stream with named file, specified flag
@@ -62,12 +62,12 @@ fn Open(path: str)!: &File {
 // mode perm (before umask). If successful, returns File reference with handle
 // to file stream and the reference can used for I/O operations.
 fn OpenFile(path: str, flag: int, perm: FileMode)!: &File {
-	ret openFile(path, flag, perm) else { error(error) }
+	ret openFile(path, flag, perm)?
 }
 
 // Removes named file.
 fn Remove(path: str)! {
-	remove(path) else { error(error) }
+	remove(path)?
 }
 
 // Creates or truncates the named file. If the file already exists,
@@ -76,15 +76,15 @@ fn Remove(path: str)! {
 // be used for I/O; the associated file descriptor has mode O_RDWR.
 // Calls internally `File.Open` and forwards any exceptional.
 fn Create(path: str)!: &File {
-	ret OpenFile(path, O_RDWR|O_CREATE|O_TRUNC, 0666) else { error(error) }
+	ret OpenFile(path, O_RDWR|O_CREATE|O_TRUNC, 0666)?
 }
 
 // Reads bytes of file.
 // First, learns byte-size of file.
 // Then reads bytes and returns buffer.
 fn ReadFile(path: str)!: []byte {
-	mut f := Open(path) else { error(error) }
-	info := Stat(path) else { error(error) }
+	mut f := Open(path)?
+	info := Stat(path)?
 
 	let mut size: int
 	size64 := info.Size()
@@ -105,9 +105,9 @@ fn ReadFile(path: str)!: []byte {
 
 	mut data := make([]byte, 0, size)
 	for {
-		n := f.Read(data[len(data):cap(data)]) else { error(error) }
+		n := f.Read(data[len(data):cap(data)])?
 		if n == io::EOF {
-			f.Close() else { error(error) }
+			f.Close()?
 			ret data
 		}
 		data = data[:len(data)+n]
@@ -125,21 +125,21 @@ fn ReadFile(path: str)!: []byte {
 // can leave the file in a partially written state.
 // Calls internally `File.Open`, `File.Write`, `File.Close` and forwards any exceptional.
 fn WriteFile(path: str, data: []byte, perm: FileMode)! {
-	mut f := OpenFile(path, O_WRONLY|O_CREATE|O_TRUNC, perm) else { error(error) }
-	f.Write(data) else { error(error) }
-	f.Close() else { error(error) }
+	mut f := OpenFile(path, O_WRONLY|O_CREATE|O_TRUNC, perm)?
+	f.Write(data)?
+	f.Close()?
 }
 
 impl File {
 	// Writes bytes to handle and returns written byte count.
 	// The number of bytes written can never exceed the length of the buf.
 	fn Write(mut *self, buf: []byte)!: (n: int) {
-		ret self.fd.Write(buf) else { error(error) }
+		ret self.fd.Write(buf)?
 	}
 
 	// Like Write, but writes the contents of string s rather than a slice of bytes.
 	fn WriteStr(mut *self, s: str)!: (n: int) {
-		ret self.Write(unsafe::StrBytes(s)) else { error(error) }
+		ret self.Write(unsafe::StrBytes(s))?
 	}
 
 	// Read bytes to buffer from handle and returns read byte count.
@@ -148,31 +148,31 @@ impl File {
 	// the buffer will not cause an overflow. Offset will be shifted
 	// by the number of bytes read.
 	fn Read(mut *self, mut buf: []byte)!: (n: int) {
-		ret self.fd.Read(buf) else { error(error) }
+		ret self.fd.Read(buf)?
 	}
 
 	// Sets offset to next Read/Write operation and returns the new offset.
 	// whence: 0 (io::SeekStart) means, relative to the whence of the file, 1 (io::SeekCurrent)
 	// means relative to the current offset, and 2 (io::SeekEnd) means relative to end.
 	fn Seek(mut *self, offset: i64, whence: int)!: i64 {
-		ret self.fd.Seek(offset, whence) else { error(error) }
+		ret self.fd.Seek(offset, whence)?
 	}
 
 	// Commits the current contents of the file to stable storage.
 	// Typically, this means flushing the file system's in-memory copy
 	// of recently written data to disk.
 	fn Sync(mut *self)! {
-		self.fd.Fsync() else { error(error) }
+		self.fd.Fsync()?
 	}
 
 	// Changes the size of the file.
 	// It does not change the I/O offset.
 	fn Truncate(mut *self, size: i64)! {
-		self.fd.Ftruncate(size) else { error(error) }
+		self.fd.Ftruncate(size)?
 	}
 
 	// Closes file handle.
 	fn Close(mut *self)! {
-		self.fd.Close() else { error(error) }
+		self.fd.Close()?
 	}
 }

@@ -116,7 +116,7 @@ impl Writer {
 			if n > 0 {
 				mut bytes := make([]byte, utf8::UTFMax)
 				j := utf8::EncodeRune(bytes, self.Comma)
-				self.w.Write(bytes[:j]) else { error(error) }
+				self.w.Write(bytes[:j])?
 			}
 
 			// Use fb instead of field to avoid copying.
@@ -125,11 +125,11 @@ impl Writer {
 			// If we don't have to have a quoted field then just
 			// write out the field and continue to the next field.
 			if !self.fieldNeedsQuotes(fb) {
-				self.w.Write(fb) else { error(error) }
+				self.w.Write(fb)?
 				continue
 			}
 
-			self.w.Write(['"']) else { error(error) }
+			self.w.Write(['"'])?
 
 			for len(fb) > 0 {
 				// Search for special characters.
@@ -139,42 +139,42 @@ impl Writer {
 				}
 
 				// Copy verbatim everything before the special character.
-				self.w.Write(fb[:i]) else { error(error) }
+				self.w.Write(fb[:i])?
 				fb = fb[i:]
 
 				// Encode the special character.
 				if len(fb) > 0 {
 					match fb[0] {
 					| '"':
-						self.w.Write(unsafe::StrBytes(`""`)) else { error(error) }
+						self.w.Write(unsafe::StrBytes(`""`))?
 					| '\r':
 						if !self.UseCRLF {
-							self.w.Write(['\r']) else { error(error) }
+							self.w.Write(['\r'])?
 						}
 					| '\n':
 						if self.UseCRLF {
-							self.w.Write(unsafe::StrBytes("\r\n")) else { error(error) }
+							self.w.Write(unsafe::StrBytes("\r\n"))?
 						} else {
-							self.w.Write(unsafe::StrBytes("\n")) else { error(error) }
+							self.w.Write(unsafe::StrBytes("\n"))?
 						}
 					}
 					fb = fb[1:]
 				}
 			}
 
-			self.w.Write(unsafe::StrBytes("\"")) else { error(error) }
+			self.w.Write(unsafe::StrBytes("\""))?
 		}
 		if self.UseCRLF {
-			self.w.Write(unsafe::StrBytes("\r\n")) else { error(error) }
+			self.w.Write(unsafe::StrBytes("\r\n"))?
 		} else {
-			self.w.Write(unsafe::StrBytes("\n")) else { error(error) }
+			self.w.Write(unsafe::StrBytes("\n"))?
 		}
 	}
 
 	// Writes multiple CSV records using [Writer.Write].
 	fn WriteAll(mut *self, records: [][]str)! {
 		for _, record in records {
-			self.Write(record) else { error(error) }
+			self.Write(record)?
 		}
 	}
 }

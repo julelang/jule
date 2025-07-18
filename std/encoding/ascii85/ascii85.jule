@@ -227,7 +227,7 @@ impl io::WriteCloser for encoder {
 				ret
 			}
 			nout := Encode(self.out, self.buf)
-			self.w.Write(self.out[:nout]) else { error(error) }
+			self.w.Write(self.out[:nout])?
 			self.nbuf = 0
 		}
 
@@ -240,7 +240,7 @@ impl io::WriteCloser for encoder {
 			nn -= nn % 4
 			if nn > 0 {
 				nout := Encode(self.out, dest[:nn])
-				self.w.Write(self.out[:nout]) else { error(error) }
+				self.w.Write(self.out[:nout])?
 			}
 			n += nn
 			unsafe { *(&dest) = (*(&dest))[nn:] }
@@ -260,7 +260,7 @@ impl io::WriteCloser for encoder {
 		if self.nbuf > 0 {
 			nout := Encode(self.out, self.buf[:self.nbuf])
 			self.nbuf = 0
-			self.w.Write(self.out[:nout]) else { error(error) }
+			self.w.Write(self.out[:nout])?
 		}
 	}
 }
@@ -303,7 +303,7 @@ impl io::Reader for decoder {
 			// Decode leftover input from last read.
 			mut nn, mut nsrc, mut ndst := 0, 0, 0
 			if self.nbuf > 0 {
-				ndst, nsrc = Decode(self.outbuf, self.buf[:self.nbuf], true) else { error(error) }
+				ndst, nsrc = Decode(self.outbuf, self.buf[:self.nbuf], true)?
 				if ndst > 0 {
 					self.out = self.outbuf[:ndst]
 					self.nbuf = copy(self.buf, self.buf[nsrc:self.nbuf])
@@ -328,7 +328,7 @@ impl io::Reader for decoder {
 			}
 
 			// Read more data.
-			nn = self.r.Read(self.buf[self.nbuf:]) else { error(error) }
+			nn = self.r.Read(self.buf[self.nbuf:])?
 			if nn == io::EOF {
 				self.eof = true
 			} else {

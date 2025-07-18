@@ -16,7 +16,7 @@ use "std/time"
 fn Listen(network: Network, addr: str)!: Listener {
 	match network {
 	| TCP | TCP4 | TCP6:
-		ret tcpBind(network, addr) else { error(error) }
+		ret tcpBind(network, addr)?
 	|:
 		error(&AddrError{Err: "invalid network: " + str(network)})
 	}
@@ -28,7 +28,7 @@ fn Listen(network: Network, addr: str)!: Listener {
 //
 // See the [Dial] function for a description of the network and addr parameters.
 fn ListenUDP(network: Network, addr: str)!: &UDPConn {
-	ret udpBind(network, addr) else { error(error) }
+	ret udpBind(network, addr)?
 }
 
 // Connects to the address on the named network.
@@ -71,7 +71,7 @@ fn ListenUDP(network: Network, addr: str)!: &UDPConn {
 //
 // It will forward any exceptional from network connectors.
 fn Dial(network: Network, addr: str)!: Conn {
-	ret DialTimeout(network, addr, 0) else { error(error) }
+	ret DialTimeout(network, addr, 0)?
 }
 
 // Same as Dial, but uses timeout.
@@ -81,20 +81,20 @@ fn Dial(network: Network, addr: str)!: Conn {
 fn DialTimeout(network: Network, addr: str, timeout: time::Duration)!: Conn {
 	match network {
 	| TCP | TCP4 | TCP6:
-		ret tcpDial(network, addr, timeout) else { error(error) }
+		ret tcpDial(network, addr, timeout)?
 	| UDP | UDP4 | UDP6:
-		ret udpDial(network, addr) else { error(error) }
+		ret udpDial(network, addr)?
 	|:
 		error(&AddrError{Err: "invalid network: " + str(network)})
 	}
 }
 
 fn getSocketAddr(handle: poll::NetHandle, addr: uintptr, len: sys::Socklen)! {
-	sys::Getsockname(handle, addr, len) else { error(error) }
+	sys::Getsockname(handle, addr, len)?
 }
 
 fn connectSocketNoTimeout(handle: poll::NetHandle, sockAddr: uintptr, sockLen: sys::Socklen)! {
-	sys::Connect(handle, sockAddr, sockLen) else { error(error) }
+	sys::Connect(handle, sockAddr, sockLen)?
 }
 
 fn timevalFromDuration(timeout: time::Duration): (tv: sys::Timeval, ok: bool) {

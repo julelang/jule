@@ -68,8 +68,8 @@ impl Cmd {
 		utf16path := integ::UTF16FromStr(path)
 		argv := integ::UTF16FromStr(makeCmdLine(self.args()))
 
-		mut env := self.env() else { error(error) }
-		envblock := createEnvBlock(env) else { error(error) }
+		mut env := self.env()?
+		envblock := createEnvBlock(env)?
 		mut envp := &envblock[0]
 
 		mut utf16dir := []u16(nil)
@@ -120,12 +120,12 @@ impl Cmd {
 			}
 		}
 		self.attrs.hProcess = pi.hProcess
-		sys::CloseHandle(pi.hThread) else { error(error) }
+		sys::CloseHandle(pi.hThread)?
 	}
 
 	fn kill(*self)! {
 		if unsafe { cpp.TerminateProcess(cpp.HANDLE(self.attrs.hProcess), 0) } {
-			sys::CloseHandle(sys::Handle(self.attrs.hProcess)) else { error(error) }
+			sys::CloseHandle(sys::Handle(self.attrs.hProcess))?
 			self.attrs.hProcess = 0
 			ret
 		}
@@ -137,7 +137,7 @@ impl Cmd {
 		mut exitCode := unsafe { integ::LongLong(0) }
 		unsafe {
 			cpp.GetExitCodeProcess(cpp.HANDLE(self.attrs.hProcess), &exitCode)
-			sys::CloseHandle(sys::Handle(self.attrs.hProcess)) else { error(error) }
+			sys::CloseHandle(sys::Handle(self.attrs.hProcess))?
 		}
 		self.attrs.hProcess = 0
 		ret unsafe { int(exitCode) }
@@ -247,7 +247,7 @@ fn createEnvBlock(env: []str)!: []u16 {
 }
 
 fn chkStat(file: str)! {
-	d := Stat(file) else { error(error) }
+	d := Stat(file)?
 	if d.IsDir() {
 		error(sys::Errno(sys::ERROR_ACCESS_DENIED))
 	}
@@ -263,7 +263,7 @@ fn hasExt(file: str): bool {
 
 fn findExecutable(file: str, exts: []str)!: str {
 	if len(exts) == 0 {
-		chkStat(file) else { error(error) }
+		chkStat(file)?
 		ret file
 	}
 	if hasExt(file) {
@@ -326,23 +326,23 @@ fn lookExtensions(mut path: str, dir: str)!: str {
 		}
 	}
 	if dir == "" {
-		ret _lookPath(path, exts) else { error(error) }
+		ret _lookPath(path, exts)?
 	}
 	if filepathlite::VolumeName(path) != "" {
-		ret _lookPath(path, exts) else { error(error) }
+		ret _lookPath(path, exts)?
 	}
 	if len(path) > 1 && filepathlite::IsPathSeparator(path[0]) {
-		ret _lookPath(path, exts) else { error(error) }
+		ret _lookPath(path, exts)?
 	}
 	dirandpath := filepathlite::Join(dir, path)
 	// We assume that LookPath will only add file extension.
-	lp := _lookPath(dirandpath, exts) else { error(error) }
+	lp := _lookPath(dirandpath, exts)?
 	ext = strings::TrimPrefix(lp, dirandpath)
 	ret path + ext
 }
 
 fn lookPath(file: str)!: str {
-	ret _lookPath(file, pathExt()) else { error(error) }
+	ret _lookPath(file, pathExt())?
 }
 
 // Implements lookPath for the given PATHEXT list.

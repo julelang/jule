@@ -245,9 +245,9 @@ impl jsonEncoder {
 			const match {
 			| useIndent:
 				self.buf.writeByte(' ')
-				fieldCache.encodeIndent(self, p+fieldCache.offset) else { error(error) }
+				fieldCache.encodeIndent(self, p+fieldCache.offset)?
 			|:
-				fieldCache.encodePlain(self, p+fieldCache.offset) else { error(error) }
+				fieldCache.encodePlain(self, p+fieldCache.offset)?
 			}
 		}
 		if next == '{' {
@@ -312,7 +312,7 @@ impl jsonEncoder {
 			| useIndent:
 				self.buf.writeByte(' ')
 			}
-			self.encode[valueTyp, Flag](v) else { error(error) }
+			self.encode[valueTyp, Flag](v)?
 		}
 		const match {
 		| useIndent:
@@ -339,7 +339,7 @@ impl jsonEncoder {
 				self.buf.writeByte('\n')
 				self.buf.writeStr(strings::Repeat(self.indent, self.depth))
 			}
-			self.encode[valueTyp, Flag](e) else { error(error) }
+			self.encode[valueTyp, Flag](e)?
 		}
 		if next == '[' {
 			self.buf.writeStr("[]")
@@ -366,7 +366,7 @@ impl jsonEncoder {
 		| comptime::U8:
 			self.encodeByteSlice([]byte(t))
 		|:
-			self.encodeArray[T, Flag](t) else { error(error) }
+			self.encodeArray[T, Flag](t)?
 		}
 	}
 
@@ -413,10 +413,10 @@ impl jsonEncoder {
 			self.encodeUint(u64(t))
 			ret
 		| comptime::F32:
-			self.encodeFloat(f64(t), 32) else { error(error) }
+			self.encodeFloat(f64(t), 32)?
 			ret
 		| comptime::F64:
-			self.encodeFloat(f64(t), 64) else { error(error) }
+			self.encodeFloat(f64(t), 64)?
 			ret
 		| comptime::Bool:
 			self.encodeBool(bool(t))
@@ -432,16 +432,16 @@ impl jsonEncoder {
 				self.encodeNil()
 			} else {
 				comptime::TypeAlias(valueTyp, tt.Value())
-				self.encode[valueTyp, Flag](*t) else { error(error) }
+				self.encode[valueTyp, Flag](*t)?
 			}
 		| comptime::Struct:
-			self.encodeStruct[T, Flag](t) else { error(error) }
+			self.encodeStruct[T, Flag](t)?
 		| comptime::Map:
-			self.encodeMap[T, Flag](t) else { error(error) }
+			self.encodeMap[T, Flag](t)?
 		| comptime::Array:
-			self.encodeArray[T, Flag](t) else { error(error) }
+			self.encodeArray[T, Flag](t)?
 		| comptime::Slice:
-			self.encodeSlice[T, Flag](t) else { error(error) }
+			self.encodeSlice[T, Flag](t)?
 		|:
 			error(&UnsupportedTypeError{Type: tt.Str()})
 		}
@@ -456,7 +456,7 @@ impl jsonEncoder {
 		| tt.Bind():
 			error(&UnsupportedTypeError{Type: tt.Str()})
 		|:
-			self.encodePlain[T, Flag](t) else { error(error) }
+			self.encodePlain[T, Flag](t)?
 		}
 	}
 }
@@ -537,7 +537,7 @@ fn encoder(): jsonEncoder {
 //	JSONEncoder, TextEncoder
 fn Encode[T](t: T)!: []byte {
 	mut encoder := encoder()
-	encoder.encode[T, encodePlain](t) else { error(error) }
+	encoder.encode[T, encodePlain](t)?
 	ret encoder.buf.bytes()
 }
 
@@ -545,10 +545,10 @@ fn Encode[T](t: T)!: []byte {
 fn EncodeIndent[T](t: T, indent: str)!: []byte {
 	mut encoder := encoder()
 	if indent == "" {
-		encoder.encode[T, encodePlain](t) else { error(error) }
+		encoder.encode[T, encodePlain](t)?
 	} else {
 		encoder.indent = indent
-		encoder.encode[T, encodeIndent](t) else { error(error) }
+		encoder.encode[T, encodeIndent](t)?
 	}
 	ret encoder.buf.bytes()
 }
@@ -700,13 +700,13 @@ fn resolveKeyName[T](k: T): str {
 }
 
 fn typeEncoderPlain[T](mut &encoder: *jsonEncoder, field: uintptr)! {
-	encoder.encode[T, encodePlain](unsafe { *(*T)(field) }) else { error(error) }
+	encoder.encode[T, encodePlain](unsafe { *(*T)(field) })?
 }
 
 fn typeEncoderIndent[T](mut &encoder: *jsonEncoder, field: uintptr)! {
-	encoder.encode[T, encodeIndent](unsafe { *(*T)(field) }) else { error(error) }
+	encoder.encode[T, encodeIndent](unsafe { *(*T)(field) })?
 }
 
 fn typeDecoder[T](&decoder: *jsonDecoder, field: uintptr)! {
-	decoder.value(unsafe { &(*(*T)(field)) }) else { error(error) }
+	decoder.value(unsafe { &(*(*T)(field)) })?
 }

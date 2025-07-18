@@ -32,7 +32,7 @@ impl UDPConn {
 	//
 	// See the [Dial] function for a description of the addr parameter.
 	fn Bind(addr: str)!: &UDPConn {
-		ret udpBind(Network.UDP, addr) else { error(error) }
+		ret udpBind(Network.UDP, addr)?
 	}
 
 	// Connects to UDP listener by given address.
@@ -42,7 +42,7 @@ impl UDPConn {
 	//
 	// See the [Dial] function for a description of the addr parameter.
 	fn Dial(addr: str)!: &UDPConn {
-		ret udpDial(Network.UDP, addr) else { error(error) }
+		ret udpDial(Network.UDP, addr)?
 	}
 
 	// Read bytes to buffer from connection and returns read byte count.
@@ -55,9 +55,9 @@ impl UDPConn {
 			panic("net: UDPConn.Read: connection is closed")
 		}
 		if self.v6 {
-			ret self.fd.ReadV6(buf, self.sockaddr6) else { error(error) }
+			ret self.fd.ReadV6(buf, self.sockaddr6)?
 		} else {
-			ret self.fd.ReadV4(buf, self.sockaddr4) else { error(error) }
+			ret self.fd.ReadV4(buf, self.sockaddr4)?
 		}
 	}
 
@@ -68,9 +68,9 @@ impl UDPConn {
 			panic("net: UDPConn.Write: connection is closed")
 		}
 		if self.v6 {
-			ret self.fd.WriteV6(buf, self.sockaddr6) else { error(error) }
+			ret self.fd.WriteV6(buf, self.sockaddr6)?
 		} else {
-			ret self.fd.WriteV4(buf, self.sockaddr4) else { error(error) }
+			ret self.fd.WriteV4(buf, self.sockaddr4)?
 		}
 	}
 
@@ -82,7 +82,7 @@ impl UDPConn {
 		if self.fd == nil {
 			panic("net: TCPConn.SetReadTimeout: connection is closed")
 		}
-		setSocketTimeout(poll::NetHandle(self.fd.File), sys::SO_RCVTIMEO, timeout) else { error(error) }
+		setSocketTimeout(poll::NetHandle(self.fd.File), sys::SO_RCVTIMEO, timeout)?
 	}
 
 	// Sets write timeout for connection.
@@ -93,7 +93,7 @@ impl UDPConn {
 		if self.fd == nil {
 			panic("net: TCPConn.SetReadTimeout: connection is closed")
 		}
-		setSocketTimeout(poll::NetHandle(self.fd.File), sys::SO_SNDTIMEO, timeout) else { error(error) }
+		setSocketTimeout(poll::NetHandle(self.fd.File), sys::SO_SNDTIMEO, timeout)?
 	}
 
 	// Returns network name which is connected or listening.
@@ -114,38 +114,38 @@ impl UDPConn {
 		if self.fd == nil {
 			ret
 		}
-		self.fd.Close() else { error(error) }
+		self.fd.Close()?
 		self.fd = nil
 		self.v6 = false
 	}
 }
 
 fn udpBind(network: Network, addr: str)!: &UDPConn {
-	mut connAddr := UDPAddr.Resolve(network, addr) else { error(error) }
+	mut connAddr := UDPAddr.Resolve(network, addr)?
 	mut conn := UDPConn{
 		Addr: connAddr,
 	}
 	if conn.Addr.IP.Empty() {
 		match network {
 		| UDP | UDP4:
-			handle := sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP) else { error(error) }
+			handle := sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
 			conn.sockaddr4 = sys::SockaddrInet4{}
 			conn.sockaddr4.Family = sys::AF_INET
 			conn.sockaddr4.Port = htons(conn.Addr.Port)
 			sys::Bind(handle, uintptr(&conn.sockaddr4), sys::Socklen(mem::SizeOf(conn.sockaddr4))) else {
-				conn.fd.Close() else { error(error) }
+				conn.fd.Close()?
 				error(error)
 			}
 		| UDP6:
 			conn.v6 = true
-			handle := sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP) else { error(error) }
+			handle := sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
 			mut sockAddr := sys::SockaddrInet6{}
 			sockAddr.Family = sys::AF_INET6
 			sockAddr.Port = htons(conn.Addr.Port)
 			sys::Bind(handle, uintptr(&sockAddr), sys::Socklen(mem::SizeOf(sockAddr))) else {
-				conn.fd.Close() else { error(error) }
+				conn.fd.Close()?
 				error(error)
 			}
 		|:
@@ -158,7 +158,7 @@ fn udpBind(network: Network, addr: str)!: &UDPConn {
 				error(&AddrError{Err: "expected IPv4 address but found IPv6", Addr: addr})
 			}
 			conn.v6 = true
-			handle := sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP) else { error(error) }
+			handle := sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
 			conn.sockaddr6 = sys::SockaddrInet6{}
 			conn.sockaddr6.Family = sys::AF_INET6
@@ -166,7 +166,7 @@ fn udpBind(network: Network, addr: str)!: &UDPConn {
 			ipv6 := conn.Addr.IP.To16()
 			copy(conn.sockaddr6.Addr[:], ipv6)
 			sys::Bind(handle, uintptr(&conn.sockaddr6), sys::Socklen(mem::SizeOf(conn.sockaddr6))) else {
-				conn.fd.Close() else { error(error) }
+				conn.fd.Close()?
 				error(error)
 			}
 		} else {
@@ -174,14 +174,14 @@ fn udpBind(network: Network, addr: str)!: &UDPConn {
 				error(&AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr})
 			}
 			conn.Addr.IP = ipv4
-			handle := sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP) else { error(error) }
+			handle := sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
 			conn.sockaddr4 = sys::SockaddrInet4{}
 			conn.sockaddr4.Family = sys::AF_INET
 			conn.sockaddr4.Port = htons(conn.Addr.Port)
 			copy(conn.sockaddr4.Addr[:], ipv4)
 			sys::Bind(handle, uintptr(&conn.sockaddr4), sys::Socklen(mem::SizeOf(conn.sockaddr4))) else {
-				conn.fd.Close() else { error(error) }
+				conn.fd.Close()?
 				error(error)
 			}
 		}
@@ -190,7 +190,7 @@ fn udpBind(network: Network, addr: str)!: &UDPConn {
 }
 
 fn udpDial(network: Network, addr: str)!: &UDPConn {
-	mut connAddr := UDPAddr.Resolve(network, addr) else { error(error) }
+	mut connAddr := UDPAddr.Resolve(network, addr)?
 	mut conn := UDPConn{
 		Addr: connAddr,
 	}
@@ -198,13 +198,13 @@ fn udpDial(network: Network, addr: str)!: &UDPConn {
 	if conn.Addr.IP.Empty() {
 		match network {
 		| UDP | UDP4:
-			handle := sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP) else { error(error) }
+			handle := sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
 			conn.sockaddr4 = sys::SockaddrInet4{}
 			conn.sockaddr4.Family = sys::AF_INET
 			conn.sockaddr4.Port = htons(conn.Addr.Port)
 		| UDP6:
-			handle := sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP) else { error(error) }
+			handle := sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
 			conn.sockaddr6 = sys::SockaddrInet6{}
 			conn.sockaddr6.Family = sys::AF_INET6
@@ -219,7 +219,7 @@ fn udpDial(network: Network, addr: str)!: &UDPConn {
 				error(&AddrError{Err: "expected IPv4 address but found IPv6", Addr: addr})
 			}
 			conn.v6 = true
-			handle := sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP) else { error(error) }
+			handle := sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
 			conn.sockaddr6 = sys::SockaddrInet6{}
 			conn.sockaddr6.Family = sys::AF_INET6
@@ -231,7 +231,7 @@ fn udpDial(network: Network, addr: str)!: &UDPConn {
 				error(&AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr})
 			}
 			conn.Addr.IP = ipv4
-			handle := sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP) else { error(error) }
+			handle := sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
 			conn.sockaddr4 = sys::SockaddrInet4{}
 			conn.sockaddr4.Family = sys::AF_INET

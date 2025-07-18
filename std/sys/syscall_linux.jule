@@ -3756,11 +3756,11 @@ fn unlinkat(dirfd: int, path: []byte, flags: int)! {
 
 fn Unlinkat(dirfd: int, path: str, flags: int)! {
 	cpath := integ::StrToBytes(path)
-	unlinkat(dirfd, cpath, flags) else { error(error) }
+	unlinkat(dirfd, cpath, flags)?
 }
 
 fn Unlink(path: str)! {
-	Unlinkat(AT_FDCWD, path, 0) else { error(error) }
+	Unlinkat(AT_FDCWD, path, 0)?
 }
 
 // Path should be NUL-terminated if it is not empty.
@@ -3780,11 +3780,11 @@ fn mkdirat(dirfd: int, path: []byte, mode: u32)! {
 // Path should be NUL-terminated if it is not empty.
 fn Mkdirat(dirfd: int, path: str, mode: u32)! {
 	cpath := integ::StrToBytes(path)
-	mkdirat(dirfd, cpath, mode) else { error(error) }
+	mkdirat(dirfd, cpath, mode)?
 }
 
 fn Mkdir(path: str, mode: u32)! {
-	Mkdirat(AT_FDCWD, path, mode) else { error(error) }
+	Mkdirat(AT_FDCWD, path, mode)?
 }
 
 fn Getcwd(mut buf: []byte)!: (n: int) {
@@ -3847,11 +3847,11 @@ fn openat(dirfd: int, path: str, flags: int, mode: u32)!: (fd: int) {
 }
 
 fn Open(path: str, mode: int, perm: u32)!: (fd: int) {
-	ret openat(AT_FDCWD, path, mode|O_LARGEFILE, perm) else { error(error) }
+	ret openat(AT_FDCWD, path, mode|O_LARGEFILE, perm)?
 }
 
 fn Pipe(mut p: []int)! {
-	Pipe2(p, 0) else { error(error) }
+	Pipe2(p, 0)?
 }
 
 fn Pipe2(mut p: []int, flags: int)! {
@@ -3891,7 +3891,7 @@ fn Faccessat2(dirfd: int, path: str, mode: u32, flags: int)! {
 }
 
 fn Getgroups()!: (gids: []int) {
-	mut n := getgroups(0, 0) else { error(error) }
+	mut n := getgroups(0, 0)?
 	if n == 0 {
 		ret nil
 	}
@@ -3902,7 +3902,7 @@ fn Getgroups()!: (gids: []int) {
 	}
 
 	mut a := make([]Gid, n)
-	n = getgroups(n, uintptr(&a[0])) else { error(error) }
+	n = getgroups(n, uintptr(&a[0]))?
 	gids = make([]int, n)
 	for i, v in a[0:n] {
 		gids[i] = int(v)
@@ -3933,7 +3933,7 @@ fn isCapDacOverrideSet(): bool {
 
 fn Faccessat(dirfd: int, path: str, mut mode: u32, flags: int)! {
 	if flags == 0 {
-		faccessat(dirfd, path, mode) else { error(error) }
+		faccessat(dirfd, path, mode)?
 	}
 
 	Faccessat2(dirfd, path, mode, flags) else {
@@ -3953,7 +3953,7 @@ fn Faccessat(dirfd: int, path: str, mut mode: u32, flags: int)! {
 	}
 
 	let mut st: SysStat
-	Fstatat(dirfd, path, &st, flags&AT_SYMLINK_NOFOLLOW) else { error(error) }
+	Fstatat(dirfd, path, &st, flags&AT_SYMLINK_NOFOLLOW)?
 
 	mode &= 7
 	if mode == 0 {
@@ -4051,7 +4051,7 @@ fn Kill(pid: int, sig: Signal)! {
 }
 
 fn Dup2(oldfd: int, newfd: int)! {
-	Dup3(oldfd, newfd, 0) else { error(error) }
+	Dup3(oldfd, newfd, 0)?
 }
 
 fn Dup3(oldfd: int, newfd: int, flags: int)! {
@@ -4078,5 +4078,5 @@ fn Readlinkat(dirfd: int, path: str, mut buf: []byte)!: (n: int) {
 }
 
 fn Readlink(path: str, mut buf: []byte)!: (n: int) {
-	ret Readlinkat(AT_FDCWD, path, buf) else { error(error) }
+	ret Readlinkat(AT_FDCWD, path, buf)?
 }

@@ -221,10 +221,10 @@ impl Reader {
 	// between multiple calls to read.
 	fn Read(mut *self)!: (record: []str) {
 		if self.ReuseRecord {
-			record = self.readRecord(self.lastRecord) else { error(error) }
+			record = self.readRecord(self.lastRecord)?
 			self.lastRecord = record
 		} else {
-			record = self.readRecord(nil) else { error(error) }
+			record = self.readRecord(nil)?
 		}
 		ret
 	}
@@ -249,7 +249,7 @@ impl Reader {
 	// Each record is a slice of fields.
 	fn ReadAll(mut *self)!: (records: [][]str) {
 		for {
-			mut record := self.readRecord(nil) else { error(error) }
+			mut record := self.readRecord(nil)?
 			if len(record) == 0 {
 				break
 			}
@@ -262,7 +262,7 @@ impl Reader {
 	// If EOF is hit without a trailing endline, it will be omitted.
 	// The result is only valid until the next call to readLine.
 	fn readLine(mut *self)!: []byte {
-		mut line := self.r.readSlice('\n') else { error(error) }
+		mut line := self.r.readSlice('\n')?
 		mut readSize := len(line)
 		if readSize > 0 {
 			// For backwards compatibility, drop trailing \r before EOF.
@@ -291,7 +291,7 @@ impl Reader {
 		// Read line (automatically skipping past empty lines and any comments).
 		let mut line: []byte
 		for {
-			line = self.readLine() else { error(error) }
+			line = self.readLine()?
 			if len(line) == 0 {
 				ret nil
 			}
@@ -404,7 +404,7 @@ impl Reader {
 						// Hit end of line (copy all data so far).
 						self.recordBuffer = append(self.recordBuffer, line...)
 						pos.col += len(line)
-						line = self.readLine() else { error(error) }
+						line = self.readLine()?
 						if len(line) > 0 {
 							pos.line++
 							pos.col = 1
@@ -512,7 +512,7 @@ impl bufreader {
 				copy(buf, self.buf)
 				self.buf = buf
 			}
-			w := self.rd.Read(self.buf[self.r+n:]) else { error(error) }
+			w := self.rd.Read(self.buf[self.r+n:])?
 			if w == io::EOF {
 				line = self.buf[self.r:self.w]
 				self.r = self.w

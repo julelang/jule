@@ -251,7 +251,7 @@ impl Reader for limitedReader {
 		if i64(len(p)) > self.n {
 			p = p[0:self.n]
 		}
-		n = self.r.Read(p) else { error(error) }
+		n = self.r.Read(p)?
 		if n != EOF {
 			self.n -= i64(n)
 		}
@@ -267,7 +267,7 @@ let mut Discard = discard{}
 // error encountered while copying.
 // On return, written == n if and only if no error.
 fn CopyN(mut dst: Writer, mut src: Reader, n: i64)!: (written: i64) {
-	written = Copy(dst, LimitReader(src, n)) else { error(error) }
+	written = Copy(dst, LimitReader(src, n))?
 	if written == n {
 		ret n
 	}
@@ -280,7 +280,7 @@ fn CopyN(mut dst: Writer, mut src: Reader, n: i64)!: (written: i64) {
 //
 // Forwards any exceptional and may be throw InvalidWrite or ShortWrite.
 fn Copy(mut dst: Writer, mut src: Reader)!: (written: i64) {
-	ret copyBuffer(dst, src, nil) else { error(error) }
+	ret copyBuffer(dst, src, nil)?
 }
 
 // Identical to Copy except that it stages through the
@@ -291,7 +291,7 @@ fn CopyBuffer(mut dst: Writer, mut src: Reader, mut buf: []byte)!: (written: i64
 	if buf != nil && len(buf) == 0 {
 		panic("std/io: empty buffer in CopyBuffer")
 	}
-	ret copyBuffer(dst, src, buf) else { error(error) }
+	ret copyBuffer(dst, src, buf)?
 }
 
 // Actual implementation of Copy and CopyBuffer.
@@ -301,12 +301,12 @@ fn copyBuffer(mut dst: Writer, mut src: Reader, mut buf: []byte)!: (written: i64
 		buf = make([]byte, 32*1024)
 	}
 	for {
-		nr := src.Read(buf) else { error(error) }
+		nr := src.Read(buf)?
 		if nr == EOF {
 			break
 		}
 		if nr > 0 {
-			nw := dst.Write(buf[0:nr]) else { error(error) }
+			nw := dst.Write(buf[0:nr])?
 			if nw < 0 || nr < nw {
 				error(errInvalidWrite)
 			}
@@ -322,13 +322,13 @@ fn copyBuffer(mut dst: Writer, mut src: Reader, mut buf: []byte)!: (written: i64
 // Writes the contents of the string s to w efficiently.
 // Guarantees a slice will not be allocated.
 fn WriteStr(mut w: Writer, s: str)!: (n: int) {
-	ret w.Write(unsafe::StrBytes(s)) else { error(error) }
+	ret w.Write(unsafe::StrBytes(s))?
 }
 
 // Writes a single byte to w efficiently.
 // Guarantees a slice will not be allocated.
 fn WriteByte(mut w: Writer, b: byte)!: (n: int) {
-	ret w.Write(unsafe::Slice(&b, 1, 1)) else { error(error) }
+	ret w.Write(unsafe::Slice(&b, 1, 1))?
 }
 
 // Reads from r until an error or EOF and returns the data it read.
@@ -336,7 +336,7 @@ fn WriteByte(mut w: Writer, b: byte)!: (n: int) {
 fn ReadAll(mut r: Reader)!: []byte {
 	mut b := make([]byte, 0, 512)
 	for {
-		n := r.Read(b[len(b):cap(b)]) else { error(error) }
+		n := r.Read(b[len(b):cap(b)])?
 		if n == EOF {
 			ret b
 		}
