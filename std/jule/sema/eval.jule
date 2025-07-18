@@ -2310,13 +2310,20 @@ impl eval {
 					} else {
 						mut root := s.getRoot()
 						if root.owner.Decl.Exceptional {
+							// Build error variable. Declare in the current scope.
+							// Since there is no child scope analysis,
+							// current scope may will capture it for closure.
+							// To avoid it, handle it like declared in the current scope,
+							// then assign scope of variable to the child.
+							mut errorVar := buildErrorVar(s.scope, fc)
 							model.Except = s.getChild()
 							mut ec := buildVoidValue()
 							ec.Model = &BuiltinErrorCallExpr{
 								Func: root.owner,
-								Err: self.evalVar(buildErrorVar(model.Except, fc), fc.Token),
+								Err: self.evalVar(errorVar, fc.Token),
 							}
 							model.Except.Stmts = append(model.Except.Stmts, ec)
+							errorVar.Scope = model.Except
 							break
 						}
 					}
