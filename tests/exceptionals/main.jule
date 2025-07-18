@@ -37,6 +37,52 @@ fn failRet2()!: (a: int, b: int) {
 	error("not implemented")
 }
 
+fn err()! { error("bar") }
+
+fn anonForward()! {
+	fn()! {
+		err()?
+	}()?
+}
+
+fn anonForward1()! {
+	fn()! {
+		err() else { error(error) }
+	}()?
+}
+
+fn closureForward()! {
+	fn()! {
+		err()?
+	}() else {
+		fn()! {
+			error(error)
+		}()?
+	}
+}
+
+fn closureForward1()! {
+	fn()! {
+		error("cf1")
+	}() else {
+		fn()! {
+			err() else {
+				error(error)
+			}
+		}()?
+	}
+}
+
+fn closureForward2()! {
+	fn()! {
+		error("cf2")
+	}() else {
+		fn()! {
+			error(error)
+		}()?
+	}
+}
+
 fn main() {
 	successVoid() else {
 		panic("successVoid failed, should be success")
@@ -65,4 +111,45 @@ fn main() {
 	failRet2() else {
 		println("handled error of failRet2")
 	}
+
+	anonForward() else {
+		if error != "bar" {
+			panic("expected \"bar\"")
+		}
+		goto AF
+	}
+	panic("expected exceptional for anonForward")
+AF:
+	anonForward1() else {
+		if error != "bar" {
+			panic("expected \"bar\"")
+		}
+		goto AF1
+	}
+	panic("expected exceptional for anonForward1")
+AF1:
+	closureForward() else {
+		if error != "bar" {
+			panic("expected \"bar\"")
+		}
+		goto CF
+	}
+	panic("expected exceptional for closureForward")
+CF:
+	closureForward1() else {
+		if error != "bar" {
+			panic("expected \"bar\"")
+		}
+		goto CF1
+	}
+	panic("expected exceptional for closureForward1")
+CF1:
+	closureForward2() else {
+		if error != "cf2" {
+			panic("expected \"bar\"")
+		}
+		goto CF2
+	}
+	panic("expected exceptional for closureForward2")
+CF2:
 }
