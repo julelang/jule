@@ -450,7 +450,7 @@ impl scopeOptimizer {
 		if assign.Op.ID == token::ASSIGN &&
 			obj::EqualModels(assign.Left.Model, assign.Right.Model) {
 			self.removeCurrent()
-			self.i-- // In next iteration, point to correct statement.
+			self.i-- // In next iteration, point to the correct statement.
 			ret
 		}
 
@@ -534,9 +534,10 @@ impl scopeOptimizer {
 				// Binary model optimized.
 				// Use optimized model directly.
 				if assign.Op.ID == token::XOR {
-					// If caret operator optimized, it is equal to self assignment.
+					// If XOR operator optimized, it is equal to self assignment.
 					// Remove this unnecessary statement.
 					self.removeCurrent()
+					self.i-- // In next iteration, point to the correct statement.
 					ret
 				}
 				assign.Right = new(sema::OperandExpr, *assign.Right)
@@ -798,6 +799,7 @@ impl scopeOptimizer {
 			// remove this statement if all operands are removed
 			if len(assign.Left) == 0 {
 				self.removeCurrent()
+				self.i-- // In next iteration, point to the correct statement.
 				ret // Assignment removed, following analysis is not necessary.
 			}
 			// There is single operand.
