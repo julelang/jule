@@ -30,7 +30,7 @@ struct TypeAlias {
 	Token:    &token::Token
 	Name:     str
 	TypeSym:  &TypeSym
-	Generics: []&TypeAlias // See developer reference (1).
+	Generics: []&ast::Generic // See the developer reference (3).
 }
 
 // Kind of type declaration.
@@ -1078,21 +1078,20 @@ impl typeChecker {
 			}
 		}
 
-		// Push generic reference to owner type alias.
-		// See developer reference (3) and (4) for more information.
-		if ta.Generic && self.referencer != nil {
-			mut rta, ok := self.referencer.owner.(&TypeAlias)
-			if ok {
-				rta.Generics = append(rta.Generics, ta)
-			}
-		}
-
 		mut tk := &Type{
 			Provider: ta.Name,
 			Generic: ta.Generic,
 			Kind: ta.TypeSym.Type.Kind,
 		}
-		self.pushReferenceByKind(tk)
+
+		// Handle generic strict type alias structure instances.
+		// They are must be instantiated and the source instance is a placeholder.
+		// Do not mutate it, never. Allocate a new instance, and handle it.
+		if len(ta.Generics) > 0 {
+			tk.Kind = ta.TypeSym.Type.Kind.(&StructIns).Decl.instance()
+		} else {
+			self.pushReferenceByKind(tk)
+		}
 		ret tk
 	}
 
@@ -1158,6 +1157,21 @@ impl typeChecker {
 		if self.s != ins.Decl.sema && len(ins.Decl.Generics) > 0 {
 			self.s.meta.flags |= semametaGstruct
 		}
+
+		// If instance is generic strict type alias.
+		// Resolve the source type using resolved generics.
+		if len(ins.Generics) > 0 && ins.Decl.alias != nil {
+			ok = self.s.basicStructEnvironment(ins, fn|mut sema| {
+				ret unsafe { self.s.checkTypeAliasDeclKind(ins.Decl.alias, ins.env.generics, nil, sema) }
+			})
+			if !ok {
+				ret false
+			}
+			mut typ := ins.Decl.alias.TypeSym.Type
+			ins.Source = ins.Decl.alias.TypeSym.Type
+			ins.Decl.alias.TypeSym.Type = typ
+		}
+
 		ok = self.s.precheckStructIns(ins, self.getReferencer(), errorToken)
 		if ok && len(ins.Decl.Generics) > 0 {
 			// If gstruct collection mode already enabled for this sema,
@@ -1217,6 +1231,9 @@ impl typeChecker {
 	fn inscatchNeeded(mut *self, mut s: &Struct): (yes: bool, letGenerics: []&ast::Generic) {
 		if len(s.Generics) == 0 {
 			ret false, nil
+		}
+		if s.alias != nil {
+			ret true, s.Generics
 		}
 		mut sc, mut ok := self.lookup.(&scopeChecker)
 		if ok {

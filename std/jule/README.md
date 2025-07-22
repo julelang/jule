@@ -18,7 +18,7 @@ It is also used by the official reference compiler JuleC and is developed in par
 
 - **(2)** All generic types represented by `sema::TypeAlias` structure, and pushed into symbol table of relevant scope. Appends to symbol table first owner function's (see (1)) generics, then appends function's owner's (structure, so owner function is actually a method) generics if exist.
 
-- **(3)** The `Generics` field of `sema::TypeAlias` structure is stores all generic types that used in evaluation of destination type kind of type alias. This types are deep references. Stores `*T` or `[]T`, but also stores deep usages such as `MyStruct[T]` or `fn(s: MyStruct[[]*T])` types.
+- **(3)** The `Generics` field of `sema::TypeAlias` stores generic type declaration of the type alias. They also will be used for the underlying structure type for the generic handling. The `alias` field of the underlying `sema::Struct` will point to the owner `sema::TypeAlias`.
 
 - **(4)** If the `referencer.owner` field of `sema::TypeChecker` structure is type alias which is uses `TypeChecker` instance to build it's own destination type kind. This is the hard reference to owner. Always points to root type alias of this build even in nested type builds. Used to collect generic dependencies (see (3)) and etc. of type aliaes.
 

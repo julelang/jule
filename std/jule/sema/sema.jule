@@ -703,7 +703,7 @@ impl sema {
 	// Checks TypeSYm, builds result as Type and collects referred type aliases.
 	// Skips already checked types.
 	// See also developer reference (9).
-	fn checkTypeSymWithRefers(mut &self, mut t: &TypeSym, mut l: Lookup, mut referencer: &referencer): (ok: bool) {
+	fn checkTypeSymWithRefers(mut &self, mut t: &TypeSym, mut l: Lookup, mut generics: []&TypeAlias, mut referencer: &referencer): (ok: bool) {
 		mut ta := false // Referencer owner is type alias.
 		if t.checked() {
 			match type referencer.owner {
@@ -714,7 +714,7 @@ impl sema {
 				ret true
 			}
 		}
-		mut tt := self.buildTypeWithRefers(t.Decl, l, nil, referencer)
+		mut tt := self.buildTypeWithRefers(t.Decl, l, generics, referencer)
 		if tt == nil || !ta {
 			t.Type = tt
 		} else {
@@ -730,7 +730,7 @@ impl sema {
 	// Checks type and builds result as Type.
 	// Skips already checked types.
 	fn checkTypeSym(mut &self, mut t: &TypeSym, mut l: Lookup): bool {
-		ret self.checkTypeSymWithRefers(t, l, nil)
+		ret self.checkTypeSymWithRefers(t, l, nil, nil)
 	}
 
 	// Same as the checkTypeSym but takes referencer.
@@ -1027,6 +1027,28 @@ impl sema {
 		ret self.basicFuncEnvironment(f, fn|mut sema| algo(f.env.sema, f.env.generics))
 	}
 
+	// Calls algo in the struct's native environment.
+	// Errors will be handled.
+	// Returns result of algo.
+	fn basicStructEnvironment(mut &self, mut s: &StructIns, algo: fn(mut sema: &sema): bool): bool {
+		s.fillEnviron()
+
+		if s.env.file != nil {
+			mut old := s.env.sema.getCurrentFile()
+			defer { s.env.sema.setCurrentFile(old) }
+			s.env.sema.setCurrentFile(s.env.file)
+		}
+
+		ok := algo(s.env.sema)
+
+		if s.env.sema != self {
+			self.errors = append(self.errors, s.env.sema.errors...)
+			s.env.sema.errors = nil
+		}
+
+		ret ok
+	}
+
 	fn checkFuncParamKind(mut &self, mut p: &ParamIns) {
 		p.Type.Variadic = p.Decl.Variadic
 		if p.Decl.Reference {
@@ -1195,7 +1217,7 @@ impl sema {
 		ret atc.checkValidity()
 	}
 
-	fn checkTypeAliasDeclKind(mut &self, mut ta: &TypeAlias, mut prev: &referencer, mut l: Lookup): (ok: bool) {
+	fn checkTypeAliasDeclKind(mut &self, mut ta: &TypeAlias, mut generics: []&TypeAlias, mut prev: &referencer, mut l: Lookup): (ok: bool) {
 		mut old := self.file
 		defer {
 			self.setCurrentFile(old)
@@ -1216,7 +1238,7 @@ impl sema {
 			defer { prev.next = nil }
 		}
 		referencer.tains = ta.Strict
-		ok = self.checkTypeSymWithRefers(ta.TypeSym, l, referencer)
+		ok = self.checkTypeSymWithRefers(ta.TypeSym, l, generics, referencer)
 		if ok && ta.TypeSym.Type.Array() != nil && ta.TypeSym.Type.Array().Auto {
 			self.pushErr(ta.TypeSym.Decl.Token, "auto-sized arrays are not allowed as value type")
 			ok = false
@@ -1241,8 +1263,33 @@ impl sema {
 			s.Decl.Token = ta.Token
 			s.Decl.Public = ta.Public
 			ta.TypeSym.Type = &Type{Kind: s}
+			if len(ta.Generics) > 0 {
+				if ta.Bind {
+					self.pushErr(ta.Token, "bind strict type alias cannot have generics")
+					ret false
+				}
+				ok = self.checkDeclGenerics(ta.Generics)
+				if !ok {
+					ret false
+				}
+				// Remove instances for generic type alias.
+				// This instance will be placeholder for the declaration.
+				// Generic type aliases handled like structs.
+				s.Decl.Instances = nil
+				// Assign type alias generics to underlying structure.
+				// This enables generic type analysis and support for the struct type.
+				// Also assign the type alias to the struct.
+				// See developer reference (3).
+				s.Decl.Generics = ta.Generics
+				s.Decl.alias = ta
+				ret true
+			}
+		} else if len(ta.Generics) > 0 {
+			self.pushErr(ta.Token, "soft type alias cannot have generics")
+			self.pushSuggestion("define as strict type alias, like; type @[Generics]: Type", ta.Name)
+			ret false
 		}
-		ok = self.checkTypeAliasDeclKind(ta, prev, l)
+		ok = self.checkTypeAliasDeclKind(ta, nil, prev, l)
 		if !ok {
 			ret false
 		}
@@ -2903,18 +2950,20 @@ impl sema {
 			self.setCurrentFile(f)
 			for (_, mut ta) in self.file.TypeAliases {
 				if ta.Strict {
-					mut s := ta.TypeSym.Type.Kind.(&StructIns)
-					if !s.checked {
-						s.checked = true
-						ok := self.precheckStructIns(s, nil, nil)
-						if !ok {
-							ret
+					mut s := ta.TypeSym.Type.Kind.(&StructIns).Decl
+					for (_, mut ins) in s.Instances {
+						if !ins.checked {
+							ins.checked = true
+							ok := self.precheckStructIns(ins, nil, nil)
+							if !ok {
+								ret
+							}
 						}
 					}
 					// We can check strict structures here. It should be safe
 					// as described above; structures will be prechecked if needed.
 					// So other unchecked strict type aliases should not be a concern.
-					self.checkTypeStruct(s.Decl)
+					self.checkTypeStruct(s)
 				}
 			}
 		}

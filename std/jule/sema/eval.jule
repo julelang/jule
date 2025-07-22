@@ -689,6 +689,13 @@ impl eval {
 			// But, as far as tested, there is no risk for current implementation.
 			// Future implementations should pay attention for here.
 			mut s := kind.(&StructIns)
+			// Handle generic strict type alias structure instances.
+			// They are must be instantiated and the source instance is a placeholder.
+			// Do not mutate it, never. Allocate a new instance, and handle it.
+			if len(ta.Generics) > 0 {
+				s = s.Decl.instance()
+				ret self._evalStruct(s)
+			}
 			self.pushReference(s)
 			v = self._evalStruct(s)
 		| &Enum:
