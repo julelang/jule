@@ -494,42 +494,69 @@ impl scopeCoder {
 	}
 
 	fn whileIter(mut &self, mut it: &sema::WhileIter) {
-		if it.Expr != nil && it.Next == nil {
-			self.oc.write("while (")
-			self.oc.ec.possibleRefExpr(it.Expr)
-			self.oc.write(") {")
-		} else {
-			self.oc.write("for (; ")
-			if it.Expr != nil {
-				self.oc.ec.possibleRefExpr(it.Expr)
-			}
-			self.oc.write("; ")
-			if it.Next != nil {
-				self.st(it.Next)
-			}
-			self.oc.write(") {")
-		}
+		mut sb := strings::Builder{}
+		identCoder.iterBegin(&sb, uintptr(it))
+		begin := sb.Str()
+		sb.Clear()
+		identCoder.iterNext(&sb, uintptr(it))
+		next := sb.Str()
+		itaddr := conv::FormatUint(u64(uintptr(it)), 16)
 
-		if len(it.Scope.Stmts) == 0 {
-			self.oc.write("}")
-			ret
-		}
-
-		self.oc.write("\n")
+		self.oc.write("{\n")
 		self.oc.addIndent()
 		self.oc.indent()
-		self.scope(it.Scope)
-		self.oc.write("\n")
-		self.oc.doneIndent()
-		self.oc.indent()
 
-		identCoder.iterNext(&self.oc.Buf, uintptr(it))
+		self.oc.write(begin)
 		self.oc.write(":;\n")
 		self.oc.indent()
-		self.oc.write("}\n")
+
+		if it.Expr != nil {
+			self.oc.write(typeBool)
+			self.oc.write(" _")
+			self.oc.write(itaddr)
+			self.oc.write("_expr = ")
+			self.oc.ec.possibleRefExpr(it.Expr)
+			self.oc.write(";\n")
+			self.oc.indent()
+			self.oc.write("if (_")
+			self.oc.write(itaddr)
+			self.oc.write("_expr) {\n")
+			self.oc.addIndent()
+			self.oc.indent()
+		}
+
+		self.scope(it.Scope)
+		self.oc.write("\n")
 		self.oc.indent()
+
+		self.oc.write(next)
+		self.oc.write(":;\n")
+		self.oc.indent()
+
+		if it.Next != nil {
+			self.st(it.Next)
+			self.oc.write(";\n")
+			self.oc.indent()
+		}
+
+		self.oc.write("goto ")
+		self.oc.write(begin)
+		self.oc.write(";\n")
+
+		if it.Expr != nil {
+			self.oc.doneIndent()
+			self.oc.indent()
+			self.oc.write("}\n")
+		}
+		self.oc.indent()
+
 		identCoder.iterEnd(&self.oc.Buf, uintptr(it))
-		self.oc.write(":;")
+		self.oc.write(":;\n")
+
+		// Close scope.
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("}")
 	}
 
 	fn rangeIter(mut &self, mut it: &sema::RangeIter) {
