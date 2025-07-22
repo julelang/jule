@@ -398,7 +398,7 @@ impl scopeOptimizer {
 
 	fn optimizeWhileIter(mut &self, mut it: &sema::WhileIter) {
 		exprOptimizer.optimizeValue(&it.Expr, self.data, self)
-		self.optimizeStmt(it.Next)
+		self.optimizeStmtChild(&it.Next)
 		self.optimizeChildHard(it.Scope)
 	}
 
@@ -918,6 +918,29 @@ impl scopeOptimizer {
 			ret
 		}
 		self.setCurrentStmt(&ExceptionalForwardingExpr{Expr: fc})
+	}
+
+	// Like optimizeStmt, but handles independent statement from the scope.
+	// For example, next-statement of the while-next iterations.
+	// They are not part of the current scope explicitly.
+	// This function handles such statements properly, and optimizes it.
+	// The value of the *stmt will be &sema::Scope after return,
+	// which is contains optimized statements, may have more than single statement.
+	fn optimizeStmtChild(mut &self, mut &stmt: *sema::Stmt) {
+		// Early return for nil statement.
+		if *stmt == nil {
+			ret
+		}
+		// Create new unique scope and optimize statement in it.
+		// Because statement optimizer may convert single statement to multiple statements.
+		// For example:
+		//	`x, y = 10, 20`, may be:
+		//	`x = 10; y = 20`, after optimization.
+		mut scope := new(sema::Scope)
+		scope.Stmts = append(scope.Stmts, *stmt)
+		mut opt := scopeOptimizer.new(scope)
+		opt.optimize()
+		*stmt = scope
 	}
 
 	fn optimizeStmt(mut &self, mut stmt: sema::Stmt) {
