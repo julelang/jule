@@ -1161,15 +1161,15 @@ impl typeChecker {
 		// If instance is generic strict type alias.
 		// Resolve the source type using resolved generics.
 		if len(ins.Generics) > 0 && ins.Decl.alias != nil {
+			mut typ := ins.Decl.alias.TypeSym.Type // Save placeholder type.
+			ins.Decl.alias.TypeSym.Type.Kind = ins // Use instance as placeholder, to resolve source type to it.
 			ok = self.s.basicStructEnvironment(ins, fn|mut sema| {
 				ret unsafe { self.s.checkTypeAliasDeclKind(ins.Decl.alias, ins.env.generics, nil, sema) }
 			})
+			ins.Decl.alias.TypeSym.Type = typ // Restore placeholder type.
 			if !ok {
 				ret false
 			}
-			mut typ := ins.Decl.alias.TypeSym.Type
-			ins.Source = ins.Decl.alias.TypeSym.Type
-			ins.Decl.alias.TypeSym.Type = typ
 		}
 
 		ok = self.s.precheckStructIns(ins, self.getReferencer(), errorToken)
