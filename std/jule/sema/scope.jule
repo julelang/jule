@@ -2716,8 +2716,13 @@ fn checkAssign(mut s: &sema, mut left: &Value, mut right: &Value, op: &token::To
 
 	f := left.Type.Func()
 	if f != nil && f.Decl != nil && f.Decl.Global {
-		s.pushErr(op, "cannot assign to function")
-		ret false
+		// Make sure function is indeed a global function.
+		// Model is equals to the function when referred to directly.
+		// Otherwise it may be a variable, if it used as anonymous function.
+		if left.Model == f {
+			s.pushErr(op, "cannot assign to function")
+			ret false
+		}
 	}
 	// Assignment to constant memory.
 	if left.IsConst() {
