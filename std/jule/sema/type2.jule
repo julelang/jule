@@ -799,12 +799,10 @@ impl dynamicTypeAnnotation {
 		ret self.annotateKind(sptr.Value)
 	}
 
-	unsafe fn annotateStruct(mut *self, mut k: &Type): (ok: bool) {
-		mut s := (*self.k).Struct()
-		if s == nil {
-			ret false
-		}
-		mut s2 := k.Struct()
+	// Parameters:
+	//	- s: structure type for self.k
+	//	- s2: structure type for k
+	unsafe fn _annotateStruct(mut *self, mut s: &StructIns, mut s2: &StructIns): (ok: bool) {
 		if len(s.Generics) != len(s2.Generics) {
 			ret false
 		}
@@ -819,6 +817,24 @@ impl dynamicTypeAnnotation {
 			}
 		}
 		ret true
+	}
+
+	unsafe fn annotateStruct(mut *self, mut k: &Type): (ok: bool) {
+		mut s := (*self.k).Struct()
+		if s == nil {
+			ret false
+		}
+		mut s2 := k.Struct()
+		ret self._annotateStruct(s, s2)
+	}
+
+	unsafe fn annotateSoftStruct(mut *self, mut k: &Type): (ok: bool) {
+		mut s := (*self.k).SoftStruct()
+		if s == nil {
+			ret false
+		}
+		mut s2 := k.SoftStruct()
+		ret self._annotateStruct(s, s2)
 	}
 
 	unsafe fn annotateChan(mut *self, mut k: &Type): (ok: bool) {
@@ -868,6 +884,12 @@ impl dynamicTypeAnnotation {
 		ok, _ = self.annotateAny(k)
 		if ok {
 			ret
+		}
+		if k.SoftStruct() != nil {
+			ok = self.annotateSoftStruct(k)
+			if ok {
+				ret
+			}
 		}
 		match {
 		| k.Prim() != nil:
