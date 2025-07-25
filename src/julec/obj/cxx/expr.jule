@@ -1853,7 +1853,7 @@ impl exprCoder {
 			ret
 		}
 		self.oc.write("; ")
-		self.initCollection(slice.Value)
+		self.initCollection(slice.Value, collectionIdent+"._len")
 		self.oc.write(" " + collectionIdent + "; })")
 	}
 
@@ -2374,17 +2374,26 @@ impl exprCoder {
 	}
 
 	// Assumes collection element kind able to init.
-	fn initCollection(mut &self, mut elem: &sema::Type) {
-		self.oc.write("auto ")
-		self.oc.write(collectionItIdent)
-		self.oc.write(" = ")
+	fn initCollection(mut &self, mut elem: &sema::Type, size: str) {
+		// If element type supports fast memcpy implementation, use it to initialize.
+		if obj::FastMemcpy(elem) {
+			self.oc.write("memset(")
+			self.oc.write(collectionIdent)
+			self.oc.write(".begin(), 0, sizeof(")
+			self.oc.tc.kind(&self.oc.Buf, elem)
+			self.oc.write(")*")
+			self.oc.write(size)
+			self.oc.write(");")
+			ret
+		}
+
+		self.oc.write("std::fill(")
 		self.oc.write(collectionIdent)
-		self.oc.write(".begin(); const auto ")
+		self.oc.write(".begin(), ")
 		self.oc.write(collectionIdent)
-		self.oc.write("_end = ")
-		self.oc.write(collectionIdent)
-		self.oc.write(".hard_end(); ")
-		self.fillCollectionByDefault(elem)
+		self.oc.write(".hard_end(), ")
+		self.initExpr(elem)
+		self.oc.write(");")
 	}
 
 	// Writes default array literal expression to initialize it by default.
@@ -2398,7 +2407,7 @@ impl exprCoder {
 		self.oc.write("({ auto " + collectionIdent + " = ")
 		self.oc.tc.array(&self.oc.Buf, arr)
 		self.oc.write("(); ")
-		self.initCollection(arr.Value)
+		self.initCollection(arr.Value, toStrArraySize(i64(arr.N), 10))
 		self.oc.write(" " + collectionIdent + "; })")
 	}
 
