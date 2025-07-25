@@ -4,6 +4,7 @@
 
 use "std/comptime"
 use "std/internal/runtime"
+use "std/mem"
 use "std/unsafe"
 
 // Reports whether pointer allocations are points to same address.
@@ -90,7 +91,39 @@ unsafe fn readUnaligned64(p: *unsafe): u64 {
 	ret u64(q[0]) | u64(q[1])<<8 | u64(q[2])<<16 | u64(q[3])<<24 | u64(q[4])<<32 | u64(q[5])<<40 | u64(q[6])<<48 | u64(q[7])<<56
 }
 
+// Implementation of the fastmemcopy, body will be implemented by the compiler.
+fn fastmemcopy_impl(dest: *unsafe, src: *unsafe, n: uint) {
+	panic("compiler-implemented")
+}
+
+// The fast runtime implementation of the built-in copy function.
+// This function is only suitable for specific data types.
+// Compiler will optimize the built-in copy function calls to this function if possible.
+// Do not call this function directly, call the built-in copy function instead.
+unsafe fn fastmemcopy[Dest, Src](mut dest: Dest, mut src: Src): (n: int) {
+	n = len(src)
+	if n > len(dest) {
+		n = len(dest)
+	}
+	if n == 0 {
+		ret
+	}
+	// fastmemcopy may have string type for Src but it is safe to
+	// handle them as slice. According to Jule memory model,
+	// slice memory model can represent a string memory model.
+	// And this implementation does not need to slice-specific data.
+	comptime::TypeAlias(E, comptime::TypeOf(Dest).Value())
+	mut d := (*runtime::Slice[E])(&dest).Slice
+	mut s := (*runtime::Slice[E])(&src).Slice
+	fastmemcopy_impl(d, s, uint(n)*mem::SizeOf(E))
+	ret
+}
+
 // The runtime implementation of the built-in copy function.
+// This is a Pure Jule implementation and no Assembly helpers.
+// But compiler may optimize it to a more efficient variant, fastmemcopy.
+// To enable optimizations, even in this package, use the built-copy function
+// instead of direct call to the memcopy function.
 fn memcopy[Dest, Src](mut dest: Dest, mut src: Src): (n: int) {
 	n = len(src)
 	if n > len(dest) {
@@ -160,7 +193,7 @@ fn prememappend[Slice](mut &s: *Slice, newItems: int) {
 		ret
 	}
 	mut ns := make(Slice, len(*s), nextslicecap(len(*s)+newItems, cap(*s)))
-	memcopy(ns, *s)
+	copy(ns, *s)
 	*s = ns
 }
 
@@ -172,7 +205,7 @@ fn memappend[Dest, Src](mut dest: Dest, mut src: Src): Dest {
 	prememappend(&dest, len(src))
 	n := len(dest)
 	dest = dest[:len(dest)+len(src)]
-	memcopy(dest[n:], src)
+	copy(dest[n:], src)
 	ret dest
 }
 

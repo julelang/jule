@@ -1330,6 +1330,13 @@ impl exprCoder {
 	}
 
 	fn funcCall(mut &self, mut m: &sema::FuncCallExpr, ignoreExceptional: bool) {
+		if m.Func == meta::Program.Runtime.FastmemcopyImpl {
+			self.oc.write("memmove(")
+			self.args(m)
+			self.oc.write(")")
+			ret
+		}
+
 		if m.IsCo {
 			// Do not check for exceptionals,
 			// exceptional functions cannot be called with co.
@@ -1734,8 +1741,15 @@ impl exprCoder {
 			})
 			ie.Expr.Model = unsafe { *(*sema::Expr)(&model) }
 		}
-		mut ins := obj::FindFuncGenericInstance(meta::Program.Runtime.Memcopy, m.Dest.Type, m.Src.Type)
-		identCoder.funcIns(&self.oc.Buf, ins)
+
+		if sema::Fastmemcopy(m.Dest.Type.Slice().Value) {
+			mut ins := obj::FindFuncGenericInstance(meta::Program.Runtime.Fastmemcopy, m.Dest.Type, m.Src.Type)
+			identCoder.funcIns(&self.oc.Buf, ins)
+		} else {
+			mut ins := obj::FindFuncGenericInstance(meta::Program.Runtime.Memcopy, m.Dest.Type, m.Src.Type)
+			identCoder.funcIns(&self.oc.Buf, ins)
+		}
+
 		self.oc.write("(")
 		self.possibleRefExpr(m.Dest.Model)
 		self.oc.write(", ")
@@ -2375,8 +2389,8 @@ impl exprCoder {
 
 	// Assumes collection element kind able to init.
 	fn initCollection(mut &self, mut elem: &sema::Type, size: str) {
-		// If element type supports fast memcpy implementation, use it to initialize.
-		if obj::FastMemcpy(elem) {
+		// If element type supports fastmemcopy implementation, use it to initialize.
+		if sema::Fastmemcopy(elem) {
 			self.oc.write("memset(")
 			self.oc.write(collectionIdent)
 			self.oc.write(".begin(), 0, sizeof(")

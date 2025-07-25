@@ -686,11 +686,21 @@ fn callerCopySlice(mut dest: &Value, mut e: &eval, mut fc: &ast::CallExpr, mut v
 		// Add instance to relevant runtime function for slice type if not exist.
 		mut f := runtimeFindFunc(e.s.meta.runtime, "memcopy").instanceForce()
 		f.Generics = append(f.Generics, &InsGeneric{Type: dest.Type}, &InsGeneric{Type: src.Type})
-		ok, _ := e.s.checkGenericFunc(&f, fc.Token)
+		mut ok, _ := e.s.checkGenericFunc(&f, fc.Token)
 		if !ok {
 			panic("sema: memcopy evaluation failed, this is an implementation mistake")
 		}
 		e.pushReference(f)
+
+		if Fastmemcopy(dest.Type.Slice().Value) {
+			f = runtimeFindFunc(e.s.meta.runtime, "fastmemcopy").instanceForce()
+			f.Generics = append(f.Generics, &InsGeneric{Type: dest.Type}, &InsGeneric{Type: src.Type})
+			ok, _ = e.s.checkGenericFunc(&f, fc.Token)
+			if !ok {
+				panic("sema: fastmemcopy evaluation failed, this is an implementation mistake")
+			}
+			e.pushReference(f)
+		}
 	}
 
 	v.untyped = false

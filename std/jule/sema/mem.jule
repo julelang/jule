@@ -1,0 +1,64 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Cache for the fastMemcpy function to avoid repetitive computations.
+let mut memcpyCache = map[&StructIns]bool{}
+
+// Reports whether type supports fastmemcopy implementation.
+// Which is highly optimized variant of the built-in copy function.
+fn Fastmemcopy(mut t: &Type): (r: bool) {
+	// Report false for bind types.
+	// Because they might be have constructor or etc.
+	// The memcpy implementation is a kind of the memcpy function of C.
+	// There is no support for constructors, destructors, and other high level things.
+	if t.Bind() {
+		ret false
+	}
+
+	mut arr := t.Array()
+	if arr != nil {
+		ret Fastmemcopy(arr.Value)
+	}
+	mut s := t.Struct()
+	if s != nil {
+		ret fastmemcopyStruct(s)
+	}
+
+	prim := t.Prim()
+	if prim == nil {
+		ret false
+	}
+
+	// Type any is dynamic and perform GC.
+	// Like type any, type str performs GC too.
+	// We cannot use fastmemcopy for GC types.
+	ret !prim.IsAny() && !prim.IsStr()
+}
+
+fn fastmemcopyStruct(mut s: &StructIns): (r: bool) {
+	// If struct type is empty (no fields), report true.
+	// No caching needed.
+	if len(s.Fields) == 0 {
+		ret true
+	}
+
+	// Look to cache before analysis.
+	r, ok := memcpyCache[s]
+	if ok {
+		ret r
+	}
+
+	for (_, mut field) in s.Fields {
+		if !Fastmemcopy(field.Type) {
+			r = false
+			goto Cache
+		}
+	}
+	r = true
+
+Cache:
+	memcpyCache[s] = r
+
+	ret
+}
