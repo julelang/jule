@@ -111,7 +111,7 @@ fn pushCompCmdClang(mut args: []str): []str {
 	}
 	// Enable wrap around behavior.
 	args = append(args, "-fwrapv")
-	// The ffloat-store flag is used to prevent excess precision issues in
+	// The -ffloat-store flag is used to prevent excess precision issues in
 	// floating-point arithmetic on certain architectures, particularly x86.
 	// By default, the x87 floating-point unit (FPU) uses extended precision
 	// (80-bit) for calculations, which can lead to inconsistencies when storing
@@ -123,6 +123,75 @@ fn pushCompCmdClang(mut args: []str): []str {
 	// performance overhead due to additional memory operations. But it is a
 	// good tradeoff for consistency.
 	args = append(args, "-ffloat-store")
+	// The -fsignaling-nans flag enables support for signaling NaNs (Not-a-Number) in floating-point operations.
+	// Signaling NaNs are special NaN values that, when used, raise an exception or signal an error,
+	// unlike quiet NaNs which propagate silently.
+	// This flag ensures that the generated code properly recognizes and handles signaling NaNs,
+	// which is important for strict IEEE 754 compliance.
+	//
+	// IEEE 754 defines signaling NaNs as a way to detect invalid operations early,
+	// so enabling -fsignaling-nans helps catch errors like uninitialized variables or
+	// invalid floating-point computations during runtime.
+	// Without this flag, signaling NaNs might be treated as quiet NaNs, masking potential issues.
+	args = append(args, "-fsignaling-nans")
+	// The -fno-fast-math flag disables aggressive floating-point optimizations that may violate
+	// IEEE 754 standards or alter the precise semantics of floating-point arithmetic.
+	//
+	// By default, some compilers enable fast-math optimizations to improve performance,
+	// but these can reorder operations, ignore NaNs or infinities, or assume associativity,
+	// which leads to results that are not fully IEEE 754 compliant.
+	//
+	// Using -fno-fast-math ensures that floating-point operations adhere strictly to
+	// IEEE 754 rules, preserving correct handling of special values (NaN, infinity),
+	// rounding modes, and exception behavior.
+	//
+	// This flag is essential when exact IEEE 754 compliance is required,
+	// for example in numerical software where reproducibility and correctness are critical.
+	args = append(args, "-fno-fast-math")
+	// The -fexcess-precision=standard flag enforces that floating-point computations use only the
+	// precision specified by the IEEE 754 standard for the given data type (e.g., f32, f64).
+	//
+	// Some hardware and compilers by default may use extended precision registers (like x87 FPU)
+	// which hold intermediate results at higher precision than the defined type,
+	// causing subtle differences in rounding and comparison results.
+	//
+	// This flag ensures that excess precision is not used, so calculations strictly conform
+	// to the standard precision and rounding behavior, which is crucial for IEEE 754 compliance.
+	//
+	// Enabling this flag helps maintain consistent, predictable floating-point behavior across
+	// different platforms and compilation settings, avoiding hard-to-debug numerical discrepancies.
+	args = append(args, "-fexcess-precision=standard")
+	// The -frounding-math flag enables correct handling of floating-point rounding modes as defined by IEEE 754.
+	//
+	// By default, some compilers may assume the default rounding mode (usually round-to-nearest)
+	// and optimize floating-point operations under that assumption, ignoring changes in rounding mode.
+	//
+	// This flag tells the compiler to respect and generate code that correctly handles
+	// dynamic changes to the rounding mode during execution.
+	//
+	// Proper support for rounding modes (e.g., round-to-zero, round-up, round-down) is
+	// necessary for full IEEE 754 compliance, especially in numerical software
+	// that relies on precise control of rounding behavior.
+	//
+	// Without this flag, rounding mode changes might be ignored or optimized away,
+	// leading to incorrect or non-compliant floating-point results.
+	args = append(args, "-frounding-math")
+	// The -ffp-contract=off flag disables the contraction of floating-point operations,
+	// such as combining multiply and add into a fused multiply-add (FMA) instruction.
+	//
+	// Fused multiply-add performs multiplication and addition in one step with a single rounding,
+	// which can improve performance and accuracy but changes the rounding behavior compared
+	// to separate multiply and add operations.
+	//
+	// Disabling contraction ensures that each floating-point operation is performed and rounded
+	// separately, strictly following IEEE 754 semantics for each individual operation.
+	//
+	// This flag is important for strict IEEE 754 compliance when precise control over
+	// the sequence and rounding of floating-point operations is required.
+	//
+	// Without this flag, the compiler might fuse operations, producing results that
+	// differ slightly due to combined rounding, potentially affecting reproducibility and correctness.
+	args = append(args, "-ffp-contract=off")
 
 	if env::Production {
 		args = append(args, "-O3")        // Enable all optimizations.
@@ -166,7 +235,7 @@ fn pushCompCmdGcc(mut args: []str): []str {
 	}
 	// Enable wrap around behavior.
 	args = append(args, "-fwrapv")
-	// The ffloat-store flag is used to prevent excess precision issues in
+	// The -ffloat-store flag is used to prevent excess precision issues in
 	// floating-point arithmetic on certain architectures, particularly x86.
 	// By default, the x87 floating-point unit (FPU) uses extended precision
 	// (80-bit) for calculations, which can lead to inconsistencies when storing
@@ -178,6 +247,75 @@ fn pushCompCmdGcc(mut args: []str): []str {
 	// performance overhead due to additional memory operations. But it is a
 	// good tradeoff for consistency.
 	args = append(args, "-ffloat-store")
+	// The -fsignaling-nans flag enables support for signaling NaNs (Not-a-Number) in floating-point operations.
+	// Signaling NaNs are special NaN values that, when used, raise an exception or signal an error,
+	// unlike quiet NaNs which propagate silently.
+	// This flag ensures that the generated code properly recognizes and handles signaling NaNs,
+	// which is important for strict IEEE 754 compliance.
+	//
+	// IEEE 754 defines signaling NaNs as a way to detect invalid operations early,
+	// so enabling -fsignaling-nans helps catch errors like uninitialized variables or
+	// invalid floating-point computations during runtime.
+	// Without this flag, signaling NaNs might be treated as quiet NaNs, masking potential issues.
+	args = append(args, "-fsignaling-nans")
+	// The -fno-fast-math flag disables aggressive floating-point optimizations that may violate
+	// IEEE 754 standards or alter the precise semantics of floating-point arithmetic.
+	//
+	// By default, some compilers enable fast-math optimizations to improve performance,
+	// but these can reorder operations, ignore NaNs or infinities, or assume associativity,
+	// which leads to results that are not fully IEEE 754 compliant.
+	//
+	// Using -fno-fast-math ensures that floating-point operations adhere strictly to
+	// IEEE 754 rules, preserving correct handling of special values (NaN, infinity),
+	// rounding modes, and exception behavior.
+	//
+	// This flag is essential when exact IEEE 754 compliance is required,
+	// for example in numerical software where reproducibility and correctness are critical.
+	args = append(args, "-fno-fast-math")
+	// The -fexcess-precision=standard flag enforces that floating-point computations use only the
+	// precision specified by the IEEE 754 standard for the given data type (e.g., f32, f64).
+	//
+	// Some hardware and compilers by default may use extended precision registers (like x87 FPU)
+	// which hold intermediate results at higher precision than the defined type,
+	// causing subtle differences in rounding and comparison results.
+	//
+	// This flag ensures that excess precision is not used, so calculations strictly conform
+	// to the standard precision and rounding behavior, which is crucial for IEEE 754 compliance.
+	//
+	// Enabling this flag helps maintain consistent, predictable floating-point behavior across
+	// different platforms and compilation settings, avoiding hard-to-debug numerical discrepancies.
+	args = append(args, "-fexcess-precision=standard")
+	// The -frounding-math flag enables correct handling of floating-point rounding modes as defined by IEEE 754.
+	//
+	// By default, some compilers may assume the default rounding mode (usually round-to-nearest)
+	// and optimize floating-point operations under that assumption, ignoring changes in rounding mode.
+	//
+	// This flag tells the compiler to respect and generate code that correctly handles
+	// dynamic changes to the rounding mode during execution.
+	//
+	// Proper support for rounding modes (e.g., round-to-zero, round-up, round-down) is
+	// necessary for full IEEE 754 compliance, especially in numerical software
+	// that relies on precise control of rounding behavior.
+	//
+	// Without this flag, rounding mode changes might be ignored or optimized away,
+	// leading to incorrect or non-compliant floating-point results.
+	args = append(args, "-frounding-math")
+	// The -ffp-contract=off flag disables the contraction of floating-point operations,
+	// such as combining multiply and add into a fused multiply-add (FMA) instruction.
+	//
+	// Fused multiply-add performs multiplication and addition in one step with a single rounding,
+	// which can improve performance and accuracy but changes the rounding behavior compared
+	// to separate multiply and add operations.
+	//
+	// Disabling contraction ensures that each floating-point operation is performed and rounded
+	// separately, strictly following IEEE 754 semantics for each individual operation.
+	//
+	// This flag is important for strict IEEE 754 compliance when precise control over
+	// the sequence and rounding of floating-point operations is required.
+	//
+	// Without this flag, the compiler might fuse operations, producing results that
+	// differ slightly due to combined rounding, potentially affecting reproducibility and correctness.
+	args = append(args, "-ffp-contract=off")
 
 	if env::Production {
 		args = append(args, "-O3")                  // Enable all optimizations.
