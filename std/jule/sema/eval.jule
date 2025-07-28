@@ -4660,22 +4660,19 @@ impl binaryEval {
 		| token::SHL
 		| token::SHR:
 			panic("sema: binary shifting operator handling failed")
-		| token::ADD
-		| token::SUB
-		| token::MUL:
-			self.setTypeToGreater()
-			ret self.l
-		| token::QUO:
-			self.setTypeToGreater()
-			ret self.l
 		| token::REM:
 			if !types::IsInt(self.r.Type.Prim().Kind) {
 				self.e.pushErr(self.op, "mismatched types: @ and @", self.l.Type.Str(), self.r.Type.Str())
 				ret nil
 			}
 			self.mod()
+			fall
+		| token::ADD
+		| token::SUB
+		| token::MUL
+		| token::QUO:
 			self.setTypeToGreater()
-			ret self.r
+			ret self.l
 		|:
 			self.e.pushErr(self.op, "operator @ is not defined for floating-point types", self.op.Kind)
 			ret nil
@@ -4706,19 +4703,16 @@ impl binaryEval {
 		| token::SHL
 		| token::SHR:
 			panic("sema: binary shifting operator handling failed")
+		| token::REM:
+			self.mod()
+			fall
 		| token::ADD
 		| token::SUB
 		| token::MUL
 		| token::AND
 		| token::OR
-		| token::XOR:
-			self.setTypeToGreater()
-			ret self.l
+		| token::XOR
 		| token::QUO:
-			self.setTypeToGreater()
-			ret self.l
-		| token::REM:
-			self.mod()
 			self.setTypeToGreater()
 			ret self.l
 		|:
