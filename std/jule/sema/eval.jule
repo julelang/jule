@@ -159,6 +159,9 @@ impl eval {
 
 		match {
 		| types::IsFloat(prim.Str()):
+			if !floatAssignable(prim.Str(), v) {
+				ret false
+			}
 			v.Type = new(Type, *self.prefix)
 			v.Constant.SetF64(v.Constant.AsF64())
 			v.Constant.Kind = prim.Kind
@@ -177,6 +180,7 @@ impl eval {
 			v.Constant.SetU64(v.Constant.AsU64())
 			v.Constant.Kind = prim.Kind
 		}
+
 		ret true
 	}
 
@@ -5339,7 +5343,7 @@ fn applyCastModelByEnum(mut s: &sema, mut v: &Value, mut e: &Enum,
 	applyCastKindModel(s, v, e.TypeSym.Type, token, refers)
 }
 
-fn castConstByType(mut s: &sema, token: &token::Token, mut t: &Type, mut v: &Value): (overflow: bool) {
+fn castConstByType(mut s: &sema, token: &token::Token, mut t: &Type, mut v: &Value): (ok: bool) {
 	mut kind := ""
 	if t.Prim() != nil {
 		kind = t.Prim().Kind
@@ -5348,8 +5352,10 @@ fn castConstByType(mut s: &sema, token: &token::Token, mut t: &Type, mut v: &Val
 	}
 	match {
 	| types::IsSigInt(kind):
-		if v.untyped && token != nil && !sigAssignable(kind, v) {
-			s.pushErr(token, "untyped value @ overflows @", v.Constant.Str(), t.Str())
+		if v.untyped && !sigAssignable(kind, v) {
+			if token != nil {
+				s.pushErr(token, "untyped value @ overflows @", v.Constant.Str(), t.Str())
+			}
 			ret false
 		}
 		match types::BitSizeOf(types::RealKindOf(kind)) {
@@ -5361,11 +5367,15 @@ fn castConstByType(mut s: &sema, token: &token::Token, mut t: &Type, mut v: &Val
 			v.Constant.SetI64(i64(i16(v.Constant.AsI64())))
 		| 8:
 			v.Constant.SetI64(i64(i8(v.Constant.AsI64())))
+		|:
+			panic("unreachable")
 		}
 		v.Constant.Kind = kind
 	| types::IsUnsigInt(kind):
-		if v.untyped && token != nil && !unsigAssignable(kind, v) {
-			s.pushErr(token, "untyped value @ overflows @", v.Constant.Str(), t.Str())
+		if v.untyped && !unsigAssignable(kind, v) {
+			if token != nil {
+				s.pushErr(token, "untyped value @ overflows @", v.Constant.Str(), t.Str())
+			}
 			ret false
 		}
 		match types::BitSizeOf(types::RealKindOf(kind)) {
@@ -5377,11 +5387,15 @@ fn castConstByType(mut s: &sema, token: &token::Token, mut t: &Type, mut v: &Val
 			v.Constant.SetU64(u64(u16(v.Constant.AsU64())))
 		| 8:
 			v.Constant.SetU64(u64(u8(v.Constant.AsU64())))
+		|:
+			panic("unreachable")
 		}
 		v.Constant.Kind = kind
 	| types::IsFloat(kind):
-		if v.untyped && token != nil && !floatAssignable(kind, v) {
-			s.pushErr(token, "untyped value @ overflows @", v.Constant.Str(), t.Str())
+		if v.untyped && !floatAssignable(kind, v) {
+			if token != nil {
+				s.pushErr(token, "untyped value @ overflows @", v.Constant.Str(), t.Str())
+			}
 			ret false
 		}
 		match types::BitSizeOf(types::RealKindOf(kind)) {
@@ -5389,11 +5403,15 @@ fn castConstByType(mut s: &sema, token: &token::Token, mut t: &Type, mut v: &Val
 			v.Constant.SetF64(v.Constant.AsF64())
 		| 32:
 			v.Constant.SetF64(f64(f32(v.Constant.AsF64())))
+		|:
+			panic("unreachable")
 		}
 		v.Constant.Kind = kind
 	| types::IsCmplx(kind):
-		if v.untyped && token != nil && !cmplxAssignable(kind, v) {
-			s.pushErr(token, "untyped value @ overflows @", v.Constant.Str(), t.Str())
+		if v.untyped && !cmplxAssignable(kind, v) {
+			if token != nil {
+				s.pushErr(token, "untyped value @ overflows @", v.Constant.Str(), t.Str())
+			}
 			ret false
 		}
 		if !v.Constant.IsCmplx128() {
@@ -5402,6 +5420,8 @@ fn castConstByType(mut s: &sema, token: &token::Token, mut t: &Type, mut v: &Val
 				v.Constant.SetCmplx128(cmplx(v.Constant.AsF64(), 0))
 			| 64:
 				v.Constant.SetCmplx128(cmplx(f64(f32(v.Constant.AsF64())), 0))
+			|:
+				panic("unreachable")
 			}
 		}
 		v.Constant.Kind = kind
