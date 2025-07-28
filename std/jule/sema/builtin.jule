@@ -341,9 +341,10 @@ fn builtinCallerNew(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value
 			mut token := fc.Args[1].Token
 			const Reference = false
 			const FirstAssignToDest = false
-			e.s.checkValidityForInitExpr(
-				e.target.mutable, Reference, t.Type, init, token)
-			_ = e.s.checkAssignType(Reference, FirstAssignToDest, t.Type, init, token, e.getOwnerRefers())
+			if e.s.checkValidityForInitExpr(
+				e.target.mutable, Reference, t.Type, init, token) {
+				e.s.checkAssignType(Reference, FirstAssignToDest, t.Type, init, token, e.getOwnerRefers())
+			}
 
 			v.Model = &BuiltinNewCallExpr{
 				Type: t.Type,
@@ -1384,9 +1385,11 @@ fn builtinCallerStdSysAddrcall(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Val
 		ret nil
 	}
 
-	if argVal.Type.Prim() == nil || !argVal.Type.Prim().IsUintptr() {
-		e.pushErr(fc.Args[0].Token, "mismatched types: @ and @", argVal.Type.Str(), primUintptr.Str())
-		ret nil
+	const Reference = false
+	const FirstAssignToDest = true
+	if e.s.checkValidityForInitExpr(
+		e.target.mutable, Reference, primUintptr, argVal, fc.Args[0].Token) {
+		e.s.checkAssignType(Reference, FirstAssignToDest, primUintptr, argVal, fc.Args[0].Token, e.getOwnerRefers())
 	}
 
 	mut r := buildVoidValue()
