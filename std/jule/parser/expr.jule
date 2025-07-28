@@ -31,6 +31,12 @@ impl exprBuilder {
 
 	fn pushErr(mut *self, token: &token::Token, fmt: str, args: ...any) {
 		if self.err {
+			if token != nil {
+				n := len(self.p.errors)
+				if n > 0 && self.p.errors[n-1].Row == token.Row {
+					ret // discard - likely a spurious error
+				}
+			}
 			self.p.pushErr(token, fmt, args...)
 		}
 	}
@@ -76,6 +82,23 @@ impl exprBuilder {
 		ret
 	}
 
+	// Expects comma or at least following token, reports error if needed.
+	// Reports whether there is no error.
+	// Reports false for follow token, but does not log error.
+	fn atComma(mut *self, follow: int, msg: str): (err: bool) {
+		if self.eof() {
+			ret false
+		}
+		if self.t.ID == token::COMMA {
+			ret true
+		}
+		if self.t.ID == follow {
+			ret false
+		}
+		self.pushErr(self.t, msg)
+		ret false
+	}
+
 	// Caller should pass the leading namespace token, scanning must be point to the separator token.
 	fn parseNamespaceExpr(mut *self, mut name: &token::Token): &ast::Expr {
 		mut ns := new(ast::NamespaceExpr)
@@ -93,20 +116,20 @@ impl exprBuilder {
 
 	fn parseTypeInstance(mut *self, mut typ: &ast::Expr): &ast::Expr {
 		mut lbrack := self.t
+		self.next()
+		if !self.eof() && self.t.ID == token::ELLIPSIS {
+			// Array type.
+			self.i-- // back to [
+			ret self.parseType()
+		}
+
 		let mut list: []&ast::Expr
 		for !self.eof() && self.t.ID != token::RBRACK {
+			list = append(list, self.parse())
+			if !self.atComma(token::RBRACK, "expected , or ]") {
+				break
+			}
 			self.next()
-			if !self.eof() && self.t.ID != token::RBRACK {
-				if len(list) == 0 && self.t.ID == token::ELLIPSIS {
-					// Array type.
-					self.i-- // back to [
-					ret self.parseType()
-				}
-				list = append(list, self.parse())
-			}
-			if self.eof() || self.t.ID != token::COMMA && self.t.ID != token::RBRACK {
-				self.pushErr(self.t, "expected , or ]")
-			}
 		}
 		mut rbrack := self.t
 		self.expect(token::RBRACK, "expected ]")
@@ -557,16 +580,14 @@ impl exprBuilder {
 
 	fn parseCallOrConversion(mut *self, mut x: &ast::Expr): &ast::Expr {
 		mut lparen := self.t
+		self.next()
 		let mut list: []&ast::Expr
 		for !self.eof() && self.t.ID != token::RPAREN {
+			list = append(list, self.parse()) // builtins may expect a type: make(some type, ...)
+			if !self.atComma(token::RPAREN, "expected , or )") {
+				break
+			}
 			self.next()
-			if !self.eof() && self.t.ID != token::COMMA && self.t.ID != token::RPAREN {
-				list = append(list, self.parse()) // builtins may expect a type: make(some type, ...)
-			}
-			if self.eof() || self.t.ID != token::COMMA && self.t.ID != token::RPAREN {
-				self.pushErr(self.lt, "expected , or )")
-				ret nil
-			}
 		}
 		mut rparen := self.t
 		if self.expect(token::RPAREN, "expected )") {
@@ -606,16 +627,14 @@ impl exprBuilder {
 
 	fn parseUntypedLiteralValue(mut *self): &ast::Expr {
 		mut lbrace := self.t
+		self.next()
 		let mut list: []&ast::Expr
 		for !self.eof() && self.t.ID != token::RBRACE {
+			list = append(list, self.parseElement())
+			if !self.atComma(token::RBRACE, "expected , or }") {
+				break
+			}
 			self.next()
-			if !self.eof() && self.t.ID != token::COMMA && self.t.ID != token::RBRACE {
-				list = append(list, self.parseElement())
-			}
-			if self.eof() || self.t.ID != token::COMMA && self.t.ID != token::RBRACE {
-				self.pushErr(self.lt, "expected , or }")
-				ret nil
-			}
 		}
 		mut rbrace := self.t
 		if self.expect(token::RBRACE, "expected }") {
@@ -691,43 +710,56 @@ impl exprBuilder {
 
 	fn parseSliceLiteralOrType(mut *self): &ast::Expr {
 		mut lbrack := self.t
+		self.next()
+
+		if !self.eof() && self.t.ID == token::ELLIPSIS {
+			// Array type with auto-size.
+			// Example: [...]int
+			ret self.parseArrayType(lbrack, nil)
+		}
+
 		let mut list: []&ast::Expr
-		for !self.eof() && self.t.ID != token::RBRACK {
-			self.next()
-			if !self.eof() && self.t.ID != token::RBRACK {
-				if len(list) < 2 && self.t.ID == token::ELLIPSIS {
-					if len(list) == 0 {
-						// Array type with auto-size.
-						ret self.parseArrayType(lbrack, nil)
-					} else if len(list) == 1 {
-						mut t := self.t
-						// Array-fill expression.
-						self.next()
-						mut rbrack := self.t
-						self.expect(token::RBRACK, "expected ]")
-						list = append(list, &ast::Expr{
-							Token: t,
-							End: t,
-							Data: new(ast::VariadicExpr),
-						})
-						ret &ast::Expr{
-							Token: lbrack,
-							End: rbrack,
-							Data: &ast::SliceExpr{
-								Token: lbrack,
-								End: rbrack,
-								X: list,
-							},
-						}
-					}
-				}
-				list = append(list, self.parse())
+
+		// First iteration is separate to detect array-fill expressions.
+		if !self.eof() && self.t.ID != token::RBRACK {
+			list = append(list, self.parse())
+			if !self.atComma(token::RBRACK, "expected , or ]") {
+				goto Closing
 			}
-			if self.eof() || self.t.ID != token::COMMA && self.t.ID != token::RBRACK {
-				self.pushErr(self.t, "expected , or ]")
-				ret nil
+			self.next()
+			if !self.eof() && self.t.ID == token::ELLIPSIS {
+				// Array-fill expression.
+				// Example: [10, ...]
+				mut t := self.t
+				self.next()
+				mut rbrack := self.t
+				self.expect(token::RBRACK, "expected ]")
+				list = append(list, &ast::Expr{
+					Token: t,
+					End: t,
+					Data: new(ast::VariadicExpr),
+				})
+				ret &ast::Expr{
+					Token: lbrack,
+					End: rbrack,
+					Data: &ast::SliceExpr{
+						Token: lbrack,
+						End: rbrack,
+						X: list,
+					},
+				}
 			}
 		}
+
+		// Common iteration.
+		for !self.eof() && self.t.ID != token::RBRACK {
+			list = append(list, self.parse())
+			if !self.atComma(token::RBRACK, "expected , or ]") {
+				goto Closing
+			}
+			self.next()
+		}
+	Closing:
 		mut rbrack := self.t
 		if self.expect(token::RBRACK, "expected ]") {
 			ret nil
