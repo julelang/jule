@@ -1355,27 +1355,18 @@ impl exprCoder {
 	}
 
 	fn slice(mut &self, mut m: &sema::SliceExpr) {
-		self.oc.write("({ auto " + collectionIdent + " = ")
+		// Using initializer list for slice literal is more efficient than manually initializing.
+		// C++ compiler compiles more slow when we use manual initialization.
+		// On runtime, there is no notable performance impact using of initializer lists.
 		self.oc.tc.asSlice(&self.oc.Buf, m.ElemType)
-		size := conv::Itoa(len(m.Elems))
-		self.oc.write("::alloc(")
-		self.oc.write(size)
-		self.oc.write(", ")
-		self.oc.write(size)
-		self.oc.write("); auto ")
-		self.oc.write(collectionItIdent)
-		self.oc.write(" = ")
-		self.oc.write(collectionIdent)
-		self.oc.write(".begin(); ")
+		self.oc.write("::make({")
 		for i in m.Elems {
-			self.oc.write("(*")
-			self.oc.write(collectionItIdent)
-			self.oc.write("++) = ")
+			if i > 0 {
+				self.oc.write(", ")
+			}
 			self.possibleRefExpr(m.Elems[i].Model)
-			self.oc.write("; ")
 		}
-		self.oc.write(collectionIdent)
-		self.oc.write("; })")
+		self.oc.write("})")
 	}
 
 	fn indexingWithSafety(mut &self, mut m: &sema::IndexingExpr, safe: bool) {
