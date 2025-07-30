@@ -50,8 +50,7 @@ namespace jule
             jule::Slice<Item> slice;
             slice.alloc_new(src.size(), src.size());
             const auto src_begin = src.begin();
-            for (jule::Int i = 0; i < slice._len; ++i)
-                slice.data.alloc[i] = *static_cast<const Item *>(src_begin + i);
+            std::copy(src.begin(), src.end(), slice.begin());
             return slice;
         }
 
