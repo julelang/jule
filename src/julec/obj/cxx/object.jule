@@ -838,34 +838,6 @@ impl ObjectCoder {
 		}
 	}
 
-	fn prepareStructure(mut *self, mut s: &sema::Struct) {
-		for (_, mut ins) in s.Instances {
-			for (_, mut m) in ins.Methods {
-				if m.Static {
-					continue
-				}
-				for (_, mut mins) in m.Instances {
-					mut p := mins.Params[0]
-					mut kind := strings::Builder{}
-					self.tc.kind(&kind, p.Type)
-					p.Type = &sema::Type{
-						Kind: &customType{
-							kind: kind.Str(),
-						},
-					}
-				}
-			}
-		}
-	}
-
-	fn prepareStructures(mut &self) {
-		for (_, mut s) in self.ir.Ordered.Structs {
-			if s.Token != nil {
-				self.prepareStructure(s)
-			}
-		}
-	}
-
 	fn structurePlainDecl(mut &self, mut s: &sema::Struct) {
 		for (_, mut ins) in s.Instances {
 			self.write("struct ")
@@ -1737,7 +1709,6 @@ impl ObjectCoder {
 
 	fn serializeHead(mut &self) {
 		self.buildTraitHashes()
-		self.prepareStructures()
 		self.head()
 		self.write("\n")
 		self.decls()
