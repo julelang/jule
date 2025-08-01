@@ -447,33 +447,51 @@ impl scopeCoder {
 		self.oc.write("}")
 	}
 
-	fn ifCase(mut &self, mut i: &sema::If) {
-		if i.Expr != nil {
-			self.oc.write("if (")
-			self.oc.ec.possibleRefExpr(i.Expr)
-			self.oc.write(") ")
-		}
-		self.scope(i.Scope)
-	}
-
 	fn conditional(mut &self, mut c: &sema::Conditional) {
-		mut written := false
-		for (_, mut elif) in c.Elifs {
-			if elif == nil {
+		self.oc.write("{\n")
+		self.oc.addIndent()
+		self.oc.indent()
+		self.oc.write(typeBool)
+		self.oc.write(" x;\n")
+		for (_, mut case) in c.Elifs {
+			if case == nil {
 				continue
 			}
-			if written {
-				self.oc.write(" else ")
-			}
-			written = true
-			self.ifCase(elif)
+			self.oc.indent()
+			self.oc.write("{\n")
+			self.oc.addIndent()
+			self.oc.indent()
+			self.oc.write("x = ")
+			self.oc.ec.possibleRefExpr(case.Expr)
+			self.oc.write(";\n")
+			self.oc.indent()
+			self.oc.write("if (x) {\n")
+			self.oc.addIndent()
+			self.oc.indent()
+			self.scope(case.Scope)
+			self.oc.write("\n")
+			self.oc.indent()
+			self.oc.write("goto ")
+			identCoder.matchEnd(&self.oc.Buf, uintptr(c))
+			self.oc.write(";\n")
+			self.oc.doneIndent()
+			self.oc.indent()
+			self.oc.write("}\n")
+			self.oc.doneIndent()
+			self.oc.indent()
+			self.oc.write("}\n")
 		}
 		if c.Default != nil {
-			if written {
-				self.oc.write(" else ")
-			}
+			self.oc.indent()
 			self.scope(c.Default.Scope)
+			self.oc.write("\n")
 		}
+		self.oc.indent()
+		identCoder.matchEnd(&self.oc.Buf, uintptr(c))
+		self.oc.write(":;\n")
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("}")
 	}
 
 	fn infIter(mut &self, mut it: &sema::InfIter) {

@@ -45,8 +45,7 @@ namespace jule
         static jule::Slice<Item> make(const std::initializer_list<Item> &src)
         {
             if (src.size() == 0)
-                return nullptr;
-
+            return nullptr;
             jule::Slice<Item> slice;
             slice.alloc_new(src.size(), src.size());
             const auto src_begin = src.begin();
