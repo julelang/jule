@@ -68,28 +68,37 @@ struct constraintChecker {
 impl constraintChecker {
 	fn readyFunc(mut &self): fn(mut sema: &sema, mut generics: []&TypeAlias): bool {
 		ret fn|mut sema, mut generics| {
+			mut ok := true
 			for (i, mut g) in self.genericsD {
 				mut generic := self.generics[i]
 				if g.Constraint == nil || len(g.Constraint.Mask) == 0 {
 					continue
 				}
-				generic.Constraint = make([]&Type, 0, len(g.Constraint.Mask))
+				generic.Constraint = make([]ConstraintMask, 0, len(g.Constraint.Mask))
 				for (_, mut mask) in g.Constraint.Mask {
 					n := len(sema.errors)
-					mut kind := sema.buildTypeWithRefers(mask, sema, generics, nil)
-					if kind == nil {
-						mut itd, ok := mask.Data.(&ast::NameExpr)
-						if ok && isBuiltinConstraint(itd.Name) {
-							kind = &Type{Kind: buildPrimType(itd.Name)}
+					mut typ := sema.buildTypeWithRefers(mask.Type, sema, generics, nil)
+					if typ == nil {
+						mut itd, _ := mask.Type.Data.(&ast::NameExpr)
+						if itd != nil && isBuiltinConstraint(itd.Name) {
+							typ = &Type{Kind: buildPrimType(itd.Name)}
 							sema.errors = sema.errors[:n]
 						} else {
 							ret false
 						}
+					} else if mask.Deep {
+						if typ.SoftStruct() != nil || typ.Prim() == nil {
+							sema.pushErr(mask.Type.Token, "tilde ~ operator expects primitive type")
+							ret false
+						}
 					}
-					generic.Constraint = append(generic.Constraint, kind)
+					generic.Constraint = append(generic.Constraint, ConstraintMask{
+						Deep: mask.Deep,
+						Type: typ,
+					})
 				}
 			}
-			ret true
+			ret ok
 		}
 	}
 
@@ -124,14 +133,15 @@ impl constraintChecker {
 				continue
 			}
 			for (_, mut c2) in g.Constraint {
-				mut prim := c2.Prim()
+				mut prim := c2.Type.Prim()
 				if prim != nil && prim.IsConstraint() {
 					if matchConstraint(prim.Kind, g.Type) {
 						continue lookup
 					}
 					continue
 				}
-				if c2.Equal(g.Type) {
+				if (c2.Deep && c2.Type.ActualEqual(g.Type)) ||
+					(!c2.Deep && c2.Type.Equal(g.Type)) {
 					continue lookup
 				}
 			}

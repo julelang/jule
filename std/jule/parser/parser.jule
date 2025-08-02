@@ -488,11 +488,20 @@ impl parser {
 				self.errors = append(self.errors, errors...)
 				ret nil
 			}
-			g.Constraint = &ast::Constraint{Mask: make([]&ast::Expr, 0, len(parts))}
+			g.Constraint = &ast::Constraint{Mask: make([]ast::ConstraintMask, 0, len(parts))}
 			for (_, mut part) in parts {
+				let mut mask: ast::ConstraintMask
 				mut i := 0
-				mut kind, _ := self.buildType(part, &i, true)
-				g.Constraint.Mask = append(g.Constraint.Mask, kind)
+				if part[0].ID == token::TILDE {
+					mask.Deep = true
+					i++
+					if i >= len(part) {
+						self.pushErr(part[0], "operator ~ expects type")
+						continue
+					}
+				}
+				mask.Type, _ = self.buildType(part, &i, true)
+				g.Constraint.Mask = append(g.Constraint.Mask, mask)
 				if i < len(part) {
 					self.pushErr(part[i], "invalid syntax")
 				}
