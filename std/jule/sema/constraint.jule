@@ -87,8 +87,11 @@ impl constraintChecker {
 							ret false
 						}
 					} else if mask.Deep {
-						if typ.SoftStruct() != nil || typ.Prim() == nil {
-							sema.pushErr(mask.Type.Token, "tilde ~ operator expects primitive type")
+						if !canTilde(typ) {
+							sema.pushErr(mask.Type.Token, "tilde ~ operator expects primitive, slice, array, map, chan or pointer type")
+							if typ.Struct() == nil {
+								sema.pushSuggestion("use the underlying type as mask: " + typ.ActualKind().Str())
+							}
 							ret false
 						}
 					}
@@ -222,4 +225,18 @@ fn isBuiltinConstraint(name: str): bool {
 		}
 	}
 	ret false
+}
+
+fn canTilde(mut typ: &Type): bool {
+	// Ignore strict type aliases.
+	if typ.SoftStruct() != nil {
+		ret false
+	}
+	ret typ.Prim() != nil ||
+		typ.Slice() != nil ||
+		typ.Array() != nil ||
+		typ.Map() != nil ||
+		typ.Chan() != nil ||
+		typ.Ptr() != nil ||
+		typ.Sptr() != nil
 }
