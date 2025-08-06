@@ -2705,12 +2705,16 @@ impl sema {
 		}
 	}
 
-	fn checkRets(mut *self, mut f: &FuncIns) {
+	fn checkRets(mut *self, mut f: &FuncIns, mut sc: &scopeChecker) {
 		if f.Decl.IsVoid() {
 			ret
 		}
 		mrc := missingRetChecker.new()
-		ok := mrc.check(f.Scope)
+		mut ok := mrc.memoizeLabelsAndGotos(sc)
+		if !ok {
+			self.pushErr(f.Decl.Token, "missing return at end of function")
+		}
+		ok = mrc.check(f.Scope)
 		if !ok {
 			self.pushErr(f.Decl.Token, "missing return at end of function")
 		}
@@ -2728,10 +2732,11 @@ impl sema {
 
 		n := len(self.errors)
 		sc.check(f.Decl.Scope, f.Scope)
+		f.Scope.Owner = uintptr(f)
 
 		// Check return statements if scopeChecker not forced to stop and no error.
 		if !sc.stopped() && len(self.errors) == n {
-			self.checkRets(f)
+			self.checkRets(f, sc)
 		}
 	}
 
@@ -3055,6 +3060,178 @@ impl missingRetChecker {
 		}
 	}
 
+	fn memoizeLabel(*self, mut l: &Label): (ok: bool) {
+		laddr := uintptr(l)
+		// If label is already checked, return the memoized data.
+		mut r, ok := self.labels[laddr]
+		if ok {
+			ret r&_LMEMO_TRUE == _LMEMO_TRUE
+		}
+		// Temporarily memoize the label to avoid infinite recursion.
+		// Also this data used to catch in-check state:
+		self.labels[laddr] = _LMEMO_CHECKING
+		// Check rest of the statements following label.
+		// With `l.Index+1` skip the current label statement.
+		i := l.Index + 1
+		if l.Scope.Traits&ST_INFINITE == ST_INFINITE {
+			ok = self.checkInfinite(l.Scope.Owner, l.Scope, i)
+		} else {
+			ok = self.checkScope(l.Scope, i)
+		}
+		if ok {
+			r = _LMEMO_TRUE
+		} else {
+			r = _LMEMO_FALSE
+		}
+		// Memoize the actual result.
+		self.labels[laddr] = r
+		// Time to return.
+		ret ok
+	}
+
+	fn memoizeGoto(*self, mut g: &Goto): (ok: bool) {
+		// Goto statement appeared. We have to check statements by label.
+		// Following statements will not be executed, ignore them, if any.
+
+		// Update lead label data. If it is nil, set to g's label.
+		// Otherwise make sure g's label is more close to the root.
+		if self.lead == nil || self.lead.Scope.ChildIndex > g.Label.Scope.ChildIndex {
+			self.lead = g.Label
+		}
+		let mut r: int
+		// If goto jumps down, assume the label is not memoized yet.
+		// Because label is declared below in the code.
+		if g.Direction == DOWN {
+			ok = false
+		} else {
+			r, ok = self.labels[uintptr(g.Label)]
+		}
+		if !ok {
+			// Label is not memoized yet, so this is the first time.
+			// Check scope by label index. Start from label index,
+			// because label statement will trigger the memoization.
+			// Save report to the hard register.
+			// Because label is not checked, even not in in-check state.
+			// So we jumping to below, we have to memoize "false" reports.
+			// Otherwise we may miss "false" reports.
+			//
+			// Example wrong "true" report on pseudo AST:
+			//	╭──────────────────╮
+			//	│ fn foo(): int  { │
+			//	│     if true {    │
+			//	│         goto Bar │ > this branch jumps below, reports no return
+			//	│     }            │
+			//	│     ret 0        │ > analysis sees this and assumes function returns
+			//	│ Bar:             │   we have to remember branch's report at this point
+			//	│ }                │
+			//	╰──────────────────╯
+			if g.Label.Scope.Traits&ST_INFINITE == ST_INFINITE {
+				ok = self.checkInfinite(g.Label.Scope.Owner, g.Label.Scope, g.Label.Index)
+			} else {
+				ok = self.checkScope(g.Label.Scope, g.Label.Index)
+			}
+			// If analysis repor is true, then assign the result directly.
+			// Otherwise we have to check following statements.
+			if ok {
+				// No operation needed for the hard register.
+				// If self.hard is true, we have already true.
+				// Otherwise, we must store the false state.
+				// Just report the current result of analysis.
+				ret ok
+			} else {
+				// Analysis report is false, we have to check following statements.
+				// Otherwise we cannot know label's following situation.
+				//
+				// Example on pseudo AST:
+				//	╭──────────────────────╮
+				//	│ fn foo(): str {      │
+				//	│     {                │
+				//	│         goto Keep    │ < jumps to below
+				//	│         ret "return" │
+				//	│     Keep:            │ < this label reports false for its own scope here
+				//	│     }                │   but it is actually wrong
+				//	│     ret "return"     │ < because the following statement returns
+				//	│ }                    │   so label should report true.
+				//	╰──────────────────────╯
+				mut ls := g.Label.Scope
+				for ls != nil {
+					// No parent scope and we did not see "true" report.
+					// So this label should report "false".
+					if ls.Parent == nil {
+						self.hard = false
+						ret false
+					}
+					mut ps := ls.Parent
+					// Start checking parent scope from the following
+					// statements of the current child scope.
+					i := ls.StmtIndex + 1
+					if ps.Traits&ST_INFINITE == ST_INFINITE {
+						ok = self.checkInfinite(ps.Owner, ps, i)
+					} else {
+						ok = self.checkScope(ps, i)
+					}
+					// Scope analysis returns true for the parent.
+					// So this label should report "true".
+					if ok {
+						// No operation needed for the hard register.
+						// If self.hard is true, we have already true.
+						// Otherwise, we must store the false state.
+						// Just report the current result of analysis.
+						ret true
+					}
+					// Continue to the next parent scope.
+					ls = ps
+				}
+				panic("unreachable")
+			}
+		} else if r&_LMEMO_CHECKING != _LMEMO_CHECKING {
+			// Label is already memoized, report the result.
+			ret r&_LMEMO_TRUE == _LMEMO_TRUE
+		}
+		// Jumping into scope is not allowed.
+		// So goto jumps in the same scope or one of to parent scopes.
+		// Make label and goto scopes equal for analysis if they not.
+		if g.Scope.ChildIndex > g.Label.Scope.ChildIndex {
+			// Scopes are different, make them equal.
+			// See documentation of the [scopeChecker.checkGoto].
+			mut gtsc := g.Scope
+			for gtsc.ChildIndex-1 > g.Label.Scope.ChildIndex {
+				gtsc = gtsc.Parent
+			}
+			// Scopes are same now, make sure the goto jumps above.
+			ret gtsc.StmtIndex > g.Label.Index
+		} else {
+			// They are in the same scope. Report true anyway.
+			// If goto jumps above, this is an infinite loop.
+			// Otherwise goto jumps below, but this label is in-check state.
+			// So already checking, report true for now.
+			// If checking fails, root checker will report it with hard register.
+			ret true
+		}
+	}
+
+	// Memoizes labels and goto statements.
+	// Reports whether all goto statements reports true.
+	fn memoizeLabelsAndGotos(*self, mut sc: &scopeChecker): bool {
+		if sc.labels != nil {
+			for (_, mut lbl) in *sc.labels {
+				self.memoizeLabel(lbl.node)
+			}
+		}
+		if sc.gotos != nil {
+			for (_, mut g) in *sc.gotos {
+				// If any goto statement reports false, return with false immediately.
+				// Because analysis will not be executed completely in this case.
+				// This is such a fast path: if any goto statement reports false,
+				// so there is no exact return in all branchs.
+				if !self.memoizeGoto(g) {
+					ret false
+				}
+			}
+		}
+		ret true
+	}
+
 	fn checkConditional(*self, mut c: &Conditional): (ok: bool) {
 		// To collect all break statements, check the all scopes.
 		ok = true
@@ -3137,8 +3314,8 @@ impl missingRetChecker {
 		ret
 	}
 
-	// Reports we have infinite iteration.
-	fn checkInfinite(*self, it: uintptr, mut s: &Scope): bool {
+	// Reports we have infinite iteration, starts from i.
+	fn checkInfinite(*self, it: uintptr, mut s: &Scope, i: int): bool {
 		mut lead := self.lead
 		hard := self.hard
 
@@ -3149,7 +3326,7 @@ impl missingRetChecker {
 		// Because checkScope reports false for no-return.
 		// But we look for iteration breaker, not for return.
 		// Just check the scope and collect break statements.
-		self.checkScope(s, 0)
+		self.checkScope(s, i)
 
 		// We have lead label data, check it.
 		if self.lead != nil {
@@ -3222,131 +3399,9 @@ impl missingRetChecker {
 		for (_, mut st) in s.Stmts[i:] {
 			match type st {
 			| &Label:
-				mut l := st.(&Label)
-				laddr := uintptr(l)
-				// If label is already checked, return the memoized data.
-				mut r, mut ok := self.labels[laddr]
-				if ok {
-					ret r&_LMEMO_TRUE == _LMEMO_TRUE
-				}
-				// Temporarily memoize the label to avoid infinite recursion.
-				// Also this data used to catch in-check state:
-				self.labels[laddr] = _LMEMO_CHECKING
-				// Check rest of the statements following label.
-				// With `l.Index+1` skip the current label statement.
-				ok = self.checkScope(l.Scope, l.Index+1)
-				if ok {
-					r = _LMEMO_TRUE
-				} else {
-					r = _LMEMO_FALSE
-				}
-				// Memoize the actual result.
-				self.labels[laddr] = r
-				// Time to return.
-				ret ok
+				ret self.memoizeLabel(st.(&Label))
 			| &Goto:
-				// Goto statement appeared. We have to check statements by label.
-				// Following statements will not be executed, ignore them, if any.
-				mut g := st.(&Goto)
-				// Update lead label data. If it is nil, set to g's label.
-				// Otherwise make sure g's label is more close to the root.
-				if self.lead == nil || self.lead.Scope.ChildIndex > g.Label.Scope.ChildIndex {
-					self.lead = g.Label
-				}
-				r, mut ok := self.labels[uintptr(g.Label)]
-				if !ok {
-					// Label is not memoized yet, so this is the first time.
-					// Check scope by label index. Start from label index,
-					// because label statement will trigger the memoization.
-					// Save report to the hard register.
-					// Because label is not checked, even not in in-check state.
-					// So we jumping to below, we have to memoize "false" reports.
-					// Otherwise we may miss "false" reports.
-					//
-					// Example wrong "true" report on pseudo AST:
-					//	╭──────────────────╮
-					//	│ fn foo(): int  { │
-					//	│     if true {    │
-					//	│         goto Bar │ > this branch jumps below, reports no return
-					//	│     }            │
-					//	│     ret 0        │ > analysis sees this and assumes function returns
-					//	│ Bar:             │   we have to remember branch's report at this point
-					//	│ }                │
-					//	╰──────────────────╯
-					ok = self.checkScope(g.Label.Scope, g.Label.Index)
-					// If analysis repor is true, then assign the result directly.
-					// Otherwise we have to check following statements.
-					if ok {
-						// No operation needed for the hard register.
-						// If self.hard is true, we have already true.
-						// Otherwise, we must store the false state.
-						// Just report the current result of analysis.
-						ret ok
-					} else {
-						// Analysis report is false, we have to check following statements.
-						// Otherwise we cannot know label's following situation.
-						//
-						// Example on pseudo AST:
-						//	╭──────────────────────╮
-						//	│ fn foo(): str {      │
-						//	│     {                │
-						//	│         goto Keep    │ < jumps to below
-						//	│         ret "return" │
-						//	│     Keep:            │ < this label reports false for its own scope here
-						//	│     }                │   but it is actually wrong
-						//	│     ret "return"     │ < because the following statement returns
-						//	│ }                    │   so label should report true.
-						//	╰──────────────────────╯
-						mut ls := g.Label.Scope
-						for ls != nil {
-							// No parent scope and we did not see "true" report.
-							// So this label should report "false".
-							if ls.Parent == nil {
-								self.hard = false
-								ret false
-							}
-							mut ps := ls.Parent
-							// Start checking parent scope from the following
-							// statements of the current child scope.
-							ok = self.checkScope(ps, ls.StmtIndex+1)
-							// Scope analysis returns true for the parent.
-							// So this label should report "true".
-							if ok {
-								// No operation needed for the hard register.
-								// If self.hard is true, we have already true.
-								// Otherwise, we must store the false state.
-								// Just report the current result of analysis.
-								ret true
-							}
-							// Continue to the next parent scope.
-							ls = ps
-						}
-						panic("unreachable")
-					}
-				} else if r&_LMEMO_CHECKING != _LMEMO_CHECKING {
-					// Label is already memoized, report the result.
-					ret r&_LMEMO_TRUE == _LMEMO_TRUE
-				}
-				// Jumping into scope is not allowed.
-				// So goto jumps in the same scope or one of to parent scopes.
-				// Make label and goto scopes equal for analysis if they not.
-				if g.Scope.ChildIndex > g.Label.Scope.ChildIndex {
-					// Scopes are different, make them equal.
-					// See documentation of the [scopeChecker.checkGoto].
-					mut gtsc := g.Scope
-					for gtsc.ChildIndex-1 > g.Label.Scope.ChildIndex {
-						gtsc = gtsc.Parent
-					}
-					// Scopes are same now, make sure the goto jumps above.
-					ret gtsc.StmtIndex > g.Label.Index
-				} else {
-					// They are in the same scope. Report true anyway.
-					// If goto jumps above, this is an infinite loop.
-					// Otherwise goto jumps below, but this label is in-check state.
-					// So already checking, report true for now.
-					// If checking fails, root checker will report it with hard register.
-					ret true
-				}
+				ret self.memoizeGoto(st.(&Goto))
 			| &Ret:
 				// Return statement appeared, report true for this scope.
 				// But check the return expression before reporting true.
@@ -3403,7 +3458,7 @@ impl missingRetChecker {
 				// Because following statements will not be executed,
 				// so function will not be ended.
 				mut ii := st.(&InfIter)
-				if self.checkInfinite(uintptr(ii), ii.Scope) {
+				if self.checkInfinite(ii.Scope.Owner, ii.Scope, 0) {
 					ret true
 				}
 			| &WhileIter:
@@ -3412,8 +3467,8 @@ impl missingRetChecker {
 				// If this iteration will not be breaked, then report true.
 				// Because following statements will not be executed,
 				// so function will not be ended.
-				if wn.IsWhileNext() && wn.Expr == nil {
-					if self.checkInfinite(uintptr(wn), wn.Scope) {
+				if wn.Scope.Traits&ST_INFINITE == ST_INFINITE {
+					if self.checkInfinite(wn.Scope.Owner, wn.Scope, 0) {
 						ret true
 					}
 				}

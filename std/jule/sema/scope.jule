@@ -55,8 +55,21 @@ struct exprPart {
 	expr: &ast::Expr
 }
 
+// Represents traits of a scope.
+type ScopeTrait: int
+
+// Scope traits.
+const (
+	// Scope is an infinite scope.
+	// This passed when scope owner is exactly and infinite iteration,
+	// or while-next iteration with no condition.
+	ST_INFINITE: ScopeTrait = 1 << iota
+)
+
 // Scope.
 struct Scope {
+	Traits:   ScopeTrait
+	Owner:    uintptr // Memory address of the owner.
 	Parent:   &Scope
 	Unsafe:   bool
 	Deferred: bool
@@ -141,13 +154,23 @@ struct Label {
 	Index: int    // Index of statement.
 }
 
+// Basic direction flags.
+type Direction: int
+
+// Directions.
+const (
+	UP: Direction = iota
+	DOWN
+)
+
 // Goto statement.
 struct Goto {
-	Name:  str
-	Token: &token::Token
-	Label: &Label
-	Scope: &Scope // Owner scope.
-	Index: int    // Index of statement.
+	Name:      str
+	Token:     &token::Token
+	Label:     &Label
+	Scope:     &Scope // Owner scope.
+	Index:     int    // Index of statement.
+	Direction: Direction
 }
 
 // Postfix assignment.
@@ -641,6 +664,7 @@ impl scopeChecker {
 
 	fn getChild(mut *self): &Scope {
 		ret &Scope{
+			Owner: uintptr(self.scope),
 			Parent: self.scope,
 		}
 	}
@@ -780,6 +804,7 @@ impl scopeChecker {
 	fn checkIterScopeSc(mut &self, it: uintptr, mut tree: &ast::ScopeTree, mut ssc: &scopeChecker): &Scope {
 		mut scope := self.getChild()
 		self.checkIterScopeSsc(it, tree, scope, ssc)
+		scope.Owner = it
 		ret scope
 	}
 
@@ -792,6 +817,7 @@ impl scopeChecker {
 		mut kind := new(InfIter)
 		self.scope.Stmts = append(self.scope.Stmts, kind)
 		kind.Scope = self.checkIterScope(uintptr(kind), it.Scope)
+		kind.Scope.Traits |= ST_INFINITE
 	}
 
 	fn checkWhileIter(mut &self, mut it: &ast::Iter) {
@@ -804,6 +830,9 @@ impl scopeChecker {
 		mut kind := new(WhileIter)
 		self.scope.Stmts = append(self.scope.Stmts, kind)
 		kind.Scope = self.checkIterScope(uintptr(kind), it.Scope)
+		if wh.IsWhileNext() && wh.X == nil {
+			kind.Scope.Traits |= ST_INFINITE
+		}
 
 		if wh.X != nil {
 			mut v := self.s.eval(self).evalExpr(wh.X, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
@@ -2362,6 +2391,7 @@ impl scopeChecker {
 		if gt.Scope == label.node.Scope {
 			// Scopes are same and label at above, so it is safe.
 			if gt.Index > label.node.Index {
+				gt.Direction = UP
 				ret
 			}
 			// Limit controlling to goto's position.
@@ -2403,10 +2433,11 @@ impl scopeChecker {
 			}
 			// Scopes are same and label at above, so it is safe.
 			if gtsc.StmtIndex > label.node.Index {
+				gt.Direction = UP
 				ret
 			}
 			// Cap analysis statement position limit to goto's position.
-			// Label and goto is in same scope.  If same scope condition is not met,
+			// Label and goto is in same scope. If same scope condition is not met,
 			// we will have zero offset because of root scope.
 			// So algorithm will check all statements without limitation,
 			// so any declaration will cause an error.
@@ -2422,6 +2453,7 @@ impl scopeChecker {
 			self.s.pushErr(gt.Token, "goto jumps into scope")
 			ret
 		}
+		gt.Direction = DOWN
 
 		mut s := label.node.Scope     // Start checking at scope of label.
 		mut i := label.node.Index - 1 // Start end limit by label statement.
