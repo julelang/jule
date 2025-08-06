@@ -1,0 +1,49 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/byteslite"
+use "std/mem"
+use "std/runtime"
+use "std/sys"
+use "std/unsafe"
+
+fn hostname()!: (name: str) {
+	// Try uname first, as it's only one system call and reading
+	// from /proc is not allowed on Android (future-proof).
+	let mut un: sys::Utsname
+	let mut err: any
+	sys::Uname(&un) else {
+		err = error
+	}
+
+	mut buf := make([]byte, 512) // Enough for a DNS name.
+	for i, b in un.Nodename {
+		buf[i] = u8(b)
+		if b == 0 {
+			name = unsafe::StrFromBytes(buf[:i])
+			break
+		}
+	}
+	// If we got a name and it's not potentially truncated
+	// (Nodename is 65 bytes), return it.
+	if err == nil && len(name) > 0 && len(name) < 64 {
+		ret name
+	}
+
+	// Future proof.
+	if runtime::OS == "android" {
+		if name != "" {
+			ret name
+		}
+		ret "localhost"
+	}
+
+	mut f := Open("/proc/sys/kernel/hostname")?
+	defer { f.Close() else {} }
+	mut n := f.Read(buf)?
+	if n > 0 && buf[n-1] == '\n' {
+		n--
+	}
+	ret unsafe::StrFromBytes(buf[:n])
+}

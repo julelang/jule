@@ -1,0 +1,23 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+#build darwin
+
+use "std/sys"
+use "std/unsafe"
+
+fn hostname()!: (name: str) {
+	let mut size: int
+	mib := []i32([sys::CTL_KERN, sys::KERN_HOSTNAME])
+
+	// Learn the buffer size.
+	sys::Sysctl(mib, 0, uintptr(&size), 0, 0)?
+
+	// Allocate buffer.
+	mut hostname := make([]byte, size)
+
+	// Read hostname.
+	sys::Sysctl(mib, uintptr(&hostname[0]), uintptr(&size), 0, 0)?
+	ret unsafe::StrFromBytes(hostname)
+}

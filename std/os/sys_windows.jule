@@ -1,0 +1,29 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/sys/windows"
+use integ "std/jule/integrated"
+use "std/sys"
+
+fn hostname()!: (name: str) {
+	// Use PhysicalDnsHostname to uniquely identify host in a cluster
+	const format = windows::ComputerNamePhysicalDnsHostname
+
+	mut n := u32(64)
+	for {
+		mut b := make([]u16, n)
+		windows::GetComputerNameEx(format, unsafe { &b[0] }, &n) else {
+			if error != sys::ERROR_MORE_DATA {
+				error(error)
+			}
+
+			// If we received an ERROR_MORE_DATA, but n doesn't get larger,
+			// something has gone wrong and we may be in an infinite loop.
+			if n <= u32(len(b)) {
+				error(error)
+			}
+		}
+		ret integ::UTF16ToStr(b[:n])
+	}
+}
