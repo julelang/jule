@@ -514,9 +514,9 @@ impl scopeChecker {
 		const Bind = false   // Local variables cannot be bind.
 		mut parent := unsafe { (&scopeChecker)(self) }
 		for parent != nil {
-			// Closure mode is disable and we have a owner.
-			// Do not capture variables from the parent scopes.
-			if !closure && parent.owner != nil {
+			// Closure limition mode is disabled and we are in the closure.
+			// Do not lookup variables from the parent scopes.
+			if !closure && parent.parent != nil && parent.owner != nil {
 				ret nil
 			}
 			mut v := parent.table.findVar(name, Bind, Reverse)
@@ -569,12 +569,13 @@ impl scopeChecker {
 	// If founded identifier address equals to self, will be skipped.
 	fn isDuplicatedName(mut *self, itself: uintptr, name: str): bool {
 		const Closure = false
+		shadowing := self.s.isFlag(Shadowing)
 		v := self.findVar(name, Closure)
 		if v != nil && uintptr(v) != itself {
 			if v.Scope == nil { // Ignore globals.
 				ret false
 			}
-			ret v.Scope == self.scope || !self.s.isFlag(Shadowing)
+			ret v.Scope == self.scope || !shadowing
 		}
 
 		ta := self.FindTypeAlias(name, false)
@@ -582,7 +583,7 @@ impl scopeChecker {
 			if ta.Scope == nil { // Ignore globals.
 				ret false
 			}
-			ret ta.Scope == self.tree || !self.s.isFlag(Shadowing)
+			ret ta.Scope == self.tree || !shadowing
 		}
 
 		ret false
