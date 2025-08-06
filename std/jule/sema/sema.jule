@@ -3111,6 +3111,32 @@ impl missingRetChecker {
 		ret
 	}
 
+	fn checkSelect(*self, mut slct: &Select): (ok: bool) {
+		// To collect all break statements, check the all scopes.
+		ok = true
+		addr := uintptr(slct)
+		for (_, mut c) in slct.Cases {
+			if c == nil || !self.checkScope(c.Scope, 0) {
+				ok = false
+			} else {
+				// Scope reports true. To make sure
+				// catch break statements for the select.
+				if self.breaked[addr] {
+					ok = false
+				}
+			}
+		}
+		// If there is no default case, there is no all-time return possibility, then report false.
+		// Otherwise evaluate the default scope.
+		// No extra attention needed for the default case like other cases.
+		if slct.Default == nil {
+			ok = false
+		} else if !self.checkScope(slct.Default.Scope, 0) {
+			ok = false
+		}
+		ret
+	}
+
 	// Reports we have infinite iteration.
 	fn checkInfinite(*self, it: uintptr, mut s: &Scope): bool {
 		mut lead := self.lead
@@ -3356,6 +3382,8 @@ impl missingRetChecker {
 					self.breaked[brk.It] = true
 				| brk.Match != 0:
 					self.breaked[brk.Match] = true
+				| brk.Select != 0:
+					self.breaked[brk.Select] = true
 				}
 				// Following statements will not be executed, ignore them, if any.
 				ret false
@@ -3426,11 +3454,16 @@ impl missingRetChecker {
 				}
 			| &Select:
 				// Select statement appeared.
-				// It might be empty, report true if so.
+				// It might be empty (so select{}), report true if so.
 				// Because empty select statement yields CPU or panics.
 				// Following statements will not be executed, ignore them, if any.
-				slct := st.(&Select)
+				mut slct := st.(&Select)
 				if len(slct.Cases) == 0 && slct.Default == nil {
+					ret true
+				}
+				// Select statement is not empty, check all cases like match.
+				// If all cases returns, then report true.
+				if self.checkSelect(slct) {
 					ret true
 				}
 			|:

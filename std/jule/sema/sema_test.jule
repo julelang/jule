@@ -542,6 +542,84 @@ fn test()!: str {
 `,
 		err: false,
 	},
+	{
+		code: `
+fn foo(mut ch: chan bool): bool {
+	select {
+	| ch <- true:
+		ret true
+	|:
+		ret false
+	}
+}
+`,
+		err: false,
+	},
+	{
+		code: `
+fn foo(mut ch: chan bool): bool {
+	select {
+	| ch <- true:
+		break
+		ret true
+	|:
+		ret false
+	}
+}
+`,
+		err: true,
+	},
+	{
+		code: `
+fn foo(mut ch: chan bool): bool {
+	select {
+	| ch <- true:
+		if true {
+			break
+		}
+		ret true
+	|:
+		ret false
+	}
+}
+`,
+		err: true,
+	},
+	{
+		code: `
+fn foo(mut ch: chan bool): bool {
+	select {
+	| ch <- true:
+		select {
+		| ch <- true:
+			break
+		}
+		ret true
+	|:
+		ret false
+	}
+}
+`,
+		err: false,
+	},
+	{
+		code: `
+fn foo(mut ch: chan bool): bool {
+Root:
+	select {
+	| ch <- true:
+		select {
+		| ch <- true:
+			break Root
+		}
+		ret true
+	|:
+		ret false
+	}
+}
+`,
+		err: true,
+	},
 ])
 
 #test
