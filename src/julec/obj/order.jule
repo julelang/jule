@@ -14,11 +14,16 @@ struct OrderedDefines {
 fn isOrdered[T](t: &T, s: []&T, partial: bool): bool {
 lookup:
 	for _, d in t.Depends {
-		// Fast way:
 		const match type T {
 		| sema::Var:
-			if d.Constant {
-				// Skip constant variables for dependency analysis.
+			if d.Constant || d.Bind {
+				// Skip constant or bind variables for dependency analysis.
+				// It is not cost for runtime, so it is not an real-memory dependency.
+				continue
+			}
+		| sema::StructIns:
+			if d.Decl != nil && d.Decl.Bind {
+				// Skip bind structures for dependency analysis.
 				// It is not cost for runtime, so it is not an real-memory dependency.
 				continue
 			}
