@@ -5,14 +5,70 @@
 use "std/io"
 use "std/time"
 
+// Represents a DNS lookup error.
+struct DNSError {
+	Err:    str // description of the error
+	Name:   str // name looked for
+	Server: str // server used
+}
+
+impl DNSError {
+	fn Str(*self): str {
+		if self == nil {
+			ret "<nil>"
+		}
+		mut s := "lookup " + self.Name
+		if self.Server != "" {
+			s += " on " + self.Server
+		}
+		s += ": " + self.Err
+		ret s
+	}
+}
+
+fn newDNSError(err: str, name: str, server: str): &DNSError {
+	ret &DNSError{
+		Err: err,
+		Name: name,
+		Server: server,
+	}
+}
+
 // Network names.
 enum Network: str {
+	IP: "ip",
+	IP4: "ip4",
+	IP6: "ip6",
 	TCP: "tcp",
 	TCP4: "tcp4",
 	TCP6: "tcp6",
 	UDP: "udp",
 	UDP4: "udp4",
 	UDP6: "udp6",
+}
+
+fn networkToStr(net: Network): str {
+	match net {
+	| IP:
+		ret "ip"
+	| IP4:
+		ret "ip4"
+	| IP6:
+		ret "ip6"
+	| TCP:
+		ret "tcp"
+	| TCP4:
+		ret "tcp4"
+	| TCP6:
+		ret "tcp6"
+	| UDP:
+		ret "udp"
+	| UDP4:
+		ret "udp4"
+	| UDP6:
+		ret "udp6"
+	}
+	panic("unreachable")
 }
 
 // Common connection behavior.

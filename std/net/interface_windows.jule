@@ -1,0 +1,43 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/sys/windows"
+use "std/sys"
+
+// Returns a list of IP adapter and address structures.
+// The structure contains an IP adapter and flattened multiple IP addresses
+// including unicast, anycast and multicast addresses.
+fn adapterAddresses(mut &b: *[]byte)!: []*windows::IpAdapterAddresses {
+	mut l := u32(15000) // recommended initial size
+	for {
+		*b = make([]byte, l)
+		const flags = windows::GAA_FLAG_INCLUDE_PREFIX | windows::GAA_FLAG_INCLUDE_GATEWAYS
+		let mut err: any
+		unsafe {
+			windows::GetAdaptersAddresses(sys::AF_UNSPEC, flags, 0, (*windows::IpAdapterAddresses)(&(*b)[0]), &l) else {
+				err = error
+			}
+		}
+		if err == nil {
+			if l == 0 {
+				ret nil
+			}
+			break
+		}
+		if err != sys::ERROR_BUFFER_OVERFLOW {
+			error(err)
+		}
+		if l <= u32(len(*b)) {
+			error(err)
+		}
+	}
+	let mut aas: []*windows::IpAdapterAddresses
+	unsafe {
+		mut aa := (*windows::IpAdapterAddresses)(&(*b)[0])
+		for aa != nil; aa = aa.Next {
+			aas = append(aas, aa)
+		}
+	}
+	ret aas
+}

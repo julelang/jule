@@ -1,0 +1,145 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/byteslite"
+use "std/internal/conv"
+use "std/internal/stringslite"
+use "std/os"
+use "std/sync/atomic"
+use "std/time"
+
+const osConfigPath = "/etc/resolv.conf"
+
+fn osResolveConfig() {
+	conf.ndots = 1
+	conf.timeout = 5 * time::Second
+	conf.attempts = 2
+	conf.soffset.Store(0, atomic::SeqCst)
+	mut file, mut ok := open(osConfigPath)
+	if !ok {
+		conf.servers = defaultNS
+		conf.search = dnsDefaultSearch()
+		conf.mtime = time::Time{}
+		ret
+	}
+	fi := os::Stat(osConfigPath) else {
+		conf.servers = defaultNS
+		conf.search = dnsDefaultSearch()
+		conf.mtime = time::Time{}
+		ret
+	}
+	conf.mtime = fi.ModTime()
+	defer { file.close() }
+	mut line, ok := file.readLine()
+	for ok; line, ok = file.readLine() {
+		if len(line) > 0 && (line[0] == ';' || line[0] == '#') {
+			// comment.
+			continue
+		}
+		f := getFields(line)
+		if len(f) < 1 {
+			continue
+		}
+		match f[0] {
+		| "nameserver": // add one name server
+			if len(f) > 1 && len(conf.servers) < 3 { // small, but the standard limit
+				// One more check: make sure server name is
+				// just an IP address. Otherwise we need DNS
+				// to look it up.
+				parseAddr(f[1]) else { break }
+				conf.servers = append(conf.servers, JoinHostPort(f[1], "53"))
+			}
+		| "domain": // set search path to just this domain
+			if len(f) > 1 {
+				conf.search = [ensureRooted(f[1])]
+			}
+		| "search": // set search path to given servers
+			conf.search = make([]str, 0, len(f)-1)
+			mut i := 1
+			for i < len(f); i++ {
+				name := ensureRooted(f[i])
+				if name == "." {
+					continue
+				}
+				conf.search = append(conf.search, name)
+			}
+		| "options": // magic options
+			for _, s in f[1:] {
+				match {
+				| stringslite::HasPrefix(s, "ndots:"):
+					mut n, _, _ := conv::Dtoi(s[6:])
+					if n < 0 {
+						n = 0
+					} else if n > 15 {
+						n = 15
+					}
+					conf.ndots = n
+				| stringslite::HasPrefix(s, "timeout:"):
+					mut n, _, _ := conv::Dtoi(s[8:])
+					if n < 1 {
+						n = 1
+					}
+					conf.timeout = time::Duration(n) * time::Second
+				| stringslite::HasPrefix(s, "attempts:"):
+					mut n, _, _ := conv::Dtoi(s[9:])
+					if n < 1 {
+						n = 1
+					}
+					conf.attempts = n
+				| s == "rotate":
+					conf.rotate = true
+				| s == "single-request" || s == "single-request-reopen":
+					// Linux option:
+					// http://man7.org/linux/man-pages/man5/resolv.conf.5.html
+					// "By default, glibc performs IPv4 and IPv6 lookups in parallel [...]
+					//  This option disables the behavior and makes glibc
+					//  perform the IPv6 and IPv4 requests sequentially."
+					// We use single request by default.
+					// Ignore this option.
+				| s == "use-vc" || s == "usevc" || s == "tcp":
+					// Linux (use-vc), FreeBSD (usevc) and OpenBSD (tcp) option:
+					// http://man7.org/linux/man-pages/man5/resolv.conf.5.html
+					// "Sets RES_USEVC in _res.options.
+					//  This option forces the use of TCP for DNS resolutions."
+					// https://www.freebsd.org/cgi/man.cgi?query=resolv.conf&sektion=5&manpath=freebsd-release-ports
+					// https://man.openbsd.org/resolv.conf.5
+					conf.useTCP = true
+				| s == "trust-ad":
+					conf.trustAD = true
+				| s == "edns0":
+					// We use EDNS by default.
+					// Ignore this option.
+				| s == "no-reload":
+					conf.noReload = true
+				}
+			}
+		}
+		if len(conf.servers) == 0 {
+			conf.servers = defaultNS
+		}
+		if len(conf.search) == 0 {
+			conf.search = dnsDefaultSearch()
+		}
+	}
+}
+
+fn dnsDefaultSearch(): []str {
+	hn := os::Hostname() else {
+		// best effort
+		ret nil
+	}
+
+	i := byteslite::IndexByteStr(hn, '.')
+	if i >= 0 && i < len(hn)-1 {
+		ret [ensureRooted(hn[i+1:])]
+	}
+	ret nil
+}
+
+fn ensureRooted(s: str): str {
+	if len(s) > 0 && s[len(s)-1] == '.' {
+		ret s
+	}
+	ret s + "."
+}

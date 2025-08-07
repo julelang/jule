@@ -1,0 +1,133 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use integ "std/jule/integrated"
+use "std/sys"
+use "std/time"
+
+cpp use "<netdb.h>"
+
+cpp let getaddrinfo: *unsafe
+cpp let freeaddrinfo: *unsafe
+
+cpp struct addrinfo {
+	ai_flags:    int
+	ai_family:   int
+	ai_socktype: int
+	ai_protocol: int
+	ai_next:     *cpp.addrinfo
+	ai_addr:     *unsafe
+}
+
+#disable boundary
+fn integLookupIP(net: Network, host: str)!: (addrs: []IPAddr) {
+	let mut hints: cpp.addrinfo
+	hints.ai_flags = integAddrInfoFlags
+	hints.ai_socktype = sys::SOCK_STREAM
+	match net {
+	| IP | TCP | UDP:
+		hints.ai_family = sys::AF_UNSPEC
+	| IP4 | TCP4 | UDP4:
+		hints.ai_family = sys::AF_INET
+	| IP6 | TCP6 | UDP6:
+		hints.ai_family = sys::AF_INET6
+	}
+	hostb := integ::StrToBytes(host)
+	let mut res: *cpp.addrinfo
+	e := sys::Addrcall[int](uintptr(cpp.getaddrinfo), uintptr(&hostb[0]), uintptr(0), uintptr(&hints), uintptr(&res))
+	if e != 0 {
+		error(sys::Errno(e))
+	}
+
+	unsafe {
+		mut r := res
+		for r != nil; r = r.ai_next {
+			// We only asked for SOCK_STREAM, but check anyhow.
+			if r.ai_socktype != sys::SOCK_STREAM {
+				continue
+			}
+			match r.ai_family {
+			| sys::AF_INET:
+				sa := (*sys::RawSockaddrInet4)(r.ai_addr)
+				addrs = append(addrs, IPAddr{IP: IPv4(sa.Addr[0], sa.Addr[1], sa.Addr[2], sa.Addr[3])})
+			| sys::AF_INET6:
+				sa := (*sys::RawSockaddrInet6)(r.ai_addr)
+				mut ip := make(IP, len(sa.Addr))
+				copy(ip, sa.Addr[:])
+				addrs = append(addrs, IPAddr{IP: ip})
+			}
+		}
+	}
+
+	sys::Addrcall(uintptr(cpp.freeaddrinfo), uintptr(res))
+	ret addrs
+}
+
+#disable boundary
+fn integLookupPortMap(network: Network, service: str)!: (port: int) {
+	let mut hints: cpp.addrinfo
+	match network {
+	| IP:
+		hints.ai_family = sys::AF_UNSPEC
+	| IP4:
+		hints.ai_family = sys::AF_INET
+	| IP6:
+		hints.ai_family = sys::AF_INET6
+	| TCP:
+		hints.ai_family = sys::AF_UNSPEC
+		hints.ai_socktype = sys::SOCK_STREAM
+		hints.ai_protocol = sys::IPPROTO_TCP
+	| TCP4:
+		hints.ai_family = sys::AF_INET
+		hints.ai_socktype = sys::SOCK_STREAM
+		hints.ai_protocol = sys::IPPROTO_TCP
+	| TCP6:
+		hints.ai_family = sys::AF_INET6
+		hints.ai_socktype = sys::SOCK_STREAM
+		hints.ai_protocol = sys::IPPROTO_TCP
+	| UDP:
+		hints.ai_family = sys::AF_UNSPEC
+		hints.ai_socktype = sys::SOCK_DGRAM
+		hints.ai_protocol = sys::IPPROTO_UDP
+	| UDP4:
+		hints.ai_family = sys::AF_INET
+		hints.ai_socktype = sys::SOCK_DGRAM
+		hints.ai_protocol = sys::IPPROTO_UDP
+	| UDP6:
+		hints.ai_family = sys::AF_INET6
+		hints.ai_socktype = sys::SOCK_DGRAM
+		hints.ai_protocol = sys::IPPROTO_UDP
+	|:
+		error(&DNSError{Err: "unknown network", Name: networkToStr(network) + "/" + service})
+	}
+	mut serviceb := integ::StrToBytes(service)
+	// Lowercase the C service name.
+	for i, b in serviceb[:len(service)] {
+		serviceb[i] = lowerASCII(b)
+	}
+	let mut res: *cpp.addrinfo
+	e := sys::Addrcall[int](uintptr(cpp.getaddrinfo), uintptr(0), uintptr(&serviceb[0]), uintptr(&hints), uintptr(&res))
+	if e != 0 {
+		error(sys::Errno(e))
+	}
+
+	defer { sys::Addrcall(uintptr(cpp.freeaddrinfo), uintptr(res)) }
+
+	unsafe {
+		mut r := res
+		for r != nil; r = r.ai_next {
+			match r.ai_family {
+			| sys::AF_INET:
+				sa := (*sys::RawSockaddrInet4)(r.ai_addr)
+				p := (*[2]byte)(&sa.Port)
+				ret int((*p)[0])<<8 | int((*p)[1])
+			| sys::AF_INET6:
+				sa := (*sys::RawSockaddrInet6)(r.ai_addr)
+				p := (*[2]byte)(&sa.Port)
+				ret int((*p)[0])<<8 | int((*p)[1])
+			}
+		}
+	}
+	error(newDNSError("unknown port", networkToStr(network)+"/"+service, ""))
+}

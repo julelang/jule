@@ -1,0 +1,68 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/sys/windows"
+use "std/sync/atomic"
+use "std/sys"
+use "std/time"
+
+const osConfigPath = ""
+
+fn osResolveConfig() {
+	conf.ndots = 1
+	conf.timeout = 5 * time::Second
+	conf.attempts = 2
+	conf.soffset.Store(0, atomic::SeqCst)
+	{
+		// Pass buffer from outside.
+		// Because all content will use this buffer.
+		// When buffer being an internal detail, memory will be deallocated automatically.
+		// Which is causes segfault.
+		let mut b: []byte
+		mut aas := adapterAddresses(&b) else { goto RET }
+		unsafe {
+			for (_, mut aa) in aas {
+				// Only take interfaces whose OperStatus is IfOperStatusUp(0x01) into DNS configs.
+				if aa.OperStatus != windows::IfOperStatusUp {
+					continue
+				}
+
+				// Only take interfaces which have at least one gateway
+				if aa.FirstGatewayAddress == nil {
+					continue
+				}
+
+				mut dns := aa.FirstDnsServerAddress
+				for dns != nil; dns = dns.Next {
+					let mut ip: IP
+					match dns.Address.Sockaddr.Addr.Family {
+					| sys::AF_INET:
+						mut pp := (*sys::RawSockaddrInet4)(dns.Address.Sockaddr)
+						ip = IPv4(pp.Addr[0], pp.Addr[1], pp.Addr[2], pp.Addr[3])
+					| sys::AF_INET6:
+						mut pp := (*sys::RawSockaddrInet6)(dns.Address.Sockaddr)
+						ip = make(IP, IPv6Len)
+						copy(ip, pp.Addr[:])
+						if ip[0] == 0xfe && ip[1] == 0xc0 {
+							// fec0/10 IPv6 addresses are site local anycast DNS
+							// addresses Microsoft sets by default if no other
+							// IPv6 DNS address is set. Site local anycast is
+							// deprecated since 2004, see
+							// https://datatracker.ietf.org/doc/html/rfc3879
+							continue
+						}
+					|:
+						// Unexpected type.
+						continue
+					}
+					conf.servers = append(conf.servers, JoinHostPort(ip.Str(), "53"))
+				}
+			}
+		}
+	}
+RET:
+	if len(conf.servers) == 0 {
+		conf.servers = defaultNS
+	}
+}

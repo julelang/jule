@@ -1,0 +1,476 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/encoding/binary"
+use "std/errors"
+use "std/io"
+use "std/math/rand"
+use "std/runtime"
+use "std/strings"
+use "std/time"
+use "std/unsafe"
+
+// Contains minimal mappings between services names and port
+// numbers for platforms that don't have a complete list of port numbers.
+//
+// See https://www.iana.org/assignments/service-names-port-numbers
+//
+// On Unix, this map is augmented by readServices via lookupPort.
+let mut services = map[str]map[str]int{
+	"udp": {
+		"domain": 53,
+	},
+	"tcp": {
+		"ftp": 21,
+		"ftps": 990,
+		"http": 80,
+		"https": 443,
+		"imap2": 143,
+		"imap3": 220,
+		"imaps": 993,
+		"pop3": 110,
+		"pop3s": 995,
+		"smtp": 25,
+		"submissions": 465,
+		"ssh": 22,
+		"telnet": 23,
+	},
+}
+
+struct dnsHeader {
+	ID:      u16
+	Flags:   u16
+	QDCount: u16
+	ANCount: u16
+	NSCount: u16
+	ARCount: u16
+}
+
+let dnsrand = rand::New(rand::NewPCG(u64(runtime::nanotime()), u64(runtime::nanotime())))
+
+const bigEndianU16Size = 2
+
+// DNS qtype
+const (
+	_QTYPE_A     = 1
+	_QTYPE_AAAA  = 28
+	_QTYPE_MX    = 15
+	_QTYPE_CNAME = 5
+	_QTYPE_NS    = 2
+	_QTYPE_TXT   = 16
+	_QTYPE_SRV   = 33
+	_QTYPE_PTR   = 12
+	_QTYPE_SOA   = 6
+	_QTYPE_ANY   = 255
+)
+
+struct dnsQuestion {
+	QName:  []byte
+	QType:  u16
+	QClass: u16
+}
+
+// Encodes a domain like "www.example.com" to DNS wire format.
+fn encodeDomainName(mut &buf: *[]byte, mut domain: str)! {
+	handleLabel := fn(mut &buf: *[]byte, label: str)! {
+		if len(label) > 63 {
+			error(errors::New("label too long"))
+		}
+		*buf = append(*buf, byte(len(label)))
+		*buf = append(*buf, label...)
+	}
+	for {
+		m := strings::IndexByte(domain, '.')
+		if m < 0 {
+			handleLabel(buf, domain)?
+			break
+		}
+		handleLabel(buf, domain[:m])?
+		domain = domain[m+1:]
+	}
+	*buf = append(*buf, 0) // terminator
+}
+
+// Maximum DNS packet size.
+// Value taken from https://dnsflagday.net/2020/.
+const maxDNSPacketSize = 1232
+
+// Builds a DNS query with EDNS and optional AD flag.
+fn buildQuery(mut &buf: *[]byte, domain: str, mut &qtypePos: *int, trustAD: bool)!: u16 {
+	id := u16(dnsrand.IntN(65536))
+
+	if cap(*buf) == 0 {
+		*buf = make([]byte, 0, maxDNSPacketSize)
+	} else {
+		*buf = (*buf)[:0]
+	}
+	*buf = binary::BigEndian.AppendU16(*buf, id) // ID
+	mut flags := u16(0x0100)                     // standard query
+	if trustAD {
+		flags |= 0x0020 // set AD flag
+	}
+	*buf = binary::BigEndian.AppendU16(*buf, flags)
+	*buf = binary::BigEndian.AppendU16(*buf, 1) // QDCOUNT
+	*buf = binary::BigEndian.AppendU16(*buf, 0) // ANCOUNT
+	*buf = binary::BigEndian.AppendU16(*buf, 0) // NSCOUNT
+	*buf = binary::BigEndian.AppendU16(*buf, 1) // ARCOUNT (for EDNS)
+
+	encodeDomainName(buf, domain)?
+	*qtypePos = len(*buf)
+	*buf = binary::BigEndian.AppendU16(*buf, 0) // QTYPE
+	*buf = binary::BigEndian.AppendU16(*buf, 1) // QCLASS IN
+
+	// OPT record for EDNS
+	*buf = append(*buf, 0)                                     // name root
+	*buf = binary::BigEndian.AppendU16(*buf, 41)               // TYPE: OPT
+	*buf = binary::BigEndian.AppendU16(*buf, maxDNSPacketSize) // UDP payload size
+	*buf = append(*buf, 0)                                     // extended RCODE
+	*buf = append(*buf, 0)                                     // EDNS version
+	*buf = binary::BigEndian.AppendU16(*buf, 0)                // Z
+	*buf = binary::BigEndian.AppendU16(*buf, 0)                // RDLENGTH
+
+	ret id
+}
+
+// Handles DNS name parsing with label compression support.
+fn parseName(msg: []byte, mut offset: int)!: (str, int) {
+	let mut labels: []str
+	mut original := offset
+	mut jumped := false
+
+	for {
+		if offset >= len(msg) {
+			error(errors::New("offset out of range"))
+		}
+		b := msg[offset]
+		if b == 0 {
+			offset++
+			break
+		}
+
+		if b&0xC0 == 0xC0 {
+			if offset+1 >= len(msg) {
+				error(errors::New("pointer out of range"))
+			}
+			ptr := int(binary::BigEndian.DecodeU16(msg[offset:offset+bigEndianU16Size]) & 0x3FFF)
+			if !jumped {
+				original = offset + bigEndianU16Size
+				jumped = true
+			}
+			offset = ptr
+			continue
+		}
+
+		length := int(b)
+		offset++
+		if offset+length > len(msg) {
+			error(errors::New("label out of range"))
+		}
+
+		labels = append(labels, str(msg[offset:offset+length]))
+		offset += length
+	}
+
+	name := strings::Join(labels, ".")
+	if !jumped {
+		ret name, offset
+	}
+	ret name, original
+}
+
+// Parses the DNS response and returns IPAddr list with zone info if applicable.
+#disable boundary
+fn parseResponse(msg: []byte, id: u16): ([]IPAddr, ok: bool) {
+	if len(msg) < 12 {
+		// short response
+		ret nil, false
+	}
+	gotID := binary::BigEndian.DecodeU16(msg[0:bigEndianU16Size])
+	if gotID != id {
+		// mismatched ID
+		ret nil, false
+	}
+
+	qdCount := binary::BigEndian.DecodeU16(msg[4 : 4+bigEndianU16Size])
+	anCount := binary::BigEndian.DecodeU16(msg[6 : 6+bigEndianU16Size])
+	mut pos := 12
+
+	// Skip questions.
+	mut i := 0
+	for i < int(qdCount); i++ {
+		_, next := parseName(msg, pos) else {
+			ret nil, false
+		}
+		pos = next + 4
+	}
+
+	let mut addrs: []IPAddr
+	i = 0
+	for i < int(anCount); i++ {
+		_, next := parseName(msg, pos) else {
+			ret nil, false
+		}
+		pos = next
+		if pos+10 > len(msg) {
+			// invalid RR
+			ret nil, false
+		}
+
+		typ := binary::BigEndian.DecodeU16(msg[pos : pos+bigEndianU16Size])
+		class := binary::BigEndian.DecodeU16(msg[pos+2 : pos+2+bigEndianU16Size])
+		rdlen := binary::BigEndian.DecodeU16(msg[pos+8 : pos+8+bigEndianU16Size])
+		pos += 10
+
+		if class != 1 {
+			continue
+		}
+
+		if pos+int(rdlen) > len(msg) {
+			// invalid RDLENGTH
+			ret nil, false
+		}
+
+		rdata := msg[pos : pos+int(rdlen)]
+		pos += int(rdlen)
+
+		match typ {
+		| _QTYPE_A:
+			if rdlen == IPv4Len {
+				mut ip := IPv4(rdata[0], rdata[1], rdata[2], rdata[3])
+				addrs = append(addrs, IPAddr{IP: ip})
+			}
+		| _QTYPE_AAAA:
+			if rdlen == IPv6Len {
+				// If link-local, return with empty zone and let caller decide what to do.
+				mut ip := make(IP, len(rdata))
+				copy(ip, rdata)
+				addrs = append(addrs, IPAddr{IP: ip, Zone: ""})
+			}
+		}
+	}
+
+	ret addrs, true
+}
+
+// Looks up the addresses and the canonical name for the given host from static host.
+fn lookupStaticHost(mut host: str): (ips: []str, canonical: str) {
+	hosts.mu.Lock()
+	readHosts()
+	if len(hosts.byName) != 0 {
+		if hasUpperCase(host) {
+			mut lowerHost := []byte(host)
+			lowerASCIIBytes(lowerHost)
+			host = unsafe::StrFromBytes(lowerHost)
+		}
+		byName, ok := hosts.byName[absDomainName(host)]
+		if ok {
+			ips = make([]str, len(byName.addrs))
+			copy(ips, byName.addrs)
+			canonical = byName.canonicalName
+		}
+	}
+	hosts.mu.Unlock()
+	ret
+}
+
+// lookup entries from static host
+fn lookupIPFiles(name: str): (addrs: []IPAddr, canonical: str) {
+	addr, canonical := lookupStaticHost(name)
+	for (_, mut haddr) in addr {
+		haddr, zone := splitHostZone(haddr)
+		mut ip := ParseIP(haddr)
+		if ip != nil {
+			addrs = append(addrs, IPAddr{IP: ip, Zone: zone})
+		}
+	}
+	ret addrs, canonical
+}
+
+fn lookupQuery(mut &buf: *[]byte, mut conn: Conn, query: str)!: (results: []IPAddr, ok: bool) {
+	let mut id: u16
+	let mut qtypePos: int
+	id = buildQuery(buf, query, &qtypePos, conf.trustAD)?
+
+	// send length-prefixed message for TCP
+	if conf.useTCP {
+		qtypePos += bigEndianU16Size
+		if cap(*buf) >= len(*buf)+bigEndianU16Size {
+			*buf = (*buf)[:len(*buf)+bigEndianU16Size]
+			copy((*buf)[bigEndianU16Size:], *buf)
+		} else {
+			mut newBuf := make([]byte, len(*buf)+bigEndianU16Size)
+			copy(newBuf[bigEndianU16Size:], *buf)
+			*buf = newBuf
+		}
+		binary::BigEndian.PutU16(*buf, u16(len(*buf)-bigEndianU16Size))
+	}
+
+	// Lookup for IPv4 (A) and IPv6 (AAAA).
+	qtypes := [2]u16([_QTYPE_A, _QTYPE_AAAA])
+
+	for _, qtype in qtypes {
+		// Write current qtype to buf.
+		binary::BigEndian.PutU16((*buf)[qtypePos:], qtype)
+
+		mut attempt := 0
+		for attempt < conf.attempts; attempt++ {
+			conn.Write(*buf) else { continue }
+
+			let mut n: int
+			if conf.useTCP {
+				n = conn.Read((*buf)[:bigEndianU16Size]) else { use io::EOF }
+				if n > 0 {
+					ln := binary::BigEndian.DecodeU16((*buf)[:bigEndianU16Size])
+					n = conn.Read((*buf)[:ln]) else { use io::EOF }
+				}
+			} else {
+				n = conn.Read((*buf)[:maxDNSPacketSize]) else { use io::EOF }
+			}
+			if n <= 0 {
+				continue
+			}
+
+			results, ok = parseResponse((*buf)[:n], id)
+			if !ok {
+				continue
+			}
+			ret
+		}
+	}
+	ret nil, false
+}
+
+// Native implementation for the DNS lookup.
+#disable boundary
+fn juleLookupIP(net: Network, host: str)!: []IPAddr {
+	// Lookup files first.
+	{
+		mut addrs, _ := lookupIPFiles(host)
+		if len(addrs) > 0 {
+			ret addrs
+		}
+	}
+
+	resolveConfig()
+
+	dots := strings::Count(host, ".")
+	isFQDN := strings::HasSuffix(host, ".")
+	baseName := strings::TrimSuffix(host, ".")
+
+	mut network := Network.UDP
+	if conf.useTCP {
+		network = Network.TCP
+	}
+
+	serverOffset := conf.serverOffset()
+	serversLen := u32(len(conf.servers))
+
+	let mut buf: []byte // will be allocated once and grow if needed
+	mut i := u32(0)
+	for i < serversLen; i++ {
+		server := conf.servers[(serverOffset+i)%serversLen]
+
+		// Get connection for the server.
+		mut conn := DialTimeout(network, server, conf.timeout)?
+		if conf.timeout > 0 {
+			conn.SetReadTimeout(conf.timeout)?
+			conn.SetWriteTimeout(conf.timeout)?
+		}
+
+		if isFQDN || dots >= conf.ndots {
+			mut results, ok := lookupQuery(&buf, conn, host)?
+			if ok {
+				conn.Close() else {}
+				ret results
+			}
+		}
+		for _, suffix in conf.search {
+			fqdn := baseName + "." + suffix
+			mut results, ok := lookupQuery(&buf, conn, fqdn)?
+			if ok {
+				conn.Close() else {}
+				ret results
+			}
+		}
+
+		conn.Close() else {}
+	}
+
+	error(errors::New("resolution failed for " + host))
+}
+
+// Looks up host using the local resolver and particular network.
+// It returns a slice of that host's IPv4 and IPv6 addresses.
+fn lookupIPAddr(net: Network, host: str)!: []IPAddr {
+	// Make sure that no matter what we do later, host=="" is rejected.
+	if host == "" {
+		error(newDNSError("no such host", host, ""))
+	}
+
+	// If parseAddr can parse host, it is a literal.
+	mut ip := parseAddr(host) else {
+		// Host is not literal.
+		// We need to lookup DNS and resolve the IP.
+		if DefaultResolver.PreferJule {
+			ret juleLookupIP(net, host)?
+		}
+		ret integLookupIP(net, host)?
+	}
+	ip.IP = ip.IP.To16()
+	ret [ip]
+}
+
+// The longest reasonable name of a service (non-numeric port).
+// Currently the longest known IANA-unregistered name is
+// "mobility-header", so we use that length, plus some slop in case
+// something longer is added in the future.
+const maxPortBufSize = len("mobility-header") + 10
+
+// Native implementation for the port lookup.
+fn juleLookupPortMap(network: Network, service: str)!: (port: int) {
+	match network {
+	| IP: // no hints
+		ret lookupPortMapWithNetwork(Network.TCP, Network.IP, service) else {
+			ret lookupPortMapWithNetwork(Network.UDP, Network.IP, service)?
+		}
+	| TCP | TCP4 | TCP6:
+		ret lookupPortMapWithNetwork(Network.TCP, Network.TCP, service)?
+	| UDP | UDP4 | UDP6:
+		ret lookupPortMapWithNetwork(Network.UDP, Network.UDP, service)?
+	|:
+		error(&DNSError{Err: "unknown network", Name: networkToStr(network) + "/" + service})
+	}
+}
+
+fn lookupPortMapWithNetwork(network: Network, errNetwork: str, service: str)!: (port: int) {
+	m, mut ok := services[network]
+	if ok {
+		let mut lowerService: [maxPortBufSize]byte
+		n := copy(lowerService[:], service)
+		lowerASCIIBytes(unsafe::Slice(&lowerService[0], n, n))
+		port, ok = m[unsafe::Str(&lowerService[0], n)]
+		if ok && n == len(service) {
+			ret port
+		}
+		error(newDNSError("unknown port", errNetwork+"/"+service, ""))
+	}
+	error(&DNSError{Err: "unknown network", Name: errNetwork + "/" + service})
+}
+
+fn lookupPort(net: Network, service: str)!: (port: int) {
+	port, needsLookup := parsePort(service)
+	if needsLookup {
+		match net {
+		| TCP | TCP4 | TCP6 | UDP | UDP4 | UDP6 | IP:
+			break // no-op
+		|:
+			error(&AddrError{Err: "unknown network", Addr: net})
+		}
+		port = _lookupPort(net, service)?
+	}
+	if 0 > port || port > 65535 {
+		error(&AddrError{Err: "invalid port", Addr: service})
+	}
+	ret port
+}

@@ -1,0 +1,92 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/os"
+use "std/runtime"
+use "std/sync"
+use "std/sync/atomic"
+use "std/time"
+
+// DNS resolver configuration.
+struct Resolver {
+	// When it is true, it forces to use pure Jule DNS resolver.
+	// Otherwise, DNS resolver of the operating system will be used, if it is available.
+	// Pure Jule implementation might be slow compared to the operating system implementation.
+	// Disabled by default.
+	PreferJule: bool
+}
+
+// Default DNS resolver of the package.
+let mut DefaultResolver = Resolver{}
+
+// Default name servers to use in the absence of DNS configuration.
+let mut defaultNS = ["127.0.0.1:53", "[::1]:53"]
+
+struct dnsConfig {
+	mu:       sync::Mutex
+	servers:  []str          // server addresses (in host:port form) to use
+	search:   []str          // rooted suffixes to append to local name
+	ndots:    int            // number of dots in name to trigger absolute lookup
+	timeout:  time::Duration // wait before giving up on a query, including retries
+	attempts: int            // lost packets before giving up on server
+	rotate:   bool           // round robin among servers
+	mtime:    time::Time     // time of resolv.conf modification
+	soffset:  atomic::U32    // used by serverOffset
+	useTCP:   bool           // force usage of TCP for DNS resolutions
+	trustAD:  bool           // add AD flag to queries
+	noReload: bool           // do not check for config file updates
+}
+
+impl dnsConfig {
+	// Returns an offset that can be used to determine
+	// indices of servers in c.servers when making queries.
+	// When the rotate option is enabled, this offset increases.
+	// Otherwise it is always 0.
+	fn serverOffset(mut *self): u32 {
+		if self.rotate {
+			ret self.soffset.Add(1, atomic::SeqCst) - 1 // return 0 to start
+		}
+		ret 0
+	}
+}
+
+// Global DNS config.
+// Fields of this variable will be updated if needed,
+// but never will be assigned data to it directly.
+// Otherwise, the sync::RWMutex field might be compromised.
+let mut conf = dnsConfig{}
+
+let mut configInitializer = sync::Once{}
+
+// Resolves config to conf.
+fn resolveConfig() {
+	// Ensure only one update at a time checks config.
+	conf.mu.Lock()
+	defer { conf.mu.Unlock() }
+
+	// Fast path: zero mtime, not initialized yet.
+	zero := time::Time{}
+	if conf.mtime == zero {
+		osResolveConfig()
+		ret
+	}
+
+	const match runtime::OS {
+	| "windows":
+		// There's no file on disk, so don't bother checking
+		// and failing.
+		//
+		// The Windows implementation of osResolveConfig (called
+		// below) ignores the osConfigPath.
+	|:
+		let mut mtime: time::Time
+		fi := os::Stat(osConfigPath) else { break }
+		mtime = fi.ModTime()
+		if mtime.Equal(conf.mtime) {
+			ret
+		}
+	}
+
+	osResolveConfig()
+}

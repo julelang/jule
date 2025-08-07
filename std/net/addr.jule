@@ -3,9 +3,6 @@
 // license that can be found in the LICENSE file.
 
 use "std/internal/byteslite"
-use "std/internal/conv"
-
-const localhost = "localhost"
 
 // Represents a network end point address.
 trait Addr {
@@ -86,26 +83,35 @@ fn SplitHostPort(hostport: str)!: (host: str, port: str) {
 	ret
 }
 
-fn internetAddr(net: Network, mut ip: IP, port: int, zone: str): Addr {
+fn splitHostZone(s: str): (host: str, zone: str) {
+	// The IPv6 scoped addressing zone identifier starts after the
+	// last percent sign.
+	i := byteslite::LastIndexByteStr(s, '%')
+	if i > 0 {
+		host, zone = s[:i], s[i+1:]
+	} else {
+		host = s
+	}
+	ret
+}
+
+fn internetAddr(net: Network, mut ip: IPAddr, port: int): Addr {
 	match net {
 	| TCP | TCP4 | TCP6:
-		ret &TCPAddr{IP: ip, Port: port, Zone: zone}
+		ret &TCPAddr{IP: ip.IP, Port: port, Zone: ip.Zone}
 	| UDP | UDP4 | UDP6:
-		ret &UDPAddr{IP: ip, Port: port, Zone: zone}
+		ret &UDPAddr{IP: ip.IP, Port: port, Zone: ip.Zone}
+	| IP | IP4 | IP6:
+		ret &IPAddr{IP: ip.IP, Zone: ip.Zone}
 	|:
 		panic("net: unexpected network: " + str(net))
 	}
 }
 
-enum ipAddr: type {
-	IP,
-	TCPAddr,
-}
-
 // Parses addr as an IP address, returning the result. The string
 // addr can be in dotted decimal ("192.0.2.1"), IPv6 ("2001:db8::68"),
 // or IPv6 with a scoped addressing zone ("fe80::1cc0:3e8c:119f:c2e1%ens18").
-fn parseAddr(addr: str)!: ipAddr {
+fn parseAddr(addr: str)!: IPAddr {
 	for _, r in addr {
 		match r {
 		| '.':
@@ -121,119 +127,129 @@ fn parseAddr(addr: str)!: ipAddr {
 	error(&parseAddrError{input: addr, msg: "unable to parse IP"})
 }
 
-// Resolvers addr which may be aliteral IP address and
+// Represents a list of network endpoint addresses.
+type addrList: []Addr
+
+// Reports whether addr contains an IPv4 address.
+fn isIPv4(mut addr: Addr): bool {
+	match type addr {
+	| &TCPAddr:
+		ret addr.(&TCPAddr).IP.To4() != nil
+	| &UDPAddr:
+		ret addr.(&UDPAddr).IP.To4() != nil
+	| &IPAddr:
+		ret addr.(&IPAddr).IP.To4() != nil
+	|:
+		ret false
+	}
+}
+
+// Reports whether addr does not contain an IPv4 address.
+fn isNotIPv4(mut addr: Addr): bool { ret !isIPv4(addr) }
+
+impl addrList {
+	// Returns the most appropriate address in address for a call to ResolveXAddr variants.
+	// IPv4 is preferred, unless addr contains an IPv6 literal.
+	fn forResolve(mut *self, network: Network, addr: str): Addr {
+		let mut want6: bool
+		match network {
+		| IP:
+			// IPv6 literal (addr does NOT contain a port)
+			want6 = byteslite::CountStr(addr, ':') > 0
+		| TCP | UDP:
+			// IPv6 literal. (addr contains a port, so look for '[')
+			want6 = byteslite::CountStr(addr, '[') > 0
+		|:
+			break // no-op
+		}
+		if want6 {
+			ret self.first(isNotIPv4)
+		}
+		ret self.first(isIPv4)
+	}
+
+	// first returns the first address which satisfies strategy, or if
+	// none do, then the first address of any kind.
+	fn first(mut *self, strategy: fn(mut Addr): bool): Addr {
+		for (_, mut addr) in *self {
+			if strategy(addr) {
+				ret addr
+			}
+		}
+		ret (*self)[0]
+	}
+}
+
+// Applies a filter to a list of IP addresses,
+// yielding a list of Addr objects. Known filters are nil, ipv4only,
+// and ipv6only. It returns every address when the filter is nil.
+// The result contains at least one address when error is nil.
+fn filterAddrList(filter: fn(mut IPAddr): bool, net: Network, mut ips: []IPAddr, port: int, originalAddr: str)!: addrList {
+	let mut addrs: addrList
+	for (_, mut ip) in ips {
+		if filter == nil || filter(ip) {
+			addrs = append(addrs, internetAddr(net, ip, port))
+		}
+	}
+	if len(addrs) == 0 {
+		error(&AddrError{Err: "no suitable address found", Addr: originalAddr})
+	}
+	ret addrs
+}
+
+// Resolves addr which may be aliteral IP address and
 // returns internal protocol family address.
 //
 // Forwards any exceptional from used methods.
-fn resolveInternetAddr(net: Network, addr: str)!: Addr {
+fn resolveInternetAddrList(net: Network, addr: str)!: addrList {
 	mut host, mut port := "", ""
 	mut portnum := 0
 	match net {
 	| TCP | TCP4 | TCP6
 	| UDP | UDP4 | UDP6:
 		host, port = SplitHostPort(addr)?
-		(portnum), ok := conv::Atoi(port)
-		if !ok {
-			error(&AddrError{Err: "invalid port: " + port})
+		portnum = lookupPort(net, port)?
+	| IP | IP4 | IP6:
+		if addr != "" {
+			host = addr
 		}
 	|:
 		error(&AddrError{Err: "invalid network: " + str(net)})
 	}
 	if host == "" {
-		ret internetAddr(net, IP.Empty(), portnum, "")
+		ret [internetAddr(net, IPAddr{}, portnum)]
 	}
-	if host == localhost {
-		ret buildLocalhostAddr(net, portnum)
+
+	// Try as a literal IP address, then as a DNS name.
+	mut ips := lookupIPAddr(net, host)?
+	// If the machine has halfway configured
+	// IPv6 such that it can bind on "::" (IPv6Unspecified)
+	// but not connect back to that same address, fall
+	// back to dialing 0.0.0.0.
+	// See Go's issue 18806.
+	if len(ips) == 1 && ips[0].IP.Equal(IPv6Unspecified) {
+		ips = append(ips, IPAddr{IP: IPv4Zero})
 	}
-	mut ip := parseAddr(host)?
-	match type ip {
-	| IP:
-		match net {
-		| TCP6 | UDP6:
-			ret nil
-		| TCP | TCP4:
-			ret &TCPAddr{
-				IP: ip.(IP),
-				Port: portnum,
-			}
-		| UDP | UDP4:
-			ret &UDPAddr{
-				IP: ip.(IP),
-				Port: portnum,
-			}
-		|:
-			panic("net: implementation bug, this panic should be unreachable")
-		}
-	| TCPAddr:
-		mut ipAddr := ip.(TCPAddr)
-		match net {
-		| TCP:
-			ipAddr.Port = portnum
-			ret new(TCPAddr, ipAddr)
-		| UDP:
-			ret &UDPAddr{
-				IP: ipAddr.IP,
-				Zone: ipAddr.Zone,
-				Port: portnum,
-			}
-		| TCP4:
-			if !ipAddr.IP.To4().Empty() {
-				ipAddr.Port = portnum
-				ret new(TCPAddr, ipAddr)
-			}
-		| UDP4:
-			if !ipAddr.IP.To4().Empty() {
-				ret &UDPAddr{
-					IP: ipAddr.IP,
-					Zone: ipAddr.Zone,
-					Port: portnum,
-				}
-			}
-		| TCP6:
-			if len(ipAddr.IP) == IPv6Len && ipAddr.IP.To4().Empty() {
-				ipAddr.Port = portnum
-				ret new(TCPAddr, ipAddr)
-			}
-		| UDP6:
-			if len(ipAddr.IP) == IPv6Len && ipAddr.IP.To4().Empty() {
-				ret &UDPAddr{
-					IP: ipAddr.IP,
-					Zone: ipAddr.Zone,
-					Port: portnum,
-				}
-			}
-		}
+	let mut filter: fn(mut IPAddr): bool
+	match net {
+	| TCP | UDP:
+		filter = nil
+	| TCP4 | UDP4:
+		filter = ipv4only
+	| TCP6 | UDP6:
+		filter = ipv6only
+	|:
+		panic("unreachable")
 	}
-	ret nil
+	ret filterAddrList(filter, net, ips, portnum, host)?
 }
 
-fn buildLocalhostAddr(net: Network, port: int): Addr {
-	match net {
-	| TCP | TCP4:
-		ret &TCPAddr{
-			IP: IPv4(127, 0, 0, 1),
-			Port: port,
-		}
-	| UDP | UDP4:
-		ret &UDPAddr{
-			IP: IPv4(127, 0, 0, 1),
-			Port: port,
-		}
-	| TCP6:
-		mut ip := make(IP, IPv6Len)
-		ip[len(ip)-1] = 1
-		ret &TCPAddr{
-			IP: ip,
-			Port: port,
-		}
-	| UDP6:
-		mut ip := make(IP, IPv6Len)
-		ip[len(ip)-1] = 1
-		ret &UDPAddr{
-			IP: ip,
-			Port: port,
-		}
-	|:
-		panic("net: implementation bug, this panic should be unreachable")
-	}
+// Reports whether addr is an IPv4 address.
+fn ipv4only(mut addr: IPAddr): bool {
+	ret addr.IP.To4() != nil
+}
+
+// Reports whether addr is an IPv6 address except IPv4-mapped IPv6 address.
+fn ipv6only(mut addr: IPAddr): bool {
+	ret len(addr.IP) == IPv6Len && addr.IP.To4() == nil
 }

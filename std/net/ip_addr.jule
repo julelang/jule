@@ -23,6 +23,7 @@ impl parseAddrError {
 }
 
 // Returns the address of the IPv4 address given by the 4-bytes representation.
+#disable boundary
 fn ipAddrFrom4(ip: IP): u128 {
 	ret u128{
 		hi: 0,
@@ -38,15 +39,18 @@ fn ipAddrFrom16(ip: IP): u128 {
 	}
 }
 
+#disable boundary
 fn beU64(ip: IP): u64 {
 	ret u64(ip[7]) | u64(ip[6])<<8 | u64(ip[5])<<16 | u64(ip[4])<<24 |
 		u64(ip[3])<<32 | u64(ip[2])<<40 | u64(ip[1])<<48 | u64(ip[0])<<56
 }
 
+#disable boundary
 fn beU64v4(ip: IP): u64 {
 	ret u64(ip[3])<<24 | u64(ip[2])<<16 | u64(ip[1])<<8 | u64(ip[0])
 }
 
+#disable boundary
 fn bePutU64v4(mut ip: IP, v: u64) {
 	ip[3] = byte(v >> 24)
 	ip[2] = byte(v >> 16)
@@ -54,6 +58,7 @@ fn bePutU64v4(mut ip: IP, v: u64) {
 	ip[0] = byte(v)
 }
 
+#disable boundary
 fn bePutU64(mut ip: IP, v: u64) {
 	ip[7] = byte(v)
 	ip[6] = byte(v >> 8)
@@ -87,6 +92,7 @@ fn v6u16(ip: u128, i: u8): u16 {
 // appendDecimal and appendHex to format IP addresses.
 const digits = "0123456789abcdef"
 
+#disable boundary
 fn appendDecimal(mut &s: *strings::Builder, x: u8) {
 	if x >= 100 {
 		s.WriteByte(digits[x/100])!
@@ -97,6 +103,7 @@ fn appendDecimal(mut &s: *strings::Builder, x: u8) {
 	s.WriteByte(digits[x%10])!
 }
 
+#disable boundary
 fn appendHex(mut &s: *strings::Builder, x: u16) {
 	if x >= 0x1000 {
 		s.WriteByte(digits[x>>12])!
@@ -159,6 +166,7 @@ fn str16(ip: u128): str {
 	ret s.Str()
 }
 
+#disable boundary
 fn parseIPv4Fields(addr: str, off: int, end: int, mut ip: IP)! {
 	mut val, mut pos := 0, 0
 	mut digLen := 0 // number of digits in current octet
@@ -199,14 +207,15 @@ fn parseIPv4Fields(addr: str, off: int, end: int, mut ip: IP)! {
 	ip[3] = byte(val)
 }
 
-fn parseIPv4(addr: str)!: IP {
+fn parseIPv4(addr: str)!: IPAddr {
 	mut ip := make(IP, 4)
 	parseIPv4Fields(addr, 0, len(addr), ip)?
-	ret ip
+	ret IPAddr{IP: ip}
 }
 
 // Parses addr as an IPv6 address (in form "2001:db8::68").
-fn parseIPv6(addr: str)!: TCPAddr {
+#disable boundary
+fn parseIPv6(addr: str)!: IPAddr {
 	mut s := addr
 
 	// Split off the zone right from the start. Yes it's a second scan
@@ -232,11 +241,11 @@ fn parseIPv6(addr: str)!: TCPAddr {
 		s = s[2:]
 		// Might be only ellipsis.
 		if len(s) == 0 {
-			mut tcpAddr := TCPAddr{
+			mut ipAddr := IPAddr{
 				IP: IPv6Unspecified.To16(),
 				Zone: zone,
 			}
-			ret tcpAddr
+			ret ipAddr
 		}
 	}
 
@@ -352,12 +361,12 @@ fn parseIPv6(addr: str)!: TCPAddr {
 	u128addr := ipAddrFrom16(ip)
 	bePutU64(ip[:8], u128addr.hi)
 	bePutU64(ip[8:], u128addr.lo)
-	mut tcpAddr := TCPAddr{
+	mut ipAddr := IPAddr{
 		IP: ip,
-		Zone: str(zone),
+		Zone: zone,
 	}
-	tcpAddr.IP = tcpAddr.IP.To16()
-	ret tcpAddr
+	ipAddr.IP = ipAddr.IP.To16()
+	ret ipAddr
 }
 
 fn htons(x: int): u16 {

@@ -70,6 +70,7 @@ impl IP {
 
 	// Reports whether IP is a private address according to
 	// RFC 1918 (for IPv4) and RFC 4193 (for IPv6).
+	#disable boundary
 	fn IsPrivate(*self): bool {
 		ip4 := unsafe { (*(&self)).To4() }
 		if !ip4.Empty() {
@@ -91,6 +92,7 @@ impl IP {
 	// Converts the IPv4 address to a 4-byte representation.
 	// Returns empty if IP is not an IPv4 address.
 	// Returned IP may use the common mutable allocation with self.
+	#disable boundary
 	fn To4(mut *self): IP {
 		if len(*self) == IPv4Len {
 			ret *self
@@ -106,6 +108,7 @@ impl IP {
 
 	// Converts the IP address to a 16-byte representation.
 	// Returns empty if address is not an IP address (it is the wrong length).
+	#disable boundary
 	fn To16(mut *self): IP {
 		match {
 		| len(*self) == IPv4Len:
@@ -160,6 +163,7 @@ let mut IPv4AllRouters = IPv4(224, 0, 0, 2)
 let mut IPv4Zero = IPv4(0, 0, 0, 0)
 
 // Returns the IP address (in 16-byte form) of the IPv4 address a.b.c.d.
+#disable boundary
 fn IPv4(a: byte, b: byte, c: byte, d: byte): IP {
 	mut ip := make(IP, IPv6Len)
 	copy(ip, v4InV6Prefix)
@@ -207,10 +211,25 @@ fn isZeros(ip: IP): bool {
 	ret true
 }
 
+#disable boundary
 fn hexStr(b: IP): str {
 	mut s := make([]byte, (len(b)<<1)+1)
 	for i, tn in b {
 		s[i<<1], s[i<<1+1] = hexDigit[tn>>4], hexDigit[tn&0xF]
 	}
 	ret unsafe::StrFromBytes(s[:len(s)-1])
+}
+
+// Parses s as an IP address, returning the result.
+// The string s can be in IPv4 dotted decimal ("192.0.2.1"), IPv6
+// ("2001:db8::68"), or IPv4-mapped IPv6 ("::ffff:192.0.2.1") form.
+// If s is not a valid textual representation of an IP address,
+// it returns nil. The returned address is always 16 bytes,
+// IPv4 addresses are returned in IPv4-mapped IPv6 form.
+fn ParseIP(s: str): IP {
+	mut ip := parseAddr(s) else { ret nil }
+	if ip.Zone != "" {
+		ret nil
+	}
+	ret ip.IP.To16()
 }

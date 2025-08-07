@@ -1,0 +1,59 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/sys/windows"
+use integ "std/jule/integrated"
+use "std/sys"
+use "std/time"
+
+cpp use "<ws2tcpip.h>"
+
+const integAddrInfoFlags = windows::AI_CANONNAME | windows::AI_V4MAPPED | windows::AI_ALL
+
+cpp let GetAddrInfoW: *unsafe
+cpp let FreeAddrInfoW: *unsafe
+
+#disable boundary
+fn integLookupIP(net: Network, host: str)!: (addrs: []IPAddr) {
+	let mut hints: windows::AddrinfoW
+	hints.Flags = integAddrInfoFlags
+	hints.Socktype = sys::SOCK_STREAM
+	match net {
+	| IP | TCP | UDP:
+		hints.Family = sys::AF_UNSPEC
+	| IP4 | TCP4 | UDP4:
+		hints.Family = sys::AF_INET
+	| IP6 | TCP6 | UDP6:
+		hints.Family = sys::AF_INET6
+	}
+	utf16host := integ::UTF16FromStr(host)
+	let mut res: *windows::AddrinfoW
+	e := sys::Addrcall[int](uintptr(cpp.GetAddrInfoW), uintptr(&utf16host[0]), uintptr(0), uintptr(&hints), uintptr(&res))
+	if e != 0 {
+		error(sys::Errno(e))
+	}
+
+	unsafe {
+		mut r := res
+		for r != nil; r = r.Next {
+			// We only asked for SOCK_STREAM, but check anyhow.
+			if r.Socktype != sys::SOCK_STREAM {
+				continue
+			}
+			match r.Family {
+			| sys::AF_INET:
+				sa := (*sys::RawSockaddrInet4)(r.Addr)
+				addrs = append(addrs, IPAddr{IP: IPv4(sa.Addr[0], sa.Addr[1], sa.Addr[2], sa.Addr[3])})
+			| sys::AF_INET6:
+				sa := (*sys::RawSockaddrInet6)(r.Addr)
+				mut ip := make(IP, len(sa.Addr))
+				copy(ip, sa.Addr[:])
+				addrs = append(addrs, IPAddr{IP: ip})
+			}
+		}
+	}
+
+	sys::Addrcall(uintptr(cpp.FreeAddrInfoW), uintptr(res))
+	ret addrs
+}

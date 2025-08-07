@@ -2,7 +2,155 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+#pass "-lIphlpapi"
+
+use integ "std/jule/integrated"
 use "std/sys"
+
+cpp use "<iphlpapi.h>"
+
+cpp let GetSystemDirectoryW: *unsafe
+cpp let GetAdaptersAddresses: *unsafe
+cpp let GetComputerNameExW: *unsafe
+
+const (
+	GAA_FLAG_INCLUDE_PREFIX   = 0x00000010
+	GAA_FLAG_INCLUDE_GATEWAYS = 0x0080
+)
+
+const (
+	IfOperStatusUp             = 1
+	IfOperStatusDown           = 2
+	IfOperStatusTesting        = 3
+	IfOperStatusUnknown        = 4
+	IfOperStatusDormant        = 5
+	IfOperStatusNotPresent     = 6
+	IfOperStatusLowerLayerDown = 7
+)
+
+const (
+	MAX_ADAPTER_NAME_LENGTH        = 256
+	MAX_ADAPTER_DESCRIPTION_LENGTH = 128
+	MAX_ADAPTER_ADDRESS_LENGTH     = 8
+)
+
+const (
+	AI_PASSIVE                = 0x01
+	AI_CANONNAME              = 0x02
+	AI_NUMERICHOST            = 0x04
+	AI_ALL                    = 0x0100
+	AI_ADDRCONFIG             = 0x0400
+	AI_V4MAPPED               = 0x0800
+	AI_NON_AUTHORITATIVE      = 0x04000
+	AI_SECURE                 = 0x08000
+	AI_RETURN_PREFERRED_NAMES = 0x010000
+	AI_FQDN                   = 0x00020000
+	AI_FILESERVER             = 0x00040000
+	AI_DISABLE_IDN_ENCODING   = 0x00080000
+)
+
+struct SocketAddress {
+	Sockaddr:       *sys::RawSockaddrAny
+	SockaddrLength: i32
+}
+
+struct IpAdapterUnicastAddress {
+	Length:             u32
+	Flags:              u32
+	Next:               *IpAdapterUnicastAddress
+	Address:            SocketAddress
+	PrefixOrigin:       i32
+	SuffixOrigin:       i32
+	DadState:           i32
+	ValidLifetime:      u32
+	PreferredLifetime:  u32
+	LeaseLifetime:      u32
+	OnLinkPrefixLength: u8
+}
+
+struct IpAdapterAnycastAddress {
+	Length:  u32
+	Flags:   u32
+	Next:    *IpAdapterAnycastAddress
+	Address: SocketAddress
+}
+
+struct IpAdapterMulticastAddress {
+	Length:  u32
+	Flags:   u32
+	Next:    *IpAdapterMulticastAddress
+	Address: SocketAddress
+}
+
+struct IpAdapterDnsServerAdapter {
+	Length:   u32
+	Reserved: u32
+	Next:     *IpAdapterDnsServerAdapter
+	Address:  SocketAddress
+}
+
+struct IpAdapterPrefix {
+	Length:       u32
+	Flags:        u32
+	Next:         *IpAdapterPrefix
+	Address:      SocketAddress
+	PrefixLength: u32
+}
+
+struct IpAdapterWinsServerAddress {
+	Length:   u32
+	Reserved: u32
+	Next:     *IpAdapterWinsServerAddress
+	Address:  SocketAddress
+}
+
+struct IpAdapterGatewayAddress {
+	Length:   u32
+	Reserved: u32
+	Next:     *IpAdapterGatewayAddress
+	Address:  SocketAddress
+}
+
+struct IpAdapterAddresses {
+	Length:                 u32
+	IfIndex:                u32
+	Next:                   *IpAdapterAddresses
+	AdapterName:            *byte
+	FirstUnicastAddress:    *IpAdapterUnicastAddress
+	FirstAnycastAddress:    *IpAdapterAnycastAddress
+	FirstMulticastAddress:  *IpAdapterMulticastAddress
+	FirstDnsServerAddress:  *IpAdapterDnsServerAdapter
+	DnsSuffix:              *u16
+	Description:            *u16
+	FriendlyName:           *u16
+	PhysicalAddress:        [MAX_ADAPTER_ADDRESS_LENGTH]byte
+	PhysicalAddressLength:  u32
+	Flags:                  u32
+	Mtu:                    u32
+	IfType:                 u32
+	OperStatus:             u32
+	Ipv6IfIndex:            u32
+	ZoneIndices:            [16]u32
+	FirstPrefix:            *IpAdapterPrefix
+	TransmitLinkSpeed:      u64
+	ReceiveLinkSpeed:       u64
+	FirstWinsServerAddress: *IpAdapterWinsServerAddress
+	FirstGatewayAddress:    *IpAdapterGatewayAddress
+	/* more fields might be present here. */
+}
+
+fn GetSystemDirectory(): str {
+	mut path := make([]u16, sys::MAX_PATH)
+	n := sys::Addrcall[uint](uintptr(cpp.GetSystemDirectoryW), uintptr(&path[0]), uint(len(path)))
+	ret integ::UTF16ToStr(path[:n])
+}
+
+fn GetAdaptersAddresses(family: u32, flags: u32, reserved: uintptr, mut adapterAddresses: *IpAdapterAddresses, mut &sizePointer: *u32)! {
+	r := sys::Addrcall[u32](uintptr(cpp.GetAdaptersAddresses), family, flags, reserved, uintptr(adapterAddresses), uintptr(sizePointer))
+	if r != 0 {
+		error(sys::Errno(r))
+	}
+}
 
 const (
 	ComputerNameNetBIOS                   = 0
@@ -23,11 +171,20 @@ const (
 	MOVEFILE_FAIL_IF_NOT_TRACKABLE = 0x20
 )
 
-cpp let GetComputerNameExW: *unsafe
-
 fn GetComputerNameEx(nameformat: u32, buf: *u16, mut n: *u32)! {
 	r := sys::Addrcall[bool](uintptr(cpp.GetComputerNameExW), uintptr(nameformat), uintptr(buf), uintptr(n))
 	if !r {
 		error(sys::GetLastErrno())
 	}
+}
+
+struct AddrinfoW {
+	Flags:     i32
+	Family:    i32
+	Socktype:  i32
+	Protocol:  i32
+	Addrlen:   uintptr
+	Canonname: *u16
+	Addr:      uintptr
+	Next:      *AddrinfoW
 }

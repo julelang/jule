@@ -1,0 +1,111 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/bufio"
+use "std/internal/byteslite"
+use "std/os"
+use "std/time"
+
+struct file {
+	fd:   &os::File
+	scan: &bufio::Scanner
+}
+
+impl file {
+	fn close(mut *self) {
+		self.fd.Close()!
+	}
+
+	fn readLine(mut *self): (str, ok: bool) {
+		ok = self.scan.Scan() else {
+			ret "", false
+		}
+		ret self.scan.Text(), ok
+	}
+}
+
+fn open(name: str): (file, ok: bool) {
+	mut fd := os::Open(name) else {
+		ret file{}, false
+	}
+	let mut f: file
+	f.fd = fd
+	f.scan = bufio::Scanner.New(fd)
+	f.scan.Buffer(make([]byte, 0, 64*1024), 64*1024)
+	ret f, true
+}
+
+fn stat(name: str): (mtime: time::Time, size: i64, ok: bool) {
+	st := os::Stat(name) else {
+		ret time::Time{}, 0, false
+	}
+	ret st.ModTime(), st.Size(), true
+}
+
+// Count occurrences in s of any bytes in t.
+#disable boundary
+fn countAnyByte(s: str, t: str): int {
+	mut n := 0
+	mut i := 0
+	for i < len(s); i++ {
+		if byteslite::IndexByteStr(t, s[i]) >= 0 {
+			n++
+		}
+	}
+	ret n
+}
+
+// Split s at any bytes in t.
+#disable boundary
+fn splitAtBytes(s: str, t: str): []str {
+	mut a := make([]str, 1+countAnyByte(s, t))
+	mut n := 0
+	mut last := 0
+	mut i := 0
+	for i < len(s); i++ {
+		if byteslite::IndexByteStr(t, s[i]) >= 0 {
+			if last < i {
+				a[n] = s[last:i]
+				n++
+			}
+			last = i + 1
+		}
+	}
+	if last < len(s) {
+		a[n] = s[last:]
+		n++
+	}
+	ret a[0:n]
+}
+
+fn getFields(s: str): []str { ret splitAtBytes(s, " \r\t\n") }
+
+// Reports whether the given string contains at least one upper-case.
+#disable boundary
+fn hasUpperCase(s: str): bool {
+	for i in s {
+		if 'A' <= s[i] && s[i] <= 'Z' {
+			ret true
+		}
+	}
+	ret false
+}
+
+// Makes x ASCII lowercase in-place.
+#disable boundary
+fn lowerASCIIBytes(mut x: []byte) {
+	for i, b in x {
+		if 'A' <= b && b <= 'Z' {
+			x[i] += 'a' - 'A'
+		}
+	}
+}
+
+// Returns the ASCII lowercase version of b.
+fn lowerASCII(b: byte): byte {
+	if 'A' <= b && b <= 'Z' {
+		ret b + ('a' - 'A')
+	}
+	ret b
+}

@@ -1,0 +1,62 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/byteslite"
+use "std/internal/conv"
+use "std/sync"
+
+let onceReadServices = sync::Once{}
+
+#disable boundary
+fn readServices() {
+	mut file, mut ok := open("/etc/services")
+	if !ok {
+		ret
+	}
+	defer { file.close() }
+
+	mut line, ok := file.readLine()
+	for ok; line, ok = file.readLine() {
+		// "http 80/tcp www www-http # World Wide Web HTTP"
+		mut i := byteslite::IndexByteStr(line, '#')
+		if i >= 0 {
+			line = line[:i]
+		}
+		f := getFields(line)
+		if len(f) < 2 {
+			continue
+		}
+		portnet := f[1] // "80/tcp"
+		port, j, (ok) := conv::Dtoi(portnet)
+		if !ok || port <= 0 || j >= len(portnet) || portnet[j] != '/' {
+			continue
+		}
+		netw := portnet[j+1:] // "tcp"
+		mut m, (ok) := services[netw]
+		if !ok {
+			m = map[str]int{}
+			services[netw] = m
+		}
+		i = 0
+		for i < len(f); i++ {
+			if i != 1 { // f[1] was port/net
+				m[f[i]] = port
+			}
+		}
+	}
+}
+
+fn _lookupPort(network: Network, service: str)!: (port: int) {
+	if DefaultResolver.PreferJule {
+		onceReadServices.Do(readServices)
+		ret juleLookupPortMap(network, service)?
+	} else {
+		ret integLookupPortMap(network, service) else {
+			// If integrated lookup fails, first check to see whether we
+			// have the answer baked-in to the net package.
+			onceReadServices.Do(readServices)
+			ret juleLookupPortMap(network, service)?
+		}
+	}
+}
