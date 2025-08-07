@@ -44,12 +44,13 @@ namespace jule
 
         static jule::Slice<Item> make(const std::initializer_list<Item> &src)
         {
-            if (src.size() == 0)
-            return nullptr;
             jule::Slice<Item> slice;
             slice.alloc_new(src.size(), src.size());
-            const auto src_begin = src.begin();
-            std::copy(src.begin(), src.end(), slice.begin());
+            if (src.size() > 0)
+            {
+                const auto src_begin = src.begin();
+                std::copy(src.begin(), src.end(), slice.begin());
+            }
             return slice;
         }
 
