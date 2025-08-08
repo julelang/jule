@@ -180,19 +180,19 @@ fn parseName(msg: []byte, mut offset: int)!: (str, int) {
 	ret name, original
 }
 
-// Parses the DNS response and returns IPAddr list with zone info if applicable.
 #disable boundary
-fn parseResponse(msg: []byte, id: u16): ([]IPAddr, ok: bool) {
+fn parseResponseHead(msg: []byte): (id: u16, ok: bool) {
 	if len(msg) < 12 {
 		// short response
-		ret nil, false
+		ret 0, false
 	}
-	gotID := binary::BigEndian.DecodeU16(msg[0:bigEndianU16Size])
-	if gotID != id {
-		// mismatched ID
-		ret nil, false
-	}
+	id = binary::BigEndian.DecodeU16(msg[0:bigEndianU16Size])
+	ret id, true
+}
 
+// Parses the DNS response and returns IPAddr list with zone info if applicable.
+#disable boundary
+fn parseResponseBody(msg: []byte): ([]IPAddr, ok: bool) {
 	qdCount := binary::BigEndian.DecodeU16(msg[4 : 4+bigEndianU16Size])
 	anCount := binary::BigEndian.DecodeU16(msg[6 : 6+bigEndianU16Size])
 	mut pos := 12
@@ -302,7 +302,7 @@ fn lookupParallel(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype1: u16, qt
 		ret true
 	}
 
-	read := fn(mut &buf: *[]byte, id: u16, mut &results: *[]IPAddr): (ok: bool) {
+	read := fn(mut &buf: *[]byte, mut &results: *[]IPAddr): (id: u16, ok: bool) {
 		let mut n: int
 		if conf.useTCP {
 			n = io::ReadFull(conn, (*buf)[:bigEndianU16Size]) else { use io::EOF }
@@ -312,18 +312,25 @@ fn lookupParallel(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype1: u16, qt
 				n = io::ReadFull(conn, *buf) else { use io::EOF }
 			}
 		} else {
-			n = conn.Read((*buf)[:maxDNSPacketSize]) else { use io::EOF }
+			for {
+				n = conn.Read((*buf)[:maxDNSPacketSize]) else { use io::EOF }
+				break
+			}
 		}
 		if n <= 0 {
-			ret false
+			ret 0, false
 		}
 
-		mut res, ok := parseResponse((*buf)[:n], id)
+		payload := (*buf)[:n]
+		id, ok = parseResponseHead(payload)
 		if ok {
-			if len(*results) == 0 {
-				*results = res
-			} else {
-				*results = append(*results, res...)
+			mut res, (ok) := parseResponseBody(payload)
+			if ok {
+				if len(*results) == 0 {
+					*results = res
+				} else {
+					*results = append(*results, res...)
+				}
 			}
 		}
 		ret
@@ -345,16 +352,21 @@ fn lookupParallel(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype1: u16, qt
 			continue
 		}
 
-		if !read1 && read(buf, id1, &results) {
-			read1 = true
-		}
-		if !read2 && read(buf, id2, &results) {
-			read2 = true
-		}
-
 		// All queries responded.
 		if read1 && read2 {
 			break
+		}
+
+		id, readOk := read(buf, &results)
+		if !readOk {
+			continue
+		}
+
+		match id {
+		| id1:
+			read1 = true
+		| id2:
+			read2 = true
 		}
 	}
 
@@ -390,9 +402,13 @@ fn lookupSingle(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype: u16, qtype
 			continue
 		}
 
-		results, ok = parseResponse((*buf)[:n], id)
+		payload := (*buf)[:n]
+		_, ok = parseResponseHead(payload)
 		if ok {
-			ret
+			results, ok = parseResponseBody(payload)
+			if ok {
+				ret
+			}
 		}
 	}
 	ret nil, false
