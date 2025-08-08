@@ -404,10 +404,7 @@ namespace jule
         jule::Bool operator==(const jule::Str &str) const noexcept
         {
             return this->_len == str._len &&
-                   std::strncmp(
-                       reinterpret_cast<const char *>(this->begin()),
-                       reinterpret_cast<const char *>(str.begin()),
-                       this->_len) == 0;
+                std::memcmp(this->begin(), str.begin(), this->_len) == 0;
         }
 
         inline jule::Bool operator!=(const jule::Str &str) const noexcept
