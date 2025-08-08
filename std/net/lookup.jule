@@ -587,3 +587,19 @@ fn growBuffer(mut &buf: *[]byte, n: int) {
 		*buf = make([]byte, n)
 	}
 }
+
+// Looks up host using the local resolver.
+// It returns a slice of that host's IPv4 and IPv6 addresses by network.
+// Network must be IP, IP4 or IP6.
+// Looks up for IPv4 addresses only, if network is IP4.
+// Looks up for IPv6 addresses only, if network is IP6.
+// Looks up for IPv4 and IPv6 addresses, if network is IP.
+fn LookupIP(mut network: Network, address: str)!: []&IPAddr {
+	match network {
+	| IP | IP4 | IP6:
+		mut addrs := resolveInternetAddrList(network, address)?
+		ret addrs.forResolveAll(network)
+	|:
+		error(&AddrError{Err: "invalid network: " + str(network)})
+	}
+}
