@@ -3,6 +3,8 @@
 // license that can be found in the LICENSE file.
 
 use integ "std/jule/integrated"
+use "std/mem"
+use "std/runtime"
 use "std/sys"
 use "std/time"
 
@@ -16,6 +18,7 @@ cpp struct addrinfo {
 	ai_family:   int
 	ai_socktype: int
 	ai_protocol: int
+	ai_addrlen:  sys::Socklen
 	ai_next:     *cpp.addrinfo
 	ai_addr:     *unsafe
 }
@@ -23,6 +26,7 @@ cpp struct addrinfo {
 #disable boundary
 fn integLookupIP(net: Network, host: str)!: (addrs: []IPAddr) {
 	let mut hints: cpp.addrinfo
+	unsafe { runtime::memset(&hints, 0, mem::SizeOf(hints)) }
 	hints.ai_flags = integAddrInfoFlags
 	hints.ai_socktype = sys::SOCK_STREAM
 	match net {
