@@ -2,12 +2,49 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+// The Jule code is a modified version of the original Go code from
+// https://github.com/golang/go/blob/go1.24.3/src/strings/replace.go and came with this notice.
+//
+// ====================================================
+// Copyright (c) 2009 The Go Authors. All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// ====================================================
+
 use "std/io"
+use "std/sync"
+use "std/unsafe"
 
 // Replaces a list of strings with replacements.
 // It is more efficient than Replace function for multiple replacements on one string.
 // It is safe for concurrent use by multiple threads.
 struct Replacer {
+	mut once:   sync::Once // guards buildOnce
+	mut r:      replacer
 	mut oldnew: []str
 }
 
@@ -22,99 +59,562 @@ impl Replacer {
 		if len(oldnew)%2 == 1 {
 			panic("std/strings: Replacer.New: odd argument count")
 		}
-		mut r := &Replacer{oldnew: append([]str(nil), oldnew...)}
-		if len(r.oldnew) == 0 {
-			ret r
+		mut r := &Replacer{}
+		if len(oldnew) != 0 {
+			r.oldnew = append([]str(nil), oldnew...)
 		}
-		// Sort replacements by length.
-		replacesort(r.oldnew)
 		ret r
 	}
 
-	// Applies replace on s and writes result to w.
-	// Forwards any exception if any.
-	fn write(*self, s: str, mut w: io::StrWriter)!: (n: int) {
-		mut last := 0
-		for last < len(s) {
-			// Find the lowest index to match.
-			// Search should start at shortest replacement.
-			mut low, mut lowpos := -1, -1
-			{
-				mut i := 0
-				for i < len(self.oldnew); i += 2 {
-					pos := Index(s[last:], self.oldnew[i])
-					if pos != -1 && (low == -1 || pos < low) {
-						low, lowpos = pos, i
-						// Zero index is the lowest, break immediately.
-						if low == 0 {
-							break
-						}
-					}
-				}
-			}
-			if low == -1 {
-				break
-			}
-			n += w.WriteStr(s[last : last+low])?
-			n += w.WriteStr(self.oldnew[lowpos+1])?
-			last += low + len(self.oldnew[lowpos])
-		}
-		if last < len(s) {
-			n += w.WriteStr(s[last:])?
-		}
-		ret n
+	fn buildOnce(*self) {
+		self.r = self.build()
+		self.oldnew = nil
 	}
 
-	// Replaces s and returns the result.
-	fn Replace(*self, s: str): str {
-		if len(self.oldnew) == 0 {
-			ret s
+	#disable boundary
+	fn build(*self): replacer {
+		oldnew := self.oldnew
+		if len(oldnew) == 2 && len(oldnew[0]) > 1 {
+			ret singleStrReplacer.make(oldnew[0], oldnew[1])
 		}
-		// Compute number of replacements to
-		// preallocate anough memory at one time.
-		mut t := len(s)
-		{
-			mut found := false
-			mut i := 0
-			for i < len(self.oldnew); i += 2 {
-				n := Count(s, self.oldnew[i])
-				found = found || n > 0
-				t -= n * len(self.oldnew[i])   // Remove length of old.
-				t += n * len(self.oldnew[i+1]) // Add length of new.
+
+		mut allNewBytes := true
+		mut i := 0
+		for i < len(oldnew); i += 2 {
+			if len(oldnew[i]) != 1 {
+				ret genericReplacer.make(oldnew)
 			}
-			// No any replacement exist.
-			// Return immediately.
-			if !found {
-				ret s
+			if len(oldnew[i+1]) != 1 {
+				allNewBytes = false
 			}
 		}
-		mut b := new(Builder)
-		b.Grow(t)
-		self.write(s, b)!
-		ret b.Str()
+
+		if allNewBytes {
+			mut r := new(byteReplacer)
+			for j in *r {
+				(*r)[j] = byte(j)
+			}
+			// The first occurrence of old->new map takes precedence
+			// over the others with the same old string.
+			i = len(oldnew) - 2
+			for i >= 0; i -= 2 {
+				o := oldnew[i][0]
+				n := oldnew[i+1][0]
+				(*r)[o] = n
+			}
+			ret r
+		}
+
+		mut r := new(byteStrReplacer)
+		r.toReplace = make([]str, 0, len(oldnew)/2)
+		// The first occurrence of old->new map takes precedence
+		// over the others with the same old string.
+		i = len(oldnew) - 2
+		for i >= 0; i -= 2 {
+			o := oldnew[i][0]
+			n := oldnew[i+1]
+			// To avoid counting repetitions multiple times.
+			if r.replacements[o] == nil {
+				// We need to use string([]byte{o}) instead of string(o),
+				// to avoid utf8 encoding of o.
+				// E. g. byte(150) produces string of length 2.
+				r.toReplace = append(r.toReplace, str(o))
+			}
+			r.replacements[o] = []byte(n)
+		}
+		ret r
 	}
 
-	// Applies replace on s and writes result to w.
-	// Forwards any exception if any.
-	fn WriteStr(*self, s: str, mut w: io::StrWriter)!: (n: int) {
-		if len(self.oldnew) == 0 {
-			ret w.WriteStr(s)?
-		}
-		ret self.write(s, w)?
+	// Returns a copy of s with all replacements performed.
+	fn Replace(&self, s: str): str {
+		self.once.Do(fn|| self.buildOnce())
+		ret self.r.Replace(s)
+	}
+
+	// Writes s to w with all replacements performed.
+	fn WriteStr(&self, mut w: io::Writer, s: str)!: (n: int) {
+		self.once.Do(fn|| self.buildOnce())
+		ret self.r.WriteStr(w, s)?
 	}
 }
 
-// Implements basic bubble sort algorithm for Replacer oldnew.
-fn replacesort(mut s: []str) {
-	n := len(s)
-	mut i := 0
-	for i < n-2; i += 2 {
-		mut j := 0
-		for j < n-i-2; j += 2 {
-			if len(s[j]) > len(s[j+2]) {
-				s[j], s[j+2] = s[j+2], s[j]
-				s[j+1], s[j+3] = s[j+3], s[j+1]
+// Trait that a replacement algorithm needs to implement.
+trait replacer {
+	fn Replace(mut *self, s: str): str
+	fn WriteStr(mut *self, mut w: io::Writer, s: str)!: (n: int)
+}
+
+// Node in a lookup trie for prioritized key/value pairs. Keys
+// and values may be empty. For example, the trie containing keys "ax", "ay",
+// "bcbc", "x" and "xy" could have eight nodes:
+//
+//	n0  -
+//	n1  a-
+//	n2  .x+
+//	n3  .y+
+//	n4  b-
+//	n5  .cbc+
+//	n6  x+
+//	n7  .y+
+//
+// n0 is the root node, and its children are n1, n4 and n6; n1's children are
+// n2 and n3; n4's child is n5; n6's child is n7. Nodes n0, n1 and n4 (marked
+// with a trailing "-") are partial keys, and nodes n2, n3, n5, n6 and n7
+// (marked with a trailing "+") are complete keys.
+struct trieNode {
+	// Value of the trie node's key/value pair. It is empty if
+	// this node is not a complete key.
+	value: str
+
+	// Priority (higher is more important) of the trie node's
+	// key/value pair; keys are not necessarily matched shortest- or longest-
+	// first. Priority is positive if this node is a complete key, and zero
+	// otherwise. In the example above, positive/zero priorities are marked
+	// with a trailing "+" or "-".
+	priority: int
+
+	// A trie node may have zero, one or more child nodes:
+	//  * if the remaining fields are zero, there are no children.
+	//  * if prefix and next are non-zero, there is one child in next.
+	//  * if table is non-zero, it defines all the children.
+	//
+	// Prefixes are preferred over tables when there is one child, but the
+	// root node always uses a table for lookup efficiency.
+
+	// prefix is the difference in keys between this trie node and the next.
+	// In the example above, node n4 has prefix "cbc" and n4's next node is n5.
+	// Node n5 has no children and so has zero prefix, next and table fields.
+	prefix: str
+	next:   &trieNode
+
+	// Lookup table indexed by the next byte in the key, after
+	// remapping that byte through genericReplacer.mapping to create a dense
+	// index. In the example above, the keys only use 'a', 'b', 'c', 'x' and
+	// 'y', which remap to 0, 1, 2, 3 and 4. All other bytes remap to 5, and
+	// genericReplacer.tableSize will be 5. Node n0's table will be
+	// []*trieNode{ 0:n1, 1:n4, 3:n6 }, where the 0, 1 and 3 are the remapped
+	// 'a', 'b' and 'x'.
+	table: []&trieNode
+}
+
+impl trieNode {
+	#disable boundary
+	fn add(mut *self, key: str, val: str, priority: int, r: &genericReplacer) {
+		if key == "" {
+			if self.priority == 0 {
+				self.value = val
+				self.priority = priority
+			}
+			ret
+		}
+
+		if self.prefix != "" {
+			// Need to split the prefix among multiple nodes.
+			let mut n: int // length of the longest common prefix
+			for n < len(self.prefix) && n < len(key); n++ {
+				if self.prefix[n] != key[n] {
+					break
+				}
+			}
+			if n == len(self.prefix) {
+				self.next.add(key[n:], val, priority, r)
+			} else if n == 0 {
+				// First byte differs, start a new lookup table here. Looking up
+				// what is currently self.prefix[0] will lead to prefixNode, and
+				// looking up key[0] will lead to keyNode.
+				let mut prefixNode: &trieNode
+				if len(self.prefix) == 1 {
+					prefixNode = self.next
+				} else {
+					prefixNode = &trieNode{
+						prefix: self.prefix[1:],
+						next: self.next,
+					}
+				}
+				mut keyNode := new(trieNode)
+				self.table = make([]&trieNode, r.tableSize)
+				self.table[r.mapping[self.prefix[0]]] = prefixNode
+				self.table[r.mapping[key[0]]] = keyNode
+				self.prefix = ""
+				self.next = nil
+				keyNode.add(key[1:], val, priority, r)
+			} else {
+				// Insert new node after the common section of the prefix.
+				mut next := &trieNode{
+					prefix: self.prefix[n:],
+					next: self.next,
+				}
+				self.prefix = self.prefix[:n]
+				self.next = next
+				next.add(key[n:], val, priority, r)
+			}
+		} else if self.table != nil {
+			// Insert into existing table.
+			m := r.mapping[key[0]]
+			if self.table[m] == nil {
+				self.table[m] = new(trieNode)
+			}
+			self.table[m].add(key[1:], val, priority, r)
+		} else {
+			self.prefix = key
+			self.next = new(trieNode)
+			self.next.add("", val, priority, r)
+		}
+	}
+}
+
+// Fully generic algorithm.
+// It's used as a fallback when nothing faster can be used.
+struct genericReplacer {
+	root: &trieNode
+
+	// Size of a trie node's lookup table. It is the number of unique key bytes.
+	tableSize: int
+
+	// Maps from key bytes to a dense index for trieNode.table.
+	mapping: [256]byte
+}
+
+impl genericReplacer {
+	#disable boundary
+	fn make(oldnew: []str): &genericReplacer {
+		mut r := new(genericReplacer)
+		// Find each byte used, then assign them each an index.
+		mut i := 0
+		for i < len(oldnew); i += 2 {
+			key := oldnew[i]
+			mut j := 0
+			for j < len(key); j++ {
+				r.mapping[key[j]] = 1
 			}
 		}
+
+		for _, b in r.mapping {
+			r.tableSize += int(b)
+		}
+
+		let mut index: byte
+		for j, b in r.mapping {
+			if b == 0 {
+				r.mapping[j] = byte(r.tableSize)
+			} else {
+				r.mapping[j] = index
+				index++
+			}
+		}
+		// Ensure root node uses a lookup table (for performance).
+		r.root = new(trieNode)
+		r.root.table = make([]&trieNode, r.tableSize)
+
+		i = 0
+		for i < len(oldnew); i += 2 {
+			r.root.add(oldnew[i], oldnew[i+1], len(oldnew)-i, r)
+		}
+		ret r
+	}
+
+	#disable boundary
+	fn lookup(mut *self, mut s: str, ignoreRoot: bool): (val: str, keylen: int, found: bool) {
+		// Iterate down the trie to the end, and grab the value and keylen with
+		// the highest priority.
+		mut bestPriority := 0
+		mut node := self.root
+		mut n := 0
+		for node != nil {
+			if node.priority > bestPriority && !(ignoreRoot && node == self.root) {
+				bestPriority = node.priority
+				val = node.value
+				keylen = n
+				found = true
+			}
+
+			if s == "" {
+				break
+			}
+			if node.table != nil {
+				index := self.mapping[s[0]]
+				if int(index) == self.tableSize {
+					break
+				}
+				node = node.table[index]
+				s = s[1:]
+				n++
+			} else if node.prefix != "" && HasPrefix(s, node.prefix) {
+				n += len(node.prefix)
+				s = s[len(node.prefix):]
+				node = node.next
+			} else {
+				break
+			}
+		}
+		ret
+	}
+
+	#disable boundary
+	fn appendStr(mut *self, mut &w: *appendSliceWriter, s: str)!: (n: int) {
+		let mut last: int
+		let mut prevMatchEmpty: bool
+		mut i := 0
+		for i <= len(s) {
+			// Fast path: s[i] is not a prefix of any pattern.
+			if i != len(s) && self.root.priority == 0 {
+				index := int(self.mapping[s[i]])
+				if index == self.tableSize || self.root.table[index] == nil {
+					i++
+					continue
+				}
+			}
+
+			// Ignore the empty match iff the previous loop found the empty match.
+			val, keylen, _match := self.lookup(s[i:], prevMatchEmpty)
+			prevMatchEmpty = _match && keylen == 0
+			if _match {
+				n += w.WriteStr(s[last:i])
+				n += w.WriteStr(val)
+				i += keylen
+				last = i
+				continue
+			}
+			i++
+		}
+		if last != len(s) {
+			n += w.WriteStr(s[last:])
+		}
+		ret
+	}
+}
+
+impl replacer for genericReplacer {
+	fn Replace(mut *self, s: str): str {
+		mut buf := make(appendSliceWriter, 0, len(s))
+		self.appendStr(&buf, s) else {}
+		ret unsafe::StrFromBytes([]byte(buf))
+	}
+
+	#disable boundary
+	fn WriteStr(mut *self, mut w: io::Writer, s: str)!: (n: int) {
+		let mut last: int
+		let mut prevMatchEmpty: bool
+		mut i := 0
+		for i <= len(s) {
+			// Fast path: s[i] is not a prefix of any pattern.
+			if i != len(s) && self.root.priority == 0 {
+				index := int(self.mapping[s[i]])
+				if index == self.tableSize || self.root.table[index] == nil {
+					i++
+					continue
+				}
+			}
+
+			// Ignore the empty match iff the previous loop found the empty match.
+			val, keylen, _match := self.lookup(s[i:], prevMatchEmpty)
+			prevMatchEmpty = _match && keylen == 0
+			if _match {
+				n += io::WriteStr(w, s[last:i])?
+				n += io::WriteStr(w, val)?
+				i += keylen
+				last = i
+				continue
+			}
+			i++
+		}
+		if last != len(s) {
+			n += io::WriteStr(w, s[last:])?
+		}
+		ret
+	}
+}
+
+type appendSliceWriter: []byte
+
+impl appendSliceWriter {
+	// WriteString writes to the buffer without string->[]byte->string allocations.
+	fn WriteStr(mut *self, s: str): int {
+		*self = append(*self, s...)
+		ret len(s)
+	}
+}
+
+// The implementation that's used when there is only
+// one string to replace (and that string has more than one byte).
+struct singleStrReplacer {
+	finder: &strFinder
+
+	// value is the new string that replaces that pattern when it's found.
+	value: str
+}
+
+impl singleStrReplacer {
+	fn make(pattern: str, value: str): &singleStrReplacer {
+		ret &singleStrReplacer{finder: strFinder.make(pattern), value: value}
+	}
+}
+
+impl replacer for singleStrReplacer {
+	#disable boundary
+	fn Replace(mut *self, s: str): str {
+		let mut buf: Builder
+		mut i, mut matched := 0, false
+		for {
+			_match := self.finder.next(s[i:])
+			if _match == -1 {
+				break
+			}
+			matched = true
+			buf.Grow(_match + len(self.value))
+			buf.WriteStr(s[i : i+_match]) else {}
+			buf.WriteStr(self.value) else {}
+			i += _match + len(self.finder.pattern)
+		}
+		if !matched {
+			ret s
+		}
+		buf.WriteStr(s[i:]) else {}
+		ret buf.Str()
+	}
+
+	#disable boundary
+	fn WriteStr(mut *self, mut w: io::Writer, s: str)!: (n: int) {
+		let mut i: int
+		for {
+			_match := self.finder.next(s[i:])
+			if _match == -1 {
+				break
+			}
+			n += io::WriteStr(w, s[i:i+_match])?
+			n += io::WriteStr(w, self.value)?
+			i += _match + len(self.finder.pattern)
+		}
+		n += io::WriteStr(w, s[i:])?
+		ret
+	}
+}
+
+// The implementation that's used when all the "old"
+// and "new" values are single ASCII bytes.
+// The array contains replacement bytes indexed by old byte.
+type byteReplacer: [256]byte
+
+impl replacer for byteReplacer {
+	fn Replace(mut *self, s: str): str {
+		let mut buf: []byte // lazily allocated
+		mut i := 0
+		for i < len(s); i++ {
+			b := s[i]
+			if (*self)[b] != b {
+				if buf == nil {
+					buf = []byte(s)
+				}
+				buf[i] = (*self)[b]
+			}
+		}
+		if buf == nil {
+			ret s
+		}
+		ret unsafe::StrFromBytes(buf)
+	}
+
+	#disable boundary
+	fn WriteStr(mut *self, mut w: io::Writer, s: str)!: (n: int) {
+		mut last := 0
+		mut i := 0
+		for i < len(s); i++ {
+			b := s[i]
+			if (*self)[b] == b {
+				continue
+			}
+			if last != i {
+				n += io::WriteStr(w, s[last:i])?
+			}
+			last = i + 1
+			n += w.Write((*self)[b : int(b)+1])?
+		}
+		if last != len(s) {
+			n += io::WriteStr(w, s[last:])?
+		}
+		ret n
+	}
+}
+
+// The implementation that's used when all the
+// "old" values are single ASCII bytes but the "new" values vary in size.
+struct byteStrReplacer {
+	// Contains replacement byte slices indexed by old byte.
+	// A nil []byte means that the old byte should not be replaced.
+	replacements: [256][]byte
+
+	// Keeps a list of bytes to replace. Depending on length of toReplace
+	// and length of target string it may be faster to use Count, or a plain loop.
+	// We store single byte as a string, because Count takes a string.
+	toReplace: []str
+}
+
+// Controls the ratio of a string length to a number of replacements
+// at which (byteStrReplacer).Replace switches algorithms.
+// For strings with higher ration of length to replacements than that value,
+// we call Count, for each replacement from toReplace.
+// For strings, with a lower ratio we use simple loop, because of Count overhead.
+// countCutOff is an empirically determined overhead multiplier.
+const countCutOff = 8
+
+impl replacer for byteStrReplacer {
+	fn Replace(mut *self, s: str): str {
+		mut newSize := len(s)
+		mut anyChanges := false
+		// Is it faster to use Count?
+		if len(self.toReplace)*countCutOff <= len(s) {
+			for _, x in self.toReplace {
+				c := Count(s, x)
+				if c != 0 {
+					// The -1 is because we are replacing 1 byte with len(replacements[b]) bytes.
+					newSize += c * (len(self.replacements[x[0]]) - 1)
+					anyChanges = true
+				}
+			}
+		} else {
+			mut i := 0
+			for i < len(s); i++ {
+				b := s[i]
+				if self.replacements[b] != nil {
+					// See above for explanation of -1
+					newSize += len(self.replacements[b]) - 1
+					anyChanges = true
+				}
+			}
+		}
+		if !anyChanges {
+			ret s
+		}
+		mut buf := make([]byte, newSize)
+		mut i, mut j := 0, 0
+		for i < len(s); i++ {
+			b := s[i]
+			if self.replacements[b] != nil {
+				j += copy(buf[j:], self.replacements[b])
+			} else {
+				buf[j] = b
+				j++
+			}
+		}
+		ret unsafe::StrFromBytes(buf)
+	}
+
+	fn WriteStr(mut *self, mut w: io::Writer, s: str)!: (n: int) {
+		mut i, mut last := 0, 0
+		for i < len(s); i++ {
+			b := s[i]
+			if self.replacements[b] == nil {
+				continue
+			}
+			if last != i {
+				n += io::WriteStr(w, s[last:i])?
+			}
+			last = i + 1
+			n += w.Write(self.replacements[b])?
+		}
+		if last != len(s) {
+			n += io::WriteStr(w, s[last:])?
+		}
+		ret
 	}
 }

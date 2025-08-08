@@ -38,3 +38,236 @@ fn testReplacer(t: &testing::T) {
 		}
 	}
 }
+
+struct replacerCase {
+	rep:   &strings::Replacer
+	input: str
+	out:   str
+}
+
+let mut capitalLetters = strings::Replacer.New("a", "A", "b", "B")
+
+let mut htmlEscaper = strings::Replacer.New(
+	"&", "&amp;",
+	"<", "&lt;",
+	">", "&gt;",
+	`"`, "&quot;",
+	"'", "&apos;")
+
+let mut htmlUnescaper = strings::Replacer.New(
+	"&amp;", "&",
+	"&lt;", "<",
+	"&gt;", ">",
+	"&quot;", `"`,
+	"&apos;", "'")
+
+#test
+fn testReplacerGoCompatibility(t: &testing::T) {
+	let mut testCases: []replacerCase
+	let mut s: []str
+
+	// inc maps "\x00"->"\x01", ..., "a"->"b", "b"->"c", ..., "\xff"->"\x00".
+	s = nil
+	mut i := 0
+	for i < 256; i++ {
+		s = append(s, str(byte(i)), str(byte(i+1)))
+	}
+	mut inc := strings::Replacer.New(s...)
+
+	// Test cases with 1-byte old strings, 1-byte new strings.
+	testCases = append(testCases,
+		{capitalLetters, "brad", "BrAd"},
+		{capitalLetters, strings::Repeat("a", (32<<10)+123), strings::Repeat("A", (32<<10)+123)},
+		{capitalLetters, "", ""},
+		{inc, "brad", "csbe"},
+		{inc, "\x00\xff", "\x01\x00"},
+		{inc, "", ""},
+		{strings::Replacer.New("a", "1", "a", "2"), "brad", "br1d"})
+
+	// repeat maps "a"->"a", "b"->"bb", "c"->"ccc", ...
+	s = nil
+	i = 0
+	for i < 256; i++ {
+		mut n := i + 1 - 'a'
+		if n < 1 {
+			n = 1
+		}
+		s = append(s, str(byte(i)), strings::Repeat(str(byte(i)), n))
+	}
+	mut repeat := strings::Replacer.New(s...)
+
+	// Test cases with 1-byte old strings, variable length new strings.
+	testCases = append(testCases,
+		{htmlEscaper, "No changes", "No changes"},
+		{htmlEscaper, "I <3 escaping & stuff", "I &lt;3 escaping &amp; stuff"},
+		{htmlEscaper, "&&&", "&amp;&amp;&amp;"},
+		{htmlEscaper, "", ""},
+		{repeat, "brad", "bbrrrrrrrrrrrrrrrrrradddd"},
+		{repeat, "abba", "abbbba"},
+		{repeat, "", ""},
+		{strings::Replacer.New("a", "11", "a", "22"), "brad", "br11d"})
+
+	// The remaining test cases have variable length old strings.
+
+	testCases = append(testCases,
+		{htmlUnescaper, "&amp;amp;", "&amp;"},
+		{htmlUnescaper, "&lt;b&gt;HTML&apos;s neat&lt;/b&gt;", "<b>HTML's neat</b>"},
+		{htmlUnescaper, "", ""},
+		{strings::Replacer.New("a", "1", "a", "2", "xxx", "xxx"), "brad", "br1d"},
+		{strings::Replacer.New("a", "1", "aa", "2", "aaa", "3"), "aaaa", "1111"},
+		{strings::Replacer.New("aaa", "3", "aa", "2", "a", "1"), "aaaa", "31"})
+
+	// gen1 has multiple old strings of variable length. There is no
+	// overall non-empty common prefix, but some pairwise common prefixes.
+	mut gen1 := strings::Replacer.New(
+		"aaa", "3[aaa]",
+		"aa", "2[aa]",
+		"a", "1[a]",
+		"i", "i",
+		"longerst", "most long",
+		"longer", "medium",
+		"long", "short",
+		"xx", "xx",
+		"x", "X",
+		"X", "Y",
+		"Y", "Z")
+	testCases = append(testCases,
+		{gen1, "fooaaabar", "foo3[aaa]b1[a]r"},
+		{gen1, "long, longerst, longer", "short, most long, medium"},
+		{gen1, "xxxxx", "xxxxX"},
+		{gen1, "XiX", "YiY"},
+		{gen1, "", ""})
+
+	// gen2 has multiple old strings with no pairwise common prefix.
+	mut gen2 := strings::Replacer.New(
+		"roses", "red",
+		"violets", "blue",
+		"sugar", "sweet")
+	testCases = append(testCases,
+		{gen2, "roses are red, violets are blue...", "red are red, blue are blue..."},
+		{gen2, "", ""})
+
+	// gen3 has multiple old strings with an overall common prefix.
+	mut gen3 := strings::Replacer.New(
+		"abracadabra", "poof",
+		"abracadabrakazam", "splat",
+		"abraham", "lincoln",
+		"abrasion", "scrape",
+		"abraham", "isaac")
+	testCases = append(testCases,
+		{gen3, "abracadabrakazam abraham", "poofkazam lincoln"},
+		{gen3, "abrasion abracad", "scrape abracad"},
+		{gen3, "abba abram abrasive", "abba abram abrasive"},
+		{gen3, "", ""})
+
+	// foo{1,2,3,4} have multiple old strings with an overall common prefix
+	// and 1- or 2- byte extensions from the common prefix.
+	mut foo1 := strings::Replacer.New(
+		"foo1", "A",
+		"foo2", "B",
+		"foo3", "C")
+	mut foo2 := strings::Replacer.New(
+		"foo1", "A",
+		"foo2", "B",
+		"foo31", "C",
+		"foo32", "D")
+	mut foo3 := strings::Replacer.New(
+		"foo11", "A",
+		"foo12", "B",
+		"foo31", "C",
+		"foo32", "D")
+	mut foo4 := strings::Replacer.New(
+		"foo12", "B",
+		"foo32", "D")
+	testCases = append(testCases,
+		{foo1, "fofoofoo12foo32oo", "fofooA2C2oo"},
+		{foo1, "", ""},
+		{foo2, "fofoofoo12foo32oo", "fofooA2Doo"},
+		{foo2, "", ""},
+		{foo3, "fofoofoo12foo32oo", "fofooBDoo"},
+		{foo3, "", ""},
+		{foo4, "fofoofoo12foo32oo", "fofooBDoo"},
+		{foo4, "", ""})
+
+	// genAll maps "\x00\x01\x02...\xfe\xff" to "[all]", amongst other things.
+	mut allBytes := make([]byte, 256)
+	for j in allBytes {
+		allBytes[j] = byte(j)
+	}
+	allString := str(allBytes)
+	mut genAll := strings::Replacer.New(
+		allString, "[all]",
+		"\xff", "[ff]",
+		"\x00", "[00]")
+	testCases = append(testCases,
+		{genAll, allString, "[all]"},
+		{genAll, "a\xff"+allString+"\x00", "a[ff][all][00]"},
+		{genAll, "", ""})
+
+	// Test cases with empty old strings.
+
+	mut blankToX1 := strings::Replacer.New("", "X")
+	mut blankToX2 := strings::Replacer.New("", "X", "", "")
+	mut blankHighPriority := strings::Replacer.New("", "X", "o", "O")
+	mut blankLowPriority := strings::Replacer.New("o", "O", "", "X")
+	mut blankNoOp1 := strings::Replacer.New("", "")
+	mut blankNoOp2 := strings::Replacer.New("", "", "", "A")
+	mut blankFoo := strings::Replacer.New("", "X", "foobar", "R", "foobaz", "Z")
+	testCases = append(testCases,
+		{blankToX1, "foo", "XfXoXoX"},
+		{blankToX1, "", "X"},
+		{blankToX2, "foo", "XfXoXoX"},
+		{blankToX2, "", "X"},
+		{blankHighPriority, "oo", "XOXOX"},
+		{blankHighPriority, "ii", "XiXiX"},
+		{blankHighPriority, "oiio", "XOXiXiXOX"},
+		{blankHighPriority, "iooi", "XiXOXOXiX"},
+		{blankHighPriority, "", "X"},
+		{blankLowPriority, "oo", "OOX"},
+		{blankLowPriority, "ii", "XiXiX"},
+		{blankLowPriority, "oiio", "OXiXiOX"},
+		{blankLowPriority, "iooi", "XiOOXiX"},
+		{blankLowPriority, "", "X"},
+		{blankNoOp1, "foo", "foo"},
+		{blankNoOp1, "", ""},
+		{blankNoOp2, "foo", "foo"},
+		{blankNoOp2, "", ""},
+		{blankFoo, "foobarfoobaz", "XRXZX"},
+		{blankFoo, "foobar-foobaz", "XRX-XZX"},
+		{blankFoo, "", "X"})
+
+	// single string replacer
+
+	mut abcMatcher := strings::Replacer.New("abc", "[match]")
+
+	testCases = append(testCases,
+		{abcMatcher, "", ""},
+		{abcMatcher, "ab", "ab"},
+		{abcMatcher, "abc", "[match]"},
+		{abcMatcher, "abcd", "[match]d"},
+		{abcMatcher, "cabcabcdabca", "c[match][match]d[match]a"})
+
+	// Go's issue 6659 cases (more single string replacer)
+
+	mut noHello := strings::Replacer.New("Hello", "")
+	testCases = append(testCases,
+		{noHello, "Hello", ""},
+		{noHello, "Hellox", "x"},
+		{noHello, "xHello", "x"},
+		{noHello, "xHellox", "xx"})
+
+	// No-arg test cases.
+
+	mut nop := strings::Replacer.New()
+	testCases = append(testCases,
+		{nop, "abc", "abc"},
+		{nop, "", ""})
+
+	// Test.
+	for j, test in testCases {
+		out := test.rep.Replace(test.input)
+		if out != test.out {
+			t.Errorf("#{} got {}, expected {}", j, out, test.out)
+		}
+	}
+}
