@@ -26,3 +26,28 @@ impl Addr for IPAddr {
 		ret ip
 	}
 }
+
+impl IPAddr {
+	// Returns an address of IP end point.
+	// The network must be a IP network name.
+	//
+	// If the host in the address parameter is not a literal IP address or
+	// the port is not a literal port number, it resolves the
+	// address to an address of IP end point.
+	// Otherwise, it parses the address as a pair of literal IP address
+	// and port number.
+	// The address parameter can use a host name, but this is not
+	// recommended, because it will return at most one of the host name's
+	// IP addresses.
+	//
+	// See the [Dial] function for a description of the network and address parameters.
+	fn Resolve(mut network: Network, address: str)!: &IPAddr {
+		match network {
+		| IP | IP4 | IP6:
+			mut addrs := resolveInternetAddrList(network, address)?
+			ret addrs.forResolve(network, address).(&IPAddr)
+		|:
+			error(&AddrError{Err: "invalid network: " + str(network)})
+		}
+	}
+}
