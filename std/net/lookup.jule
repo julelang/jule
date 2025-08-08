@@ -92,21 +92,24 @@ fn encodeDomainName(mut &buf: *[]byte, mut domain: str)! {
 	*buf = append(*buf, 0) // terminator
 }
 
-// Maximum DNS packet size.
+// Maximum DNS packet size for UDP.
 // Value taken from https://dnsflagday.net/2020/.
 const maxDNSPacketSize = 1232
 
-// Builds a DNS query with EDNS and optional AD flag.
-fn buildQuery(mut &buf: *[]byte, domain: str, mut &qtypePos: *int, trustAD: bool)!: u16 {
-	id := u16(dnsrand.IntN(65536))
+fn getDNSId(): u16 {
+	ret u16(dnsrand.IntN(65536))
+}
 
+// Builds a DNS query with EDNS and optional AD flag.
+fn buildQuery(mut &buf: *[]byte, domain: str, mut &idPos: *int, mut &qtypePos: *int, trustAD: bool)! {
 	if cap(*buf) == 0 {
 		*buf = make([]byte, 0, maxDNSPacketSize)
 	} else {
 		*buf = (*buf)[:0]
 	}
-	*buf = binary::BigEndian.AppendU16(*buf, id) // ID
-	mut flags := u16(0x0100)                     // standard query
+	*idPos = len(*buf)
+	*buf = binary::BigEndian.AppendU16(*buf, 0) // ID
+	mut flags := u16(0x0100)                    // standard query
 	if trustAD {
 		flags |= 0x0020 // set AD flag
 	}
@@ -129,8 +132,6 @@ fn buildQuery(mut &buf: *[]byte, domain: str, mut &qtypePos: *int, trustAD: bool
 	*buf = append(*buf, 0)                                     // EDNS version
 	*buf = binary::BigEndian.AppendU16(*buf, 0)                // Z
 	*buf = binary::BigEndian.AppendU16(*buf, 0)                // RDLENGTH
-
-	ret id
 }
 
 // Handles DNS name parsing with label compression support.
@@ -287,13 +288,124 @@ fn lookupIPFiles(name: str): (addrs: []IPAddr, canonical: str) {
 	ret addrs, canonical
 }
 
-fn lookupQuery(mut &buf: *[]byte, mut conn: Conn, query: str)!: (results: []IPAddr, ok: bool) {
-	let mut id: u16
-	let mut qtypePos: int
-	id = buildQuery(buf, query, &qtypePos, conf.trustAD)?
+fn lookupParallel(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype1: u16, qtype2: u16, qtypePos: int): (results: []IPAddr, ok: bool) {
+	id1 := getDNSId()
+	mut id2 := id1
+	for id2 == id1 {
+		id2 = getDNSId()
+	}
 
-	// send length-prefixed message for TCP
+	write := fn(mut &buf: *[]byte, id: u16, qtype: u16): (ok: bool) {
+		binary::BigEndian.PutU16((*buf)[idPos:], id)       // Write id to buf.
+		binary::BigEndian.PutU16((*buf)[qtypePos:], qtype) // Write current qtype to buf.
+		conn.Write(*buf) else { ret false }
+		ret true
+	}
+
+	read := fn(mut &buf: *[]byte, id: u16, mut &results: *[]IPAddr): (ok: bool) {
+		let mut n: int
+		if conf.useTCP {
+			n = io::ReadFull(conn, (*buf)[:bigEndianU16Size]) else { use io::EOF }
+			if n > 0 {
+				ln := binary::BigEndian.DecodeU16((*buf)[:bigEndianU16Size])
+				growBuffer(buf, int(ln))
+				n = io::ReadFull(conn, *buf) else { use io::EOF }
+			}
+		} else {
+			n = conn.Read((*buf)[:maxDNSPacketSize]) else { use io::EOF }
+		}
+		if n <= 0 {
+			ret false
+		}
+
+		mut res, ok := parseResponse((*buf)[:n], id)
+		if ok {
+			if len(*results) == 0 {
+				*results = res
+			} else {
+				*results = append(*results, res...)
+			}
+		}
+		ret
+	}
+
+	mut write1, mut write2 := false, false
+	mut read1, mut read2 := false, false
+	mut attempt := 0
+	for attempt < conf.attempts; attempt++ {
+		if !write1 && write(buf, id1, qtype1) {
+			write1 = true
+		}
+		if !write2 && write(buf, id2, qtype2) {
+			write2 = true
+		}
+
+		// No query sent yet.
+		if !write1 && !write2 {
+			continue
+		}
+
+		if !read1 && read(buf, id1, &results) {
+			read1 = true
+		}
+		if !read2 && read(buf, id2, &results) {
+			read2 = true
+		}
+
+		// All queries responded.
+		if read1 && read2 {
+			break
+		}
+	}
+
+	ok = read1 || read2
+	ret
+}
+
+fn lookupSingle(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype: u16, qtypePos: int): (results: []IPAddr, ok: bool) {
+	id := getDNSId()
+
+	// Write id to buf.
+	binary::BigEndian.PutU16((*buf)[idPos:], id)
+
+	// Write current qtype to buf.
+	binary::BigEndian.PutU16((*buf)[qtypePos:], qtype)
+
+	mut attempt := 0
+	for attempt < conf.attempts; attempt++ {
+		conn.Write(*buf) else { continue }
+
+		let mut n: int
+		if conf.useTCP {
+			n = io::ReadFull(conn, (*buf)[:bigEndianU16Size]) else { use io::EOF }
+			if n > 0 {
+				ln := binary::BigEndian.DecodeU16((*buf)[:bigEndianU16Size])
+				growBuffer(buf, int(ln))
+				n = io::ReadFull(conn, *buf) else { use io::EOF }
+			}
+		} else {
+			n = conn.Read((*buf)[:maxDNSPacketSize]) else { use io::EOF }
+		}
+		if n <= 0 {
+			continue
+		}
+
+		results, ok = parseResponse((*buf)[:n], id)
+		if ok {
+			ret
+		}
+	}
+	ret nil, false
+}
+
+fn lookupQuery(mut &buf: *[]byte, mut conn: Conn, network: Network, query: str)!: (results: []IPAddr, ok: bool) {
+	let mut idPos: int
+	let mut qtypePos: int
+	buildQuery(buf, query, &idPos, &qtypePos, conf.trustAD)?
+
+	// Send length-prefixed message for TCP.
 	if conf.useTCP {
+		idPos += bigEndianU16Size
 		qtypePos += bigEndianU16Size
 		if cap(*buf) >= len(*buf)+bigEndianU16Size {
 			*buf = (*buf)[:len(*buf)+bigEndianU16Size]
@@ -306,38 +418,31 @@ fn lookupQuery(mut &buf: *[]byte, mut conn: Conn, query: str)!: (results: []IPAd
 		binary::BigEndian.PutU16(*buf, u16(len(*buf)-bigEndianU16Size))
 	}
 
-	// Lookup for IPv4 (A) and IPv6 (AAAA).
-	qtypes := [2]u16([_QTYPE_A, _QTYPE_AAAA])
-
-	for _, qtype in qtypes {
-		// Write current qtype to buf.
-		binary::BigEndian.PutU16((*buf)[qtypePos:], qtype)
-
-		mut attempt := 0
-		for attempt < conf.attempts; attempt++ {
-			conn.Write(*buf) else { continue }
-
-			let mut n: int
-			if conf.useTCP {
-				n = conn.Read((*buf)[:bigEndianU16Size]) else { use io::EOF }
-				if n > 0 {
-					ln := binary::BigEndian.DecodeU16((*buf)[:bigEndianU16Size])
-					n = conn.Read((*buf)[:ln]) else { use io::EOF }
-				}
-			} else {
-				n = conn.Read((*buf)[:maxDNSPacketSize]) else { use io::EOF }
+	match network {
+	| IP | TCP | UDP:
+		// Lookup for IPv4 (A) and IPv6 (AAAA).
+		if conf.singleRequest {
+			mut results1, ok1 := lookupSingle(buf, conn, idPos, _QTYPE_A, qtypePos)
+			mut results2, ok2 := lookupSingle(buf, conn, idPos, _QTYPE_AAAA, qtypePos)
+			match {
+			| ok1 && ok2:
+				ret append(results1, results2...), true
+			| ok1:
+				ret results1, true
+			| ok2:
+				ret results2, true
 			}
-			if n <= 0 {
-				continue
-			}
-
-			results, ok = parseResponse((*buf)[:n], id)
-			if !ok {
-				continue
-			}
-			ret
+		} else {
+			ret lookupParallel(buf, conn, idPos, _QTYPE_A, _QTYPE_AAAA, qtypePos)
 		}
+	| IP4 | TCP4 | UDP4:
+		// Lookup for IPv4.
+		ret lookupSingle(buf, conn, idPos, _QTYPE_A, qtypePos)
+	| IP6 | TCP6 | UDP6:
+		// Lookup for IPv6 (AAAA).
+		ret lookupSingle(buf, conn, idPos, _QTYPE_AAAA, qtypePos)
 	}
+
 	ret nil, false
 }
 
@@ -379,7 +484,7 @@ fn juleLookupIP(net: Network, host: str)!: []IPAddr {
 		}
 
 		if isFQDN || dots >= conf.ndots {
-			mut results, ok := lookupQuery(&buf, conn, host)?
+			mut results, ok := lookupQuery(&buf, conn, net, host)?
 			if ok {
 				conn.Close() else {}
 				ret results
@@ -387,7 +492,7 @@ fn juleLookupIP(net: Network, host: str)!: []IPAddr {
 		}
 		for _, suffix in conf.search {
 			fqdn := baseName + "." + suffix
-			mut results, ok := lookupQuery(&buf, conn, fqdn)?
+			mut results, ok := lookupQuery(&buf, conn, net, fqdn)?
 			if ok {
 				conn.Close() else {}
 				ret results
@@ -473,4 +578,12 @@ fn lookupPort(net: Network, service: str)!: (port: int) {
 		error(&AddrError{Err: "invalid port", Addr: service})
 	}
 	ret port
+}
+
+fn growBuffer(mut &buf: *[]byte, n: int) {
+	if cap(*buf) >= n {
+		*buf = (*buf)[:n]
+	} else {
+		*buf = make([]byte, n)
+	}
 }

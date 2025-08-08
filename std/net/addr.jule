@@ -148,19 +148,65 @@ fn isIPv4(mut addr: Addr): bool {
 fn isNotIPv4(mut addr: Addr): bool { ret !isIPv4(addr) }
 
 impl addrList {
+	// Returns all addresses as &IPAddr.
+	#disable boundary
+	fn forResolveAll(mut *self, network: Network): []&IPAddr {
+		want4 := network == Network.TCP4 || network == Network.UDP4 || network == Network.IP4
+		want6 := network == Network.TCP6 || network == Network.UDP6 || network == Network.IP6
+
+		mut addrs := make([]&IPAddr, len(*self))
+		mut i := 0
+		for (_, mut addr) in *self {
+			match type addr {
+			| &TCPAddr:
+				mut tcp := addr.(&TCPAddr)
+				if want6 && tcp.IP.To4() != nil {
+					continue
+				} else if want4 && tcp.IP.To4() == nil {
+					continue
+				}
+				mut ip := new(IPAddr)
+				ip.IP = tcp.IP
+				ip.Zone = tcp.Zone
+				addrs[i] = ip
+			| &UDPAddr:
+				mut udp := addr.(&UDPAddr)
+				if want6 && udp.IP.To4() != nil {
+					continue
+				} else if want4 && udp.IP.To4() == nil {
+					continue
+				}
+				mut ip := new(IPAddr)
+				ip.IP = udp.IP
+				ip.Zone = udp.Zone
+				addrs[i] = ip
+			| &IPAddr:
+				mut ip := addr.(&IPAddr)
+				if want6 && ip.IP.To4() != nil {
+					continue
+				} else if want4 && ip.IP.To4() == nil {
+					continue
+				}
+				addrs[i] = ip
+			}
+			i++
+		}
+		ret addrs[:i]
+	}
+
 	// Returns the most appropriate address in address for a call to ResolveXAddr variants.
-	// IPv4 is preferred, unless addr contains an IPv6 literal.
-	fn forResolve(mut *self, network: Network, addr: str): Addr {
+	// IPv4 is preferred, unless address contains an IPv6 literal.
+	fn forResolve(mut *self, network: Network, address: str): Addr {
 		let mut want6: bool
 		match network {
 		| IP:
-			// IPv6 literal (addr does NOT contain a port)
-			want6 = byteslite::CountStr(addr, ':') > 0
+			// IPv6 literal (address does NOT contain a port)
+			want6 = byteslite::CountStr(address, ':') > 0
 		| TCP | UDP:
-			// IPv6 literal. (addr contains a port, so look for '[')
-			want6 = byteslite::CountStr(addr, '[') > 0
+			// IPv6 literal. (address contains a port, so look for '[')
+			want6 = byteslite::CountStr(address, '[') > 0
 		|:
-			break // no-op
+			want6 = false
 		}
 		if want6 {
 			ret self.first(isNotIPv4)
@@ -232,14 +278,12 @@ fn resolveInternetAddrList(net: Network, addr: str)!: addrList {
 	}
 	let mut filter: fn(mut IPAddr): bool
 	match net {
-	| TCP | UDP:
+	| TCP | UDP | IP:
 		filter = nil
-	| TCP4 | UDP4:
+	| TCP4 | UDP4 | IP4:
 		filter = ipv4only
-	| TCP6 | UDP6:
+	| TCP6 | UDP6 | IP6:
 		filter = ipv6only
-	|:
-		panic("unreachable")
 	}
 	ret filterAddrList(filter, net, ips, portnum, host)?
 }
