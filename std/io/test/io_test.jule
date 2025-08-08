@@ -80,3 +80,52 @@ fn testCopyBufferNil(t: &testing::T) {
 		t.Errorf("CopyBuffer did not work properly")
 	}
 }
+
+#test
+fn testReadAtLeast(t: &testing::T) {
+	mut rb := new(testbuffer)
+	rb.Write([]byte("0123"))!
+	mut buf := make([]byte, 2)
+	mut n := io::ReadAtLeast(rb, buf, 2) else {
+		t.Errorf("{}", error)
+		use 0
+	}
+	if n != 2 {
+		t.Errorf("expected to have read 2 bytes, got {}", n)
+	}
+	let mut err: any
+	n = io::ReadAtLeast(rb, buf, 4) else {
+		err = error
+		use 0
+	}
+	if err != io::ErrShortBuffer {
+		t.Errorf("expected ErrShortBuffer got {}", err)
+	}
+	if n != 0 {
+		t.Errorf("expected to have read 0 bytes, got {}", n)
+	}
+	n = io::ReadAtLeast(rb, buf, 1) else {
+		t.Errorf("{}", error)
+		use 0
+	}
+	if n != 2 {
+		t.Errorf("expected to have read 2 bytes, got {}", n)
+	}
+	n = io::ReadAtLeast(rb, buf, 2) else {
+		t.Errorf("{}", error)
+		use 0
+	}
+	if n != io::EOF {
+		t.Errorf("expected EOF, got {}", n)
+	}
+	rb.Write([]byte("4"))!
+	err = nil
+	n = io::ReadAtLeast(rb, buf, 2) else {
+		err = error
+		use 0
+	}
+	mut want := io::ErrUnexpectedEOF
+	if err != want {
+		t.Errorf("expected {}, got {}", want, err)
+	}
+}

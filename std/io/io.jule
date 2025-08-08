@@ -348,3 +348,33 @@ fn ReadAll(mut r: Reader)!: []byte {
 		}
 	}
 }
+
+// Reads from r into buf until it has read at least min bytes.
+// It returns the number of bytes copied and an error if fewer bytes were read.
+// The error is EOF only if no bytes were read.
+// If an EOF happens after reading fewer than min bytes, exception is ErrUnexpectedEOF.
+// If min is greater than the length of buf, exception is ErrShortBuffer.
+// On return, n >= min if and only if err == nil.
+// If r returns an error having read at least min bytes, the error is dropped.
+fn ReadAtLeast(mut r: Reader, mut buf: []byte, min: int)!: (n: int) {
+	if len(buf) < min {
+		error(ErrShortBuffer)
+	}
+	for n < min {
+		rn := r.Read(buf[n:]) else {
+			if n >= min {
+				ret n
+			}
+			error(error)
+		}
+		if rn == EOF {
+			if n > 0 {
+				error(ErrUnexpectedEOF)
+			}
+			n = EOF
+			break
+		}
+		n += rn
+	}
+	ret
+}
