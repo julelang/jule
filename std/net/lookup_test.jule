@@ -1,0 +1,166 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/testing"
+
+fn isValidIP(network: Network, mut ip: IP): bool {
+	if len(ip) != IPv6Len && len(ip) != IPv4Len {
+		ret false
+	}
+	if ip.Equal(IPv6Zero) || ip.Equal(IPv4Zero) {
+		ret false
+	}
+	match network {
+	| IP | TCP | UDP:
+		ret true
+	| IP4 | TCP4 | UDP4:
+		ret ip.To4() != nil
+	| IP6 | TCP6 | UDP6:
+		ret ip.To4() == nil
+	}
+	ret false
+}
+
+// Hosts for lookup tests.
+// Supports IPv4 and IPv6.
+let testHosts = [
+	"jule.dev",
+	"manual.jule.dev",
+	"example.com",
+	"google.com",
+	"cloudflare.com",
+	"wikipedia.org",
+]
+
+fn _testLookupIP(t: &testing::T) {
+	networks := [Network.IP, Network.IP4, Network.IP6]
+	for _, host in testHosts {
+		for _, network in networks {
+			comb := host + ":" + networkToStr(network)
+
+			mut ips := LookupIP(network, host) else {
+				t.Errorf("[{}]: unexpected error: {}", comb, error)
+				continue
+			}
+			if len(ips) == 0 {
+				t.Errorf("[{}]: zero addresses returned", comb)
+			}
+			for (_, mut ip) in ips {
+				if !isValidIP(network, ip.IP) {
+					t.Errorf("[{}]: invalid IP: ", comb, ip.IP.Str())
+				}
+			}
+		}
+	}
+}
+
+#test
+fn testLookupIP(t: &testing::T) {
+	_testLookupIP(t)
+}
+
+#test
+fn testLookupIPJule(t: &testing::T) {
+	DefaultResolver.PreferJule = true
+	_testLookupIP(t)
+	DefaultResolver.PreferJule = false
+}
+
+#test
+fn testLookupIPJuleTCP(t: &testing::T) {
+	t.Skip() // Skip TCP tests because it may be fail on CI.
+	ret
+
+	DefaultResolver.PreferJule = true
+	conf.useTCP = true
+	_testLookupIP(t)
+	DefaultResolver.PreferJule = false
+	conf.useTCP = false
+}
+
+#test
+fn testLookupIPJuleParallel(t: &testing::T) {
+	DefaultResolver.PreferJule = true
+	DefaultResolver.ForceParallel = true
+	_testLookupIP(t)
+	DefaultResolver.PreferJule = false
+	DefaultResolver.ForceParallel = false
+}
+
+#test
+fn testLookupIPJuleParallelTCP(t: &testing::T) {
+	t.Skip() // Skip TCP tests because it may be fail on CI.
+	ret
+
+	DefaultResolver.PreferJule = true
+	DefaultResolver.ForceParallel = true
+	conf.useTCP = true
+	_testLookupIP(t)
+	DefaultResolver.PreferJule = false
+	DefaultResolver.ForceParallel = false
+	conf.useTCP = false
+}
+
+#test
+fn testTCPAddrResolve(t: &testing::T) {
+	networks := [Network.TCP, Network.TCP4, Network.TCP6]
+	for _, host in testHosts {
+		for _, network in networks {
+			comb := host + ":" + networkToStr(network)
+
+			mut addr := TCPAddr.Resolve(network, host+":53") else {
+				t.Errorf("[{}]: unexpected error: {}", comb, error)
+				continue
+			}
+			if addr == nil {
+				t.Errorf("[{}]: nil address returned", comb)
+			}
+			if !isValidIP(network, addr.IP) {
+				t.Errorf("[{}]: invalid IP: ", comb, addr.IP.Str())
+			}
+		}
+	}
+}
+
+#test
+fn testUDPAddrResolve(t: &testing::T) {
+	networks := [Network.UDP, Network.UDP4, Network.UDP6]
+	for _, host in testHosts {
+		for _, network in networks {
+			comb := host + ":" + networkToStr(network)
+
+			mut addr := UDPAddr.Resolve(network, host+":53") else {
+				t.Errorf("[{}]: unexpected error: {}", comb, error)
+				continue
+			}
+			if addr == nil {
+				t.Errorf("[{}]: nil address returned", comb)
+			}
+			if !isValidIP(network, addr.IP) {
+				t.Errorf("[{}]: invalid IP: ", comb, addr.IP.Str())
+			}
+		}
+	}
+}
+
+#test
+fn testIPAddrResolve(t: &testing::T) {
+	networks := [Network.IP, Network.IP4, Network.IP6]
+	for _, host in testHosts {
+		for _, network in networks {
+			comb := host + ":" + networkToStr(network)
+
+			mut addr := IPAddr.Resolve(network, host) else {
+				t.Errorf("[{}]: unexpected error: {}", comb, error)
+				continue
+			}
+			if addr == nil {
+				t.Errorf("[{}]: nil address returned", comb)
+			}
+			if !isValidIP(network, addr.IP) {
+				t.Errorf("[{}]: invalid IP: ", comb, addr.IP.Str())
+			}
+		}
+	}
+}
