@@ -421,19 +421,19 @@ fn lookupQuery(mut &buf: *[]byte, mut conn: Conn, network: Network, query: str)!
 	match network {
 	| IP | TCP | UDP:
 		// Lookup for IPv4 (A) and IPv6 (AAAA).
-		if conf.singleRequest {
-			mut results1, ok1 := lookupSingle(buf, conn, idPos, _QTYPE_A, qtypePos)
-			mut results2, ok2 := lookupSingle(buf, conn, idPos, _QTYPE_AAAA, qtypePos)
-			match {
-			| ok1 && ok2:
-				ret append(results1, results2...), true
-			| ok1:
-				ret results1, true
-			| ok2:
-				ret results2, true
-			}
-		} else {
+		if DefaultResolver.ForceParallel || !conf.singleRequest {
 			ret lookupParallel(buf, conn, idPos, _QTYPE_A, _QTYPE_AAAA, qtypePos)
+		}
+		// Lookup sequentially.
+		mut results1, ok1 := lookupSingle(buf, conn, idPos, _QTYPE_A, qtypePos)
+		mut results2, ok2 := lookupSingle(buf, conn, idPos, _QTYPE_AAAA, qtypePos)
+		match {
+		| ok1 && ok2:
+			ret append(results1, results2...), true
+		| ok1:
+			ret results1, true
+		| ok2:
+			ret results2, true
 		}
 	| IP4 | TCP4 | UDP4:
 		// Lookup for IPv4.
