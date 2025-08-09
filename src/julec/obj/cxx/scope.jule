@@ -185,6 +185,13 @@ impl scopeCoder {
 			self.oc.indent()
 		}
 		if it.KeyB != nil {
+			// Save the original type of the variable, then restore it.
+			// Because copy optimization may update the type, which can lead compile errors.
+			// Closures, for example. When generating the closure data,
+			// the captured variable types must be correct.
+			// Otherwise, it may handled as optimized type for copy optimization.
+			mut originType := it.KeyB.TypeSym.Type
+
 			copyOptimizable := opt::Copy && isIterCopyOptimizable(it.Expr, it.KeyB)
 			if copyOptimizable {
 				it.KeyB.TypeSym.Type = &sema::Type{
@@ -219,6 +226,7 @@ impl scopeCoder {
 					}
 				}
 			})
+			it.KeyB.TypeSym.Type = originType
 			self.oc.write("\n")
 			self.oc.indent()
 		}
