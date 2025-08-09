@@ -74,6 +74,9 @@ impl scopeOptimizer {
 					}
 				}
 			}
+			if self.data.boundary != nil && isBoundaryValidType(v.TypeSym.Type) {
+				self.data.boundary.handleVarByExpr(uintptr(v), v.ValueSym.Value.Model)
+			}
 			exprOptimizer.optimizeValue(&v.ValueSym.Value.Model, self.data, self)
 		}
 	}
@@ -457,6 +460,9 @@ impl scopeOptimizer {
 		if self.data.boundary != nil {
 			if isBoundaryRiskyType(assign.Left.Type) {
 				possibleBoundaryRemove(self.data.boundary, assign.Left.Model)
+			}
+			if isBoundaryValidType(assign.Left.Type) {
+				self.data.boundary.handleVarByExpr(getBoundaryVar(assign.Left.Model), assign.Right.Model)
 			}
 		}
 		if self.data.nils != nil {
@@ -864,6 +870,9 @@ impl scopeOptimizer {
 				if self.data.boundary != nil {
 					if isBoundaryRiskyType(l.Type) {
 						possibleBoundaryRemove(checkpoint.boundary, l.Model)
+					}
+					if tup != nil && isBoundaryValidType(l.Type) {
+						checkpoint.boundary.handleVarByExpr(getBoundaryVar(l.Model), tup.Values[i].Model)
 					}
 				}
 				if self.data.nils != nil {

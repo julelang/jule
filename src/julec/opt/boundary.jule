@@ -46,17 +46,9 @@ impl boundary {
 			}
 		}
 		// Not exist, append new one.
-		i = 0
-		for i < len(self.vars); i++ {
-			mut &v := unsafe { &(*(&self.vars[i])) }
-			if v.var == invalidBoundary {
-				// Empty place, use here instead of append.
-				v.var = var
-				v.maxSize = append(v.maxSize, maxSize)
-				ret
-			}
-		}
-		self.vars = append(self.vars, boundaryVar{var: var, maxSize: [maxSize]})
+		self.updateVarNotExist(var, fn|mut data| {
+			data.maxSize = append(data.maxSize, maxSize)
+		})
 	}
 
 	fn removeVar(mut *self, var: uintptr): bool {
@@ -74,6 +66,15 @@ impl boundary {
 		ret false
 	}
 
+	fn findVar(mut *self, var: uintptr): (i: int) {
+		for i < len(self.vars); i++ {
+			if self.vars[i].var == var {
+				ret
+			}
+		}
+		ret -1
+	}
+
 	// Reports whether maximum size of variable is fits with given expression.
 	fn fitsMaxSize(mut *self, var: uintptr, mut expr: sema::Expr): bool {
 		if var != invalidBoundary {
@@ -84,6 +85,76 @@ impl boundary {
 			}
 		}
 		ret false
+	}
+
+	// Appends variable then calls handler.
+	fn updateVarNotExist(mut *self, var: uintptr, handler: fn(mut &data: *boundaryVar)) {
+		mut i := 0
+		for i < len(self.vars); i++ {
+			mut &v := unsafe { &(*(&self.vars[i])) }
+			// Empty place, use here instead of append.
+			if v.var == invalidBoundary {
+				v.var = var
+				handler(v)
+				ret
+			}
+		}
+		mut data := boundaryVar{var: var}
+		handler(&data)
+		self.vars = append(self.vars, data)
+	}
+
+	// Appends variable is not exist, or updates the existing one by address.
+	fn updateVar(mut *self, var: uintptr, handler: fn(mut &data: *boundaryVar)) {
+		i := self.findVar(var)
+		if i == -1 {
+			self.updateVarNotExist(var, handler)
+			ret
+		}
+		mut &v := unsafe { &(*(&self.vars[i])) }
+		handler(v)
+	}
+
+	fn handleVarByExpr(mut *self, var: uintptr, mut value: sema::Expr) {
+		if var == invalidBoundary {
+			ret
+		}
+		match type value {
+		| &sema::Var:
+			v := value.(&sema::Var)
+			// Self assignment, nothing to do.
+			if uintptr(v) == var {
+				ret
+			}
+			i := self.findVar(uintptr(v))
+			if i != -1 {
+				mut data := self.vars[i]
+				self.updateVar(var, fn|mut vdata| {
+					vdata.maxSize = growSlice(vdata.maxSize, len(data.maxSize))
+					copy(vdata.maxSize, data.maxSize)
+				})
+				ret
+			}
+		| &sema::BuiltinMakeCallExpr:
+			// Must be slice, but do not check it.
+			mut mk := value.(&sema::BuiltinMakeCallExpr)
+			c := getConstantSize(mk.Len)
+			if c != nil {
+				// c should be equal to c - 1
+				// Because it is count of elements, not max index.
+				// Allocate new constant to avoid mutating the actual constant.
+				// By physical limits, 64-bit unsigned inger should be enough.
+				mut size := constant::Const.NewU64(c.AsU64() - 1)
+
+				self.pushVar(var, size)
+				ret
+			}
+		|:
+			// Unsupported.
+			break
+		}
+
+		self.removeVar(var)
 	}
 }
 
@@ -196,4 +267,17 @@ fn getBoundaryVar(mut m: sema::Expr): uintptr {
 			ret invalidBoundary
 		}
 	}
+}
+
+// Grows b by n, preserving the original content of b.
+fn growSlice[S: []E, E](mut s: S, n: int): S {
+	if n <= cap(s) {
+		ret s[:n]
+	}
+	ret make(S, n)
+}
+
+fn getConstantSize(mut v: sema::Expr): &constant::Const {
+	mut c, _ := v.(&constant::Const)
+	ret c
 }
