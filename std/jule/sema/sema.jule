@@ -279,7 +279,8 @@ struct commonSemaMeta {
 	flags:             int          // General flags.
 	gstructs:          []&StructIns // Generic structs waiting to be checked.
 	comptimeTypeInfos: []&comptimeTypeInfo
-	runtime:           &ImportInfo // Implicitly imported "std/runtime" package.
+	runtime:           &ImportInfo       // Implicitly imported "std/runtime" package.
+	mrc:               missingRetChecker // General missing return statement checker.
 }
 
 impl commonSemaMeta {
@@ -2709,12 +2710,12 @@ impl sema {
 		if f.Decl.IsVoid() {
 			ret
 		}
-		mrc := missingRetChecker.new()
-		mut ok := mrc.memoizeLabelsAndGotos(sc)
+		self.meta.mrc.reset()
+		mut ok := self.meta.mrc.memoizeLabelsAndGotos(sc)
 		if !ok {
 			self.pushErr(f.Decl.Token, "missing return at end of function")
 		}
-		ok = mrc.check(f.Scope)
+		ok = self.meta.mrc.check(f.Scope)
 		if !ok {
 			self.pushErr(f.Decl.Token, "missing return at end of function")
 		}
@@ -3052,11 +3053,18 @@ struct missingRetChecker {
 }
 
 impl missingRetChecker {
-	fn new(): missingRetChecker {
-		ret missingRetChecker{
-			hard: true,
-			breaked: map[uintptr]bool{},
-			labels: map[uintptr]int{},
+	// Resets all data for the new analysis.
+	fn reset(*self) {
+		self.hard = true
+		if self.breaked == nil {
+			self.breaked = map[uintptr]bool{}
+		} else {
+			delete(self.breaked)
+		}
+		if self.labels == nil {
+			self.labels = map[uintptr]int{}
+		} else {
+			delete(self.labels)
 		}
 	}
 
