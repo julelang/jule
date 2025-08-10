@@ -118,7 +118,7 @@ fn maphash[K](&k: *K, seed: uintptr): uintptr {
 		}
 	| comptime::Enum:
 		comptime::TypeAlias(valueTyp, t.Value())
-		ret maphash(valueTyp(*k), seed)
+		ret unsafe { maphash(&(*(*valueTyp)(*k)), seed) }
 	| comptime::F32:
 		ret f32hash(f32(*k), seed)
 	| comptime::F64:
@@ -138,7 +138,9 @@ fn maphash[K](&k: *K, seed: uintptr): uintptr {
 		}
 	| comptime::Str:
 		ret unsafe { strhash(&(*(*str)(k)), seed) }
-	| comptime::Uintptr | comptime::Ptr | comptime::Smartptr:
+	| comptime::Uintptr:
+		ret unsafe { memhash(k, seed, runtime::PtrSize) }
+	| comptime::Ptr | comptime::Smartptr:
 		z := uintptr(*k)
 		ret unsafe { memhash(&z, seed, runtime::PtrSize) }
 	| comptime::Bool:
