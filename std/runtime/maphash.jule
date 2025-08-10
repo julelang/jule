@@ -57,27 +57,30 @@ fn boolhash(b: bool, seed: uintptr): uintptr {
 	ret seed
 }
 
-fn structhash[S](s: S, mut seed: uintptr): uintptr {
-	const v = comptime::ValueOf(s)
+#disable nilptr
+fn structhash[S](&s: *S, mut seed: uintptr): uintptr {
+	const v = comptime::ValueOf(*s)
 	const for i, field in v.Type().Decl().Fields() {
 		const match {
 		| field.Name() != "_":
-			seed = maphash(v.FieldByIndex(i).Unwrap(), seed)
+			seed = maphash(&v.FieldByIndex(i).Unwrap(), seed)
 		}
 	}
 	ret seed
 }
 
-fn arrayhash[A](a: A, mut seed: uintptr): uintptr {
-	for _, e in a {
-		seed = maphash(e, seed)
+#disable boundary nilptr
+fn arrayhash[A](&a: *A, mut seed: uintptr): uintptr {
+	for i in *a {
+		seed = maphash(&(*a)[i], seed)
 	}
 	ret seed
 }
 
-fn strhash(s: str, seed: uintptr): uintptr {
+#disable nilptr
+fn strhash(&s: *str, seed: uintptr): uintptr {
 	unsafe {
-		sp := (*runtime::Str)(&s)
+		sp := (*runtime::Str)(s)
 		ret memhash(sp.Slice, seed, uintptr(sp.Len))
 	}
 }
@@ -99,11 +102,12 @@ fn dynhash(ptr: *&uintptr, seed: uintptr): uintptr {
 	ret unsafe { memhash((*unsafe)(uintptr(*ptr)), seed, _ptrSize) }
 }
 
-fn maphash[K](k: K, seed: uintptr): uintptr {
+#disable nilptr
+fn maphash[K](&k: *K, seed: uintptr): uintptr {
 	const t = comptime::TypeOf(K)
 	const match {
 	| t.CanNil():
-		if k == nil {
+		if *k == nil {
 			ret seed
 		}
 	}
@@ -112,43 +116,43 @@ fn maphash[K](k: K, seed: uintptr): uintptr {
 	| comptime::Uint | comptime::U8 | comptime::U16 | comptime::U32 | comptime::U64:
 		const match t.Bits() {
 		| 64:
-			ret i64hash(u64(k), seed)
+			ret i64hash(u64(*k), seed)
 		|:
-			ret i32hash(u32(k), seed)
+			ret i32hash(u32(*k), seed)
 		}
 	| comptime::Enum:
 		comptime::TypeAlias(valueTyp, t.Value())
-		ret maphash(valueTyp(k), seed)
+		ret maphash(valueTyp(*k), seed)
 	| comptime::F32:
-		ret f32hash(f32(k), seed)
+		ret f32hash(f32(*k), seed)
 	| comptime::F64:
-		ret f64hash(f64(k), seed)
+		ret f64hash(f64(*k), seed)
 	| comptime::Cmplx64:
-		ret cmplx64hash(cmplx64(k), seed)
+		ret cmplx64hash(cmplx64(*k), seed)
 	| comptime::Cmplx128:
-		ret cmplx128hash(cmplx128(k), seed)
+		ret cmplx128hash(cmplx128(*k), seed)
 	| comptime::Trait | comptime::Any | comptime::TypeEnum:
 		// If hash function pointer equals to nil, underlying type is not hashable.
 		unsafe {
-			dt := (*runtime::DynamicType)(&k)
+			dt := (*runtime::DynamicType)(k)
 			if dt.Type.Hash == nil {
 				panic("runtime: dynamic type used as map key with not-hashable/not-comparable underlying type")
 			}
 			ret sys::Addrcall[uintptr](uintptr(dt.Type.Hash), &dt.Data, seed)
 		}
 	| comptime::Str:
-		ret strhash(str(k), seed)
+		ret unsafe { strhash(&(*(*str)(k)), seed) }
 	| comptime::Uintptr | comptime::Ptr | comptime::Smartptr:
-		z := uintptr(k)
+		z := uintptr(*k)
 		ret unsafe { memhash(&z, seed, _ptrSize) }
 	| comptime::Bool:
-		ret boolhash(bool(k), seed)
+		ret boolhash(bool(*k), seed)
 	| comptime::Array:
 		ret arrayhash(k, seed)
 	| comptime::Struct:
 		ret structhash(k, seed)
 	| comptime::Chan:
-		z := unsafe { uintptr(*(*&hchan)(&k)) }
+		z := unsafe { uintptr(*(*&hchan)(k)) }
 		ret unsafe { memhash(&z, seed, _ptrSize) }
 	}
 	panic("unreachable")
@@ -157,6 +161,7 @@ fn maphash[K](k: K, seed: uintptr): uintptr {
 // Used to seed the hash function.
 let mut hashkey: [4]uintptr = []
 
+#disable boundary
 fn hashinit() {
 	for i in hashkey {
 		hashkey[i] = uintptr(rand())
