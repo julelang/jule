@@ -7,12 +7,8 @@ use "std/internal/runtime"
 use "std/sys"
 
 const (
-	// Size of a pointer in bytes - mem::SizeOf(uintptr(0)) but as an ideal constant.
-	// It is also the size of the machine's native word size (that is, 4 on 32-bit systems, 8 on 64-bit).
-	_ptrSize = 4 << (^uintptr(0) >> 63)
-
-	c0 = uintptr((8-_ptrSize)/4*2860486313 + (_ptrSize-4)/4*33054211828000289)
-	c1 = uintptr((8-_ptrSize)/4*3267000013 + (_ptrSize-4)/4*23344194077549503)
+	c0 = uintptr((8-runtime::PtrSize)/4*2860486313 + (runtime::PtrSize-4)/4*33054211828000289)
+	c1 = uintptr((8-runtime::PtrSize)/4*3267000013 + (runtime::PtrSize-4)/4*23344194077549503)
 )
 
 // NOTE: Because NaN != NaN, a map can contain any
@@ -99,7 +95,7 @@ fn i64hash(i: u64, seed: uintptr): uintptr {
 // Exported as private non-usual API to escape from deadcode optimizations.
 #export "__jule_priv_dynhash"
 fn dynhash(ptr: *&uintptr, seed: uintptr): uintptr {
-	ret unsafe { memhash((*unsafe)(uintptr(*ptr)), seed, _ptrSize) }
+	ret unsafe { memhash((*unsafe)(uintptr(*ptr)), seed, runtime::PtrSize) }
 }
 
 #disable nilptr
@@ -144,7 +140,7 @@ fn maphash[K](&k: *K, seed: uintptr): uintptr {
 		ret unsafe { strhash(&(*(*str)(k)), seed) }
 	| comptime::Uintptr | comptime::Ptr | comptime::Smartptr:
 		z := uintptr(*k)
-		ret unsafe { memhash(&z, seed, _ptrSize) }
+		ret unsafe { memhash(&z, seed, runtime::PtrSize) }
 	| comptime::Bool:
 		ret boolhash(bool(*k), seed)
 	| comptime::Array:
@@ -153,7 +149,7 @@ fn maphash[K](&k: *K, seed: uintptr): uintptr {
 		ret structhash(k, seed)
 	| comptime::Chan:
 		z := unsafe { uintptr(*(*&hchan)(k)) }
-		ret unsafe { memhash(&z, seed, _ptrSize) }
+		ret unsafe { memhash(&z, seed, runtime::PtrSize) }
 	}
 	panic("unreachable")
 }
