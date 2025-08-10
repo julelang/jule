@@ -186,6 +186,11 @@ namespace jule
             return *this->alloc;
         }
 
+        inline T &get_unchecked(void) const noexcept
+        {
+            return *this->alloc;
+        }
+
         template <typename T2>
         jule::Ptr<T2> as(void) const noexcept
         {

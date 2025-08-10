@@ -574,10 +574,15 @@ impl exprCoder {
 			self.oc.write("))")
 			ret
 		| token::MUL:
+			nilptr := self.oc.mode&_OBJC_DISABLE_NILPTR == _OBJC_DISABLE_NILPTR
 			mut v, _ := m.Expr.Model.(&sema::Var)
 			if v != nil && v.Reference {
 				self.oc.write("(*")
-				self.checkNilRef(v)
+				if nilptr {
+					self.possibleRefExpr(v)
+				} else {
+					self.checkNilRef(v)
+				}
 				self.oc.write(")")
 				ret
 			}
@@ -585,7 +590,11 @@ impl exprCoder {
 				break
 			}
 			self.possibleRefExpr(m.Expr.Model)
-			self.oc.write(".get(\"")
+			if nilptr {
+				self.oc.write(".get_unchecked(\"")
+			} else {
+				self.oc.write(".get(\"")
+			}
 			self.oc.locInfo(m.Op)
 			self.oc.write("\")")
 			ret
