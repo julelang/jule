@@ -1387,7 +1387,7 @@ impl exprCoder {
 			identCoder.funcIns(&self.oc.Buf, f)
 			self.oc.write("(")
 			self.possibleRefExpr(m.Expr.Model)
-			self.oc.write(", ")
+			self.oc.write(".alloc, ")
 			self.possibleRefExpr(m.Index.Model)
 			self.oc.write(")")
 		| env::Production && safe
@@ -1478,7 +1478,7 @@ impl exprCoder {
 		mut maker := ins.FindMethod("make", Static).Instances[0]
 		if len(m.Entries) == 0 {
 			identCoder.funcIns(&self.oc.Buf, maker)
-			self.oc.write("()")
+			self.oc.write("(0)")
 			ret
 		}
 
@@ -1491,7 +1491,9 @@ impl exprCoder {
 		self.oc.write(mapVar)
 		self.oc.write(" = ")
 		identCoder.funcIns(&self.oc.Buf, maker)
-		self.oc.write("(); ")
+		self.oc.write("(")
+		self.oc.write(conv::Itoa(len(m.Entries)))
+		self.oc.write("); ")
 		for (_, mut pair) in m.Entries {
 			self.oc.write("(*")
 			identCoder.funcIns(&self.oc.Buf, f)
@@ -1773,11 +1775,11 @@ impl exprCoder {
 		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Value)
 		const Static = false
 		if m.Key != nil {
-			mut f := ins.FindMethod("del", Static).Instances[0]
+			mut f := ins.FindMethod("delete", Static).Instances[0]
 			identCoder.funcIns(&self.oc.Buf, f)
 			self.oc.write("(")
 			self.possibleRefExpr(m.Dest.Model)
-			self.oc.write(", ")
+			self.oc.write(".alloc, ")
 			self.possibleRefExpr(m.Key.Model)
 			self.oc.write(")")
 		} else {
@@ -1785,7 +1787,7 @@ impl exprCoder {
 			identCoder.funcIns(&self.oc.Buf, f)
 			self.oc.write("(")
 			self.possibleRefExpr(m.Dest.Model)
-			self.oc.write(")")
+			self.oc.write(".alloc)")
 		}
 	}
 
