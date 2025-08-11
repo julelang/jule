@@ -1291,7 +1291,7 @@ impl hmap {
 }
 
 struct hmapiterator[K: comparable, V] {
-	bw:        tablewalker[K, V]
+	tw:        tablewalker[K, V]
 	groups:    []group[K, V]
 	offset:    u32
 	groupMask: u32
@@ -1305,7 +1305,7 @@ impl hmapiterator {
 		// Randomize iteration order by starting iteration at a random table and
 		// within each table at a random offset.
 		offset := uintptr(rand())
-		self.bw.init(offset>>32, m)
+		self.tw.init(offset>>32, m)
 		self.offset = u32(offset)
 		self.i = 0
 		self.j = 0
@@ -1324,7 +1324,7 @@ impl hmapiterator {
 		unsafe {
 			if self.groups == nil {
 				for {
-					mut t := self.bw.next()
+					mut t := self.tw.next()
 					if t == nil {
 						ret nil, nil
 					}
@@ -1370,6 +1370,10 @@ impl tablewalker {
 	// The offset argument specifies the table to start iteration at (used to randomize iteration order).
 	#disable boundary nilptr
 	fn init(mut *self, offset: uintptr, mut &m: *hmap[K, V]) {
+		if m == nil || m.used == 0 {
+			self.m = nil
+			ret
+		}
 		self.m = m
 		self.index = m.dir[offset&uintptr(m.tableCount()-1)].index
 
