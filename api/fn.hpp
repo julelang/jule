@@ -119,6 +119,11 @@ namespace jule
         {
             return !this->operator==(nullptr);
         }
+
+        inline operator jule::Uintptr(void) const noexcept
+        {
+            return (jule::Uintptr)(this->f);
+        }
     };
 
     struct DeferStack
