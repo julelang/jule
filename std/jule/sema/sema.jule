@@ -924,10 +924,11 @@ impl sema {
 	}
 
 	fn buildFuncNonGenericTypes(mut &self, mut f: &FuncIns, mut &ignored: *[]&Type, mut &recheckNeed: *[]recheckableType): (ok: bool) {
+		n := len(self.errors)
 		// Check with funcEnvironment, we need to generics of owner, if any.
 		// If owner generics are ignored, we cannot resolve them with type inference.
 		// Resolve owner generics in time, only ignore generics of the function.
-		ret self.funcEnvironment(f, fn|mut sema, mut generics| {
+		ok = self.funcEnvironment(f, fn|mut sema, mut generics| {
 			ok = true
 			for (_, mut p) in f.Params {
 				if !p.Decl.IsSelf() {
@@ -941,6 +942,7 @@ impl sema {
 			}
 			ret ok
 		})
+		ret ok && len(self.errors) == n
 	}
 
 	fn getTraitCheckFuncKind(mut &self, mut f: &Func): &FuncIns {
@@ -1098,7 +1100,8 @@ impl sema {
 		if f.IsBuiltin() || f.IsAnon() {
 			ret true
 		}
-		ret self.funcEnvironment(f, fn|mut sema, mut generics| {
+		n := len(self.errors)
+		ok := self.funcEnvironment(f, fn|mut sema, mut generics| {
 			self.reloadSelf(f)
 			mut ok := true
 			for (_, mut p) in f.Params {
@@ -1118,6 +1121,7 @@ impl sema {
 			}
 			ret ok
 		})
+		ret ok && n == len(self.errors)
 	}
 
 	fn checkRefValidityForInitExpr(mut &self, leftMut: bool, mut v: &Value, mut errorToken: &token::Token): bool {
@@ -2445,11 +2449,12 @@ impl sema {
 		mut recheckNeed: []recheckableType): (ok: bool, exist: bool) {
 		// If len(recheckNeed)>0, check the types before handling function.
 		if len(recheckNeed) > 0 {
+			n := len(self.errors)
 			ok = true
 			for (_, mut t) in recheckNeed {
 				ok = self.recheckType(t, et, (*f).Refers) && ok
 			}
-			if !ok {
+			if !ok || n != len(self.errors) {
 				ret false, false
 			}
 		}
@@ -2630,7 +2635,9 @@ impl sema {
 		for (_, mut f) in s.Methods {
 			if len(f.Generics) == 0 {
 				if self.readyToCheckFunc(s, f) == nil {
-					ret false
+					// Avoid checking body of the function instance and etc.
+					f.Instances[0].checked = true
+					ok = false
 				}
 			}
 		}
