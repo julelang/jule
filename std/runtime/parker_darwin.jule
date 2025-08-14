@@ -1,0 +1,101 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Thread parking for Darwin-based systems.
+//
+// Following information and implementation is adopted from Rust:
+// https://github.com/rust-lang/rust/blob/350d0ef0ec0493e6d21cfb265cb8211a0e74d766/library/std/src/sys/sync/thread_parking/darwin.rs
+//
+// Darwin actually has futex syscalls (`__ulock_wait`/`__ulock_wake`), but they
+// cannot be used in Jule runtime because they are non-public (their use will lead to
+// rejection from the App Store).
+//
+// Therefore, we need to look for other synchronization primitives. Luckily, Darwin
+// supports semaphores, which allow us to implement the behavior we need with
+// only one primitive (as opposed to a mutex-condvar pair). We use the semaphore
+// provided by libdispatch, as the underlying Mach semaphore is only dubiously
+// public.
+
+use "std/internal/runtime"
+use "std/internal/runtime/atomic"
+use "std/sys"
+
+cpp use "<dispatch/dispatch.h>"
+
+// Contained in libSystem.dylib, which is linked by default.
+cpp let dispatch_semaphore_create: *unsafe
+cpp let dispatch_semaphore_signal: *unsafe
+cpp let dispatch_semaphore_wait: *unsafe
+cpp let dispatch_release: *unsafe
+
+const (
+	_PARK_EMPTY    = 0
+	_PARK_NOTIFIED = 1
+	_PARK_PARKED   = -1
+)
+
+const (
+	_DISPATCH_TIME_NOW:     u64 = 0
+	_DISPATCH_TIME_FOREVER: u64 = ^0
+)
+
+const parkerSize = runtime::PtrSize + 1
+
+// Thread parking implementation of the Darwin-based systems.
+struct parker {
+	sema:  *unsafe
+	state: i8
+}
+
+impl parker {
+	fn init(mut *self) {
+		if self.sema != nil {
+			ret
+		}
+		self.sema = sys::Addrcall[*unsafe](uintptr(cpp.dispatch_semaphore_create), 0)
+		if self.sema == nil {
+			panic("runtime: failed to create dispatch semaphore for thread parking")
+		}
+	}
+
+	fn park(mut *self) {
+		// The semaphore counter must be zero at this point, because unparking
+		// threads will not actually increase it until we signalled that we
+		// are waiting.
+
+		// Change NOTIFIED to EMPTY and EMPTY to PARKED.
+		if atomic::Add(&self.state, -1, atomic::Acquire) == _PARK_EMPTY {
+			ret
+		}
+
+		// Another thread may increase the semaphore counter from this point on.
+		// If it is faster than us, we will decrement it again immediately below.
+		// If we are faster, we wait.
+
+		// Ensure that the semaphore counter has actually been decremented, even
+		// if the call timed out for some reason.
+		for sys::Addrcall[int](uintptr(cpp.dispatch_semaphore_wait), self.sema, _DISPATCH_TIME_FOREVER) != 0 {
+		}
+
+		// At this point, the semaphore counter is zero again.
+
+		// We were definitely woken up, so we don't need to check the state.
+		// Still, we need to reset the state using a swap to observe the state
+		// change with acquire ordering.
+		atomic::Store(&self.state, _PARK_EMPTY, atomic::Acquire)
+	}
+
+	fn unpark(mut *self) {
+		if atomic::Swap(&self.state, _PARK_NOTIFIED, atomic::Release) == _PARK_PARKED {
+			sys::Addrcall(uintptr(cpp.dispatch_semaphore_signal), self.sema)
+		}
+	}
+
+	fn release(mut *self) {
+		// SAFETY:
+		// We always ensure that the semaphore count is reset, so this will
+		// never cause an exception.
+		sys::Addrcall(uintptr(cpp.dispatch_release), self.sema)
+	}
+}

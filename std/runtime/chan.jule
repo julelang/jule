@@ -75,6 +75,44 @@ impl chanQueue {
 	}
 }
 
+struct waitq {
+	head: &parkerList
+	tail: &parkerList
+}
+
+// Unparks a thread from the waiters q.
+#disable nilptr
+fn unparkOne(mut &q: *waitq) {
+	mut p, mut s := (&parkerList)(nil), q.head
+	for s != nil; p, s = s, s.next {
+		mut n := s.next
+		if p != nil {
+			p.next = n
+		} else {
+			q.head = n
+		}
+		if n == nil {
+			q.tail = p
+		}
+		s.next = nil
+		s.parker.unpark()
+		ret
+	}
+}
+
+// Unparks all threads from the waiters q.
+#disable nilptr
+fn unparkAll(mut &q: *waitq) {
+	// Go through the local list and ready all waiters.
+	mut s := q.head
+	for s != nil {
+		mut next := s.next
+		s.next = nil
+		unsafe { s.parker.unpark() }
+		s = next
+	}
+}
+
 // Channel state flags.
 const (
 	chanClosed = 1 << iota
@@ -87,10 +125,12 @@ const (
 // shared, type-independent manner, may used with Unsafe Jule.
 // It should not be copied.
 struct hchan {
-	lock:  fmutex
-	cap:   int
-	len:   int
-	state: u32
+	lock:  fmutex // Protects all fields.
+	cap:   int    // Capacity of the channel.
+	len:   int    // Length of the channel.
+	state: u32    // State of the channel.
+	sendq: waitq  // List of send waiters.
+	recvq: waitq  // List of recv waiter.
 }
 
 // The channel implementation of the language. The fields are
@@ -103,11 +143,13 @@ struct hchan {
 // The compiler creates channels in the background using the [pchan[T].new]
 // static method. Behind the scenes, each channel is treated as a smart pointer.
 struct pchan[T] {
-	lock:  fmutex
-	cap:   int
-	len:   int
-	state: u32
-	queue: chanQueue[T]
+	lock:  fmutex       // Protects all fields.
+	cap:   int          // Capacity of the channel.
+	len:   int          // Length of the channel.
+	state: u32          // State of the channel.
+	sendq: waitq        // List of send waiters.
+	recvq: waitq        // List of recv waiter.
+	queue: chanQueue[T] // Data queue.
 }
 
 impl pchan {
@@ -115,6 +157,7 @@ impl pchan {
 	// If cap >= 1, it is initialized as a buffered channel,
 	// otherwise, it is initialized as an unbuffered channel.
 	// A negative value for cap will cause a panic.
+	#disable nilptr
 	fn new(cap: int): &pchan[T] {
 		mut ch := new(pchan[T])
 		if cap < 0 {
@@ -131,19 +174,24 @@ impl pchan {
 	// Returns the channel as a &hchan for general sharing of pchan[T].
 	// The returned &hchan does not exhibit GC behavior and can be used until
 	// the self pointer is freed, after which it should not be used.
+	#disable nilptr
 	fn hchan(mut *self): &hchan {
 		ret unsafe { (&hchan)((*hchan)(self)) }
 	}
 
 	// Closes the channel.
+	#disable nilptr
 	fn close(mut *self) {
 		self.lock.lock()
 		self.state |= chanClosed
+		unparkAll(&self.recvq) // Release all readers.
+		unparkAll(&self.sendq) // Release all writers (they will panic).
 		self.lock.unlock()
 	}
 
 	// Sends the data to the channel.
 	// If owned is true, assumes lock is already owned by the current caller.
+	#disable nilptr
 	fn send(mut *self, mut data: T, owned: bool) {
 		if !owned {
 			self.lock.lock()
@@ -151,24 +199,31 @@ impl pchan {
 		if self.state&chanBuffered == chanBuffered {
 			// If the capacity is completely consumed, wait until space becomes available.
 			// When some data is received, there will be space in the queue to write.
-			chanpark(self.hchan(), &self.len, &self.cap, reasonSend)
+			if self.len == self.cap {
+				chanpark(self.hchan(), reasonSend)
+			}
 			if self.state&chanClosed == chanClosed {
 				panic("runtime: send on closed channel")
 			}
 			self.queue.enqueue(&data)
 			self.len++
+			// Unpark a recv waiter, so it may receive the data.
+			unparkOne(&self.recvq)
 		} else {
-			one := 1
 			// If there is data waiting to be received, wait until it is received.
-			chanpark(self.hchan(), &self.len, &one, reasonSend)
+			if self.len > 0 {
+				chanpark(self.hchan(), reasonSend)
+			}
 			if self.state&chanClosed == chanClosed {
 				panic("runtime: send on closed channel")
 			}
 			self.queue.enqueue(&data)
 			self.len++
+			// Unpark a recv waiter, so it may receive the data.
+			unparkOne(&self.recvq)
 			// Wait until the length becomes zero.
 			// This means the data has been received.
-			chanpark(self.hchan(), &self.len, &one, reasonSend)
+			chanpark(self.hchan(), reasonSend)
 		}
 		self.lock.unlock()
 	}
@@ -177,13 +232,17 @@ impl pchan {
 	// The |ok| is the reference that points to boolean and
 	// it reports whether data dequeued and received successfully.
 	// If owned is true, assumes lock is already owned by the current caller.
+	#disable nilptr
 	fn recv(mut *self, mut &ok: *bool, owned: bool): T {
 		if !owned {
 			self.lock.lock()
 		}
-		zero := 0
 		// If there is no data waiting to be received in the queue, wait until there is.
-		chanpark(self.hchan(), &zero, &self.len, reasonRecv)
+		if self.state&chanClosed != chanClosed && self.len == 0 {
+			// Unpark a send waiter, so it may sent data.
+			unparkOne(&self.sendq)
+			chanpark(self.hchan(), reasonRecv)
+		}
 		// chanpark returns when the condition met or channel has been closed.
 		// An unbuffered channel cannot have a queue, so its length always varies
 		// between 0 and 1. If there is no data to receive, the only possibility is
@@ -209,6 +268,8 @@ impl pchan {
 		}
 		mut data := self.queue.dequeue()
 		self.len--
+		// Unpark a send waiter, so it may sent data.
+		unparkOne(&self.sendq)
 		self.lock.unlock()
 		if ok != nil {
 			*ok = true
@@ -218,28 +279,45 @@ impl pchan {
 }
 
 // The channel halts execution until the required condition is met.
-// ch represents the channel, n is the field data used for comparison,
-// and c indicates the value that n should be smaller than.
-// This function must be called with the channel lock held by this thread.
+// This function must be called with the channel lock held by the current thread.
 // Even if the condition is not met, it will return if the channel is in a closed state.
-fn chanpark(ch: &hchan, &n: *int, &c: *int, mut reason: u32) {
-	reason |= reasonStrict
-	for {
-		if ch.state&chanClosed == chanClosed || *n < *c {
-			break
+#disable nilptr
+fn chanpark(mut ch: &hchan, mut reason: u32) {
+	// Enqueue waiter.
+	mut thread := acquireThread()
+	mut p := new(parkerList)
+	p.parker = thread.parker
+	match reason {
+	| reasonRecv:
+		if ch.recvq.tail == nil {
+			ch.recvq.head = p
+		} else {
+			ch.recvq.tail.next = p
 		}
-		// The lock is acquired. This means no changes can occur in the channel.
-		// We must release the lock and immediately switch to a different thread.
-		yield(uintptr(&ch.lock), reason)
-		reason &= ^reasonStrict
-		// After the thread wakes up, we must acquire the lock
-		// before reaching the critical section again.
-		ch.lock.lock()
+		ch.recvq.tail = p
+	| reasonSend:
+		if ch.sendq.tail == nil {
+			ch.sendq.head = p
+		} else {
+			ch.sendq.tail.next = p
+		}
+		ch.sendq.tail = p
+	|:
+		panic("runtime: invalid reason for chanpark")
 	}
+
+	reason |= reasonStrict
+
+	// The lock is acquired. This means no changes can occur in the channel.
+	// We must release the lock and immediately switch to a different thread.
+	yield(uintptr(&ch.lock), &(*p.parker), reason)
+
+	ch.lock.lock()
 }
 
 // Reports whether channel can receive data.
 // Will locks the mutex, but will not release.
+#disable nilptr
 fn chanCanRecv(&ch: *hchan): (r: bool) {
 	ch.lock.lock()
 	r = ch.len > 0
@@ -248,6 +326,7 @@ fn chanCanRecv(&ch: *hchan): (r: bool) {
 
 // Reports whether channel can send data.
 // Will locks the mutex, but will not release.
+#disable nilptr
 fn chanCanSend(&ch: *hchan): (r: bool) {
 	ch.lock.lock()
 	if ch.state&chanBuffered == chanBuffered {
@@ -270,15 +349,12 @@ const selectThreshold = 5
 // Otherwise returns -1 which means no selected case. It only appears for non-blocking selects.
 // The channel's mutex will be locked already for the selected case.
 // For empty select statement, chans should be nil.
+#disable nilptr
 unsafe fn chanSelect(chans: *&hchan, totalChans: int, recvChans: int, block: bool): int {
 	// Empty or blocking-select statement.
 	if block || chans == nil {
-		mut t := getCurrentThread()
 		threadMutex.lock()
-		// Add special case for empty select.
-		if chans == nil {
-			threadCases |= threadSC_EmptySelect
-		}
+		mut t := getCurrentThread()
 		// Set thread state as suspended with select reason
 		// We do not need to frame analysis for this thread.
 		// If we enable the frame analysis for this thread, deadlock analysis caught
@@ -290,6 +366,8 @@ unsafe fn chanSelect(chans: *&hchan, totalChans: int, recvChans: int, block: boo
 		if chans == nil {
 			// We have to specify if this select statement is empty select.
 			t.state |= reasonSelectEmpty
+			// Add special case for empty select.
+			threadCases |= threadSC_EmptySelect
 		}
 		t.frame = 0
 		// Check deadlock before sleep and release mutex.
@@ -297,15 +375,15 @@ unsafe fn chanSelect(chans: *&hchan, totalChans: int, recvChans: int, block: boo
 		threadMutex.unlock()
 		// Empty select statement. Yield CPU indefinitely.
 		if chans == nil {
-			// Put thread into sleep for a hour.
-			// We do not need to yield CPU, this thread will never continue to run.
-			// It always yields CPU, so put it into deep sleep.
-			// Other threads can caught deadlocks, if any, after this stage.
-			// If this thread is the single thread, we already checked deadlocks.
-			// So put this thread into deep sleep indefinitely, do not waste CPU with fast cycles.
-			for {
-				sleep(1 * _Hour)
-			}
+			// Park thread indefinitely.
+			// We do not need to yield CPU with temporary parking,
+			// this thread will never continue to run.
+			// It always yields CPU due to empty select statement,
+			// so put it into deep sleep. Other threads can caught deadlocks,
+			// if any, after this stage. If this thread is the single thread,
+			// we already checked deadlocks. So put this thread into deep sleep
+			// indefinitely.
+			t.parker.park()
 			panic("unreachable")
 		}
 	}

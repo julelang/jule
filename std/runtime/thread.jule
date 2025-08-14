@@ -41,6 +41,9 @@ struct thread {
 	// It may be a mutex pointer for channel, of a sema pointer for mutex.
 	mu: uintptr
 
+	// Parker of the thread.
+	parker: &parker
+
 	// Pointer to the next thread.
 	// Threads stored in the thread stack with a singly linked-list.
 	next: &thread
@@ -80,6 +83,7 @@ fn NumCPU(): int { ret numcpu }
 //	will be marked as closed. Closed threads may be reused if a new thread spawned.
 //	It helps reduce the memory overhead of programs with high thread usage.
 //	Some tools like Valgrind may detect as memory leak, but this was done on purpose.
+#disable nilptr
 fn newThread(): &thread {
 	mut t := new(thread)
 	unsafe {
@@ -101,6 +105,11 @@ fn newThread(): &thread {
 		p.Ref = nil
 	}
 	t.state |= threadRunning
+
+	// Initialized once and never deallocated if thread waiting for resuse.
+	t.parker = new(parker)
+	t.parker.init()
+
 	ret t
 }
 
@@ -112,6 +121,7 @@ fn newThread(): &thread {
 // This function assumes |threads| is not nil. So we must have a thread pointer
 // associated with a thread in thread stack, it should be the main thread.
 // New created threads should be added to the main thread's tail.
+#disable nilptr
 fn pushNewThread(): &thread {
 	threadMutex.lock()
 	// Lookup for empty threads to caught ready to reuse thread if exist.
@@ -133,6 +143,8 @@ fn pushNewThread(): &thread {
 }
 
 // Returns the thread associated with current thread.
+// It does not locks the thread-mutex.
+#disable nilptr
 fn getCurrentThread(): &thread {
 	id := currentThreadID()
 	mut t := threads
@@ -144,10 +156,22 @@ fn getCurrentThread(): &thread {
 	ret nil
 }
 
+// Returns the thread associated with the current thread.
+// It does locks the thread-mutex, thread-safe.
+fn acquireThread(): &thread {
+	threadMutex.lock()
+	mut thread := getCurrentThread()
+	threadMutex.unlock()
+	ret thread
+}
+
 // Suspends the current thread and yields the CPU.
 // If the mu is not zero, assumes it already locked and releases before yield.
 // If reason is related with a sema, will not handle mu as a mutex.
-fn yield(mu: uintptr, mut reason: u32) {
+// If the parker is not nil, parks suspended thread.
+// The thread can be made runnable again by calling [parker.unpark].
+#disable nilptr
+fn yield(mu: uintptr, mut &parker: *parker, mut reason: u32) {
 	threadMutex.lock()
 	mut t := getCurrentThread()
 	if t == nil {
@@ -166,7 +190,7 @@ fn yield(mu: uintptr, mut reason: u32) {
 	// There is nothing to do for this thread for now, so release lock.
 	threadMutex.unlock()
 	// Release mutex if reason is not related with a sema.
-	if mu != 0 && reason&reasonMutex != reasonMutex && reason&reasonWaitGroup != reasonWaitGroup {
+	if mu != 0 {
 		unsafe { (*fmutex)(mu).unlock() }
 	}
 	// Yield the CPU if possible, it may return immediately for the same thread.
@@ -203,10 +227,14 @@ fn yield(mu: uintptr, mut reason: u32) {
 	//	In the worst case, detecting a deadlock may require waiting for a
 	//	duration of up to for all frame rights to be consumed but it should be
 	//	cheap and balanced.
-	if frameConsumed {
-		sleep(pauseThreshold)
+	if parker == nil {
+		if frameConsumed {
+			sleep(pauseThreshold)
+		} else {
+			osyield()
+		}
 	} else {
-		osyield()
+		parker.park()
 	}
 	// CPU is back for this thread.
 	// Lock mutex again and wake up.
@@ -217,6 +245,7 @@ fn yield(mu: uintptr, mut reason: u32) {
 }
 
 // Closes the thread associated with tptr, if exist.
+#disable nilptr
 fn closeThread(tptr: *unsafe) {
 	threadMutex.lock()
 	mut t := threads
@@ -242,6 +271,7 @@ fn closeThread(tptr: *unsafe) {
 
 // Checks deadlock and panics if exist.
 // mut and reason is stores the current thread's parameters to yield CPU.
+#disable nilptr
 fn checkDeadlock(mu: uintptr, reason: u32): (frameConsumed: bool) {
 	// At this point, we should manage all threads under more diverse conditions.
 	// At the end, we have do frame count analysis.

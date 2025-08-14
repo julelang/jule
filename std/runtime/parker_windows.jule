@@ -1,0 +1,94 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Thread parking for Windows-based systems.
+//
+// Following information and implementation is adopted from Rust:
+// https://github.com/rust-lang/rust/blob/350d0ef0ec0493e6d21cfb265cb8211a0e74d766/library/std/src/sys/sync/thread_parking/windows7.rs
+//
+// This uses WaitOnAddress and WakeByAddressSingle (supported on Windows 8+).
+// This modern API is exactly the same as the futex syscalls the Linux thread
+// parker uses. The implementation of this thread parker matches the Linux
+// thread parker exactly.
+//
+// WaitOnAddress first checks the state of the thread parker to make sure it no
+// WakeByAddressSingle calls can be missed between updating the parker state
+// and calling the function.
+//
+// Notes about memory ordering:
+//
+// Memory ordering is only relevant for the relative ordering of operations
+// between different variables. Even atomic::Relaxed guarantees a
+// monotonic/consistent order when looking at just a single atomic variable.
+//
+// So, since this parker is just a single atomic variable, we only need to look
+// at the ordering guarantees we need to provide to the 'outside world'.
+//
+// The only memory ordering guarantee that parking and unparking provide, is
+// that things which happened before unpark() are visible on the thread
+// returning from park() afterwards. Otherwise, it was effectively unparked
+// before unpark() was called while still consuming the 'token'.
+//
+// In other words, unpark() needs to synchronize with the part of park() that
+// consumes the token and returns.
+//
+// This is done with a release-acquire synchronization, by using
+// atomic::Release when writing NOTIFIED (the 'token') in unpark(), and using
+// atomic::Acquire when reading this state in park() after waking up.
+
+use "std/internal/runtime/atomic"
+use "std/internal/sys/windows"
+
+const (
+	_PARK_EMPTY    = 0
+	_PARK_NOTIFIED = 1
+	_PARK_PARKED   = -1
+)
+
+// Thread parking implementation of the Windows-based systems.
+struct parker {
+	state: i8
+}
+
+impl parker {
+	fn init(mut *self) {
+		// Nothing to do.
+	}
+
+	fn park(mut *self) {
+		// Change NOTIFIED=>EMPTY or EMPTY=>PARKED, and directly return in the
+		// first case.
+		if atomic::Add(&self.state, -1, atomic::Acquire) == _PARK_EMPTY {
+			ret
+		}
+
+		for {
+			// Wait for something to happen, assuming it's still set to PARKED.
+			windows::WaitOnAddress(&self.state, _PARK_PARKED, windows::INFINITE)
+			// Change NOTIFIED=>EMPTY but leave PARKED alone.
+			if atomic::CompareAndSwap(&self.state, _PARK_NOTIFIED, _PARK_EMPTY, atomic::Acquire) {
+				// Actually woken up by unpark().
+				ret
+			} else {
+				// Spurious wake up. We loop to try again.
+			}
+		}
+	}
+
+	fn unpark(mut *self) {
+		// Change PARKED=>NOTIFIED, EMPTY=>NOTIFIED, or NOTIFIED=>NOTIFIED, and
+		// wake the thread in the first case.
+		//
+		// Note that even NOTIFIED=>NOTIFIED results in a write. This is on
+		// purpose, to make sure every unpark() has a release-acquire ordering
+		// with park().
+		if atomic::Swap(&self.state, _PARK_NOTIFIED, atomic::Release) == _PARK_PARKED {
+			windows::WakeByAddressSingle(&self.state)
+		}
+	}
+
+	fn release(mut *self) {
+		// Nothing to do.
+	}
+}
