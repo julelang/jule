@@ -228,15 +228,22 @@ fn semrelease(mut &sema: *u32, handoff: bool) {
 		atomic::Add(&root.nwait, ^u32(0), atomic::SeqCst)
 	}
 	root.lock.unlock()
+	// May be slow or even yield, so unlock first.
 	if p != nil {
-		unsafe { p.parker.unpark() }
-	}
-	// If handoff is true, immediately yield the CPU with no analysis.
-	// This thread is not the expected owner of the next semacquire.
-	// So this thread doesn't matter for now, yield the CPU to increase
-	// the chances of semacquire of the dequeued thread.
-	if handoff {
-		osyield()
+		if p.ticket != 0 {
+			panic("runtime: invalid semaphore ticket")
+		}
+		if handoff && cansemacquire(sema) {
+			p.ticket = 1
+		}
+		p.parker.unpark()
+		// If handoff is true, immediately yield the CPU with no analysis.
+		// This thread is not the expected owner of the next semacquire.
+		// So this thread doesn't matter for now, yield the CPU to increase
+		// the chances of semacquire of the dequeued thread.
+		if handoff && p.ticket == 1 {
+			osyield()
+		}
 	}
 }
 
@@ -387,7 +394,7 @@ fn notifyListNotifyAll(mut &l: *notifyList) {
 	for s != nil {
 		mut next := s.next
 		s.next = nil
-		unsafe { s.parker.unpark() }
+		s.parker.unpark()
 		s = next
 	}
 }

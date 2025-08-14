@@ -80,23 +80,45 @@ struct waitq {
 	tail: &parkerList
 }
 
+impl waitq {
+	#disable nilptr
+	fn enqueue(mut *self, mut p: &parkerList) {
+		if self.tail == nil {
+			self.head = p
+		} else {
+			self.tail.next = p
+		}
+		self.tail = p
+	}
+
+	#disable nilptr
+	fn dequeue(mut *self, ticket: u32): &parkerList {
+		mut p, mut s := (&parkerList)(nil), self.head
+		for s != nil; p, s = s, s.next {
+			if s.ticket == ticket {
+				mut n := s.next
+				if p != nil {
+					p.next = n
+				} else {
+					self.head = n
+				}
+				if n == nil {
+					self.tail = p
+				}
+				s.next = nil
+				ret s
+			}
+		}
+		ret nil
+	}
+}
+
 // Unparks a thread from the waiters q.
 #disable nilptr
 fn unparkOne(mut &q: *waitq) {
-	mut p, mut s := (&parkerList)(nil), q.head
-	for s != nil; p, s = s, s.next {
-		mut n := s.next
-		if p != nil {
-			p.next = n
-		} else {
-			q.head = n
-		}
-		if n == nil {
-			q.tail = p
-		}
-		s.next = nil
-		s.parker.unpark()
-		ret
+	mut p := q.dequeue(0)
+	if p != nil {
+		p.parker.unpark()
 	}
 }
 
@@ -126,7 +148,7 @@ const (
 // It should not be copied.
 struct hchan {
 	lock:  fmutex // Protects all fields.
-	cap:   int    // Capacity of the channel.
+	cap:   int    // Capacity of the channel. Zero if channel is unbuffered.
 	len:   int    // Length of the channel.
 	state: u32    // State of the channel.
 	sendq: waitq  // List of send waiters.
@@ -144,7 +166,7 @@ struct hchan {
 // static method. Behind the scenes, each channel is treated as a smart pointer.
 struct pchan[T] {
 	lock:  fmutex       // Protects all fields.
-	cap:   int          // Capacity of the channel.
+	cap:   int          // Capacity of the channel. Zero if channel is unbuffered.
 	len:   int          // Length of the channel.
 	state: u32          // State of the channel.
 	sendq: waitq        // List of send waiters.
@@ -196,12 +218,37 @@ impl pchan {
 		if !owned {
 			self.lock.lock()
 		}
-		if self.state&chanBuffered == chanBuffered {
-			// If the capacity is completely consumed, wait until space becomes available.
-			// When some data is received, there will be space in the queue to write.
-			if self.len == self.cap {
+
+		// Buffered channels:
+		//		If the capacity is completely consumed, wait until space becomes available.
+		// 	When some data is received, there will be space in the queue to write.
+		//
+		// Unbuffered channels:
+		//		If there is data waiting to be received, wait until it is received.
+		if self.cap > 0 && self.len == self.cap ||
+			self.cap == 0 && self.len > 0 {
+			// If we found a receiver waiting for the receive data,
+			// do not park the thread with the classic chanpark function.
+			// First enqueue itself to be unparked by the receiver.
+			// Then park and wait for the data. Otherwise, slient deadlock may occur.
+			// Because unparkOne+chanpark does not play well.
+			// When calling unparkOne, the receiver may be complete until we
+			// enqueue the sender. So sender will wait for no reason.
+			// Also we avoid to making deadlock analysis with this approach.
+			mut p := self.recvq.dequeue(0)
+			if p != nil {
+				mut t := acquireThread()
+				self.sendq.enqueue(&parkerList{parker: t.parker})
+				self.lock.unlock()
+				p.parker.unpark()
+				t.parker.park()
+				self.lock.lock()
+			} else {
 				chanpark(self.hchan(), reasonSend)
 			}
+		}
+
+		if self.cap > 0 { // Buffered channel.
 			if self.state&chanClosed == chanClosed {
 				panic("runtime: send on closed channel")
 			}
@@ -210,20 +257,27 @@ impl pchan {
 			// Unpark a recv waiter, so it may receive the data.
 			unparkOne(&self.recvq)
 		} else {
-			// If there is data waiting to be received, wait until it is received.
-			if self.len > 0 {
-				chanpark(self.hchan(), reasonSend)
-			}
 			if self.state&chanClosed == chanClosed {
 				panic("runtime: send on closed channel")
 			}
 			self.queue.enqueue(&data)
 			self.len++
-			// Unpark a recv waiter, so it may receive the data.
-			unparkOne(&self.recvq)
-			// Wait until the length becomes zero.
-			// This means the data has been received.
-			chanpark(self.hchan(), reasonSend)
+
+			// If we found a receiver waiting for the data, do not park the thread.
+			// Unpark the waiter and return immediately.
+			// The waiter thread will receive the data.
+			mut p := self.recvq.dequeue(0)
+			if p != nil {
+				self.lock.unlock()
+				p.parker.unpark()
+				ret
+			} else {
+				// No waiter found, we have to park this thread.
+				// Wait until the length becomes zero.
+				// This means the data has been received.
+				chanpark(self.hchan(), reasonRecvBlocking)
+				ret
+			}
 		}
 		self.lock.unlock()
 	}
@@ -238,11 +292,37 @@ impl pchan {
 			self.lock.lock()
 		}
 		// If there is no data waiting to be received in the queue, wait until there is.
-		if self.state&chanClosed != chanClosed && self.len == 0 {
-			// Unpark a send waiter, so it may sent data.
-			unparkOne(&self.sendq)
-			chanpark(self.hchan(), reasonRecv)
+		if self.state&chanClosed != chanClosed {
+			if self.cap == 0 && self.len > 0 {
+				// Channel is unbuffered and length is not zero.
+				// So a sender sent data and waits to be unparked by the receiver.
+				mut p := self.sendq.dequeue(1)
+				if p != nil {
+					p.parker.unpark()
+				}
+			} else if self.len == 0 {
+				mut p := self.sendq.dequeue(0)
+				// If we found a sender waiting for the send data,
+				// do not park the thread with the classic chanpark function.
+				// First enqueue itself to be unparked by the sender.
+				// Then park and wait for the data. Otherwise, slient deadlock may occur.
+				// Because unparkOne+chanpark does not play well.
+				// When calling unparkOne, the sender may be complete until we
+				// enqueue the receiver. So receiver will wait for no reason.
+				// Also we avoid to making deadlock analysis with this approach.
+				if p != nil {
+					mut t := acquireThread()
+					self.recvq.enqueue(&parkerList{parker: t.parker})
+					self.lock.unlock()
+					p.parker.unpark()
+					t.parker.park()
+					self.lock.lock()
+				} else {
+					chanpark(self.hchan(), reasonRecv)
+				}
+			}
 		}
+
 		// chanpark returns when the condition met or channel has been closed.
 		// An unbuffered channel cannot have a queue, so its length always varies
 		// between 0 and 1. If there is no data to receive, the only possibility is
@@ -281,6 +361,7 @@ impl pchan {
 // The channel halts execution until the required condition is met.
 // This function must be called with the channel lock held by the current thread.
 // Even if the condition is not met, it will return if the channel is in a closed state.
+// Locks the channel mutex before return, except for reasonRecvBlocking.
 #disable nilptr
 fn chanpark(mut ch: &hchan, mut reason: u32) {
 	// Enqueue waiter.
@@ -289,19 +370,14 @@ fn chanpark(mut ch: &hchan, mut reason: u32) {
 	p.parker = thread.parker
 	match reason {
 	| reasonRecv:
-		if ch.recvq.tail == nil {
-			ch.recvq.head = p
-		} else {
-			ch.recvq.tail.next = p
-		}
-		ch.recvq.tail = p
+		ch.recvq.enqueue(p)
 	| reasonSend:
-		if ch.sendq.tail == nil {
-			ch.sendq.head = p
-		} else {
-			ch.sendq.tail.next = p
-		}
-		ch.sendq.tail = p
+		ch.sendq.enqueue(p)
+	| reasonRecvBlocking:
+		// Store receiver blocker threads with
+		// ticket 1 to detect them easily.
+		p.ticket = 1
+		ch.sendq.enqueue(p)
 	|:
 		panic("runtime: invalid reason for chanpark")
 	}
@@ -312,7 +388,9 @@ fn chanpark(mut ch: &hchan, mut reason: u32) {
 	// We must release the lock and immediately switch to a different thread.
 	yield(uintptr(&ch.lock), &(*p.parker), reason)
 
-	ch.lock.lock()
+	if p.ticket == 0 {
+		ch.lock.lock()
+	}
 }
 
 // Reports whether channel can receive data.
