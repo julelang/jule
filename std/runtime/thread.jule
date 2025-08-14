@@ -181,7 +181,7 @@ fn yield(mu: uintptr, mut &parker: *parker, mut reason: u32) {
 	// Strict reason passed, this yield call is should be the first call
 	// from parking algorithm. Reset frame count of the thread.
 	if reason&reasonStrict == reasonStrict {
-		t.frame = 4
+		t.frame = 1
 		reason &= ^reasonStrict
 	}
 	t.state |= threadSuspended | reason
@@ -274,6 +274,11 @@ fn closeThread(tptr: *unsafe) {
 // mut and reason is stores the current thread's parameters to yield CPU.
 #disable nilptr
 fn checkDeadlock(mu: uintptr, reason: u32): (frameConsumed: bool) {
+	// Fast path: single thread.
+	if threads.next == nil {
+		panic("runtime: all threads are asleep - deadlock!")
+	}
+
 	// At this point, we should manage all threads under more diverse conditions.
 	// At the end, we have do frame count analysis.
 	//
@@ -451,18 +456,6 @@ fn checkDeadlock(mu: uintptr, reason: u32): (frameConsumed: bool) {
 				// No requirement for heavy analysis, return immediately.
 				ret
 			}
-			// If mu is non-zero and reason is mutex.
-			// For a fast check, we can try sema value.
-			// If sema is not locked, mutex have a chance, so no deadlock risk.
-			// It also prevents fake deadlock analysis results for mutexes.
-			// For example: all threads tries to lock a mutex and they in the suspended
-			// state but no one locked the mutex yet. In this case common analysis will
-			// result as deadlock due to all threads suspended.
-			if t.mu != 0 && t.state&reasonMutex == reasonMutex {
-				if atomic::Load(unsafe { (*u32)(t.mu) }, atomic::Relaxed) > 0 {
-					ret
-				}
-			}
 			if t.state&reasonWaitGroup != reasonWaitGroup {
 				// Reason of this thread is not WaitGroup.
 				// So all threads are not in the wait-state WaitGroups.
@@ -488,19 +481,19 @@ fn checkDeadlock(mu: uintptr, reason: u32): (frameConsumed: bool) {
 	// We must be count all possible |wgRuns| data here.
 	// So check and return immediately if reason is WaitGroup and |wgRuns| condition met.
 	// See the hard point for documentation.
-	if wgRuns >= 1 && reason&reasonWaitGroup == reasonWaitGroup {
+	if wgRuns > 0 && reason&reasonWaitGroup == reasonWaitGroup {
 		ret
 	}
 	// We must be count all possible |condRuns| data here.
 	// So check and return immediately if reason is condition variable and |condRuns| condition met.
 	// See the hard point for documentation.
-	if condRuns >= 1 && reason&reasonCond == reasonCond {
+	if condRuns > 0 && reason&reasonCond == reasonCond {
 		ret
 	}
 	// We must be count all possible |nonlocked| data here.
 	// So check and return immediately if reason is Mutex and |nonlocked| condition met.
 	// See the hard point for documentation.
-	if nonlocked >= 1 && reason&reasonMutex == reasonMutex {
+	if nonlocked > 0 && reason&reasonMutex == reasonMutex {
 		ret
 	}
 	// There is no running active thread for common cases, but we have non-zero mu.
