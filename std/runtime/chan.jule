@@ -37,7 +37,7 @@ impl chanQueue {
 		} else {
 			q.buf = make([]T, 1)
 		}
-		q.data = unsafe { (*runtime::Slice[T])(&q.buf).Slice }
+		q.data = &q.buf[0]
 		ret q
 	}
 
@@ -256,6 +256,7 @@ impl pchan {
 			self.len++
 			// Unpark a recv waiter, so it may receive the data.
 			unparkOne(&self.recvq)
+			self.lock.unlock()
 		} else {
 			if self.state&chanClosed == chanClosed {
 				panic("runtime: send on closed channel")
@@ -270,16 +271,13 @@ impl pchan {
 			if p != nil {
 				self.lock.unlock()
 				p.parker.unpark()
-				ret
 			} else {
 				// No waiter found, we have to park this thread.
 				// Wait until the length becomes zero.
 				// This means the data has been received.
 				chanpark(self.hchan(), reasonRecvBlocking)
-				ret
 			}
 		}
-		self.lock.unlock()
 	}
 
 	// Receives the data from the channel.
@@ -300,25 +298,31 @@ impl pchan {
 				if p != nil {
 					p.parker.unpark()
 				}
-			} else if self.len == 0 {
-				mut p := self.sendq.dequeue(0)
-				// If we found a sender waiting for the send data,
-				// do not park the thread with the classic chanpark function.
-				// First enqueue itself to be unparked by the sender.
-				// Then park and wait for the data. Otherwise, slient deadlock may occur.
-				// Because unparkOne+chanpark does not play well.
-				// When calling unparkOne, the sender may be complete until we
-				// enqueue the receiver. So receiver will wait for no reason.
-				// Also we avoid to making deadlock analysis with this approach.
-				if p != nil {
-					mut t := acquireThread()
-					self.recvq.enqueue(&parkerList{parker: t.parker})
-					self.lock.unlock()
-					p.parker.unpark()
-					t.parker.park()
-					self.lock.lock()
-				} else {
-					chanpark(self.hchan(), reasonRecv)
+			} else {
+				// Make sure channel is closed or data is received.
+				// This is needed because a different thread may receive data
+				// before the current thread, so length will be zero.
+				// In such a case, we have to wait for new data.
+				for self.state&chanClosed != chanClosed && self.len == 0 {
+					mut p := self.sendq.dequeue(0)
+					// If we found a sender waiting for the send data,
+					// do not park the thread with the classic chanpark function.
+					// First enqueue itself to be unparked by the sender.
+					// Then park and wait for the data. Otherwise, slient deadlock may occur.
+					// Because unparkOne+chanpark does not play well.
+					// When calling unparkOne, the sender may be complete until we
+					// enqueue the receiver. So receiver will wait for no reason.
+					// Also we avoid to making deadlock analysis with this approach.
+					if p != nil {
+						mut t := acquireThread()
+						self.recvq.enqueue(&parkerList{parker: t.parker})
+						self.lock.unlock()
+						p.parker.unpark()
+						t.parker.park()
+						self.lock.lock()
+					} else {
+						chanpark(self.hchan(), reasonRecv)
+					}
 				}
 			}
 		}
