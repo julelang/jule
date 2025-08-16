@@ -394,8 +394,6 @@ fn chanpark(mut ch: &hchan, mut reason: u32) {
 		panic("runtime: invalid reason for chanpark")
 	}
 
-	reason |= reasonStrict
-
 	// The lock is acquired. This means no changes can occur in the channel.
 	// We must release the lock and immediately switch to a different thread.
 	yield(uintptr(&ch.lock), &(*p.parker), reason)
@@ -445,13 +443,6 @@ unsafe fn chanSelect(chans: *&hchan, totalChans: int, recvChans: int, block: boo
 	if block || chans == nil {
 		threadMutex.lock()
 		mut t := getCurrentThread()
-		// Set thread state as suspended with select reason
-		// We do not need to frame analysis for this thread.
-		// If we enable the frame analysis for this thread, deadlock analysis caught
-		// any deadlock so slow because we will put this thread into deep sleep.
-		// So do not enable frame analysis, use zero frame count. So we can caught
-		// deadlock immediately if this thread is the only thread. In other cases,
-		// other threads will caught any deadlock if occurs.
 		t.state |= threadSuspended | reasonSelect
 		if chans == nil {
 			// We have to specify if this select statement is empty select.
@@ -459,7 +450,6 @@ unsafe fn chanSelect(chans: *&hchan, totalChans: int, recvChans: int, block: boo
 			// Add special case for empty select.
 			threadCases |= threadSC_EmptySelect
 		}
-		t.frame = 0
 		// Check deadlock before sleep and release mutex.
 		checkDeadlock(0, reasonSelect)
 		threadMutex.unlock()

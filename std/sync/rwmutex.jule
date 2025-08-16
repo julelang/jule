@@ -45,7 +45,7 @@ impl RWMutex {
 	fn RLock(*self) {
 		if self.readerCount.Add(1, atomic::SeqCst) < 0 {
 			// A writer is pending, wait for it.
-			runtime::semacquire(&self.readerSem, false, runtime::semaMutex)
+			runtime::semacquire(&self.readerSem, false, runtime::reasonMutex)
 		}
 	}
 
@@ -99,7 +99,7 @@ impl RWMutex {
 		r := self.readerCount.Add(-rwmutexMaxReaders, atomic::SeqCst) + rwmutexMaxReaders
 		// Wait for active readers.
 		if r != 0 && self.readerWait.Add(r, atomic::SeqCst) != 0 {
-			runtime::semacquire(&self.writerSem, false, runtime::semaMutex)
+			runtime::semacquire(&self.writerSem, false, runtime::reasonMutex)
 		}
 	}
 

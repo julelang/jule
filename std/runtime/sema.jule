@@ -137,22 +137,9 @@ fn cansemacquire(mut &sema: *u32): bool {
 
 // Puts the current thread into a waiting state and unlocks the lock.
 #disable nilptr
-fn semapark(&lock: *fmutex, &sema: *u32, mut &p: *parker, opt: u32) {
-	mut reason := u32(reasonNA | reasonStrict)
-	if opt&semaWaitGroup == semaWaitGroup {
-		reason |= reasonWaitGroup
-	}
-	if opt&semaMutex == semaMutex {
-		reason |= reasonMutex
-	}
+fn semapark(&lock: *fmutex, mut &p: *parker, reason: u32) {
 	yield(uintptr(lock), p, reason)
 }
-
-// Semacquaire option flags.
-const (
-	semaWaitGroup = 1 << iota
-	semaMutex
-)
 
 // Waits until sema > 0 and then atomically decrements it.
 // It is intended as a simple sleep primitive for use by the synchronization
@@ -160,7 +147,7 @@ const (
 // If lifo is true, queue waiter at the head of wait queue.
 // wg reports whether the semacqure called by a waitgroup.
 #disable nilptr
-fn semacquire(mut &sema: *u32, lifo: bool, opt: u32) {
+fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 	// Easy case.
 	if cansemacquire(sema) {
 		ret
@@ -189,7 +176,7 @@ fn semacquire(mut &sema: *u32, lifo: bool, opt: u32) {
 		// Any semrelease after the cansemacquire knows we're waiting
 		// (we set nwait above), so go to sleep.
 		root.queue(sema, p, lifo)
-		semapark(&root.lock, sema, &(*p.parker), opt)
+		semapark(&root.lock, &(*p.parker), reason)
 		// Try to acquire semaphore before enqueue again.
 		if p.ticket != 0 || cansemacquire(sema) {
 			break
@@ -286,8 +273,6 @@ fn notifyListAdd(mut &l: *notifyList): u32 {
 // notifyListAdd was called, it returns immediately. Otherwise, it blocks.
 #disable nilptr
 fn notifyListWait(mut &l: *notifyList, t: u32) {
-	mut reason := u32(reasonCond | reasonStrict)
-
 	// Return right away if this ticket has already been notified.
 	l.lock.lock()
 	if less(t, l.notify) {
@@ -307,7 +292,7 @@ fn notifyListWait(mut &l: *notifyList, t: u32) {
 	}
 	l.tail = p
 
-	yield(uintptr(&l.lock), &(*p.parker), reason)
+	yield(uintptr(&l.lock), &(*p.parker), reasonCond)
 }
 
 // Notifies one entry in the list.
