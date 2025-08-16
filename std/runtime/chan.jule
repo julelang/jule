@@ -30,6 +30,7 @@ impl chanQueue {
 	// If cap >= 1, it also sets the last node. If cap >= 1,
 	// the channel is created as buffered, and if cap == 0,
 	// it is created as unbuffered channel.
+	#disable nilptr
 	fn new(cap: int): chanQueue[T] {
 		mut q := chanQueue[T]{}
 		if cap >= 1 {
@@ -43,6 +44,7 @@ impl chanQueue {
 
 	// Removes the first node from the queue and returns the data.
 	// Assumes that there is always data in the queue.
+	#disable boundary nilptr
 	fn dequeue(mut *self): T {
 		// Copy the data before resetting to default.
 		mut data := unsafe { self.data[self.r] }
@@ -64,6 +66,7 @@ impl chanQueue {
 	// Adds the data to the end of the queue.
 	// If the channel is unbuffered, it always assumes the current data has been read.
 	// If the channel is buffered, it always assumes there is free node to enqueue.
+	#disable boundary nilptr
 	fn enqueue(mut *self, mut &data: *T) {
 		// Write data to the next available node in the queue.
 		unsafe { self.data[self.w] = *data }
@@ -225,7 +228,7 @@ impl pchan {
 		//
 		// Unbuffered channels:
 		//		If there is data waiting to be received, wait until it is received.
-		if self.cap > 0 && self.len == self.cap ||
+		for self.cap > 0 && self.len == self.cap ||
 			self.cap == 0 && self.len > 0 {
 			// If we found a receiver waiting for the receive data,
 			// do not park the thread with the classic chanpark function.
@@ -238,7 +241,9 @@ impl pchan {
 			mut p := self.recvq.dequeue(0)
 			if p != nil {
 				mut t := acquireThread()
-				self.sendq.enqueue(&parkerList{parker: t.parker})
+				mut stacksend := parkerList{parker: t.parker}
+				mut send := unsafe { (&parkerList)(&stacksend) }
+				self.sendq.enqueue(send)
 				self.lock.unlock()
 				p.parker.unpark()
 				t.parker.park()
@@ -315,7 +320,9 @@ impl pchan {
 					// Also we avoid to making deadlock analysis with this approach.
 					if p != nil {
 						mut t := acquireThread()
-						self.recvq.enqueue(&parkerList{parker: t.parker})
+						mut stackrecv := parkerList{parker: t.parker}
+						mut recv := unsafe { (&parkerList)(&stackrecv) }
+						self.recvq.enqueue(recv)
 						self.lock.unlock()
 						p.parker.unpark()
 						t.parker.park()
@@ -370,7 +377,8 @@ impl pchan {
 fn chanpark(mut ch: &hchan, mut reason: u32) {
 	// Enqueue waiter.
 	mut thread := acquireThread()
-	mut p := new(parkerList)
+	mut stackp := parkerList{}
+	mut p := unsafe { (&parkerList)(&stackp) }
 	p.parker = thread.parker
 	match reason {
 	| reasonRecv:
