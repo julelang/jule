@@ -14,10 +14,6 @@ struct chanQueue[T] {
 	// Always len(buf) == cap(buf).
 	buf: []T
 
-	// Pointer to the first node of the buf.
-	// Used for the direct access to the memory, to avoid bound checking cost.
-	data: *T
-
 	// Read and write offsets of the queue. The read offset always points to the
 	// next node to be read and the write offset always points to the next free
 	// node to be used for enqueuing.
@@ -30,7 +26,7 @@ impl chanQueue {
 	// If cap >= 1, it also sets the last node. If cap >= 1,
 	// the channel is created as buffered, and if cap == 0,
 	// it is created as unbuffered channel.
-	#disable nilptr
+	#disable boundary nilptr
 	fn new(cap: int): chanQueue[T] {
 		mut q := chanQueue[T]{}
 		if cap >= 1 {
@@ -38,29 +34,7 @@ impl chanQueue {
 		} else {
 			q.buf = make([]T, 1)
 		}
-		q.data = &q.buf[0]
 		ret q
-	}
-
-	// Removes the first node from the queue and returns the data.
-	// Assumes that there is always data in the queue.
-	#disable boundary nilptr
-	fn dequeue(mut *self): T {
-		// Copy the data before resetting to default.
-		mut data := unsafe { self.data[self.r] }
-		unsafe {
-			// Remove the data from the node. Since this is a data type that performs GC,
-			// it will continue to exist until it is removed from the node.
-			// Remove its reference from the queue to allow it to be freed if possible.
-			let mut def: T
-			self.data[self.r] = def
-		}
-		// Advance the read order.
-		self.r++
-		if self.r == len(self.buf) {
-			self.r = 0
-		}
-		ret data
 	}
 
 	// Adds the data to the end of the queue.
@@ -69,13 +43,32 @@ impl chanQueue {
 	#disable boundary nilptr
 	fn enqueue(mut *self, mut &data: *T) {
 		// Write data to the next available node in the queue.
-		unsafe { self.data[self.w] = *data }
+		unsafe { self.buf[self.w] = *data }
 		// Advance the write order.
-		self.w++
-		if self.w == len(self.buf) {
-			self.w = 0
-		}
+		self.w = (self.w + 1) % len(self.buf)
 	}
+
+	// Removes the first node from the queue and returns the data.
+	// Assumes that there is always data in the queue.
+	#disable boundary nilptr
+	fn dequeue(mut *self): T {
+		// Copy the data before resetting to default.
+		mut data := unsafe { self.buf[self.r] }
+		unsafe {
+			// Remove the data from the node. Since this is a data type that performs GC,
+			// it will continue to exist until it is removed from the node.
+			// Remove its reference from the queue to allow it to be freed if possible.
+			let mut def: T
+			self.buf[self.r] = def
+		}
+		// Advance the read order.
+		self.r = (self.r + 1) % len(self.buf)
+		ret data
+	}
+}
+
+fn Nanotime(): i64 {
+	ret nanotime()
 }
 
 struct waitq {
@@ -221,6 +214,9 @@ impl pchan {
 		if !owned {
 			self.lock.lock()
 		}
+		if self.state&chanClosed == chanClosed {
+			panic("runtime: send on closed channel")
+		}
 
 		// Buffered channels:
 		//		If the capacity is completely consumed, wait until space becomes available.
@@ -253,22 +249,13 @@ impl pchan {
 			}
 		}
 
+		self.queue.enqueue(&data)
+		self.len++
 		if self.cap > 0 { // Buffered channel.
-			if self.state&chanClosed == chanClosed {
-				panic("runtime: send on closed channel")
-			}
-			self.queue.enqueue(&data)
-			self.len++
 			// Unpark a recv waiter, so it may receive the data.
 			unparkOne(&self.recvq)
 			self.lock.unlock()
 		} else {
-			if self.state&chanClosed == chanClosed {
-				panic("runtime: send on closed channel")
-			}
-			self.queue.enqueue(&data)
-			self.len++
-
 			// If we found a receiver waiting for the data, do not park the thread.
 			// Unpark the waiter and return immediately.
 			// The waiter thread will receive the data.
@@ -349,7 +336,6 @@ impl pchan {
 			// waiting for the channel to go out of scope, making it easier
 			// to gain used memory back efficiently. Helps to reduce memory consumption.
 			self.queue.buf = nil
-			self.queue.data = nil
 			self.lock.unlock()
 			if ok != nil {
 				*ok = false

@@ -46,6 +46,13 @@ fn CompareAndSwap[T](mut p: *T, old: T, new: T, mo: MemoryOrder): (swapped: bool
 	ret CompareAndSwapZ(p, old, new, mo)
 }
 
+// Atomically reads value of the p and compares it with old.
+// If comparison results with true, it atomically stores new value into p.
+// Reports whether swap succeeded.
+fn CompareAndSwap2[T](mut p: *T, old: T, new: T, succ: MemoryOrder, fail: MemoryOrder): (swapped: bool) {
+	ret CompareAndSwapZ2(p, old, new, succ, fail)
+}
+
 // Atomically adds delta to p with memory order mo and returns the new value.
 fn Add[T](mut p: *T, delta: T, mo: MemoryOrder): (new: T) {
 	ret AddZ(p, delta, mo)
@@ -80,6 +87,15 @@ fn LoadZ[T1, T2](p: *T1, mo: MemoryOrder): T2 {
 fn CompareAndSwapZ[T1, T2](mut p: *T1, old: T2, new: T2, mo: MemoryOrder): (swapped: bool) {
 	const Strong = 0 // strong atomicity
 	ret unsafe { cpp.__atomic_compare_exchange(p, &old, &new, Strong, mo, mo) }
+}
+
+// Atomically reads value of the p and compares it with old.
+// If comparison results with true, it atomically stores new value into p.
+// Reports whether swap succeeded.
+// T1 is a base pointer type, T2 is the output type.
+fn CompareAndSwapZ2[T1, T2](mut p: *T1, old: T2, new: T2, succ: MemoryOrder, fail: MemoryOrder): (swapped: bool) {
+	const Strong = 0 // strong atomicity
+	ret unsafe { cpp.__atomic_compare_exchange(p, &old, &new, Strong, succ, fail) }
 }
 
 // Atomically adds delta to p with memory order mo and returns the new value.

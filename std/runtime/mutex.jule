@@ -12,7 +12,7 @@ const pauseThreshold = 1e6
 
 const fmutexSize = 4 // i32
 
-// Simpler mutex implementation for elementary purposes.
+// Simple mutex implementation for elementary purposes.
 // Suitable for quick Lock/Unlock arenas.
 // It may be insufficient in long-term locks due to lack of thread parking integration.
 struct fmutex {
@@ -41,13 +41,45 @@ impl fmutex {
 	}
 
 	fn unlock(*self) {
-		new := atomic::Add(&self.state, -1, atomic::AcqRel)
-		if new != 0 {
+		old := atomic::Swap(&self.state, 0, atomic::Release)
+		if old == 0 {
 			panic("runtime: mutex: unlock of unlocked mutex")
 		}
 	}
 
 	fn tryLock(*self): bool {
-		ret atomic::CompareAndSwap(&self.state, 0, 1, atomic::SeqCst)
+		ret atomic::CompareAndSwap2(&self.state, 0, 1, atomic::Acquire, atomic::Relaxed)
+	}
+}
+
+const qmutexSize = 4 // i32
+
+// Simpler mutex implementation for elementary purposes.
+// Suitable for quick Lock/Unlock arenas.
+// It may be insufficient in long-term locks due to lack of thread parking integration.
+// Unlike the fmutex, it uses pure spin-lock.
+//
+// Be careful when updating memory layout of the type.
+// Because unsafe pointer conversions assumes
+// fmutex and qmutex have the same memory layout.
+struct qmutex {
+	mut state: i32
+}
+
+impl qmutex {
+	fn lock(*self) {
+		for !self.tryLock() {
+		}
+	}
+
+	fn unlock(*self) {
+		old := atomic::Swap(&self.state, 0, atomic::Release)
+		if old == 0 {
+			panic("runtime: mutex: unlock of unlocked mutex")
+		}
+	}
+
+	fn tryLock(*self): bool {
+		ret atomic::CompareAndSwap2(&self.state, 0, 1, atomic::Acquire, atomic::Relaxed)
 	}
 }
