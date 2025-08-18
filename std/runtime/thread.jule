@@ -199,22 +199,27 @@ fn park2(mut &t: *thread, mu: uintptr, mut &parker: *parker, mut reason: u32) {
 // Closes the thread associated with tptr, if exist.
 #disable nilptr
 fn closeThread(tptr: *unsafe) {
-	mut thread := getCurrentThread()
-	threadMutex.lock()
-	// We do not have to clear all state and reasons of the thread.
-	// If this will be reuse, the pushNewThread function will reset.
-	thread.state = threadClosed
-	// We have empty select special case.
-	// We have to check deadlocks after any thread closed. Because at least
-	// one thread is in deep sleep and we do not know when this thread will wake up.
-	// So, if we have a deadlock, detection may be impossible because empty selects
-	// does not checks deadlocks. So check deadlock after closed a thread to
-	// caught special case deadlock; all threads are in the deep sleep.
-	if threadCases&threadSC_EmptySelect == threadSC_EmptySelect {
-		checkDeadlock(0, reasonNA)
+	mut t := threads
+	for t != nil; t = t.next {
+		if &t.os.handle == tptr {
+			threadMutex.lock()
+			// We do not have to clear all state and reasons of the thread.
+			// If this will be reuse, the pushNewThread function will reset.
+			t.state = threadClosed
+			// We have empty select special case.
+			// We have to check deadlocks after any thread closed. Because at least
+			// one thread is in deep sleep and we do not know when this thread will wake up.
+			// So, if we have a deadlock, detection may be impossible because empty selects
+			// does not checks deadlocks. So check deadlock after closed a thread to
+			// caught special case deadlock; all threads are in the deep sleep.
+			if threadCases&threadSC_EmptySelect == threadSC_EmptySelect {
+				checkDeadlock(0, reasonNA)
+			}
+			threadsCount--
+			threadMutex.unlock()
+			break
+		}
 	}
-	threadsCount--
-	threadMutex.unlock()
 }
 
 // Checks deadlock and panics if exist.
