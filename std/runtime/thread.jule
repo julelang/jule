@@ -138,10 +138,11 @@ fn pushNewThread(): &thread {
 	ret t.next
 }
 
-// Returns the thread associated with current thread.
-// It does not locks the thread-mutex.
+// Locks the thread-mutex and returns the thread associated with current thread.
+// It does not release the thread-mutex before return.
 #disable nilptr
-fn getCurrentThread(): &thread {
+fn acquireThread(): &thread {
+	threadMutex.lock()
 	id := currentThreadID()
 	mut t := threads
 	for t != nil; t = t.next {
@@ -159,7 +160,7 @@ fn getCurrentThread(): &thread {
 // The thread can be made runnable again by calling [parker.unpark].
 #disable nilptr
 fn park(mu: uintptr, mut &parker: *parker, mut reason: u32) {
-	mut t := getCurrentThread()
+	mut t := acquireThread()
 	if t == nil {
 		panic("runtime: thread is not exist")
 	}
@@ -171,9 +172,9 @@ fn park(mu: uintptr, mut &parker: *parker, mut reason: u32) {
 // If reason is related with a sema, will not handle mu as a mutex.
 // If the parker is not nil, parks suspended thread.
 // The thread can be made runnable again by calling [parker.unpark].
+// The thread-mutex must be acquired, this function will release it.
 #disable nilptr
 fn park2(mut &t: *thread, mu: uintptr, mut &parker: *parker, mut reason: u32) {
-	threadMutex.lock()
 	t.state |= threadSuspended | reason
 	t.mu = mu
 	//checkDeadlock(mu, reason)

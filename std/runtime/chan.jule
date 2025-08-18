@@ -85,7 +85,7 @@ impl pchan {
 		}
 
 		// We have to park the thread.
-		mut thread := getCurrentThread()
+		mut thread := acquireThread()
 		mut stackp := parkerList{}
 		mut p := unsafe { (&parkerList)(&stackp) }
 		p.parker = thread.parker
@@ -209,7 +209,7 @@ impl pchan {
 		}
 
 		// We have to park the thread.
-		mut thread := getCurrentThread()
+		mut thread := acquireThread()
 		mut stackp := parkerList{}
 		mut p := unsafe { (&parkerList)(&stackp) }
 		p.parker = thread.parker
@@ -296,8 +296,7 @@ impl pchan {
 // Empty select statement implementation.
 #disable nilptr
 fn emptyselect() {
-	mut t := getCurrentThread()
-	threadMutex.lock()
+	mut t := acquireThread()
 	t.state |= threadSuspended | reasonSelect | reasonSelectEmpty
 	// Add special case for empty select.
 	threadCases |= threadSC_EmptySelect
