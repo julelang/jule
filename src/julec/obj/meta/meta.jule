@@ -31,16 +31,18 @@ struct StrBuilder {
 
 // Metadata for the runtime package.
 struct Runtime {
-	Threads: &sema::Var
-	NumCPU:  &sema::Var
-	Argc:    &sema::Var
-	Argv:    &sema::Var
-	Envp:    &sema::Var
-	Rand:    &sema::Var
+	Threads:    &sema::Var
+	NumCPU:     &sema::Var
+	Argc:       &sema::Var
+	Argv:       &sema::Var
+	Envp:       &sema::Var
+	GlobalRand: &sema::Var
 
 	// Hard initializer function of runtime.
 	Init: &sema::FuncIns
 
+	Rand:            &sema::FuncIns
+	Osyield:         &sema::FuncIns
 	ToStr:           &sema::Func
 	ArrayCmp:        &sema::Func
 	DynAssertAssign: &sema::Func
@@ -52,7 +54,7 @@ struct Runtime {
 	Memappend:       &sema::Func
 	Zprint:          &sema::FuncIns
 	Zprintln:        &sema::FuncIns
-	ChanSelect:      &sema::FuncIns
+	Emptyselect:     &sema::FuncIns
 	RCAdd:           &sema::FuncIns
 	RCLoad:          &sema::FuncIns
 	RCDrop:          &sema::FuncIns
@@ -84,7 +86,6 @@ struct Runtime {
 	Map:         &sema::Struct
 	MapIterator: &sema::Struct
 	Pchan:       &sema::Struct
-	Hchan:       &sema::Struct
 	Cmplx64:     &sema::StructIns
 	Cmplx128:    &sema::StructIns
 }
@@ -119,10 +120,12 @@ fn CollectRuntime(mut ir: &obj::IR): &Runtime {
 	meta.Argc = obj::RuntimeFindGlobal(p, "argc")
 	meta.Argv = obj::RuntimeFindGlobal(p, "argv")
 	meta.Envp = obj::RuntimeFindGlobal(p, "envp")
-	meta.Rand = obj::RuntimeFindGlobal(p, "__rand")
+	meta.GlobalRand = obj::RuntimeFindGlobal(p, "__rand")
 
 	// Functions.
 	meta.Init = obj::RuntimeFindFunc(p, "__init").Instances[0]
+	meta.Rand = obj::RuntimeFindFunc(p, "rand").Instances[0]
+	meta.Osyield = obj::RuntimeFindFunc(p, "osyield").Instances[0]
 	meta.ToStr = obj::RuntimeFindFunc(p, "toStr")
 	meta.ArrayCmp = obj::RuntimeFindFunc(p, "arrayCmp")
 	meta.DynAssertAssign = obj::RuntimeFindFunc(p, "dynAssertAssign")
@@ -134,7 +137,7 @@ fn CollectRuntime(mut ir: &obj::IR): &Runtime {
 	meta.Memappend = obj::RuntimeFindFunc(p, "memappend")
 	meta.Zprint = obj::RuntimeFindFunc(p, "zprint").Instances[0]
 	meta.Zprintln = obj::RuntimeFindFunc(p, "zprintln").Instances[0]
-	meta.ChanSelect = obj::RuntimeFindFunc(p, "chanSelect").Instances[0]
+	meta.Emptyselect = obj::RuntimeFindFunc(p, "emptyselect").Instances[0]
 	meta.RCAdd = obj::RuntimeFindFunc(p, "_RCAdd").Instances[0]
 	meta.RCLoad = obj::RuntimeFindFunc(p, "_RCLoad").Instances[0]
 	meta.RCDrop = obj::RuntimeFindFunc(p, "_RCDrop").Instances[0]
@@ -167,7 +170,6 @@ fn CollectRuntime(mut ir: &obj::IR): &Runtime {
 	meta.Map = obj::RuntimeFindStruct(p, "hmap")
 	meta.MapIterator = obj::RuntimeFindStruct(p, "hmapiterator")
 	meta.Pchan = obj::RuntimeFindStruct(p, "pchan")
-	meta.Hchan = obj::RuntimeFindStruct(p, "hchan")
 	meta.Cmplx64 = obj::RuntimeFindStruct(p, "_cmplx64").Instances[0]
 	meta.Cmplx128 = obj::RuntimeFindStruct(p, "_cmplx128").Instances[0]
 

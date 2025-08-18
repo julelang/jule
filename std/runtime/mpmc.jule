@@ -1,0 +1,130 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/cpu"
+use "std/internal/runtime/atomic"
+
+// Holds one slot's sequence and the value.
+// Vyukov protocol:
+//	- Initially: sequence == index (EMPTY for the first pass)
+//	- Producer at position pos writes value, then sequence = pos+1 (FULL)
+//	- Consumer at position pos reads value, then sequence = pos+capacity (EMPTY for next wrap)
+struct mpmcCell[T] {
+	seq: u64
+	val: T
+}
+
+// Padded counters to reduce false sharing between hot fields.
+struct paddedU64 {
+	v: u64
+	_: [cpu::CacheLinePadSize - 8]byte
+}
+
+// Bounded, lock-free MPMC ring buffer.
+// Primarly designed for channels.
+// Implementation based on the Dmitry Vyukov's MPMC queue.
+struct mpmcQueue[T] {
+	cap:    u64
+	closed: u32
+	buf:    []mpmcCell[T]
+
+	// Hot cursors on separate cache lines
+	_:          [cpu::CacheLinePadSize]byte
+	enqueuePos: paddedU64
+	_:          [cpu::CacheLinePadSize]byte
+	dequeuePos: paddedU64
+	_:          [cpu::CacheLinePadSize]byte
+}
+
+impl mpmcQueue {
+	fn new(mut cap: u64): (q: mpmcQueue[T]) {
+		if cap < 2 {
+			cap = 2
+		}
+		q.cap = cap
+		q.buf = make([]mpmcCell[T], cap)
+
+		// Initialize per-slot sequence numbers to their indices
+		mut i := u64(0)
+		for i < cap; i++ {
+			q.buf[i].seq = i
+		}
+		ret
+	}
+
+	// Attempts to enqueue val; returns false if the queue appears full.
+	// Non-blocking; uses polite backoff on contention.
+	#disable boundary nilptr
+	fn enqueue(mut *self, mut &val: *T): (ok: bool, closed: bool) {
+		for {
+			closed = atomic::Load(&self.closed, atomic::Acquire) != 0
+			if closed {
+				ret false, true
+			}
+			pos := atomic::Load(&self.enqueuePos.v, atomic::Relaxed)
+			mut &c := unsafe { &(*(&self.buf[pos%self.cap])) }
+			seq := atomic::Load(&c.seq, atomic::Acquire)
+			dif := i64(seq) - i64(pos)
+
+			if dif == 0 {
+				// slot is EMPTY for this producer position: try to claim it
+				if atomic::CompareAndSwap2Weak(&self.enqueuePos.v, pos, pos+1, atomic::SeqCst, atomic::Relaxed) {
+					// exclusive ownership of this slot
+					c.val = *val
+					// publish for consumer at pos
+					atomic::Store(&c.seq, pos+1, atomic::Release)
+					ret true, false
+				}
+				// lost race → retry
+			} else if dif < 0 {
+				// seq < pos ⇒ consumer has not yet advanced for this slot in this wrap; FULL
+				ret false, false
+			} else {
+				// another producer is ahead / not our turn yet → polite backoff
+				osyield()
+			}
+		}
+	}
+
+	// Attempts to pop one element; returns (zero, false) if empty.
+	// Non-blocking; uses polite backoff on contention.
+	#disable boundary nilptr
+	fn dequeue(mut *self, mut &val: *T): (ok: bool, closed: bool) {
+		for {
+			// do not immediately return even if isclosed is true
+			// we have to consume all queued data even if it is closed
+			closed = atomic::Load(&self.closed, atomic::Acquire) != 0
+			pos := atomic::Load(&self.dequeuePos.v, atomic::Relaxed)
+			mut &c := unsafe { &(*(&self.buf[pos%self.cap])) }
+			seq := atomic::Load(&c.seq, atomic::Acquire)
+			dif := i64(seq) - i64(pos+1)
+
+			if dif == 0 {
+				// slot is FULL for this consumer position: try to claim it
+				if atomic::CompareAndSwap2Weak(&self.dequeuePos.v, pos, pos+1, atomic::SeqCst, atomic::Relaxed) {
+					// exclusive access to this slot
+					*val = c.val
+					// help GC: clear the slot's value
+					let mut zero: T
+					c.val = zero
+					// mark EMPTY for the next wrap-around pass
+					atomic::Store(&c.seq, pos+self.cap, atomic::Release)
+					ret true, closed
+				}
+				// lost race → retry
+			} else if dif < 0 {
+				// seq < pos+1 ⇒ producer hasn't published yet; queue appears EMPTY
+				ret false, closed
+			} else {
+				// another consumer is ahead / not our turn yet → polite backoff
+				osyield()
+			}
+		}
+	}
+
+	#disable nilptr
+	fn close(mut *self) {
+		atomic::Store(&self.closed, 1, atomic::Release)
+	}
+}

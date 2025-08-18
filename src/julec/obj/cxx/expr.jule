@@ -1997,11 +1997,16 @@ impl exprCoder {
 		self.oc.write(fmt::Sprintf(m.Code, args...))
 	}
 
-	fn chanRecv(mut &self, mut m: &sema::ChanRecv, ok: fn(), owned: bool) {
+	fn chanRecv(mut &self, mut m: &sema::ChanRecv, ok: fn(), block: bool) {
 		ch := m.Expr.Type.Chan()
 		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
 		const Static = false
-		mut f := ins.FindMethod("recv", Static).Instances[0]
+		let mut f: &sema::FuncIns
+		if block {
+			f = ins.FindMethod("recv", Static).Instances[0]
+		} else {
+			f = ins.FindMethod("tryRecv", Static).Instances[0]
+		}
 		identCoder.funcIns(&self.oc.Buf, f)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Expr.Model)
@@ -2020,16 +2025,19 @@ impl exprCoder {
 			// It should be safe.
 			self.oc.write("nullptr")
 		}
-		self.oc.write(", ")
-		self.oc.write(conv::FormatBool(owned))
 		self.oc.write(")")
 	}
 
-	fn chanSend(mut &self, mut m: &sema::ChanSend, owned: bool) {
+	fn chanSend(mut &self, mut m: &sema::ChanSend, block: bool) {
 		c := m.Chan.Type.Chan()
 		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, c.Value)
 		const Static = false
-		mut f := ins.FindMethod("send", Static).Instances[0]
+		let mut f: &sema::FuncIns
+		if block {
+			f = ins.FindMethod("send", Static).Instances[0]
+		} else {
+			f = ins.FindMethod("trySend", Static).Instances[0]
+		}
 		identCoder.funcIns(&self.oc.Buf, f)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Chan.Model)
@@ -2041,8 +2049,6 @@ impl exprCoder {
 		}
 		self.oc.write("), ")
 		self.possibleRefExpr(m.Data.Model)
-		self.oc.write(", ")
-		self.oc.write(conv::FormatBool(owned))
 		self.oc.write(")")
 	}
 
@@ -2293,9 +2299,9 @@ impl exprCoder {
 		| &sema::BackendEmitExpr:
 			self.backendEmit(m.(&sema::BackendEmitExpr))
 		| &sema::ChanRecv:
-			self.chanRecv(m.(&sema::ChanRecv), nil, false)
+			self.chanRecv(m.(&sema::ChanRecv), nil, true)
 		| &sema::ChanSend:
-			self.chanSend(m.(&sema::ChanSend), false)
+			self.chanSend(m.(&sema::ChanSend), true)
 		| &sema::BuiltinCloseCallExpr:
 			self.closeCall(m.(&sema::BuiltinCloseCallExpr))
 		| &sema::TypeAssertionExpr:

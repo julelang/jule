@@ -12,15 +12,14 @@ const (
 	threadClosed                // Thread execution completed, thread closed.
 
 	// State flags of threads for suspend reason.
-	reasonNA           = 0
-	reasonRecv         = 1 << iota // Channel-recv.
-	reasonSend                     // Channel-send.
-	reasonRecvBlocking             // Channel blocks until the sent data received.
-	reasonWaitGroup                // WaitGroup.
-	reasonMutex                    // Mutex.
-	reasonCond                     // Condition variable.
-	reasonSelect                   // Header group specifier of select statement.
-	reasonSelectEmpty              // Empty select statement state. Use like reasonSelect&reasonSelectEmpty.
+	reasonNA          = 0
+	reasonRecv        = 1 << iota // Channel-recv.
+	reasonSend                    // Channel-send.
+	reasonWaitGroup               // WaitGroup.
+	reasonMutex                   // Mutex.
+	reasonCond                    // Condition variable.
+	reasonSelect                  // Header group specifier of select statement.
+	reasonSelectEmpty             // Empty select statement state. Use like reasonSelect&reasonSelectEmpty.
 )
 
 // A thread instance is represents a spawned thread.
@@ -60,6 +59,7 @@ const (
 // threadCases stores special cases for thread management.
 let threadMutex = fmutex{}
 let mut threads = (&thread)(nil)
+let mut threadsCount = 0
 let mut threadCases = threadSC_NA
 
 // Stores total number of logical threads.
@@ -134,6 +134,7 @@ fn pushNewThread(): &thread {
 	}
 	// We have not any reusable thread, so create a new one.
 	t.next = newThread()
+	threadsCount++
 	ret t.next
 }
 
@@ -151,36 +152,38 @@ fn getCurrentThread(): &thread {
 	ret nil
 }
 
-// Returns the thread associated with the current thread.
-// It does locks the thread-mutex, thread-safe.
-fn acquireThread(): &thread {
-	threadMutex.lock()
-	mut thread := getCurrentThread()
-	threadMutex.unlock()
-	ret thread
-}
-
 // Suspends the current thread and yields the CPU.
 // If the mu is not zero, assumes it already locked and releases before yield.
 // If reason is related with a sema, will not handle mu as a mutex.
 // If the parker is not nil, parks suspended thread.
 // The thread can be made runnable again by calling [parker.unpark].
 #disable nilptr
-fn yield(mu: uintptr, mut &parker: *parker, mut reason: u32) {
-	threadMutex.lock()
+fn park(mu: uintptr, mut &parker: *parker, mut reason: u32) {
 	mut t := getCurrentThread()
 	if t == nil {
 		panic("runtime: thread is not exist")
 	}
+	park2(&(*t), mu, parker, reason)
+}
+
+// Suspends the thread t and yields the CPU.
+// If the mu is not zero, assumes it already locked and releases before yield.
+// If reason is related with a sema, will not handle mu as a mutex.
+// If the parker is not nil, parks suspended thread.
+// The thread can be made runnable again by calling [parker.unpark].
+#disable nilptr
+fn park2(mut &t: *thread, mu: uintptr, mut &parker: *parker, mut reason: u32) {
+	threadMutex.lock()
 	t.state |= threadSuspended | reason
 	t.mu = mu
-	checkDeadlock(mu, reason)
+	//checkDeadlock(mu, reason)
 	// Unlock the mutex because other threads may need to lock.
 	// There is nothing to do for this thread for now, so release lock.
 	threadMutex.unlock()
 	// Release mutex if reason is not related with a sema.
 	if mu != 0 {
-		// Assume fmutex and qmutex have the same memory layout.
+		// Assume fmutex and qmutex have the same memory layout and
+		// implementation for unlock.
 		unsafe { (*fmutex)(mu).unlock() }
 	}
 	// Park the thread and yield the CPU until to be unparked by the another thread.
@@ -196,26 +199,22 @@ fn yield(mu: uintptr, mut &parker: *parker, mut reason: u32) {
 // Closes the thread associated with tptr, if exist.
 #disable nilptr
 fn closeThread(tptr: *unsafe) {
+	mut thread := getCurrentThread()
 	threadMutex.lock()
-	mut t := threads
-	for t != nil; t = t.next {
-		if &t.os.handle == tptr {
-			// We do not have to clear all state and reasons of the thread.
-			// If this will be reuse, the pushNewThread function will reset.
-			t.state = threadClosed
-			// We have empty select special case.
-			// We have to check deadlocks after any thread closed. Because at least
-			// one thread is in deep sleep and we do not know when this thread will wake up.
-			// So, if we have a deadlock, detection may be impossible because empty selects
-			// does not checks deadlocks. So check deadlock after closed a thread to
-			// caught special case deadlock; all threads are in the deep sleep.
-			if threadCases&threadSC_EmptySelect == threadSC_EmptySelect {
-				checkDeadlock(0, reasonNA)
-			}
-			threadMutex.unlock()
-			break
-		}
+	// We do not have to clear all state and reasons of the thread.
+	// If this will be reuse, the pushNewThread function will reset.
+	thread.state = threadClosed
+	// We have empty select special case.
+	// We have to check deadlocks after any thread closed. Because at least
+	// one thread is in deep sleep and we do not know when this thread will wake up.
+	// So, if we have a deadlock, detection may be impossible because empty selects
+	// does not checks deadlocks. So check deadlock after closed a thread to
+	// caught special case deadlock; all threads are in the deep sleep.
+	if threadCases&threadSC_EmptySelect == threadSC_EmptySelect {
+		checkDeadlock(0, reasonNA)
 	}
+	threadsCount--
+	threadMutex.unlock()
 }
 
 // Checks deadlock and panics if exist.
@@ -355,10 +354,7 @@ fn checkDeadlock(mu: uintptr, reason: u32) {
 	// now we may be suspend this thread for channel-recv on the same channel.
 	// So two threads are suspended for each other, caught this and wake
 	// suitable one. In such cases, there is no deadlock risk.
-	if mu != 0 &&
-		(reason&reasonSend == reasonSend ||
-			reason&reasonRecv == reasonRecv ||
-			reason&reasonRecvBlocking == reasonRecvBlocking) {
+	if mu != 0 && (reason&reasonSend == reasonSend || reason&reasonRecv == reasonRecv) {
 		t = threads
 		for t != nil; t = t.next {
 			// If the thread have a select statement (but not empty statement),
@@ -384,10 +380,10 @@ fn checkDeadlock(mu: uintptr, reason: u32) {
 				for lt != nil; lt = lt.next {
 					if lt.mu == t.mu {
 						if lt.state&reasonRecv == reasonRecv &&
-							(t.state&reasonSend == reasonSend || t.state&reasonRecvBlocking == reasonRecvBlocking) {
+							t.state&reasonSend == reasonSend {
 							ret
 						}
-						if (lt.state&reasonSend == reasonSend || lt.state&reasonRecvBlocking == reasonRecvBlocking) &&
+						if lt.state&reasonSend == reasonSend &&
 							t.state&reasonRecv == reasonRecv {
 							ret
 						}
