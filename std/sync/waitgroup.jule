@@ -36,7 +36,7 @@ impl WaitGroup {
 	// If a [WaitGroup] is reused to wait for several independent sets of events,
 	// new Add calls must happen after all previous Wait calls have returned.
 	fn Add(mut *self, delta: int) {
-		state := self.state.Add(u64(delta)<<32, atomic::SeqCst)
+		state := self.state.Add(u64(delta)<<32, atomic::AcqRel)
 		v := i32(state >> 32)
 		mut w := u32(state)
 		if v < 0 {
@@ -53,11 +53,11 @@ impl WaitGroup {
 		// - Adds must not happen concurrently with Wait,
 		// - Wait does not increment waiters if it sees counter == 0.
 		// Still do a cheap sanity check to detect WaitGroup misuse.
-		if self.state.Load(atomic::SeqCst) != state {
+		if self.state.Load(atomic::Acquire) != state {
 			panic("std/sync: WaitGroup misuse: Add called concurrently with Wait")
 		}
 		// Reset waiters count to 0.
-		self.state.Store(0, atomic::SeqCst)
+		self.state.Store(0, atomic::Release)
 		for w != 0; w-- {
 			runtime::semrelease(&self.sema, false)
 		}
@@ -69,16 +69,16 @@ impl WaitGroup {
 	// Blocks until the [WaitGroup] counter is zero.
 	fn Wait(mut *self) {
 		for {
-			state := self.state.Load(atomic::SeqCst)
+			state := self.state.Load(atomic::Acquire)
 			v := i32(state >> 32)
 			if v == 0 {
 				// Counter is 0, no need to wait.
 				ret
 			}
 			// Increment waiters count.
-			if self.state.CompareAndSwap(state, state+1, atomic::SeqCst, atomic::SeqCst) {
+			if self.state.CompareAndSwap(state, state+1, atomic::AcqRel, atomic::Acquire) {
 				runtime::semacquire(&self.sema, false, runtime::reasonWaitGroup)
-				if self.state.Load(atomic::SeqCst) != 0 {
+				if self.state.Load(atomic::Acquire) != 0 {
 					panic("std/sync: WaitGroup is reused before previous Wait has returned")
 				}
 				ret
