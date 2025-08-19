@@ -125,11 +125,11 @@ fn semtable_rootFor(&sema: *u32): &semaRoot {
 #disable nilptr
 fn cansemacquire(mut &sema: *u32): bool {
 	for {
-		v := atomic::Load(sema, atomic::SeqCst)
+		v := atomic::Load(sema, atomic::Acquire)
 		if v == 0 {
 			ret false
 		}
-		if atomic::CompareAndSwap(sema, v, v-1, atomic::SeqCst, atomic::SeqCst) {
+		if atomic::CompareAndSwap(sema, v, v-1, atomic::AcqRel, atomic::Acquire) {
 			ret true
 		}
 	}
@@ -160,10 +160,10 @@ fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 	for {
 		root.lock.lock()
 		// Add ourselves to nwait to disable "easy case" in semrelease.
-		atomic::Add(&root.nwait, 1, atomic::SeqCst)
+		atomic::Add(&root.nwait, 1, atomic::AcqRel)
 		// Check cansemacquire to avoid missed wakeup.
 		if cansemacquire(sema) {
-			atomic::Add(&root.nwait, ^u32(0), atomic::SeqCst)
+			atomic::Add(&root.nwait, ^u32(0), atomic::AcqRel)
 			root.lock.unlock()
 			break
 		}
@@ -186,18 +186,18 @@ fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 #disable nilptr
 fn semrelease(mut &sema: *u32, handoff: bool) {
 	mut root := semtable_rootFor(sema)
-	atomic::Add(sema, 1, atomic::SeqCst)
+	atomic::Add(sema, 1, atomic::AcqRel)
 
 	// Easy case: no waiters?
 	// This check must happen after the atomicAdd, to avoid a missed wakeup
 	// (see loop in semacquire).
-	if atomic::Load(&root.nwait, atomic::SeqCst) == 0 {
+	if atomic::Load(&root.nwait, atomic::Acquire) == 0 {
 		ret
 	}
 
 	// Harder case: search for a waiter and wake it.
 	root.lock.lock()
-	if atomic::Load(&root.nwait, atomic::SeqCst) == 0 {
+	if atomic::Load(&root.nwait, atomic::Acquire) == 0 {
 		// The count is already consumed by another thread,
 		// so no need to wake up another thread.
 		root.lock.unlock()
@@ -206,7 +206,7 @@ fn semrelease(mut &sema: *u32, handoff: bool) {
 
 	mut p := root.dequeue(sema)
 	if p != nil {
-		atomic::Add(&root.nwait, ^u32(0), atomic::SeqCst)
+		atomic::Add(&root.nwait, ^u32(0), atomic::AcqRel)
 	}
 	root.lock.unlock()
 	// May be slow or even yield, so unlock first.
@@ -260,7 +260,7 @@ struct notifyList {
 // Adds new notify ticked to list l and returns the ticket number.
 #disable nilptr
 fn notifyListAdd(mut &l: *notifyList): u32 {
-	ret atomic::Add(&l.wait, 1, atomic::SeqCst) - 1
+	ret atomic::Add(&l.wait, 1, atomic::AcqRel) - 1
 }
 
 // Waits for a notification. If one has been sent since
@@ -294,7 +294,7 @@ fn notifyListWait(mut &l: *notifyList, t: u32) {
 fn notifyListNotifyOne(mut &l: *notifyList) {
 	// Fast-path: if there are no new waiters since the last notification
 	// we don't need to acquire the lock at all.
-	if atomic::Load(&l.wait, atomic::SeqCst) == atomic::Load(&l.notify, atomic::SeqCst) {
+	if atomic::Load(&l.wait, atomic::Acquire) == atomic::Load(&l.notify, atomic::Acquire) {
 		ret
 	}
 
@@ -302,13 +302,13 @@ fn notifyListNotifyOne(mut &l: *notifyList) {
 
 	// Re-check under the lock if we need to do anything.
 	t := l.notify
-	if t == atomic::Load(&l.wait, atomic::SeqCst) {
+	if t == atomic::Load(&l.wait, atomic::Acquire) {
 		l.lock.unlock()
 		ret
 	}
 
 	// Update the next notify ticket number.
-	atomic::Add(&l.notify, t+1, atomic::SeqCst)
+	atomic::Add(&l.notify, t+1, atomic::Release)
 
 	// Try to find the p that needs to be notified.
 	// If it hasn't made it to the list yet we won't find it,
@@ -350,7 +350,7 @@ fn notifyListNotifyOne(mut &l: *notifyList) {
 fn notifyListNotifyAll(mut &l: *notifyList) {
 	// Fast-path: if there are no new waiters since the last notification
 	// we don't need to acquire the lock.
-	if atomic::Load(&l.wait, atomic::SeqCst) == atomic::Load(&l.notify, atomic::SeqCst) {
+	if atomic::Load(&l.wait, atomic::Acquire) == atomic::Load(&l.notify, atomic::Acquire) {
 		ret
 	}
 
@@ -365,8 +365,8 @@ fn notifyListNotifyAll(mut &l: *notifyList) {
 	// value of wait because any previous waiters are already in the list
 	// or will notice that they have already been notified when trying to
 	// add themselves to the list.
-	wait := atomic::Load(&l.wait, atomic::SeqCst)
-	atomic::Store(&l.notify, wait, atomic::SeqCst)
+	wait := atomic::Load(&l.wait, atomic::Acquire)
+	atomic::Store(&l.notify, wait, atomic::Release)
 	l.lock.unlock()
 
 	// Go through the local list and ready all waiters.
