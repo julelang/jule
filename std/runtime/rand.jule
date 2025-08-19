@@ -40,6 +40,8 @@ impl randmach {
 			incLo = 1442695040888963407
 		)
 
+		self.mu.lock()
+
 		// state = state * mul + inc
 		mut hi, mut lo := mul64(self.lo, mulLo)
 		hi = hi + self.hi*mulLo + self.lo*mulHi
@@ -48,6 +50,8 @@ impl randmach {
 
 		self.lo = lo
 		self.hi = hi
+
+		self.mu.unlock()
 
 		// XSL-RR would be
 		//	ret bits::RotateLeft64(lo^hi, -int(hi>>58))
@@ -82,10 +86,7 @@ fn randinit() {
 // Returns pseudo-random number.
 // It is safe for concurrent use by multiple threads.
 fn rand(): u64 {
-	__rand.mu.lock()
-	r := __rand.next()
-	__rand.mu.unlock()
-	ret r
+	ret __rand.next()
 }
 
 // Like rand() % n but faster.
