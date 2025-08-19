@@ -153,7 +153,9 @@ impl pchan {
 	// Do not blocks until success.
 	#disable nilptr
 	fn trySend(mut *self, mut data: T): bool {
-		if self.cap == 0 {
+		if self == nil {
+			ret false
+		} else if self.cap == 0 {
 			ret self.trySendUnbuffered(data)
 		} else {
 			ret self.trySendBuffered(data)
@@ -288,7 +290,13 @@ impl pchan {
 	// The parameter ok always must be not-nil.
 	#disable nilptr
 	fn tryRecv(mut *self, mut &ok: *bool): T {
-		if self.cap == 0 {
+		if self == nil {
+			if ok != nil {
+				*ok = false
+			}
+			let mut zero: T
+			ret zero
+		} else if self.cap == 0 {
 			ret self.tryRecvUnbuffered(ok)
 		} else {
 			ret self.tryRecvBuffered(ok)
