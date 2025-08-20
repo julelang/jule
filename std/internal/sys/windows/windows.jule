@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 #pass "-liphlpapi"
+#pass "-lsynchronization"
 
 use integ "std/jule/integrated"
 use "std/sys"
@@ -12,6 +13,8 @@ cpp use "<iphlpapi.h>"
 cpp let GetSystemDirectoryW: *unsafe
 cpp let GetAdaptersAddresses: *unsafe
 cpp let GetComputerNameExW: *unsafe
+cpp let WaitOnAddress: *unsafe
+cpp let WakeByAddressSingle: *unsafe
 
 const (
 	GAA_FLAG_INCLUDE_PREFIX   = 0x00000010
@@ -187,4 +190,17 @@ struct AddrinfoW {
 	Canonname: *u16
 	Addr:      uintptr
 	Next:      *AddrinfoW
+}
+
+type DWORD: u32
+
+const INFINITE = 0xFFFFFFFF // 4294967295
+
+fn WaitOnAddress(&addr: *i8, compareAddr: i8, dwMilliseconds: DWORD): bool {
+	const I8InBytes = 1
+	ret sys::Addrcall[bool](uintptr(cpp.WaitOnAddress), addr, &compareAddr, I8InBytes, dwMilliseconds)
+}
+
+fn WakeByAddressSingle(&addr: *i8) {
+	sys::Addrcall(uintptr(cpp.WakeByAddressSingle), addr)
 }
