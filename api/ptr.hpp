@@ -116,6 +116,8 @@ namespace jule
         {
             this->ref = src.ref;
             this->alloc = src.alloc;
+            src.alloc = nullptr;
+            src.ref = nullptr;
         }
 
         // Frees memory. Unsafe function, not includes any safety checking for
@@ -282,6 +284,8 @@ namespace jule
         {
             this->dealloc();
             this->__get_copy(src);
+            src.alloc = nullptr;
+            src.ref = nullptr;
             return *this;
         }
 

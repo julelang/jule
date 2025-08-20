@@ -23,7 +23,7 @@ cpp unsafe fn __atomic_load(*unsafe, *unsafe, MemoryOrder)
 cpp unsafe fn __atomic_exchange[T](*unsafe, *unsafe, *unsafe, MemoryOrder): T
 
 #cdef
-cpp unsafe fn __atomic_compare_exchange(*unsafe, *unsafe, *unsafe, int, MemoryOrder, MemoryOrder): bool
+cpp unsafe fn __atomic_compare_exchange_n[T](*unsafe, *unsafe, T, int, MemoryOrder, MemoryOrder): bool
 
 #cdef
 cpp unsafe fn __atomic_fetch_add[T](*unsafe, T, MemoryOrder): T
@@ -40,10 +40,16 @@ fn Load[T](p: *T, mo: MemoryOrder): T {
 
 // Atomically reads value of the p and compares it with old.
 // If comparison results with true, it atomically stores new value into p.
-// In every case, it will use memory order mo.
 // Reports whether swap succeeded.
-fn CompareAndSwap[T](mut p: *T, old: T, new: T, mo: MemoryOrder): (swapped: bool) {
-	ret CompareAndSwapZ(p, old, new, mo)
+fn CompareAndSwap[T](mut p: *T, old: T, new: T, succ: MemoryOrder, fail: MemoryOrder): (swapped: bool) {
+	ret CompareAndSwapZ(p, old, new, succ, fail)
+}
+
+// Atomically reads value of the p and compares it with old.
+// If comparison results with true, it atomically stores new value into p.
+// Reports whether swap succeeded.
+fn CompareAndSwapWeak[T](mut p: *T, old: T, new: T, succ: MemoryOrder, fail: MemoryOrder): (swapped: bool) {
+	ret CompareAndSwapWeakZ(p, old, new, succ, fail)
 }
 
 // Atomically adds delta to p with memory order mo and returns the new value.
@@ -74,12 +80,20 @@ fn LoadZ[T1, T2](p: *T1, mo: MemoryOrder): T2 {
 
 // Atomically reads value of the p and compares it with old.
 // If comparison results with true, it atomically stores new value into p.
-// In every case, it will use memory order mo.
 // Reports whether swap succeeded.
 // T1 is a base pointer type, T2 is the output type.
-fn CompareAndSwapZ[T1, T2](mut p: *T1, old: T2, new: T2, mo: MemoryOrder): (swapped: bool) {
+fn CompareAndSwapZ[T1, T2](mut p: *T1, old: T2, new: T2, succ: MemoryOrder, fail: MemoryOrder): (swapped: bool) {
 	const Strong = 0 // strong atomicity
-	ret unsafe { cpp.__atomic_compare_exchange(p, &old, &new, Strong, mo, mo) }
+	ret unsafe { cpp.__atomic_compare_exchange_n[T2](p, &old, new, Strong, succ, fail) }
+}
+
+// Atomically reads value of the p and compares it with old.
+// If comparison results with true, it atomically stores new value into p.
+// Reports whether swap succeeded.
+// T1 is a base pointer type, T2 is the output type.
+fn CompareAndSwapWeakZ[T1, T2](mut p: *T1, old: T2, new: T2, succ: MemoryOrder, fail: MemoryOrder): (swapped: bool) {
+	const Weak = 1 // weak atomicity
+	ret unsafe { cpp.__atomic_compare_exchange_n[T2](p, &old, new, Weak, succ, fail) }
 }
 
 // Atomically adds delta to p with memory order mo and returns the new value.

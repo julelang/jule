@@ -1,0 +1,58 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// For thread parking, Jule runtime uses futex and futex-like APIs.
+// See: https://shift.click/blog/futex-like-apis
+
+// Linked-list for parkers.
+struct parkerList {
+	parker: &parker
+	ticket: u32
+	stack:  uintptr
+	next:   &parkerList
+}
+
+struct waitq {
+	head: &parkerList
+	tail: &parkerList
+}
+
+impl waitq {
+	#disable nilptr
+	fn enqueue(mut *self, mut p: &parkerList) {
+		if self.tail == nil {
+			self.head = p
+		} else {
+			self.tail.next = p
+		}
+		self.tail = p
+	}
+
+	#disable nilptr
+	fn dequeue(mut *self): &parkerList {
+		if self.head == nil {
+			ret nil
+		}
+		mut p := self.head
+		self.head = p.next
+		if self.head == nil {
+			self.tail = nil
+		}
+		p.next = nil
+		ret p
+	}
+}
+
+// Unparks all threads from the waiters q.
+#disable nilptr
+fn unparkAll(mut &q: *waitq) {
+	// Go through the local list and ready all waiters.
+	mut s := q.head
+	for s != nil {
+		mut next := s.next
+		s.next = nil
+		s.parker.unpark()
+		s = next
+	}
+}

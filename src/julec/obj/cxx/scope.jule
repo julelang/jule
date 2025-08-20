@@ -91,7 +91,7 @@ impl scopeCoder {
 			expr.Expr = new(sema::Value)
 			expr.Expr.Type = it.Expr.Type
 			expr.Expr.Model = unsafe { *(*sema::Expr)(&model) }
-			self.oc.ec.chanRecv(expr, fn|| self.oc.write("&__ok"), false)
+			self.oc.ec.chanRecv(expr, fn|| self.oc.write("&__ok"), true)
 		}
 		if it.KeyA != nil {
 			self.oc.varInitExpr(it.KeyA, writeExpr)
@@ -995,7 +995,7 @@ impl scopeCoder {
 		if a.Left[0] == nil && a.Left[1] == nil {
 			// Expression is like: _, _ = <-c
 			// Handle as plain expression.
-			self.oc.ec.chanRecv(a.Right.(&sema::ChanRecv), nil, false)
+			self.oc.ec.chanRecv(a.Right.(&sema::ChanRecv), nil, true)
 			ret
 		}
 		if a.Left[0] != nil {
@@ -1013,7 +1013,7 @@ impl scopeCoder {
 				self.oc.write(")")
 			}
 		}
-		self.oc.ec.chanRecv(a.Right.(&sema::ChanRecv), ok, false)
+		self.oc.ec.chanRecv(a.Right.(&sema::ChanRecv), ok, true)
 	}
 
 	fn typeAssertionAssign(mut &self, mut a: &sema::MultiAssign) {
@@ -1215,151 +1215,115 @@ impl scopeCoder {
 		if len(slct.Cases) == 0 {
 			// Empty select.
 			if slct.Default == nil {
-				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.ChanSelect)
-				self.oc.write("(nullptr, 0, 0, false);")
+				identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Emptyselect)
+				self.oc.write("();")
 			} else {
 				// Just the default case.
 				self.scope(slct.Default.Scope)
 			}
 			ret
 		}
-		// Non-empty select.
-		// Generate necessary data and call the select statement function.
-		// See the [runtime::chanSelect] function for documentation.
+		block := slct.Default == nil
+		if block && len(slct.Cases) == 1 {
+			self.oc.ec.possibleRefExpr(slct.Cases[0].Exprs[0].Model)
+			ret
+		}
+
 		self.oc.write("{\n")
 		self.oc.addIndent()
 		self.oc.indent()
-
-		// Whether it is a blocking select.
-		block := slct.Default == nil
-
-		// Generate code for [runtime::hchan] type.
-		mut hchan := ""
-		{
-			mut sbuf := strings::Builder{}
-			self.oc.tc.structure(&sbuf, meta::Program.Runtime.Hchan)
-			hchan = sbuf.Str()
+		mut endLabel := strings::Builder{}
+		identCoder.matchEnd(&endLabel, uintptr(slct))
+		if block {
+			self.oc.write("while (true) {\n")
+			self.oc.addIndent()
+			self.oc.indent()
 		}
-
-		// NOTE:
-		// Create array for channels. This implementation will not check
-		// the channel count, but probably total count of channel will not
-		// cause overflow by size.
-		self.oc.tc.asSptr(&self.oc.Buf, unsafe::StrBytes(hchan))
-		self.oc.write(" __jule_chans[] = {")
-		// Most common use case, assume 1 chan-recv/chan-send per case.
-		// In the end, len(chans) equals to total count of chans.
-		// All elements, matched by index which returned by the select algorithm.
-		// So chans[i] always the matched case, if exist.
-		mut chans := make([]chanCase, 0, len(slct.Cases))
-		mut &_chans := &chans // Used by closure, unsafely.
-		obj::IterCaseExprs(slct.Cases, fn|mut c, mut val| {
-			mut cr, _ := val.Model.(&sema::ChanRecv)
-			if cr != nil {
-				unsafe { *_chans = append(*_chans, chanCase{c, val}) }
-				self.oc.ec.possibleRefExpr(cr.Expr.Model)
-				self.oc.write(".as<")
-				self.oc.write(hchan)
-				self.oc.write(">(), ")
-			}
-		})
-		recvChans := len(chans) // Total count of chan-recv cases.
-		obj::IterCaseExprs(slct.Cases, fn|mut c, mut val| {
-			mut cs, _ := val.Model.(&sema::ChanSend)
-			if cs != nil {
-				unsafe { *_chans = append(*_chans, chanCase{c, val}) }
-				self.oc.ec.possibleRefExpr(cs.Chan.Model)
-				self.oc.write(".as<")
-				self.oc.write(hchan)
-				self.oc.write(">(), ")
-			}
-		})
-		self.oc.write("};\n")
+		self.oc.write("for (int attempt = 0; attempt < 5; ++attempt) {\n")
+		self.oc.addIndent()
 		self.oc.indent()
 		self.oc.write(typeInt)
-		self.oc.write(" __offset = ")
-		identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.ChanSelect)
-		self.oc.write("(__jule_chans, ")
-		self.oc.write(conv::Itoa(len(chans)))
-		self.oc.write(", ")
-		self.oc.write(conv::Itoa(recvChans))
-		self.oc.write(", ")
-		self.oc.write(conv::FormatBool(block))
-		self.oc.write(");\n")
+		self.oc.write(" __randidx = (")
+		self.oc.write(typeInt)
+		self.oc.write(")")
+		identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Rand)
+		self.oc.write("();\n")
 		self.oc.indent()
-		if !block {
-			// This if condition is unnecessart for blocking select statements.
-			self.oc.write("if (__offset >= 0) {\n")
-			self.oc.addIndent()
-		}
+		self.oc.write("for (")
+		self.oc.write(typeInt)
+		self.oc.write(" __idx = 0; __idx < ")
+		lencases := conv::Itoa(len(slct.Cases))
+		self.oc.write(lencases)
+		self.oc.write("LL; ++__idx) {\n")
+		self.oc.addIndent()
 		self.oc.indent()
+		self.oc.write(typeInt)
+		self.oc.write(" __offset = (__randidx+__idx)%")
+		self.oc.write(lencases)
+		self.oc.write(";\n")
+		self.oc.indent()
+		self.oc.indent()
+		self.oc.write(typeBool)
+		self.oc.write(" ok = false;\n")
 		self.oc.write("switch (__offset) {\n")
-
-		// Generate cases, match them, and execute.
-		genCase := fn(i: int, mut c: chanCase) {
-			// We have to convert hchan to pchan.
-			// So use custom built-in expression for that.
-			mut sb := strings::Builder{}
-			sb.Grow(40)
-			sb.WriteStr("__jule_chans[")!
-			sb.WriteStr(conv::Itoa(i))!
-			sb.WriteStr("].as<")!
-			match type c.Value.Model {
-			| &sema::ChanRecv:
-				mut cr := c.Value.Model.(&sema::ChanRecv)
-				mut pchan := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, cr.Expr.Type.Chan().Value)
-				self.oc.tc.structureIns(&sb, pchan)
-				sb.WriteStr(">()")!
-				model := any(sb.Str())
-				cr.Expr.Model = unsafe { *(*sema::Expr)(&model) }
-				self.oc.ec.chanRecv(cr, nil, true)
-			| &sema::ChanSend:
-				mut cs := c.Value.Model.(&sema::ChanSend)
-				mut pchan := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, cs.Chan.Type.Chan().Value)
-				self.oc.tc.structureIns(&sb, pchan)
-				sb.WriteStr(">()")!
-				model := any(sb.Str())
-				cs.Chan.Model = unsafe { *(*sema::Expr)(&model) }
-				self.oc.ec.chanSend(cs, true)
-			|:
-				panic("unreachable")
-			}
-			self.oc.write(";\n")
-			self.oc.indent()
-			self.scope(c.Case.Scope)
-			self.oc.write("\n")
-		}
-		for (i, mut c) in chans {
+		for (i, mut case) in slct.Cases {
 			self.oc.indent()
 			self.oc.write("case ")
 			self.oc.write(conv::Itoa(i))
-			self.oc.write(":\n")
+			self.oc.write("LL:\n")
 			self.oc.addIndent()
 			self.oc.indent()
-			genCase(i, c)
+			match type case.Exprs[0].Model {
+			| &sema::ChanRecv:
+				mut recv := case.Exprs[0].Model.(&sema::ChanRecv)
+				self.oc.ec.chanRecv(recv, fn|| self.oc.write("&ok"), false)
+				self.oc.write(";\n")
+			| &sema::ChanSend:
+				mut send := case.Exprs[0].Model.(&sema::ChanSend)
+				self.oc.write("ok = ")
+				self.oc.ec.chanSend(send, false)
+				self.oc.write(";\n")
+			|:
+				panic("unreachable")
+			}
 			self.oc.indent()
-			self.oc.write("break;\n")
+			self.oc.write("if (!ok) continue;\n")
+			self.oc.indent()
+			if len(case.Scope.Stmts) > 0 {
+				self.scope(case.Scope)
+				self.oc.write("\n")
+				self.oc.indent()
+			}
+			self.oc.write("goto ")
+			self.oc.write(endLabel.Str())
+			self.oc.write(";\n")
 			self.oc.doneIndent()
 		}
-		// Closing switch.
 		self.oc.indent()
 		self.oc.write("}\n")
 		self.oc.doneIndent()
-
-		// Closing if.
-		if !block {
-			self.oc.indent()
-			self.oc.write("} else ")
-			self.scope(slct.Default.Scope) // Default scope is should not be nil.
-			self.oc.write("\n")
-			self.oc.doneIndent()
-		}
-
 		self.oc.indent()
-		identCoder.matchEnd(&self.oc.Buf, uintptr(slct))
+		self.oc.write("}\n")
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("}\n")
+		self.oc.indent()
+		if block {
+			identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Osyield)
+			self.oc.write("();\n")
+			self.oc.doneIndent()
+			self.oc.indent()
+			self.oc.write("}\n")
+			self.oc.indent()
+		} else if len(slct.Default.Scope.Stmts) > 0 {
+			self.scope(slct.Default.Scope)
+			self.oc.write("\n")
+			self.oc.indent()
+		}
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write(endLabel.Str())
 		self.oc.write(":;\n")
-
-		// Closing inner.
 		self.oc.indent()
 		self.oc.write("}")
 	}

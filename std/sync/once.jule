@@ -78,7 +78,7 @@ impl Once {
 	fn Do(*self, f: fn()) {
 		// Note: Here is an incorrect implementation of Do:
 		//
-		//	if self.done.CompareSwap(0, 1) {
+		//	if self.done.CompareAndSwap(0, 1, atomic::SeqCst, atomic::SeqCst) {
 		//		f()
 		//	}
 		//
@@ -90,7 +90,7 @@ impl Once {
 		// This is why the slow path falls back to a mutex, and why
 		// the self.done.store must be delayed until after f returns.
 
-		if self.done.Load(atomic::SeqCst) == 0 {
+		if self.done.Load(atomic::Acquire) == 0 {
 			// Outlined slow-path to allow inlining of the fast-path.
 			self.doSlow(f)
 		}
@@ -98,9 +98,9 @@ impl Once {
 
 	fn doSlow(*self, f: fn()) {
 		self.m.Lock()
-		if self.done.Load(atomic::SeqCst) == 0 {
+		if self.done.Load(atomic::Acquire) == 0 {
 			f()
-			self.done.Store(1, atomic::SeqCst)
+			self.done.Store(1, atomic::Release)
 		}
 		self.m.Unlock()
 	}

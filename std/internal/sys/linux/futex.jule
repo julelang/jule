@@ -1,0 +1,67 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Linux futex.
+//
+//	FutexWait(u32 *addr, u32 val)
+//	FutexWake(u32 *addr)
+//
+// FutexWait atomically checks if *addr == val and if so, sleeps on addr.
+// FutexWake wakes up threads sleeping on addr.
+// FutexWait is allowed to wake up spuriously.
+
+use "std/internal/runtime/syscall"
+use "std/sys"
+
+const (
+	_FUTEX_PRIVATE_FLAG = 128
+	_FUTEX_WAIT_PRIVATE = 0 | _FUTEX_PRIVATE_FLAG
+	_FUTEX_WAKE_PRIVATE = 1 | _FUTEX_PRIVATE_FLAG
+)
+
+type FutexState: u32
+
+const FutexStateMax = u32.Max
+
+// A low-level API for futex syscall.
+// FutexWait and FutexWake must be used in most case.
+fn Futex(addr: *unsafe, op: i32, val: FutexState, ts: *unsafe, addr2: *unsafe, val3: FutexState): uintptr {
+	_, err := syscall::Syscall(sys::SYS_FUTEX, uintptr(addr), uintptr(op), uintptr(val), uintptr(ts), uintptr(addr2), uintptr(val3))
+	ret err
+}
+
+// Atomically,
+//
+//	if(*addr == val) sleep
+//
+// Might be woken up spuriously; that's allowed.
+// Don't sleep longer than ns; ns < 0 means forever.
+fn FutexWait(&addr: *FutexState, val: FutexState, ns: i64) {
+	// Some Linux kernels have a bug where futex of
+	// FUTEX_WAIT returns an internal error code
+	// as an errno. Libpthread ignores the return value
+	// here, and so can we: as it says a few lines up,
+	// spurious wakeups are allowed.
+	if ns < 0 {
+		Futex(addr, _FUTEX_WAIT_PRIVATE, val, nil, nil, 0)
+		ret
+	}
+
+	let mut ts: timespec
+	ts.setNsec(ns)
+	Futex(addr, _FUTEX_WAIT_PRIVATE, val, &ts, nil, 0)
+}
+
+// If any procs are wakiting on addr, wake up at most cnt.
+fn FutexWake(&addr: *FutexState, cnt: FutexState) {
+	err := Futex(addr, _FUTEX_WAKE_PRIVATE, cnt, nil, nil, 0)
+	if err == syscall::NO_ERROR {
+		ret
+	}
+
+	// We don't know that futex wakeup can return
+	// EAGAIN or EINTR, but if it does, it would be
+	// safe to loop and call futex again.
+	unsafe { *(*i32)(0x1006) = 0x1006 } // Illegal memory write.
+}

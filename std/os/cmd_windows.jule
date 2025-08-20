@@ -3,13 +3,12 @@
 // license that can be found in the LICENSE file.
 
 use "std/internal/os/filepathlite"
+use "std/internal/sys/windows"
 use integ "std/jule/integrated"
 use "std/mem"
 use "std/strings"
 use "std/sys"
 use "std/unicode/utf16"
-
-cpp let INFINITE: int
 
 #typedef
 cpp struct STARTUPINFOW{}
@@ -21,7 +20,7 @@ cpp unsafe fn CreateProcessW(*integ::Wchar, *integ::Wchar, *unsafe, *unsafe, int
 cpp unsafe fn ZeroMemory(*unsafe, uint)
 cpp unsafe fn TerminateProcess(pid: cpp.HANDLE, code: int): bool
 cpp unsafe fn GetExitCodeProcess(cpp.HANDLE, mut *integ::LongLong): bool
-cpp unsafe fn WaitForSingleObject(cpp.HANDLE, int)
+cpp unsafe fn WaitForSingleObject(cpp.HANDLE, u32)
 
 struct startupInfo {
 	cb:              u32
@@ -133,7 +132,7 @@ impl Cmd {
 	}
 
 	fn wait(*self)!: int {
-		unsafe { cpp.WaitForSingleObject(cpp.HANDLE(self.attrs.hProcess), cpp.INFINITE) }
+		unsafe { cpp.WaitForSingleObject(cpp.HANDLE(self.attrs.hProcess), windows::INFINITE) }
 		mut exitCode := unsafe { integ::LongLong(0) }
 		unsafe {
 			cpp.GetExitCodeProcess(cpp.HANDLE(self.attrs.hProcess), &exitCode)

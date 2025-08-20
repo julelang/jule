@@ -43,9 +43,9 @@ impl RWMutex {
 	// call excludes new readers from acquiring the lock. See the
 	// documentation on the [RWMutex] type.
 	fn RLock(*self) {
-		if self.readerCount.Add(1, atomic::SeqCst) < 0 {
+		if self.readerCount.Add(1, atomic::AcqRel) < 0 {
 			// A writer is pending, wait for it.
-			runtime::semacquire(&self.readerSem, false, runtime::semaMutex)
+			runtime::semacquire(&self.readerSem, false, runtime::reasonMutex)
 		}
 	}
 
@@ -56,11 +56,11 @@ impl RWMutex {
 	// in a particular use of mutexes.
 	fn TryRLock(*self): bool {
 		for {
-			c := self.readerCount.Load(atomic::SeqCst)
+			c := self.readerCount.Load(atomic::Acquire)
 			if c < 0 {
 				ret false
 			}
-			if self.readerCount.CompareAndSwap(c, c+1, atomic::SeqCst) {
+			if self.readerCount.CompareAndSwap(c, c+1, atomic::AcqRel, atomic::Acquire) {
 				ret true
 			}
 		}
@@ -71,7 +71,7 @@ impl RWMutex {
 	// It is a run-time error if it is not locked for reading
 	// on entry to RUnlock.
 	fn RUnlock(*self) {
-		r := self.readerCount.Add(-1, atomic::SeqCst)
+		r := self.readerCount.Add(-1, atomic::AcqRel)
 		if r < 0 {
 			// Outlined slow-path to allow the fast-path to be inlined
 			self.rUnlockSlow(r)
@@ -83,7 +83,7 @@ impl RWMutex {
 			panic("std/sync: RUnlock of unlocked RWMutex")
 		}
 		// A writer is pending.
-		if self.readerWait.Add(-1, atomic::SeqCst) == 0 {
+		if self.readerWait.Add(-1, atomic::AcqRel) == 0 {
 			// The last reader unblocks the writer.
 			runtime::semrelease(&self.writerSem, false)
 		}
@@ -96,10 +96,10 @@ impl RWMutex {
 		// First, resolve competition with other writers.
 		self.w.Lock()
 		// Announce to readers there is a pending writer.
-		r := self.readerCount.Add(-rwmutexMaxReaders, atomic::SeqCst) + rwmutexMaxReaders
+		r := self.readerCount.Add(-rwmutexMaxReaders, atomic::AcqRel) + rwmutexMaxReaders
 		// Wait for active readers.
-		if r != 0 && self.readerWait.Add(r, atomic::SeqCst) != 0 {
-			runtime::semacquire(&self.writerSem, false, runtime::semaMutex)
+		if r != 0 && self.readerWait.Add(r, atomic::AcqRel) != 0 {
+			runtime::semacquire(&self.writerSem, false, runtime::reasonMutex)
 		}
 	}
 
@@ -112,7 +112,7 @@ impl RWMutex {
 		if !self.w.TryLock() {
 			ret false
 		}
-		if !self.readerCount.CompareAndSwap(0, -rwmutexMaxReaders, atomic::SeqCst) {
+		if !self.readerCount.CompareAndSwap(0, -rwmutexMaxReaders, atomic::AcqRel, atomic::Acquire) {
 			self.w.Unlock()
 			ret false
 		}
@@ -127,7 +127,7 @@ impl RWMutex {
 	// arrange for another thread to [RWMutex.RUnlock] ([RWMutex.Unlock]) it.
 	fn Unlock(*self) {
 		// Announce to readers there is no active writer.
-		r := self.readerCount.Add(rwmutexMaxReaders, atomic::SeqCst)
+		r := self.readerCount.Add(rwmutexMaxReaders, atomic::AcqRel)
 		if r >= rwmutexMaxReaders {
 			panic("std/sync: Unlock of unlocked RWMutex")
 		}

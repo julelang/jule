@@ -6,20 +6,14 @@ use "std/internal/cpu"
 use "std/internal/runtime"
 use "std/internal/runtime/atomic"
 
-struct semaLeaf {
-	ticket: u32  // acquired, boolean
-	deq:    bool // dequeued from list
-	next:   &semaLeaf
-}
-
 // Stores sema space for unique sema.
 struct semaNode {
 	sema: *u32
-	tree: &semaLeaf // Root of tree of the waiters.
+	tree: &parkerList // Root of tree of the waiters.
 	next: &semaNode
 }
 
-const semaRootSize = fmutexSize + runtime::SmartptrSize + 32 // +32 for u32
+const semaRootSize = fmutexSize + runtime::SmartptrSize + 4 // +4 for u32
 
 // Stores all space collections of sema.
 struct semaRoot {
@@ -29,14 +23,15 @@ struct semaRoot {
 }
 
 impl semaRoot {
-	fn queue(mut *self, mut &sema: *u32, mut sl: &semaLeaf, lifo: bool) {
+	#disable nilptr
+	fn queue(mut *self, mut &sema: *u32, mut p: &parkerList, lifo: bool) {
 		// The leaf may already used and some fields may be modified.
 		// For example, a dequeued leaf may cannot acquaire sema and
 		// enqueued again. So, data of old record may cause errors.
 		// Reset them to default to avoid data misunderstanding.
-		sl.next = nil
-		sl.ticket = 0
-		sl.deq = false
+		p.next = nil
+		p.ticket = 0
+		p.parker.init()
 
 		mut t := self.tree
 		mut otru := (&semaNode)(nil)
@@ -45,15 +40,15 @@ impl semaRoot {
 				// Already have sema in list.
 				if uintptr(t.sema) == uintptr(sema) {
 					if lifo {
-						// Add sl to head of the wait list.
-						sl.next = t.tree
-						t.tree = sl
+						// Add p to head of the wait list.
+						p.next = t.tree
+						t.tree = p
 					} else {
-						// Add sl to end of the wait list.
-						mut tsl := t.tree
-						for tsl.next != nil; tsl = tsl.next {
+						// Add p to end of the wait list.
+						mut tp := t.tree
+						for tp.next != nil; tp = tp.next {
 						}
-						tsl.next = sl
+						tp.next = p
 					}
 					ret
 				}
@@ -72,23 +67,24 @@ impl semaRoot {
 		if otru != nil {
 			// Found a node in open to reuse state, so use it.
 			otru.sema = sema
-			otru.tree = sl
+			otru.tree = p
 			ret
 		}
 		mut sn := new(semaNode)
 		sn.sema = sema
-		sn.tree = sl
+		sn.tree = p
 		if self.tree == nil {
-			// Head is nil, so sl will be.
+			// Head is nil, so p will be.
 			self.tree = sn
 		} else {
 			// Head is not nil and there is no reusable node.
-			// So append sn to nodes.
+			// So append p to nodes.
 			t.next = sn
 		}
 	}
 
-	fn dequeue(mut *self, &sema: *u32): &semaLeaf {
+	#disable nilptr
+	fn dequeue(mut *self, &sema: *u32): &parkerList {
 		mut t := self.tree
 		for t != nil; t = t.next {
 			// Already have sema in list.
@@ -96,15 +92,14 @@ impl semaRoot {
 				if t.tree == nil {
 					break
 				}
-				mut sl := t.tree
-				t.tree = sl.next
+				mut p := t.tree
+				t.tree = p.next
 				// Remove sema if tree reached to nil.
 				// So, open to reuse this allocation for other semas.
 				if t.tree == nil {
 					t.sema = nil
 				}
-				sl.deq = true
-				ret sl
+				ret p
 			}
 		}
 		ret nil
@@ -116,56 +111,37 @@ const semTabSize = 251
 
 struct semTable {
 	root: semaRoot
-	pad:  [cpu::CacheLinePadSize + semaRootSize]byte
+	_:    [cpu::CacheLinePadSize + semaRootSize]byte
 }
 
 let mut semtable: [semTabSize]semTable = []
 
 // Returns sema space collection for the sema from semtable.
+#disable nilptr
 fn semtable_rootFor(&sema: *u32): &semaRoot {
 	ret unsafe { (&semaRoot)(&semtable[(uintptr(sema)>>3)%semTabSize].root) }
 }
 
+#disable nilptr
 fn cansemacquire(mut &sema: *u32): bool {
 	for {
-		v := atomic::Load(sema, atomic::SeqCst)
+		v := atomic::Load(sema, atomic::Acquire)
 		if v == 0 {
 			ret false
 		}
-		if atomic::CompareAndSwap(sema, v, v-1, atomic::SeqCst) {
+		if atomic::CompareAndSwap(sema, v, v-1, atomic::AcqRel, atomic::Acquire) {
 			ret true
 		}
 	}
 }
-
-// Puts the current thread into a waiting state and unlocks the lock.
-fn semapark(&lock: *fmutex, &sema: *u32, &deq: *bool, opt: u32) {
-	mut reason := u32(reasonNA | reasonStrict)
-	if opt&semaWaitGroup == semaWaitGroup {
-		reason |= reasonWaitGroup
-	}
-	if opt&semaMutex == semaMutex {
-		reason |= reasonMutex
-	}
-	lock.unlock()
-	for !*deq {
-		yield(uintptr(sema), reason)
-		reason &= ^reasonStrict
-	}
-}
-
-// Semacquaire option flags.
-const (
-	semaWaitGroup = 1 << iota
-	semaMutex
-)
 
 // Waits until sema > 0 and then atomically decrements it.
 // It is intended as a simple sleep primitive for use by the synchronization
 // library and should not be used directly.
 // If lifo is true, queue waiter at the head of wait queue.
 // wg reports whether the semacqure called by a waitgroup.
-fn semacquire(mut &sema: *u32, lifo: bool, opt: u32) {
+#disable nilptr
+fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 	// Easy case.
 	if cansemacquire(sema) {
 		ret
@@ -178,23 +154,25 @@ fn semacquire(mut &sema: *u32, lifo: bool, opt: u32) {
 	//	sleep
 	//	(waiter descriptor is dequeued by signaler)
 	mut root := semtable_rootFor(sema)
-	mut sl := new(semaLeaf)
+	mut p := new(parkerList)
+	p.parker = new(parker)
+	p.parker.init()
 	for {
 		root.lock.lock()
 		// Add ourselves to nwait to disable "easy case" in semrelease.
-		atomic::Add(&root.nwait, 1, atomic::SeqCst)
+		atomic::Add(&root.nwait, 1, atomic::AcqRel)
 		// Check cansemacquire to avoid missed wakeup.
 		if cansemacquire(sema) {
-			atomic::Add(&root.nwait, ^u32(0), atomic::SeqCst)
+			atomic::Add(&root.nwait, ^u32(0), atomic::AcqRel)
 			root.lock.unlock()
 			break
 		}
 		// Any semrelease after the cansemacquire knows we're waiting
 		// (we set nwait above), so go to sleep.
-		root.queue(sema, sl, lifo)
-		semapark(&root.lock, sema, &sl.deq, opt)
+		root.queue(sema, p, lifo)
+		park(uintptr(&root.lock), &(*p.parker), reason)
 		// Try to acquire semaphore before enqueue again.
-		if cansemacquire(sema) {
+		if p.ticket != 0 || cansemacquire(sema) {
 			break
 		}
 	}
@@ -205,37 +183,48 @@ fn semacquire(mut &sema: *u32, lifo: bool, opt: u32) {
 // It is intended as a simple wakeup primitive for use by the synchronization
 // library and should not be used directly.
 // If handoff is true, tries to pass count directly to the first waiter.
+#disable nilptr
 fn semrelease(mut &sema: *u32, handoff: bool) {
 	mut root := semtable_rootFor(sema)
-	atomic::Add(sema, 1, atomic::SeqCst)
+	atomic::Add(sema, 1, atomic::AcqRel)
 
 	// Easy case: no waiters?
 	// This check must happen after the atomicAdd, to avoid a missed wakeup
 	// (see loop in semacquire).
-	if atomic::Load(&root.nwait, atomic::SeqCst) == 0 {
+	if atomic::Load(&root.nwait, atomic::Acquire) == 0 {
 		ret
 	}
 
 	// Harder case: search for a waiter and wake it.
 	root.lock.lock()
-	if atomic::Load(&root.nwait, atomic::SeqCst) == 0 {
+	if atomic::Load(&root.nwait, atomic::Acquire) == 0 {
 		// The count is already consumed by another thread,
 		// so no need to wake up another thread.
 		root.lock.unlock()
 		ret
 	}
 
-	mut sl := root.dequeue(sema)
-	if sl != nil {
-		atomic::Add(&root.nwait, ^u32(0), atomic::SeqCst)
+	mut p := root.dequeue(sema)
+	if p != nil {
+		atomic::Add(&root.nwait, ^u32(0), atomic::AcqRel)
 	}
 	root.lock.unlock()
-	// If handoff is true, immediately yield the CPU with no analysis.
-	// This thread is not the expected owner of the next semacquire.
-	// So this thread doesn't matter for now, yield the CPU to increase
-	// the chances of semacquire of the dequeued thread.
-	if handoff {
-		osyield()
+	// May be slow or even yield, so unlock first.
+	if p != nil {
+		if p.ticket != 0 {
+			panic("runtime: invalid semaphore ticket")
+		}
+		if handoff && cansemacquire(sema) {
+			p.ticket = 1
+		}
+		p.parker.unpark()
+		// If handoff is true, immediately yield the CPU with no analysis.
+		// This thread is not the expected owner of the next semacquire.
+		// So this thread doesn't matter for now, yield the CPU to increase
+		// the chances of semacquire of the dequeued thread.
+		if handoff && p.ticket == 1 {
+			osyield()
+		}
 	}
 }
 
@@ -261,62 +250,130 @@ struct notifyList {
 	// blocked on the same condvar, which is currently not possible.
 	notify: u32
 
-	lock: fmutex
+	// List of parked waiters.
+	head: &parkerList
+	tail: &parkerList
+
+	lock: qmutex
 }
 
 // Adds new notify ticked to list l and returns the ticket number.
+#disable nilptr
 fn notifyListAdd(mut &l: *notifyList): u32 {
-	ret atomic::Add(&l.wait, 1, atomic::SeqCst) - 1
+	ret atomic::Add(&l.wait, 1, atomic::AcqRel) - 1
 }
 
 // Waits for a notification. If one has been sent since
 // notifyListAdd was called, it returns immediately. Otherwise, it blocks.
+#disable nilptr
 fn notifyListWait(mut &l: *notifyList, t: u32) {
-	mut reason := u32(reasonCond | reasonStrict)
-	for {
-		l.lock.lock()
-		if less(t, l.notify) {
-			l.lock.unlock()
-			ret
-		}
+	// Return right away if this ticket has already been notified.
+	l.lock.lock()
+	if less(t, l.notify) {
 		l.lock.unlock()
-		yield(0, reason)
-		reason &= ^reasonStrict
+		ret
 	}
+
+	// Enqueue itself.
+	mut thread := acquireThread()
+	mut p := new(parkerList)
+	p.parker = thread.parker
+	p.ticket = t
+	if l.tail == nil {
+		l.head = p
+	} else {
+		l.tail.next = p
+	}
+	l.tail = p
+
+	park2(&(*thread), uintptr(&l.lock), &(*p.parker), reasonCond)
 }
 
 // Notifies one entry in the list.
+#disable nilptr
 fn notifyListNotifyOne(mut &l: *notifyList) {
 	// Fast-path: if there are no new waiters since the last notification
 	// we don't need to acquire the lock at all.
-	if atomic::Load(&l.wait, atomic::SeqCst) == atomic::Load(&l.notify, atomic::SeqCst) {
+	if atomic::Load(&l.wait, atomic::Acquire) == atomic::Load(&l.notify, atomic::Acquire) {
 		ret
 	}
 
 	l.lock.lock()
+
 	// Re-check under the lock if we need to do anything.
 	t := l.notify
-	if t == atomic::Load(&l.wait, atomic::SeqCst) {
+	if t == atomic::Load(&l.wait, atomic::Acquire) {
 		l.lock.unlock()
 		ret
 	}
 
 	// Update the next notify ticket number.
-	atomic::Add(&l.notify, t+1, atomic::SeqCst)
+	atomic::Add(&l.notify, t+1, atomic::Release)
+
+	// Try to find the p that needs to be notified.
+	// If it hasn't made it to the list yet we won't find it,
+	// but it won't park itself once it sees the new notify number.
+	//
+	// This scan looks linear but essentially always stops quickly.
+	// Because p's queue separately from taking numbers,
+	// there may be minor reorderings in the list, but we
+	// expect the p we're looking for to be near the front.
+	// The p has others in front of it on the list only to the
+	// extent that it lost the race, so the iteration will not
+	// be too long. This applies even when the p is missing:
+	// it hasn't yet gotten to sleep and has lost the race to
+	// the (few) other p's that we find on the list.
+	mut p, mut s := (&parkerList)(nil), l.head
+	for s != nil; p, s = s, s.next {
+		if s.ticket == t {
+			mut n := s.next
+			if p != nil {
+				p.next = n
+			} else {
+				l.head = n
+			}
+			if n == nil {
+				l.tail = p
+			}
+			l.lock.unlock()
+			s.next = nil
+			s.parker.unpark()
+			ret
+		}
+	}
 
 	l.lock.unlock()
 }
 
 // Notifies all entries in the list.
+#disable nilptr
 fn notifyListNotifyAll(mut &l: *notifyList) {
+	// Fast-path: if there are no new waiters since the last notification
+	// we don't need to acquire the lock.
+	if atomic::Load(&l.wait, atomic::Acquire) == atomic::Load(&l.notify, atomic::Acquire) {
+		ret
+	}
+
+	// Pull the list out into a local variable, waiters will be readied
+	// outside the lock.
 	l.lock.lock()
+	mut s := l.head
+	l.head = nil
+	l.tail = nil
 
 	// Update the next ticket to be notified. We can set it to the current
 	// value of wait because any previous waiters are already in the list
 	// or will notice that they have already been notified when trying to
 	// add themselves to the list.
-	wait := atomic::Load(&l.wait, atomic::SeqCst)
-	atomic::Store(&l.notify, wait, atomic::SeqCst)
-
+	wait := atomic::Load(&l.wait, atomic::Acquire)
+	atomic::Store(&l.notify, wait, atomic::Release)
 	l.lock.unlock()
+
+	// Go through the local list and ready all waiters.
+	for s != nil {
+		mut next := s.next
+		s.next = nil
+		s.parker.unpark()
+		s = next
+	}
 }
