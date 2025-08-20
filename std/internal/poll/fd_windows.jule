@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/internal/sys/windows"
 use "std/mem"
 use "std/sys"
 use "std/unicode/utf16"
@@ -75,8 +76,14 @@ impl FD {
 			| self.Flags&File == File | self.Flags&Pipe == Pipe:
 				nn = self.writeFile(b)?
 			| self.Flags&Socket == Socket:
-				nn = len(b)
-				sys::Send(NetHandle(self.File), b, 0)?
+				handle := NetHandle(self.File)
+				nn = execIO(operation{
+					bufSize: len(b),
+					op: fn|| {
+						sys::Send(handle, b, 0)?
+						ret len(b)
+					},
+				})?
 			|:
 				panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Write")
 			}
@@ -103,7 +110,14 @@ impl FD {
 				max = n + maxRW
 			}
 			part := buf[n:max]
-			sys::Sendto(NetHandle(self.File), part, 0, addr, addrLen)?
+			handle := NetHandle(self.File)
+			execIO(operation{
+				bufSize: len(part),
+				op: fn|| {
+					sys::Sendto(handle, part, 0, addr, addrLen)?
+					ret 0
+				},
+			})?
 			n += len(part)
 			if n == len(buf) {
 				ret
@@ -180,7 +194,11 @@ impl FD {
 		| self.Flags&File == File | self.Flags&Pipe == Pipe:
 			n = self.readFile(buf)?
 		| self.Flags&Socket == Socket:
-			n = sys::Recv(NetHandle(self.File), buf, 0)?
+			handle := NetHandle(self.File)
+			n = execIO(operation{
+				bufSize: len(buf),
+				op: fn|| sys::Recv(handle, buf, 0)?,
+			})?
 		|:
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Read")
 		}
@@ -202,7 +220,11 @@ impl FD {
 		if len(buf) > maxRW {
 			buf = buf[:maxRW]
 		}
-		n = sys::Recvfrom(NetHandle(self.File), buf, 0, addr, addrLen)?
+		handle := NetHandle(self.File)
+		n = execIO(operation{
+			bufSize: len(buf),
+			op: fn|| sys::Recvfrom(handle, buf, 0, addr, addrLen)?,
+		})?
 		n = self.statEOF(n)
 		ret n
 	}
@@ -317,5 +339,21 @@ impl FD {
 		|:
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Close")
 		}
+	}
+}
+
+struct operation {
+	bufSize: int
+	op:      fn()!: int
+}
+
+// Executes a single IO operation o.
+fn execIO(o: operation)!: int {
+	ret o.op() else {
+		// More data available. Return back the size of received data.
+		if error == sys::ERROR_MORE_DATA || error == windows::WSAEMSGSIZE {
+			ret o.bufSize
+		}
+		error(error)
 	}
 }
