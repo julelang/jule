@@ -14,7 +14,6 @@ use "std/fmt"
 use "std/jule"
 use "std/jule/build"
 use "std/jule/dist"
-use "std/jule/log"
 use "std/jule/sema"
 use "std/jule/types"
 use "std/os"
@@ -323,15 +322,18 @@ fn genCompileCmd(sourcePath: str, ir: &obj::IR): (compiler: str, args: []str) {
 		}
 	}
 
-	if Out != "" {
-		args = append(args, "-o")
-		mut out := Out
-		// If compiling for Windows and Out path is not have `.exe` extension, then add it.
-		if build::OS == dist::Windows && filepath::Ext(Out) != ".exe" {
-			out += ".exe"
-		}
-		args = append(args, out)
+	// If output name is missing, use "main" by default.
+	Out = strings::TrimSpace(Out)
+	if Out == "" {
+		Out = "main"
 	}
+	args = append(args, "-o")
+	// If compiling for Windows and Out path is not have `.exe` extension, then add it.
+	if build::OS == dist::Windows && filepath::Ext(Out) != ".exe" {
+		Out += ".exe"
+	}
+	args = append(args, Out)
+
 	args = append(args, sourcePath)
 
 	// Push passes.
