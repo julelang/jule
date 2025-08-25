@@ -389,14 +389,23 @@ fn lookupSingle(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype: u16, qtype
 
 		let mut n: int
 		if conf.useTCP {
-			n = io::ReadFull(conn, (*buf)[:bigEndianU16Size]) else { use io::EOF }
+			n = io::ReadFull(conn, (*buf)[:bigEndianU16Size]) else {
+				println(error)
+				use io::EOF
+			}
 			if n > 0 {
 				ln := binary::BigEndian.DecodeU16((*buf)[:bigEndianU16Size])
 				growBuffer(buf, int(ln))
-				n = io::ReadFull(conn, *buf) else { use io::EOF }
+				n = io::ReadFull(conn, *buf) else {
+					println(error)
+					use io::EOF
+				}
 			}
 		} else {
-			n = conn.Read((*buf)[:maxDNSPacketSize]) else { use io::EOF }
+			n = conn.Read((*buf)[:maxDNSPacketSize]) else {
+				println(error)
+				use io::EOF
+			}
 		}
 		if n <= 0 {
 			continue
@@ -475,6 +484,7 @@ fn juleLookupIP(net: Network, host: str)!: []IPAddr {
 
 	resolveConfig()
 	println(conf.servers)
+	println(conf.search)
 
 	dots := strings::Count(host, ".")
 	isFQDN := strings::HasSuffix(host, ".")
@@ -496,7 +506,6 @@ fn juleLookupIP(net: Network, host: str)!: []IPAddr {
 		// Get connection for the server.
 		mut conn := DialTimeout(network, server, conf.timeout)?
 		if conf.timeout > 0 {
-			println(conf.timeout)
 			conn.SetReadTimeout(conf.timeout)?
 			conn.SetWriteTimeout(conf.timeout)?
 		}
