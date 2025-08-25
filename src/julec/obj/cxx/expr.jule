@@ -98,7 +98,7 @@ impl exprCoder {
 	fn float32(mut &self, c: &constant::Const) {
 		x := c.AsF64()
 
-		self.oc.write("jule::F32(")
+		self.oc.write("__jule_F32(")
 
 		// Special cases.
 		if self.ftoaSpecialCases(x) {
@@ -113,7 +113,7 @@ impl exprCoder {
 	fn float64(mut &self, c: &constant::Const) {
 		x := c.AsF64()
 
-		self.oc.write("jule::F64(")
+		self.oc.write("__jule_F64(")
 
 		// Special cases.
 		if self.ftoaSpecialCases(x) {
@@ -651,7 +651,7 @@ impl exprCoder {
 	}
 
 	fn allocStructure(mut &self, mut m: &sema::AllocStructLitExpr) {
-		self.oc.write("jule::new_ptr<")
+		self.oc.write("__jule_new_ptr<")
 		self.structureIns(m.Lit.Strct)
 		self.oc.write(">(")
 		self.structureLit(m.Lit)
@@ -749,7 +749,7 @@ impl exprCoder {
 				self.oc.locInfo(m.Token)
 				self.oc.write("\", ")
 			}
-			self.oc.write("(" + typeTrait + "::Type*)&")
+			self.oc.write("(__jule_TypeMeta*)&")
 			identCoder.traitDecl(&self.oc.Buf, m.Expr.Type.Trait())
 			self.oc.write("_mptr_data")
 			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Expr.Type.Trait(), m.Type)))
@@ -832,7 +832,7 @@ impl exprCoder {
 				self.oc.locInfo(m.Token)
 				self.oc.write("\", ")
 			}
-			self.oc.write("(" + typeTrait + "::Type*)&")
+			self.oc.write("(__jule_TypeMeta*)&")
 			identCoder.traitDecl(&self.oc.Buf, m.Expr.Type.Trait())
 			self.oc.write("_mptr_data")
 			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Expr.Type.Trait(), m.Type)))
@@ -855,7 +855,7 @@ impl exprCoder {
 			self.oc.tc.kind(&self.oc.Buf, m.Type)
 			self.oc.write("(")
 			self.possibleRefExpr(m.Expr.Model)
-			self.oc.write(", (" + typeTrait + "::Type*)&")
+			self.oc.write(", (__jule_TypeMeta*)&")
 			identCoder.traitDecl(&self.oc.Buf, m.Type.Trait())
 			self.oc.write("_mptr_data")
 			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Type.Trait(), m.Expr.Type)))
@@ -1444,12 +1444,12 @@ impl exprCoder {
 	fn anonFunc(mut &self, mut m: &sema::AnonFuncExpr) {
 		closure := obj::IsClosure(m)
 		ident := self.oc.pushAnonFunc(m)
-		self.oc.write("jule::__new_closure<")
+		self.oc.write("__jule_new_closure<")
 		self.oc.tc.anonFunc(&self.oc.Buf, m.Func)
 		self.oc.write(">((void*)")
 		self.oc.write(ident)
 		if closure {
-			self.oc.write(", jule::Ptr<")
+			self.oc.write(", __jule_Ptr<")
 			self.oc.write(ident)
 			self.oc.write(anonFuncCtxSuffix)
 			self.oc.write(">::make(")
@@ -1634,7 +1634,7 @@ impl exprCoder {
 	}
 
 	fn newCall(mut &self, mut m: &sema::BuiltinNewCallExpr) {
-		self.oc.write("jule::new_ptr<")
+		self.oc.write("__jule_new_ptr<")
 		self.oc.tc.kind(&self.oc.Buf, m.Type)
 		self.oc.write(">(")
 		if m.Init != nil {
@@ -1689,16 +1689,16 @@ impl exprCoder {
 					self.oc.write(deferStackName + ".call();\n")
 					self.oc.indent()
 				}
-				self.oc.write("return jule::VoidExceptional{.error=std::move(")
+				self.oc.write("return __jule_VoidExceptional{.error=std::move(")
 				// Handle error variable like ordinary variable.
 				// Because it may be captured, use captured variable handler.
 				self.var(v)
 				self.oc.write(")}")
 				ret
 			}
-			self.oc.write("return jule::VoidExceptional{.error=")
+			self.oc.write("return __jule_VoidExceptional{.error=")
 		} else {
-			self.oc.write("return jule::Exceptional<")
+			self.oc.write("return __jule_Exceptional<")
 			self.oc.tc.rc.codeMut1(&self.oc.Buf, m.Func.Result)
 			mut v, _ := m.Err.Model.(&sema::Var)
 			if v != nil && v.Name == "error" {
@@ -2190,7 +2190,7 @@ impl exprCoder {
 			self.oc.write(ident)
 			self.oc.write(".len(); ")
 		}
-		self.oc.write("jule::Slice<" + typeU8 + "> buf; buf.alloc_new(0, size); ")
+		self.oc.write("__jule_Slice<" + typeU8 + "> buf; buf.alloc_new(0, size); ")
 		for i in m.Parts {
 			ident := "part" + conv::Itoa(i)
 			self.oc.write("buf.append(")

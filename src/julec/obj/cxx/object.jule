@@ -321,7 +321,7 @@ impl ObjectCoder {
 		self.deallocated = append(self.deallocated, t)
 		self.deallocObj.WriteStr("void " + deallocatedTypeIdent)!
 		self.deallocObj.WriteStr(conv::Itoa(i))!
-		self.deallocObj.WriteStr("(jule::Ptr<jule::Uintptr> &alloc) noexcept { alloc.__as<")!
+		self.deallocObj.WriteStr("(__jule_Ptr<__jule_Uintptr> &alloc) noexcept { alloc.__as<")!
 		// We handling map and channel types as smart pointer,
 		// because this kind types implemented as smart pointers
 		// at machine code level.
@@ -367,7 +367,7 @@ impl ObjectCoder {
 			// Ctx handler function.
 			self.anonObj.WriteStr("static void ")!
 			self.anonObj.WriteStr(name)!
-			self.anonObj.WriteStr(anonFuncCtxHandlerSuffix + "(jule::Ptr<" + typeUintptr + "> &ptr) { ptr.__as<")!
+			self.anonObj.WriteStr(anonFuncCtxHandlerSuffix + "(__jule_Ptr<" + typeUintptr + "> &ptr) { ptr.__as<")!
 			self.anonObj.WriteStr(name)!
 			self.anonObj.WriteStr(anonFuncCtxSuffix + ">().dealloc(); }\n")!
 		} else {
@@ -418,7 +418,7 @@ impl ObjectCoder {
 				if f == nil {
 					// This method should be unused.
 					// Implement as a panic call to help debugging.
-					self.anyObj.WriteStr(`__jule_panicStr(__jule_strBytePtr((jule::U8*)"runtime: type data have not string conversion data but used at runtime", 70)); }` + "\n")!
+					self.anyObj.WriteStr(`__jule_panicStr(__jule_strBytePtr((__jule_U8*)"runtime: type data have not string conversion data but used at runtime", 70)); }` + "\n")!
 				} else {
 					self.anyObj.WriteStr("return ")!
 					identCoder.funcIns(&self.anyObj, f)
@@ -439,7 +439,7 @@ impl ObjectCoder {
 			}
 
 			// Type structure.
-			self.anyObj.WriteStr("struct " + typeAny + "::Type ")!
+			self.anyObj.WriteStr("struct __jule_TypeMeta ")!
 			self.anyObj.WriteStr(anyTypeIdent)!
 			self.anyObj.WriteStr(si)!
 			self.anyObj.WriteStr("{.dealloc=" + deallocatedTypeIdent)!
@@ -498,7 +498,7 @@ impl ObjectCoder {
 			if f == nil {
 				// This method should be unused.
 				// Implement as a panic call to help debugging.
-				self.anyObj.WriteStr(`__jule_panicStr(__jule_strBytePtr((jule::U8*)"runtime: type data have not string conversion data but used at runtime", 70)); }` + "\n")!
+				self.anyObj.WriteStr(`__jule_panicStr(__jule_strBytePtr((__jule_U8*)"runtime: type data have not string conversion data but used at runtime", 70)); }` + "\n")!
 			} else {
 				self.anyObj.WriteStr("return ")!
 				identCoder.funcIns(&self.anyObj, f)
@@ -510,7 +510,7 @@ impl ObjectCoder {
 			}
 
 			// Type structure.
-			self.anyObj.WriteStr("struct " + typeAny + "::Type ")!
+			self.anyObj.WriteStr("struct __jule_TypeMeta ")!
 			self.anyObj.WriteStr(anyTypeIdent)!
 			self.anyObj.WriteStr(si)!
 			self.anyObj.WriteStr("{.dealloc=" + deallocatedTypeIdent)!
@@ -547,7 +547,7 @@ impl ObjectCoder {
 					hashhable = true
 					self.anyObj.WriteStr(typeUintptr + " " + anyTypeIdent)!
 					self.anyObj.WriteStr(si)!
-					self.anyObj.WriteStr("_hash(jule::Ptr<jule::Uintptr> *ptr, jule::Uintptr seed) noexcept { return ")!
+					self.anyObj.WriteStr("_hash(__jule_Ptr<__jule_Uintptr> *ptr, __jule_Uintptr seed) noexcept { return ")!
 					identCoder.funcIns(&self.anyObj, f)
 					self.anyObj.WriteStr("(reinterpret_cast<")!
 					self.anyObj.WriteStr(kind)!
@@ -596,7 +596,7 @@ impl ObjectCoder {
 			if f == nil {
 				// This method should be unused.
 				// Implement as a panic call to help debugging.
-				self.anyObj.WriteStr(`__jule_panicStr(__jule_strBytePtr((jule::U8*)"runtime: type data have not string conversion data but used at runtime", 70)); }` + "\n")!
+				self.anyObj.WriteStr(`__jule_panicStr(__jule_strBytePtr((__jule_U8*)"runtime: type data have not string conversion data but used at runtime", 70)); }` + "\n")!
 			} else {
 				self.anyObj.WriteStr("return ")!
 				identCoder.funcIns(&self.anyObj, f)
@@ -606,7 +606,7 @@ impl ObjectCoder {
 			}
 
 			// Type structure.
-			self.anyObj.WriteStr("struct " + typeAny + "::Type ")!
+			self.anyObj.WriteStr("struct __jule_TypeMeta ")!
 			self.anyObj.WriteStr(anyTypeIdent)!
 			self.anyObj.WriteStr(si)!
 			self.anyObj.WriteStr("{.dealloc=" + deallocatedTypeIdent)!
@@ -1077,13 +1077,13 @@ impl ObjectCoder {
 			// So, compiler may cast it to actual data type to use it. Therefore,
 			// the first field of the static data is should be always common function pointers.
 			self.indent()
-			self.write("void(*dealloc)(jule::Ptr < jule::Uintptr > &alloc);\n")
+			self.write("void(*dealloc)(__jule_Ptr < __jule_Uintptr > &alloc);\n")
 			self.indent()
-			self.write("jule::Uintptr (*hash)(jule::Ptr<jule::Uintptr> *hash, jule::Uintptr seed);\n")
+			self.write("__jule_Uintptr (*hash)(__jule_Ptr<__jule_Uintptr> *hash, __jule_Uintptr seed);\n")
 			self.indent()
-			self.write("jule::Bool(*eq)(void*alloc, void*other);\n")
+			self.write("__jule_Bool(*eq)(void*alloc, void*other);\n")
 			self.indent()
-			self.write("jule::Str(*to_str)(void * alloc);\n")
+			self.write("__jule_Str(*to_str)(void * alloc);\n")
 
 			self.traitDataTypeMethods(hash)
 			self.doneIndent()
@@ -1289,19 +1289,19 @@ impl ObjectCoder {
 					//	So cast to element type for correct handling.
 					//	Then pass address of the temporary variable to receiver.
 					if ptr && act.Sptr() != nil {
-						self.write("((jule::Ptr<")
+						self.write("((__jule_Ptr<")
 						self.tc.kind(&self.Buf, act.Sptr().Value)
 						self.write(">*)&_self_)")
 						ptr = false // Avoid ".alloc" suffix. We have a pointer already.
 					} else if ptr && act.Map() != nil {
-						self.write("((jule::Ptr<")
+						self.write("((__jule_Ptr<")
 						mp := act.Map()
 						mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Value)
 						self.tc.structureIns(&self.Buf, mps)
 						self.write(">*)&_self_)")
 						ptr = false // Avoid ".alloc" suffix. We have a pointer already.
 					} else if ptr && act.Chan() != nil {
-						self.write("((jule::Ptr<")
+						self.write("((__jule_Ptr<")
 						ch := act.Chan()
 						mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
 						self.tc.structureIns(&self.Buf, chs)
@@ -1597,9 +1597,9 @@ impl ObjectCoder {
 	fn end(mut &self) {
 		self.addIndent()
 		self.write(`int main(int argc, char *argv[], char *envp[]) {
-	__jule_argc = static_cast<jule::Int>(argc);
-	__jule_argv = reinterpret_cast<jule::U8**>(argv);
-	__jule_envp = reinterpret_cast<jule::U8**>(envp);
+	__jule_argc = static_cast<__jule_Int>(argc);
+	__jule_argv = reinterpret_cast<__jule_U8**>(argv);
+	__jule_envp = reinterpret_cast<__jule_U8**>(envp);
 
 	`)
 		identCoder.funcIns(&self.Buf, meta::Program.Runtime.Init)

@@ -30,19 +30,19 @@ impl sema::Kind for customType {
 }
 
 const (
-	typeAny     = "jule::Any"
-	typeStr     = "jule::Str"
-	typeMap     = "jule::Map"
-	typePtr     = "jule::Ptr"
-	typeSptr    = "jule::Sptr"
-	typeSlice   = "jule::Slice"
-	typeTrait   = "jule::Any"
-	typeArray   = "jule::Array"
-	typeFunc    = "jule::Fn"
-	typeBool    = "jule::Bool"
-	typeInt     = "jule::Int"
-	typeUintptr = "jule::Uintptr"
-	typeU8      = "jule::U8"
+	typeAny     = "__jule_Any"
+	typeStr     = "__jule_Str"
+	typeMap     = "__jule_Map"
+	typePtr     = "__jule_Ptr"
+	typeSptr    = "__jule_Sptr"
+	typeSlice   = "__jule_Slice"
+	typeTrait   = "__jule_Any"
+	typeArray   = "__jule_Array"
+	typeFunc    = "__jule_Fn"
+	typeBool    = "__jule_Bool"
+	typeInt     = "__jule_Int"
+	typeUintptr = "__jule_Uintptr"
+	typeU8      = "__jule_U8"
 )
 
 struct typeCoder {
@@ -70,7 +70,7 @@ impl typeCoder {
 		if id != types::Uintptr {
 			id = types::RealKindOf(id)
 		}
-		buf.WriteStr("jule::")!
+		buf.WriteStr("__jule_")!
 		if 97 <= id[0] && id[0] <= 122 {
 			buf.WriteByte(id[0] - 32)! // To upper first byte.
 		} else {
@@ -145,7 +145,7 @@ impl typeCoder {
 	// Generates C++ code of Map type.
 	fn mapType(mut *self, mut &buf: *strings::Builder, mut m: &sema::Map) {
 		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, m.Key, m.Value)
-		buf.WriteStr("jule::Ptr<")!
+		buf.WriteStr("__jule_Ptr<")!
 		identCoder.structureIns(buf, ins)
 		buf.WriteStr(">")!
 	}
@@ -218,13 +218,13 @@ impl typeCoder {
 	fn funcResult(mut *self, mut &buf: *strings::Builder, mut f: &sema::Func) {
 		if f.IsVoid() {
 			if f.Exceptional {
-				buf.WriteStr("jule::VoidExceptional")!
+				buf.WriteStr("__jule_VoidExceptional")!
 				ret
 			}
 			buf.WriteStr("void")!
 		}
 		if f.Exceptional {
-			buf.WriteStr("jule::Exceptional<")!
+			buf.WriteStr("__jule_Exceptional<")!
 			self.kind(buf, f.Result.TypeSym.Type)
 			buf.WriteByte('>')!
 			ret
@@ -236,14 +236,14 @@ impl typeCoder {
 	fn funcInsResult(mut *self, mut &s: *strings::Builder, mut f: &sema::FuncIns) {
 		if f.Decl.IsVoid() {
 			if f.Decl.Exceptional {
-				s.WriteStr("jule::VoidExceptional")!
+				s.WriteStr("__jule_VoidExceptional")!
 			} else {
 				s.WriteStr("void")!
 			}
 			ret
 		}
 		if f.Decl.Exceptional {
-			s.WriteStr("jule::Exceptional<")!
+			s.WriteStr("__jule_Exceptional<")!
 			self.rc.codeMut1(s, f.Result)
 			s.WriteByte('>')!
 			ret
@@ -280,7 +280,7 @@ impl typeCoder {
 
 	fn channel(mut *self, mut &buf: *strings::Builder, mut ch: &sema::Chan) {
 		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
-		buf.WriteStr("jule::Ptr<")!
+		buf.WriteStr("__jule_Ptr<")!
 		identCoder.structureIns(buf, ins)
 		buf.WriteStr(">")!
 	}
