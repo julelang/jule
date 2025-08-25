@@ -14,514 +14,507 @@
 #include "types.hpp"
 #include "str.hpp"
 
-namespace jule
+// Built-in slice type.
+template <typename Item>
+class __jule_Slice
 {
-    // Built-in slice type.
-    template <typename Item>
-    class Slice;
+public:
+    mutable __jule_Ptr<Item> data;
+    mutable Item *_slice = nullptr;
+    mutable __jule_Int _len = 0;
+    mutable __jule_Int _cap = 0;
 
-    template <typename Item>
-    class Slice
+    static __jule_Slice<Item> alloc(const __jule_Int &len, const __jule_Int &cap) noexcept
     {
-    public:
-        mutable jule::Ptr<Item> data;
-        mutable Item *_slice = nullptr;
-        mutable jule::Int _len = 0;
-        mutable jule::Int _cap = 0;
+        if (len < 0)
+            __jule_panic((__jule_U8 *)"runtime: []T: slice allocation length lower than zero", 53);
+        if (cap < 0)
+            __jule_panic((__jule_U8 *)"runtime: []T: slice allocation capacity lower than zero", 55);
+        if (len > cap)
+            __jule_panic((__jule_U8 *)"runtime: []T: slice allocation length greater than capacity", 59);
+        __jule_Slice<Item> buffer;
+        buffer.alloc_new(len, cap);
+        return buffer;
+    }
 
-        static jule::Slice<Item> alloc(const jule::Int &len, const jule::Int &cap) noexcept
+    static __jule_Slice<Item> make(const std::initializer_list<Item> &src)
+    {
+        __jule_Slice<Item> slice;
+        slice.alloc_new(src.size(), src.size());
+        if (src.size() > 0)
         {
-            if (len < 0)
-                __jule_panic((jule::U8 *)"runtime: []T: slice allocation length lower than zero", 53);
-            if (cap < 0)
-                __jule_panic((jule::U8 *)"runtime: []T: slice allocation capacity lower than zero", 55);
-            if (len > cap)
-                __jule_panic((jule::U8 *)"runtime: []T: slice allocation length greater than capacity", 59);
-            jule::Slice<Item> buffer;
-            buffer.alloc_new(len, cap);
-            return buffer;
+            const auto src_begin = src.begin();
+            std::copy(src.begin(), src.end(), slice.begin());
         }
+        return slice;
+    }
 
-        static jule::Slice<Item> make(const std::initializer_list<Item> &src)
-        {
-            jule::Slice<Item> slice;
-            slice.alloc_new(src.size(), src.size());
-            if (src.size() > 0)
-            {
-                const auto src_begin = src.begin();
-                std::copy(src.begin(), src.end(), slice.begin());
-            }
-            return slice;
-        }
+    __jule_Slice(void) = default;
+    __jule_Slice(const std::nullptr_t) : __jule_Slice() {}
 
-        Slice(void) = default;
-        Slice(const std::nullptr_t) : Slice() {}
+    __jule_Slice(const __jule_Slice<Item> &src) noexcept
+    {
+        this->__get_copy(src);
+    }
 
-        Slice(const jule::Slice<Item> &src) noexcept
-        {
-            this->__get_copy(src);
-        }
+    __jule_Slice(__jule_Slice<Item> &&src) noexcept
+    {
+        this->__get_copy(src);
+    }
 
-        Slice(jule::Slice<Item> &&src) noexcept
-        {
-            this->__get_copy(src);
-        }
+    ~__jule_Slice(void) noexcept
+    {
+        this->dealloc();
+    }
 
-        ~Slice(void) noexcept
-        {
-            this->dealloc();
-        }
+    // Copy content from source.
+    inline void __get_copy(const __jule_Slice<Item> &src) noexcept
+    {
+        this->_len = src._len;
+        this->_cap = src._cap;
+        this->data = src.data;
+        this->_slice = src._slice;
+    }
 
-        // Copy content from source.
-        inline void __get_copy(const jule::Slice<Item> &src) noexcept
-        {
-            this->_len = src._len;
-            this->_cap = src._cap;
-            this->data = src.data;
-            this->_slice = src._slice;
-        }
+    // Copy content from source.
+    inline void __get_copy(__jule_Slice<Item> &&src) noexcept
+    {
+        this->_len = src._len;
+        this->_cap = src._cap;
+        this->data = std::move(src.data);
+        this->_slice = src._slice;
+    }
 
-        // Copy content from source.
-        inline void __get_copy(jule::Slice<Item> &&src) noexcept
-        {
-            this->_len = src._len;
-            this->_cap = src._cap;
-            this->data = std::move(src.data);
-            this->_slice = src._slice;
-        }
-
-        inline void check(
+    inline void check(
 #ifndef __JULE_ENABLE__PRODUCTION
-            const char *file
+        const char *file
 #endif
-        ) const noexcept
+    ) const noexcept
+    {
+        if (this->operator==(nullptr))
         {
-            if (this->operator==(nullptr))
-            {
 #ifndef __JULE_ENABLE__PRODUCTION
-                jule::Str error = __JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil\nfile: ";
-                error += file;
-                __jule_panicStr(error);
+            __jule_Str error = __JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil\nfile: ";
+            error += file;
+            __jule_panicStr(error);
 #else
-                __jule_panicStr(__JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil");
+            __jule_panicStr(__JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil");
 #endif
-            }
         }
+    }
 
-        // Frees memory. Unsafe function, not includes any safety checking for
-        // heap allocations are valid or something like that.
-        void __free(void) noexcept
+    // Frees memory. Unsafe function, not includes any safety checking for
+    // heap allocations are valid or something like that.
+    void __free(void) noexcept
+    {
+        delete[] this->data.alloc;
+        this->data.alloc = nullptr;
+        this->_slice = nullptr;
+
+        __jule_RCFree(this->data.ref);
+        this->data.ref = nullptr;
+    }
+
+    void dealloc(void) noexcept
+    {
+        this->_len = 0;
+        this->_cap = 0;
+#ifdef __JULE_DISABLE__REFERENCE_COUNTING
+        this->data.dealloc();
+#else
+        if (!this->data.ref)
         {
-            delete[] this->data.alloc;
+            this->data.ref = nullptr;
             this->data.alloc = nullptr;
             this->_slice = nullptr;
-
-            __jule_RCFree(this->data.ref);
+            return;
+        }
+        if (__jule_RCDrop(this->data.ref))
+        {
             this->data.ref = nullptr;
+            this->data.alloc = nullptr;
+            this->_slice = nullptr;
+            return;
         }
-
-        void dealloc(void) noexcept
-        {
-            this->_len = 0;
-            this->_cap = 0;
-#ifdef __JULE_DISABLE__REFERENCE_COUNTING
-            this->data.dealloc();
-#else
-            if (!this->data.ref)
-            {
-                this->data.ref = nullptr;
-                this->data.alloc = nullptr;
-                this->_slice = nullptr;
-                return;
-            }
-            if (__jule_RCDrop(this->data.ref))
-            {
-                this->data.ref = nullptr;
-                this->data.alloc = nullptr;
-                this->_slice = nullptr;
-                return;
-            }
-            this->__free();
+        this->__free();
 #endif // __JULE_DISABLE__REFERENCE_COUNTING
-        }
+    }
 
-        void alloc_new(const jule::Int &len, const jule::Int &cap)
-        {
-            this->dealloc();
+    void alloc_new(const __jule_Int &len, const __jule_Int &cap)
+    {
+        this->dealloc();
 
-            __jule_pseudoMalloc(cap, sizeof(Item));
-            Item *alloc = new (std::nothrow) Item[cap];
-            if (!alloc)
-                __jule_panic((jule::U8 *)"runtime: memory allocation failed for heap-array of slice", 57);
+        __jule_pseudoMalloc(cap, sizeof(Item));
+        Item *alloc = new (std::nothrow) Item[cap];
+        if (!alloc)
+            __jule_panic((__jule_U8 *)"runtime: memory allocation failed for heap-array of slice", 57);
 
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
-            this->data = jule::Ptr<Item>::make(alloc, nullptr);
+        this->data = __jule_Ptr<Item>::make(alloc, nullptr);
 #else
-            this->data = jule::Ptr<Item>::make(alloc);
+        this->data = __jule_Ptr<Item>::make(alloc);
 #endif
-            this->_len = len;
-            this->_cap = cap;
-            this->_slice = alloc;
-        }
+        this->_len = len;
+        this->_cap = cap;
+        this->_slice = alloc;
+    }
 
-        using Iterator = Item *;
-        using ConstIterator = const Item *;
+    using Iterator = Item *;
+    using ConstIterator = const Item *;
 
-        constexpr Iterator begin(void) noexcept
-        {
-            return this->_slice;
-        }
+    constexpr Iterator begin(void) noexcept
+    {
+        return this->_slice;
+    }
 
-        constexpr ConstIterator begin(void) const noexcept
-        {
-            return this->_slice;
-        }
+    constexpr ConstIterator begin(void) const noexcept
+    {
+        return this->_slice;
+    }
 
-        constexpr Iterator end(void) noexcept
-        {
-            return this->_slice + this->_len;
-        }
+    constexpr Iterator end(void) noexcept
+    {
+        return this->_slice + this->_len;
+    }
 
-        constexpr ConstIterator end(void) const noexcept
-        {
-            return this->_slice + this->_len;
-        }
+    constexpr ConstIterator end(void) const noexcept
+    {
+        return this->_slice + this->_len;
+    }
 
-        constexpr Iterator hard_end(void) noexcept
-        {
-            return this->_slice + this->_cap;
-        }
+    constexpr Iterator hard_end(void) noexcept
+    {
+        return this->_slice + this->_cap;
+    }
 
-        constexpr ConstIterator hard_end(void) const noexcept
-        {
-            return this->_slice + this->_cap;
-        }
+    constexpr ConstIterator hard_end(void) const noexcept
+    {
+        return this->_slice + this->_cap;
+    }
 
-        inline void mut_slice(
+    inline void mut_slice(
 #ifndef __JULE_ENABLE__PRODUCTION
-            const char *file,
+        const char *file,
 #endif
-            const jule::Int &start,
-            const jule::Int &end,
-            const jule::Int &cap) const noexcept
-        {
+        const __jule_Int &start,
+        const __jule_Int &end,
+        const __jule_Int &cap) const noexcept
+    {
 #ifndef __JULE_DISABLE__SAFETY
-            if (start != 0 && end != 0)
-                this->check(
-#ifndef __JULE_ENABLE__PRODUCTION
-                    file
-#endif
-                );
-            if (start < 0 || end < 0 || cap < 0 || start > end || end > this->_cap || end > cap || cap > this->_cap)
-            {
-                jule::Str error;
-                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE3(error, start, end, cap, this->cap(), "capacity");
-                error += "\nruntime: slice slicing with out of range indexes";
-#ifndef __JULE_ENABLE__PRODUCTION
-                error += "\nfile: ";
-                error += file;
-#endif
-                __jule_panicStr(error);
-            }
-#endif
-            this->_slice = this->_slice + start;
-            this->_len = end - start;
-            this->_cap = cap - start;
-        }
-
-        inline void mut_slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-            const char *file,
-#endif
-            const jule::Int &start,
-            const jule::Int &end) const noexcept
-        {
-#ifndef __JULE_DISABLE__SAFETY
-            if (start != 0 && end != 0)
-                this->check(
-#ifndef __JULE_ENABLE__PRODUCTION
-                    file
-#endif
-                );
-            if (start < 0 || end < 0 || start > end || end > this->_cap)
-            {
-                jule::Str error;
-                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->cap(), "capacity");
-                error += "\nruntime: slice slicing with out of range indexes";
-#ifndef __JULE_ENABLE__PRODUCTION
-                error += "\nfile: ";
-                error += file;
-#endif
-                __jule_panicStr(error);
-            }
-#endif
-            this->_slice += start;
-            this->_cap -= start;
-            this->_len = end - start;
-        }
-
-        inline void mut_slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-            const char *file,
-#endif
-            const jule::Int &start) const noexcept
-        {
-            this->mut_slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-                file,
-#endif
-                start, this->len());
-        }
-
-        inline void mut_slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-            const char *file
-#else
-            void
-#endif
-        ) const noexcept
-        {
-            return this->mut_slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-                file,
-#endif
-                0,
-                this->len());
-        }
-
-        inline Slice<Item> slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-            const char *file,
-#endif
-            const jule::Int &start,
-            const jule::Int &end,
-            const jule::Int &cap) const noexcept
-        {
-#ifndef __JULE_DISABLE__SAFETY
-            if (start != 0 && end != 0)
-                this->check(
-#ifndef __JULE_ENABLE__PRODUCTION
-                    file
-#endif
-                );
-            if (start < 0 || end < 0 || cap < 0 || start > end || end > this->_cap || end > cap || cap > this->_cap)
-            {
-                jule::Str error;
-                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE3(error, start, end, cap, this->cap(), "capacity");
-                error += "\nruntime: slice slicing with out of range indexes";
-#ifndef __JULE_ENABLE__PRODUCTION
-                error += "\nfile: ";
-                error += file;
-#endif
-                __jule_panicStr(error);
-            }
-#endif
-            jule::Slice<Item> slice;
-            slice.data = this->data;
-            slice._slice = this->_slice + start;
-            slice._len = end - start;
-            slice._cap = cap - start;
-            return slice;
-        }
-
-        inline Slice<Item> slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-            const char *file,
-#endif
-            const jule::Int &start,
-            const jule::Int &end) const noexcept
-        {
-#ifndef __JULE_DISABLE__SAFETY
-            if (start != 0 && end != 0)
-                this->check(
-#ifndef __JULE_ENABLE__PRODUCTION
-                    file
-#endif
-                );
-            if (start < 0 || end < 0 || start > end || end > this->_cap)
-            {
-                jule::Str error;
-                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->cap(), "capacity");
-                error += "\nruntime: slice slicing with out of range indexes";
-#ifndef __JULE_ENABLE__PRODUCTION
-                error += "\nfile: ";
-                error += file;
-#endif
-                __jule_panicStr(error);
-            }
-#endif
-            jule::Slice<Item> slice;
-            slice.data = this->data;
-            slice._slice = this->_slice + start;
-            slice._len = end - start;
-            slice._cap = this->_cap - start;
-            return slice;
-        }
-
-        inline jule::Slice<Item> slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-            const char *file,
-#endif
-            const jule::Int &start) const noexcept
-        {
-            return this->slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-                file,
-#endif
-                start, this->len());
-        }
-
-        inline jule::Slice<Item> slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-            const char *file
-#else
-            void
-#endif
-        ) const noexcept
-        {
-            return this->slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-                file,
-#endif
-                0,
-                this->len());
-        }
-
-        constexpr jule::Int len(void) const noexcept
-        {
-            return this->_len;
-        }
-
-        constexpr jule::Int cap(void) const noexcept
-        {
-            return this->_cap;
-        }
-
-        inline jule::Bool empty(void) const noexcept
-        {
-            return !this->_slice || this->_len == 0 || this->_cap == 0;
-        }
-
-        // If capacity is not enough for newItems, allocates new slice and assigns
-        // to itself. Length will not be changed.
-        void alloc_for_append(const jule::Int newItems) noexcept
-        {
-            if (this->_cap - this->_len >= newItems)
-                return;
-            jule::Slice<Item> _new;
-            _new.alloc_new(this->_len, (this->_len + newItems) << 1);
-            std::move(this->_slice, this->_slice + this->_len, _new._slice);
-            this->dealloc();
-            this->__get_copy(_new);
-        }
-
-        // Push item to last without allocation checks.
-        inline void __push(const Item &item)
-        {
-            this->_slice[this->_len++] = item;
-        }
-
-        inline void push(const Item &item)
-        {
-            this->alloc_for_append(1);
-            this->__push(item);
-        }
-
-        // Common template for mutable appendation.
-        template <typename Items>
-        void append(const Items &items)
-        {
-            if (items._len == 0)
-                return;
-            this->alloc_for_append(items._len);
-            std::copy(items._slice, items._slice + items._len, this->_slice + this->_len);
-            this->_len += items._len;
-        }
-
-        constexpr jule::Bool operator==(const std::nullptr_t) const noexcept
-        {
-            return !this->_slice;
-        }
-
-        constexpr jule::Bool operator!=(const std::nullptr_t) const noexcept
-        {
-            return !this->operator==(nullptr);
-        }
-
-        // Returns element by index.
-        // Not includes safety checking.
-        inline Item &__at(const jule::Int &index) const noexcept
-        {
-            return this->_slice[index];
-        }
-
-        // Returns element by index.
-        // Includes safety checking.
-        inline Item &at(
-#ifndef __JULE_ENABLE__PRODUCTION
-            const char *file,
-#endif
-            const jule::Int &index) const noexcept
-        {
-#ifndef __JULE_DISABLE__SAFETY
+        if (start != 0 && end != 0)
             this->check(
 #ifndef __JULE_ENABLE__PRODUCTION
                 file
 #endif
             );
-            if (this->empty() || index < 0 || this->len() <= index)
-            {
-                jule::Str error;
-                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index, this->len());
-                error += "\nruntime: slice indexing with out of range index";
+        if (start < 0 || end < 0 || cap < 0 || start > end || end > this->_cap || end > cap || cap > this->_cap)
+        {
+            __jule_Str error;
+            __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE3(error, start, end, cap, this->cap(), "capacity");
+            error += "\nruntime: slice slicing with out of range indexes";
 #ifndef __JULE_ENABLE__PRODUCTION
-                error += "\nfile: ";
-                error += file;
+            error += "\nfile: ";
+            error += file;
 #endif
-                __jule_panicStr(error);
-            }
-#endif
-            return this->__at(index);
+            __jule_panicStr(error);
         }
+#endif
+        this->_slice = this->_slice + start;
+        this->_len = end - start;
+        this->_cap = cap - start;
+    }
 
-        inline Item &operator[](const jule::Int &index) const noexcept
-        {
-            return this->at(
+    inline void mut_slice(
 #ifndef __JULE_ENABLE__PRODUCTION
-                "/api/slice.hpp",
+        const char *file,
 #endif
-                index);
-        }
-
-        jule::Slice<Item> &operator=(const jule::Slice<Item> &src) noexcept
+        const __jule_Int &start,
+        const __jule_Int &end) const noexcept
+    {
+#ifndef __JULE_DISABLE__SAFETY
+        if (start != 0 && end != 0)
+            this->check(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file
+#endif
+            );
+        if (start < 0 || end < 0 || start > end || end > this->_cap)
         {
-            // Assignment to itself.
-            if (this->data.alloc == src.data.alloc)
-            {
-                this->_len = src._len;
-                this->_cap = src._cap;
-                this->_slice = src._slice;
-                return *this;
-            }
-            this->dealloc();
-            this->__get_copy(src);
+            __jule_Str error;
+            __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->cap(), "capacity");
+            error += "\nruntime: slice slicing with out of range indexes";
+#ifndef __JULE_ENABLE__PRODUCTION
+            error += "\nfile: ";
+            error += file;
+#endif
+            __jule_panicStr(error);
+        }
+#endif
+        this->_slice += start;
+        this->_cap -= start;
+        this->_len = end - start;
+    }
+
+    inline void mut_slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+        const char *file,
+#endif
+        const __jule_Int &start) const noexcept
+    {
+        this->mut_slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            file,
+#endif
+            start, this->len());
+    }
+
+    inline void mut_slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+        const char *file
+#else
+        void
+#endif
+    ) const noexcept
+    {
+        return this->mut_slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            file,
+#endif
+            0,
+            this->len());
+    }
+
+    inline __jule_Slice<Item> slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+        const char *file,
+#endif
+        const __jule_Int &start,
+        const __jule_Int &end,
+        const __jule_Int &cap) const noexcept
+    {
+#ifndef __JULE_DISABLE__SAFETY
+        if (start != 0 && end != 0)
+            this->check(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file
+#endif
+            );
+        if (start < 0 || end < 0 || cap < 0 || start > end || end > this->_cap || end > cap || cap > this->_cap)
+        {
+            __jule_Str error;
+            __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE3(error, start, end, cap, this->cap(), "capacity");
+            error += "\nruntime: slice slicing with out of range indexes";
+#ifndef __JULE_ENABLE__PRODUCTION
+            error += "\nfile: ";
+            error += file;
+#endif
+            __jule_panicStr(error);
+        }
+#endif
+        __jule_Slice<Item> slice;
+        slice.data = this->data;
+        slice._slice = this->_slice + start;
+        slice._len = end - start;
+        slice._cap = cap - start;
+        return slice;
+    }
+
+    inline __jule_Slice<Item> slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+        const char *file,
+#endif
+        const __jule_Int &start,
+        const __jule_Int &end) const noexcept
+    {
+#ifndef __JULE_DISABLE__SAFETY
+        if (start != 0 && end != 0)
+            this->check(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file
+#endif
+            );
+        if (start < 0 || end < 0 || start > end || end > this->_cap)
+        {
+            __jule_Str error;
+            __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->cap(), "capacity");
+            error += "\nruntime: slice slicing with out of range indexes";
+#ifndef __JULE_ENABLE__PRODUCTION
+            error += "\nfile: ";
+            error += file;
+#endif
+            __jule_panicStr(error);
+        }
+#endif
+        __jule_Slice<Item> slice;
+        slice.data = this->data;
+        slice._slice = this->_slice + start;
+        slice._len = end - start;
+        slice._cap = this->_cap - start;
+        return slice;
+    }
+
+    inline __jule_Slice<Item> slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+        const char *file,
+#endif
+        const __jule_Int &start) const noexcept
+    {
+        return this->slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            file,
+#endif
+            start, this->len());
+    }
+
+    inline __jule_Slice<Item> slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+        const char *file
+#else
+        void
+#endif
+    ) const noexcept
+    {
+        return this->slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            file,
+#endif
+            0,
+            this->len());
+    }
+
+    constexpr __jule_Int len(void) const noexcept
+    {
+        return this->_len;
+    }
+
+    constexpr __jule_Int cap(void) const noexcept
+    {
+        return this->_cap;
+    }
+
+    inline __jule_Bool empty(void) const noexcept
+    {
+        return !this->_slice || this->_len == 0 || this->_cap == 0;
+    }
+
+    // If capacity is not enough for newItems, allocates new slice and assigns
+    // to itself. Length will not be changed.
+    void alloc_for_append(const __jule_Int newItems) noexcept
+    {
+        if (this->_cap - this->_len >= newItems)
+            return;
+        __jule_Slice<Item> _new;
+        _new.alloc_new(this->_len, (this->_len + newItems) << 1);
+        std::move(this->_slice, this->_slice + this->_len, _new._slice);
+        this->dealloc();
+        this->__get_copy(_new);
+    }
+
+    // Push item to last without allocation checks.
+    inline void __push(const Item &item)
+    {
+        this->_slice[this->_len++] = item;
+    }
+
+    inline void push(const Item &item)
+    {
+        this->alloc_for_append(1);
+        this->__push(item);
+    }
+
+    // Common template for mutable appendation.
+    template <typename Items>
+    void append(const Items &items)
+    {
+        if (items._len == 0)
+            return;
+        this->alloc_for_append(items._len);
+        std::copy(items._slice, items._slice + items._len, this->_slice + this->_len);
+        this->_len += items._len;
+    }
+
+    constexpr __jule_Bool operator==(const std::nullptr_t) const noexcept
+    {
+        return !this->_slice;
+    }
+
+    constexpr __jule_Bool operator!=(const std::nullptr_t) const noexcept
+    {
+        return !this->operator==(nullptr);
+    }
+
+    // Returns element by index.
+    // Not includes safety checking.
+    inline Item &__at(const __jule_Int &index) const noexcept
+    {
+        return this->_slice[index];
+    }
+
+    // Returns element by index.
+    // Includes safety checking.
+    inline Item &at(
+#ifndef __JULE_ENABLE__PRODUCTION
+        const char *file,
+#endif
+        const __jule_Int &index) const noexcept
+    {
+#ifndef __JULE_DISABLE__SAFETY
+        this->check(
+#ifndef __JULE_ENABLE__PRODUCTION
+            file
+#endif
+        );
+        if (this->empty() || index < 0 || this->len() <= index)
+        {
+            __jule_Str error;
+            __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index, this->len());
+            error += "\nruntime: slice indexing with out of range index";
+#ifndef __JULE_ENABLE__PRODUCTION
+            error += "\nfile: ";
+            error += file;
+#endif
+            __jule_panicStr(error);
+        }
+#endif
+        return this->__at(index);
+    }
+
+    inline Item &operator[](const __jule_Int &index) const noexcept
+    {
+        return this->at(
+#ifndef __JULE_ENABLE__PRODUCTION
+            "/api/slice.hpp",
+#endif
+            index);
+    }
+
+    __jule_Slice<Item> &operator=(const __jule_Slice<Item> &src) noexcept
+    {
+        // Assignment to itself.
+        if (this->data.alloc == src.data.alloc)
+        {
+            this->_len = src._len;
+            this->_cap = src._cap;
+            this->_slice = src._slice;
             return *this;
         }
+        this->dealloc();
+        this->__get_copy(src);
+        return *this;
+    }
 
-        jule::Slice<Item> &operator=(jule::Slice<Item> &&src) noexcept
-        {
-            this->dealloc();
-            this->__get_copy(src);
-            return *this;
-        }
+    __jule_Slice<Item> &operator=(__jule_Slice<Item> &&src) noexcept
+    {
+        this->dealloc();
+        this->__get_copy(src);
+        return *this;
+    }
 
-        inline jule::Slice<Item> &operator=(const std::nullptr_t) noexcept
-        {
-            this->dealloc();
-            return *this;
-        }
-    };
-
-} // namespace jule
+    inline __jule_Slice<Item> &operator=(const std::nullptr_t) noexcept
+    {
+        this->dealloc();
+        return *this;
+    }
+};
 
 #endif // #ifndef __JULE_SLICE_HPP

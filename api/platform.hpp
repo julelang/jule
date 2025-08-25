@@ -6,31 +6,31 @@
 #define __JULE_PLATFORM_HPP
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-#define OS_WINDOWS
+#define __JULE_OS_WINDOWS
 #elif defined(__linux__) || defined(linux) || defined(__linux)
-#define OS_LINUX
+#define __JULE_OS_LINUX
 #elif defined(__APPLE__) || defined(__MACH__)
-#define OS_DARWIN
+#define __JULE_OS_DARWIN
 #endif
 
-#if defined(OS_LINUX) || defined(OS_DARWIN)
-#define OS_UNIX
+#if defined(__JULE_OS_LINUX) || defined(__JULE_OS_DARWIN)
+#define __JULE_OS_UNIX
 #endif
 
 #if defined(__amd64) || defined(__amd64__) || defined(__x86_64) || defined(__x86_64__) || defined(_M_AMD64)
-#define ARCH_AMD64
+#define __JULE_ARCH_AMD64
 #elif defined(__arm__) || defined(__thumb__) || defined(_M_ARM) || defined(__arm)
-#define ARCH_ARM
+#define __JULE_ARCH_ARM
 #elif defined(__aarch64__)
-#define ARCH_ARM64
+#define __JULE_ARCH_ARM64
 #elif defined(i386) || defined(__i386) || defined(__i386__) || defined(_X86_) || defined(__I86__) || defined(__386)
-#define ARCH_I386
+#define __JULE_ARCH_I386
 #endif
 
-#if defined(ARCH_AMD64) || defined(ARCH_ARM64)
-#define ARCH_X64
+#if defined(__JULE_ARCH_AMD64) || defined(__JULE_ARCH_ARM64)
+#define __JULE_ARCH_X64
 #else
-#define ARCH_X32
+#define __JULE_ARCH_X32
 #endif
 
 #endif // ifndef __JULE_PLATFORM_HPP

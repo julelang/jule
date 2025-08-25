@@ -12,180 +12,177 @@
 #include "slice.hpp"
 #include "str.hpp"
 
-namespace jule
+// Built-in array type.
+template <typename Item, __jule_Int N>
+struct __jule_Array
 {
-    // Built-in array type.
-    template <typename Item, jule::Int N>
-    struct Array
+public:
+    static_assert(N >= 0);
+    mutable Item buffer[static_cast<__jule_Int>(N)];
+
+    __jule_Array(void) = default;
+
+    __jule_Array(const Item &def)
     {
-    public:
-        static_assert(N >= 0);
-        mutable Item buffer[static_cast<std::size_t>(N)];
+        std::fill(this->begin(), this->end(), def);
+    }
 
-        Array(void) = default;
+    using Iterator = Item *;
+    using ConstIterator = const Item *;
 
-        Array(const Item &def)
-        {
-            std::fill(this->begin(), this->end(), def);
-        }
+    constexpr Iterator begin(void) noexcept
+    {
+        return this->buffer;
+    }
 
-        using Iterator = Item *;
-        using ConstIterator = const Item *;
+    constexpr ConstIterator begin(void) const noexcept
+    {
+        return this->buffer;
+    }
 
-        constexpr Iterator begin(void) noexcept
-        {
-            return this->buffer;
-        }
+    constexpr Iterator end(void) noexcept
+    {
+        return this->begin() + N;
+    }
 
-        constexpr ConstIterator begin(void) const noexcept
-        {
-            return this->buffer;
-        }
+    constexpr ConstIterator end(void) const noexcept
+    {
+        return this->begin() + N;
+    }
 
-        constexpr Iterator end(void) noexcept
-        {
-            return this->begin() + N;
-        }
+    constexpr Iterator hard_end(void) noexcept
+    {
+        return this->end();
+    }
 
-        constexpr ConstIterator end(void) const noexcept
-        {
-            return this->begin() + N;
-        }
+    constexpr ConstIterator hard_end(void) const noexcept
+    {
+        return this->end();
+    }
 
-        constexpr Iterator hard_end(void) noexcept
-        {
-            return this->end();
-        }
+    __jule_Slice<Item> as_slice(void) noexcept
+    {
+        __jule_Slice<Item> s;
+        s._cap = N;
+        s._len = N;
+        s._slice = this->begin();
+        s.data.alloc = s._slice;
+        return s;
+    }
 
-        constexpr ConstIterator hard_end(void) const noexcept
-        {
-            return this->end();
-        }
-
-        jule::Slice<Item> as_slice(void) noexcept {
-            jule::Slice<Item> s;
-            s._cap = N;
-            s._len = N;
-            s._slice = this->begin();
-            s.data.alloc = s._slice;
-            return s;
-        }
-
-        jule::Slice<Item> slice(
+    __jule_Slice<Item> slice(
 #ifndef __JULE_ENABLE__PRODUCTION
-            const char *file,
+        const char *file,
 #endif
-            const jule::Int &start,
-            const jule::Int &end) const noexcept
-        {
+        const __jule_Int &start,
+        const __jule_Int &end) const noexcept
+    {
 #ifndef __JULE_DISABLE__SAFETY
-            if (start < 0 || end < 0 || start > end || end > N)
-            {
-                jule::Str error;
-                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, N, "length");
-                error += "\nruntime: array slicing with out of range indexes";
-#ifndef __JULE_ENABLE__PRODUCTION
-                error += "\nfile: ";
-                error += file;
-#endif
-                __jule_panicStr(error);
-            }
-#endif
-            if (start == end)
-                return jule::Slice<Item>();
-
-            jule::Slice<Item> slice;
-            slice.alloc_new(0, end - start);
-            slice._len = slice._cap;
-
-            Item *s_it = slice.begin();
-            jule::Array<Item, N>::ConstIterator a_it = this->begin() + start;
-            jule::Array<Item, N>::ConstIterator a_end = this->begin() + end;
-            while (a_it < a_end)
-                *s_it++ = *a_it++;
-
-            return slice;
-        }
-
-        inline jule::Slice<Item> slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-            const char *file,
-#endif
-            const jule::Int &start) const noexcept
+        if (start < 0 || end < 0 || start > end || end > N)
         {
-            return this->slice(
+            __jule_Str error;
+            __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, N, "length");
+            error += "\nruntime: array slicing with out of range indexes";
 #ifndef __JULE_ENABLE__PRODUCTION
-                file,
+            error += "\nfile: ";
+            error += file;
 #endif
-                start, N);
+            __jule_panicStr(error);
         }
+#endif
+        if (start == end)
+            return __jule_Slice<Item>();
 
-        inline jule::Slice<Item> slice(
+        __jule_Slice<Item> slice;
+        slice.alloc_new(0, end - start);
+        slice._len = slice._cap;
+
+        Item *s_it = slice.begin();
+        __jule_Array<Item, N>::ConstIterator a_it = this->begin() + start;
+        __jule_Array<Item, N>::ConstIterator a_end = this->begin() + end;
+        while (a_it < a_end)
+            *s_it++ = *a_it++;
+
+        return slice;
+    }
+
+    inline __jule_Slice<Item> slice(
 #ifndef __JULE_ENABLE__PRODUCTION
-            const char *file
+        const char *file,
+#endif
+        const __jule_Int &start) const noexcept
+    {
+        return this->slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            file,
+#endif
+            start, N);
+    }
+
+    inline __jule_Slice<Item> slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+        const char *file
 #else
-            void
+        void
 #endif
-        ) const noexcept
-        {
-            return this->slice(
+    ) const noexcept
+    {
+        return this->slice(
 #ifndef __JULE_ENABLE__PRODUCTION
-                file,
+            file,
 #endif
-                0, N);
-        }
+            0, N);
+    }
 
-        constexpr jule::Int len(void) const noexcept
-        {
-            return N;
-        }
+    constexpr __jule_Int len(void) const noexcept
+    {
+        return N;
+    }
 
-        constexpr jule::Bool empty(void) const noexcept
-        {
-            return N == 0;
-        }
+    constexpr __jule_Bool empty(void) const noexcept
+    {
+        return N == 0;
+    }
 
-        // Returns element by index.
-        // Not includes safety checking.
-        constexpr Item &__at(const jule::Int &index) const noexcept
-        {
-            return this->buffer[static_cast<std::size_t>(index)];
-        }
+    // Returns element by index.
+    // Not includes safety checking.
+    constexpr Item &__at(const __jule_Int &index) const noexcept
+    {
+        return this->buffer[static_cast<std::size_t>(index)];
+    }
 
-        // Returns element by index.
-        // Includes safety checking.
-        inline Item &at(
+    // Returns element by index.
+    // Includes safety checking.
+    inline Item &at(
 #ifndef __JULE_ENABLE__PRODUCTION
-            const char *file,
+        const char *file,
 #endif
-            const jule::Int &index) const noexcept
-        {
+        const __jule_Int &index) const noexcept
+    {
 #ifndef __JULE_DISABLE__SAFETY
-            if (this->empty() || index < 0 || N <= index)
-            {
-                jule::Str error;
-                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index, N);
-                error += "\nruntime: array indexing with out of range index";
-#ifndef __JULE_ENABLE__PRODUCTION
-                error += "\nfile: ";
-                error += file;
-#endif
-                __jule_panicStr(error);
-            }
-#endif
-            return this->__at(index);
-        }
-
-        inline Item &operator[](const jule::Int &index) const
+        if (this->empty() || index < 0 || N <= index)
         {
+            __jule_Str error;
+            __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index, N);
+            error += "\nruntime: array indexing with out of range index";
 #ifndef __JULE_ENABLE__PRODUCTION
-            return this->at("/api/array.hpp", index);
-#else
-            return this->at(index);
+            error += "\nfile: ";
+            error += file;
 #endif
+            __jule_panicStr(error);
         }
-    };
+#endif
+        return this->__at(index);
+    }
 
-} // namespace jule
+    inline Item &operator[](const __jule_Int &index) const
+    {
+#ifndef __JULE_ENABLE__PRODUCTION
+        return this->at("/api/array.hpp", index);
+#else
+        return this->at(index);
+#endif
+    }
+};
 
 #endif // #ifndef __JULE_ARRAY_HPP
