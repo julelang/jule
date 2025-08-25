@@ -1,0 +1,103 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/poll"
+use "std/mem"
+use "std/sys"
+use "std/time"
+
+struct netFD {
+	pfd: poll::FD
+}
+
+impl netFD {
+	// Returns NetHandle.
+	fn Handle(*self): poll::NetHandle {
+		ret poll::NetHandle(self.pfd.File)
+	}
+
+	fn SetReadTimeout(mut *self, mut timeout: time::Duration)! {
+		timeout = newTimeout("SetReadTimeout", timeout)
+		setSocketTimeout(self.Handle(), sys::SO_RCVTIMEO, timeout)?
+	}
+
+	fn SetWriteTimeout(mut *self, mut timeout: time::Duration)! {
+		timeout = newTimeout("SetWriteTimeout", timeout)
+		setSocketTimeout(self.Handle(), sys::SO_SNDTIMEO, timeout)?
+	}
+
+	// Wrapper for [poll::FD.Write].
+	fn Write(mut *self, buf: []byte)!: (n: int) {
+		ret self.pfd.Write(buf)?
+	}
+
+	// Wrapper for [poll::FD.Read].
+	fn Read(mut *self, mut buf: []byte)!: (n: int) {
+		ret self.pfd.Read(buf)?
+	}
+
+	// Wrapper for [poll::FD.ReadV].
+	fn ReadV(mut *self, mut buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
+		ret self.pfd.ReadV(buf, addr, addrLen)?
+	}
+
+	// Wrapper for [poll::FD.ReadV4].
+	fn ReadV4(mut *self, mut buf: []byte, addr: sys::RawSockaddrInet4)!: (n: int) {
+		addrLen := mem::SizeOf(addr)
+		ret self.ReadV(buf, uintptr(&addr), sys::Socklen(addrLen))?
+	}
+
+	// Wrapper for [poll::FD.ReadV6].
+	fn ReadV6(mut *self, mut buf: []byte, addr: sys::RawSockaddrInet6)!: (n: int) {
+		addrLen := mem::SizeOf(addr)
+		ret self.ReadV(buf, uintptr(&addr), sys::Socklen(addrLen))?
+	}
+
+	// Wrapper for [poll::FD.WriteV].
+	fn WriteV(mut *self, buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
+		ret self.pfd.WriteV(buf, addr, addrLen)?
+	}
+
+	// Wrapper for [poll::FD.WriteV4].
+	fn WriteV4(mut *self, buf: []byte, addr: sys::RawSockaddrInet4)!: (n: int) {
+		addrLen := mem::SizeOf(addr)
+		ret self.WriteV(buf, uintptr(&addr), sys::Socklen(addrLen))?
+	}
+
+	// Wrapper for [poll::FD.WriteV6].
+	fn WriteV6(mut *self, buf: []byte, addr: sys::RawSockaddrInet6)!: (n: int) {
+		addrLen := mem::SizeOf(addr)
+		ret self.WriteV(buf, uintptr(&addr), sys::Socklen(addrLen))?
+	}
+
+	// Wrapper for [poll::FD.Close].
+	fn Close(mut *self)! {
+		self.pfd.Close()?
+	}
+}
+
+fn newFD(h: poll::NetHandle, flags: int, sotype: int): &netFD {
+	mut pfd := poll::FD{
+		File: u64(h),
+		Flags: flags,
+		IsStream: sotype == sys::SOCK_STREAM,
+		ZeroReadIsEOF: sotype != sys::SOCK_DGRAM && sotype != sys::SOCK_RAW,
+	}
+	pfd.Init()!
+	ret &netFD{
+		pfd: pfd,
+	}
+}
+
+fn newTimeout(caller: str, timeout: time::Duration): time::Duration {
+	if timeout < time::Millisecond {
+		ret 0
+	}
+	const _40Days = 40 * (24 * time::Hour)
+	if timeout > _40Days {
+		panic(caller + ": timeout exceeds 40 days")
+	}
+	milliseconds := timeout / time::Millisecond
+	ret milliseconds * time::Millisecond
+}

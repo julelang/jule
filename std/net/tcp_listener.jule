@@ -12,7 +12,7 @@ use "std/time"
 struct TCPListener {
 	addr:   &TCPAddr
 	mut v6: bool
-	mut fd: &poll::FD
+	mut fd: &netFD
 }
 
 impl Listener for TCPListener {}
@@ -52,7 +52,7 @@ impl TCPListener {
 		if self.v6 { // IPv6
 			mut clientAddr := sys::RawSockaddrInet6{}
 			clientAddrLen := sys::Socklen(mem::SizeOf(clientAddr))
-			handle := accept(poll::NetHandle(self.fd.File), uintptr(&clientAddr), clientAddrLen)?
+			handle := accept(self.fd.Handle(), uintptr(&clientAddr), clientAddrLen)?
 			mut ip := make(IP, IPv6Len)
 			unsafe {
 				getSocketAddr(handle, uintptr(&clientAddr), clientAddrLen)?
@@ -69,7 +69,7 @@ impl TCPListener {
 		} else { // IPv4
 			mut clientAddr := sys::RawSockaddrInet4{}
 			clientAddrLen := sys::Socklen(mem::SizeOf(clientAddr))
-			handle := accept(poll::NetHandle(self.fd.File), uintptr(&clientAddr), clientAddrLen)?
+			handle := accept(self.fd.Handle(), uintptr(&clientAddr), clientAddrLen)?
 			mut ip := make(IP, IPv4Len)
 			unsafe {
 				getSocketAddr(handle, uintptr(&clientAddr), clientAddrLen)?
@@ -111,7 +111,7 @@ impl TCPListener {
 
 fn tcpBind(network: Network, addr: str)!: &TCPListener {
 	mut tcpAddr := TCPAddr.Resolve(network, addr)?
-	mut fd := (&poll::FD)(nil)
+	mut fd := (&netFD)(nil)
 	mut v6 := false
 	if tcpAddr.IP.Empty() {
 		match network {
@@ -183,7 +183,7 @@ fn tcpBind(network: Network, addr: str)!: &TCPListener {
 		}
 	}
 	const MaxQueueLength = 10 // Length of maximum connection waiters.
-	sys::Listen(poll::NetHandle(fd.File), MaxQueueLength) else {
+	sys::Listen(fd.Handle(), MaxQueueLength) else {
 		fd.Close()?
 		error(error)
 	}
@@ -196,7 +196,7 @@ fn tcpBind(network: Network, addr: str)!: &TCPListener {
 
 fn tcpDial(network: Network, addr: str, timeout: time::Duration)!: &TCPConn {
 	mut tcpAddr := TCPAddr.Resolve(network, addr)?
-	mut fd := (&poll::FD)(nil)
+	mut fd := (&netFD)(nil)
 	mut v6 := false
 	if tcpAddr.IP.Empty() {
 		match network {

@@ -13,7 +13,7 @@ use "std/time"
 struct UDPConn {
 	mut sockaddr4: sys::RawSockaddrInet4
 	mut sockaddr6: sys::RawSockaddrInet6
-	mut fd:        &poll::FD
+	mut fd:        &netFD
 	Addr:          &UDPAddr
 	v6:            bool
 	connect:       bool
@@ -82,25 +82,27 @@ impl UDPConn {
 	}
 
 	// Sets read timeout for connection.
-	// Timeout precision is microseconds.
-	// If the timeout is below one microsecond it will be accepted as zero.
+	// Timeout precision is milliseconds.
+	// If the timeout is below one millisecond it will be accepted as zero.
+	// The maximum timeout is 40 days, if timeout is greater than 40 fays, it panics.
 	// The zero timeout, clears current timeout if exist.
 	fn SetReadTimeout(mut *self, timeout: time::Duration)! {
 		if self.fd == nil {
 			panic("net: TCPConn.SetReadTimeout: connection is closed")
 		}
-		setSocketTimeout(poll::NetHandle(self.fd.File), sys::SO_RCVTIMEO, timeout)?
+		self.fd.SetReadTimeout(timeout)?
 	}
 
 	// Sets write timeout for connection.
-	// Timeout precision is microseconds.
-	// If the timeout is below one microsecond it will be accepted as zero.
+	// Timeout precision is milliseconds.
+	// If the timeout is below one millisecond it will be accepted as zero.
+	// The maximum timeout is 40 days, if timeout is greater than 40 fays, it panics.
 	// The zero timeout, clears current timeout if exist.
 	fn SetWriteTimeout(mut *self, timeout: time::Duration)! {
 		if self.fd == nil {
-			panic("net: TCPConn.SetReadTimeout: connection is closed")
+			panic("net: TCPConn.SetWriteTimeout: connection is closed")
 		}
-		setSocketTimeout(poll::NetHandle(self.fd.File), sys::SO_SNDTIMEO, timeout)?
+		self.fd.SetWriteTimeout(timeout)?
 	}
 
 	// Returns network name which is connected or listening.
