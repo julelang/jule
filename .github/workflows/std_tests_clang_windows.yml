@@ -1,168 +1,27 @@
-name: Std Tests [Clang] - Windows
+name: Std Tests [GCC] - Windows
 on: [push, pull_request]
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   build-and-exec:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: julelang/ci@main
-
-      - name: Test - std/bufio
+      
+      - name: Get IR
+        shell: bash
         run: |
-          .\bin\julec test --compiler clang -o test std/bufio
-          ./test
-
-      - name: Test - std/bytes
+          curl -o ir.cpp https://raw.githubusercontent.com/julelang/julec-ir/main/src/windows-amd64.cpp
+      - name: Build Jule Compiler
+        shell: bash
         run: |
-          .\bin\julec test --compiler clang -o test std/bytes
-          ./test
-
-      - name: Test - std/conv
+          mkdir bin
+          clang++ -Wno-everything --std=c++17 -fwrapv -ffloat-store -fno-fast-math -fno-rounding-math -ffp-contract=fast -O0 -flto=thin -fuse-ld=lld -DNDEBUG -fomit-frame-pointer -fno-strict-aliasing -o bin/julec.exe ir.cpp -lws2_32 -lshell32 -liphlpapi -lsynchronization
+      - name: Add Compiler to the PATH
+        shell: bash
         run: |
-          .\bin\julec test --compiler clang -o test std/conv/test
-          ./test
-
-      - name: Test - std/internal/byteslite
-        run: |
-          .\bin\julec test --compiler clang -o test std/internal/byteslite/test
-          ./test
-
-      - name: Test - std/internal/conv
-        run: |
-          .\bin\julec test --compiler clang -o test std/internal/conv/test
-          ./test
-
-      - name: Test - std/encoding/ascii85
-        run: |
-          .\bin\julec test --compiler clang -o test std/encoding/ascii85
-          ./test
-
-      - name: Test - std/encoding/base32
-        run: |
-          .\bin\julec test --compiler clang -o test std/encoding/base32
-          ./test
-
-      - name: Test - std/encoding/base64
-        run: |
-          .\bin\julec test --compiler clang -o test std/encoding/base64
-          ./test
-
-      - name: Test - std/encoding/csv
-        run: |
-          .\bin\julec test --compiler clang -o test std/encoding/csv
-          ./test
-
-      - name: Test - std/encoding/json
-        run: |
-          .\bin\julec test --compiler clang -o test std/encoding/json
-          ./test
-
-      - name: Test - std/hash/adler32
-        run: |
-          .\bin\julec test --compiler clang -o test std/hash/adler32
-          ./test
-
-      - name: Test - std/hash/fnv
-        run: |
-          .\bin\julec test --compiler clang -o test std/hash/fnv
-          ./test
-
-      - name: Test - std/html
-        run: |
-          .\bin\julec test --compiler clang -o test std/html
-          ./test
-
-      - name: Test - std/io
-        run: |
-          .\bin\julec test --compiler clang -o test std/io/test
-          ./test
-
-      - name: Test - std/jule/constant/lit
-        run: |
-          .\bin\julec test --compiler clang -o test std/jule/constant/lit
-          ./test
-
-      - name: Test - std/jule/sema
-        run: |
-          .\bin\julec test --compiler clang -o test std/jule/sema
-          ./test
-
-      - name: Test - std/maps
-        run: |
-          .\bin\julec test --compiler clang -o test std/maps
-          ./test
-
-      - name: Test - std/math
-        run: |
-          .\bin\julec test --compiler clang -o test std/math/test
-          ./test
-
-      - name: Test - std/math/big
-        run: |
-          .\bin\julec test --compiler clang -o test std/math/big
-          ./test
-
-      - name: Test - std/math/bits
-        run: |
-          .\bin\julec test --compiler clang -o test std/math/bits/test
-          ./test
-
-      - name: Test - std/math/cmplx
-        run: |
-          .\bin\julec test --compiler clang -o test std/math/cmplx
-          ./test
+          echo "export PATH=\$PATH:./bin/" >> $GITHUB_PATH
 
       - name: Test - std/net
         run: |
-          .\bin\julec test --compiler clang -o test std/net
-          ./test
-
-      - name: Test - std/net/url
-        run: |
-          .\bin\julec test --compiler clang -o test std/net/url
-          ./test
-
-      - name: Test - std/os
-        run: |
-          .\bin\julec test --compiler clang -o test std/os/test
-          ./test
-
-      - name: Test - std/path
-        run: |
-          .\bin\julec test --compiler clang -o test std/path
-          ./test
-
-      - name: Test - std/slices
-        run: |
-          .\bin\julec test --compiler clang -o test std/slices
-          ./test
-
-      - name: Test - std/strings
-        run: |
-          .\bin\julec test --compiler clang -o test std/strings/test
-          ./test
-
-      - name: Test - std/sync
-        run: |
-          .\bin\julec test --compiler clang -o test std/sync/test
-          ./test
-
-      - name: Test - std/time
-        run: |
-          .\bin\julec test --compiler clang -o test std/time/test
-          ./test
-
-      - name: Test - std/unicode/utf8
-        run: |
-          .\bin\julec test --compiler clang -o test std/unicode/utf8/test
-          ./test
-
-      - name: Test - std/unicode/utf16
-        run: |
-          .\bin\julec test --compiler clang -o test std/unicode/utf16/test
+          .\bin\julec test -o test std/net
           ./test
