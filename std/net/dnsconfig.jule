@@ -49,6 +49,7 @@ struct dnsConfig {
 	useTCP:        bool           // force usage of TCP for DNS resolutions
 	trustAD:       bool           // add AD flag to queries
 	noReload:      bool           // do not check for config file updates
+	lastChecked:   time::Time     // last time config was checked
 }
 
 impl dnsConfig {
@@ -82,8 +83,15 @@ fn resolveConfig() {
 	zero := time::Time{}
 	if conf.mtime == zero {
 		osResolveConfig()
+		conf.lastChecked = time::Now()
 		ret
 	}
+
+	now := time::Now()
+	if conf.lastChecked.After(now.Add(-5 * time::Second)) {
+		ret
+	}
+	conf.lastChecked = now
 
 	const match runtime::OS {
 	| "windows":
