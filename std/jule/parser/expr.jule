@@ -980,7 +980,7 @@ impl exprBuilder {
 		| token::STR | token::INT | token::FLOAT | token::IMAG | token::RUNE:
 			mut lit := self.t
 			self.next()
-			ret &ast::Expr{
+			mut expr := &ast::Expr{
 				Token: lit,
 				End: lit,
 				Data: &ast::LitExpr{
@@ -988,6 +988,21 @@ impl exprBuilder {
 					Value: lit.Kind,
 				},
 			}
+			// If the expression is a raw-string, we have to do extra work.
+			if lit.ID == token::STR && lit.Kind[0] == '`' {
+				// If raw-string contains new-line, we have to adjust the end token.
+				n := strings::Count(lit.Kind, "\n")
+				if n > 0 {
+					// Copy the literal token and adjust the row and column.
+					mut end := new(token::Token)
+					*end = *lit
+					end.Row += n
+					i := strings::LastIndexByte(lit.Kind, '\n')
+					end.Column = len(lit.Kind) - i - 2 // Exclude new-line and zero offset.
+					expr.End = end
+				}
+			}
+			ret expr
 		| token::LBRACK:
 			// Slice [...] literal or type []name.
 			ret self.parseSliceLiteralOrType()
