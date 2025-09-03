@@ -590,13 +590,12 @@ impl exprCoder {
 				break
 			}
 			self.possibleRefExpr(m.Expr.Model)
-			if nilptr {
-				self.oc.write(".get_unchecked()")
-			} else {
-				self.oc.write(".get(\"")
+			if !nilptr {
+				self.oc.write(".must_ok(\"")
 				self.oc.locInfo(m.Op)
 				self.oc.write("\")")
 			}
+			self.oc.write(".get()")
 			ret
 		}
 		self.oc.write("(")
@@ -1061,13 +1060,9 @@ impl exprCoder {
 						// Ignore dereferencing, use data directly to call [ptr] method.
 						safe := self.writeReceiver(ssie.Expr.Model)
 						if safe {
-							self.oc.write(".ptr(")
-							if !env::Production {
-								self.oc.write("\"")
-								self.oc.locInfo(m.Token)
-								self.oc.write("\"")
-							}
-							self.oc.write(")")
+							self.oc.write(".must_ok(\"")
+							self.oc.locInfo(m.Token)
+							self.oc.write("\").alloc")
 						}
 					|:
 						match type ssie.Expr.Type.Kind {
@@ -2011,16 +2006,11 @@ impl exprCoder {
 		self.oc.write("(")
 		self.possibleRefExpr(m.Expr.Model)
 		if block {
-			self.oc.write(".ptr(")
-			if !env::Production {
-				self.oc.write("\"")
-				self.oc.locInfo(m.Token)
-				self.oc.write("\")")
-			}
-		} else {
-			self.oc.write(".alloc")
+			self.oc.write(".must_ok(\"")
+			self.oc.locInfo(m.Token)
+			self.oc.write("\")")
 		}
-		self.oc.write(", ")
+		self.oc.write(".alloc, ")
 		if ok != nil {
 			// Write the reference expression to pass |ok| parameter.
 			ok()
@@ -2046,16 +2036,11 @@ impl exprCoder {
 		self.oc.write("(")
 		self.possibleRefExpr(m.Chan.Model)
 		if block {
-			self.oc.write(".ptr(")
-			if !env::Production {
-				self.oc.write("\"")
-				self.oc.locInfo(m.Token)
-				self.oc.write("\")")
-			}
-		} else {
-			self.oc.write(".alloc")
+			self.oc.write(".must_ok(\"")
+			self.oc.locInfo(m.Token)
+			self.oc.write("\")")
 		}
-		self.oc.write(", ")
+		self.oc.write(".alloc, ")
 		self.possibleRefExpr(m.Data.Model)
 		self.oc.write(")")
 	}
@@ -2068,13 +2053,9 @@ impl exprCoder {
 		identCoder.funcIns(&self.oc.Buf, f)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Chan.Model)
-		self.oc.write(".ptr(")
-		if !env::Production {
-			self.oc.write("\"")
-			self.oc.locInfo(m.Token)
-			self.oc.write("\"")
-		}
-		self.oc.write("))")
+		self.oc.write(".must_ok(\"")
+		self.oc.locInfo(m.Token)
+		self.oc.write("\").alloc)")
 	}
 
 	fn addrcallExpr(mut &self, mut m: &sema::AddrcallExpr) {
