@@ -296,12 +296,12 @@ impl commonSemaMeta {
 	}
 }
 
-enum stepFlag {
-	NA: 0,
-	ImplsImplemented: 1 << 0,
-	DeclsChecked: 1 << 1,
-	Done: 1 << 2,
-}
+// Semantic analysis step flags.
+const (
+	stepImplsImplemented = 1 << iota
+	stepDeclsChecked
+	stepDone
+)
 
 // Semantic analyzer for tables.
 // Accepts tables as files of package.
@@ -311,7 +311,7 @@ struct sema {
 	file:   &SymTab   // Current package file.
 	flags:  int
 	meta:   &commonSemaMeta
-	step:   stepFlag
+	step:   int
 }
 
 impl Lookup for sema {
@@ -3024,7 +3024,7 @@ impl sema {
 		if len(self.errors) > 0 {
 			ret
 		}
-		self.step |= stepFlag.ImplsImplemented
+		self.step |= stepImplsImplemented
 
 		// Check enums here.
 		// See developer reference (5).
@@ -3038,9 +3038,9 @@ impl sema {
 			ret
 		}
 
-		self.step |= stepFlag.DeclsChecked
+		self.step |= stepDeclsChecked
 		self.checkPackageTypes()
-		self.step |= stepFlag.Done
+		self.step |= stepDone
 	}
 }
 
