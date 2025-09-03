@@ -4118,54 +4118,6 @@ impl binaryEval {
 				untyped: true,
 				Type: primBool,
 			}
-		}
-
-		if !self.checkTypeCompatibility() {
-			ret nil
-		}
-
-		match self.op.ID {
-		| token::GTR
-		| token::LSS
-		| token::GEQ
-		| token::LEQ:
-			if !types::IsNum(self.l.Type.Enum().TypeSym.Type.Prim().Str()) {
-				self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
-				ret nil
-			}
-			ret &Value{
-				untyped: true,
-				Type: primBool,
-			}
-		| token::AND:
-			mut first := self.l.Type.Enum().Items[0]
-			i := first.ValueSym.Value.Constant.ReadInt()
-			match {
-			| i.IsI64():
-				if i.I64() == 0 {
-					goto next
-				}
-				goto err
-			| i.IsU64():
-				if i.U64() == 0 {
-					goto next
-				}
-				goto err
-			|:
-				panic("sema: unimplemented enum type, this panic call should be unreachable")
-			}
-		err:
-			self.e.pushErr(self.op, " enum type @ does not support @ operator", self.l.Type.Str(), self.op.Kind)
-			self.e.pushSuggestion(`define default enum field (the first one is default) with zero value to use "&"`)
-		next:
-			fall
-		| token::OR
-		| token::XOR:
-			mut enm := self.l.Type.Enum()
-			if enm.TypeSym.Type.Prim() == nil || !types::IsInt(enm.TypeSym.Type.Prim().Str()) {
-				self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
-			}
-			ret self.l
 		|:
 			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
 			ret nil
