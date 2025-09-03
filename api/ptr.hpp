@@ -150,43 +150,7 @@ struct __jule_Ptr
         this->__free();
     }
 
-    inline T *ptr(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file
-#else
-        void
-#endif
-    ) const noexcept
-    {
-#ifndef __JULE_DISABLE__SAFETY
-        this->must_ok(
-#ifndef __JULE_ENABLE__PRODUCTION
-            file
-#endif
-        );
-#endif
-        return this->alloc;
-    }
-
-    inline T &get(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file
-#else
-        void
-#endif
-    ) const noexcept
-    {
-#ifndef __JULE_DISABLE__SAFETY
-        this->must_ok(
-#ifndef __JULE_ENABLE__PRODUCTION
-            file
-#endif
-        );
-#endif
-        return *this->alloc;
-    }
-
-    inline T &get_unchecked(void) const noexcept
+    inline T &get(void) const noexcept
     {
         return *this->alloc;
     }
@@ -215,20 +179,12 @@ struct __jule_Ptr
 
     inline T *operator->(void) const noexcept
     {
-        return this->ptr(
-#ifndef __JULE_ENABLE__PRODUCTION
-            "/api/ptr.hpp"
-#endif
-        );
+        return this->alloc;
     }
 
     inline T &operator*(void) const noexcept
     {
-        return this->get(
-#ifndef __JULE_ENABLE__PRODUCTION
-            "/api/ptr.hpp"
-#endif
-        );
+        return *this->alloc;
     }
 
     inline operator __jule_Uintptr(void) const noexcept
@@ -241,30 +197,28 @@ struct __jule_Ptr
         return this->alloc;
     }
 
-    inline void must_ok(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file
-#else
-        void
-#endif
-    ) const noexcept
+    inline __jule_Ptr<T>& must_ok(const char *file) noexcept
     {
         if (this->operator==(nullptr))
         {
-#ifndef __JULE_ENABLE__PRODUCTION
-            auto n = strlen(file);
-            char *message = new (std::nothrow) char[84 + n];
-            if (!message)
-                __jule_panic((__jule_U8 *)"runtime: memory allocation failed for invalid memory dereferencing error of smart pointer", 89);
-            strncpy(message, __JULE_ERROR__INVALID_MEMORY, 47);
-            strncpy(message + 47, "\nruntime: smart pointer is nil\nfile: ", 38);
-            strncpy(message + 84, file, n);
-            message[84 + n] = '\0';
-            __jule_panic((__jule_U8 *)message, 84 + n);
-#else
-            __jule_panic((__jule_U8 *)__JULE_ERROR__INVALID_MEMORY "\nruntime: smart pointer is nil", 77);
-#endif
+            if (file != nullptr)
+            {
+                auto n = strlen(file);
+                char *message = new (std::nothrow) char[84 + n];
+                if (!message)
+                    __jule_panic((__jule_U8 *)"runtime: memory allocation failed for invalid memory dereferencing error of smart pointer", 89);
+                strncpy(message, __JULE_ERROR__INVALID_MEMORY, 47);
+                strncpy(message + 47, "\nruntime: smart pointer is nil\nfile: ", 38);
+                strncpy(message + 84, file, n);
+                message[84 + n] = '\0';
+                __jule_panic((__jule_U8 *)message, 84 + n);
+            }
+            else
+            {
+                __jule_panic((__jule_U8 *)__JULE_ERROR__INVALID_MEMORY "\nruntime: smart pointer is nil", 77);
+            }
         }
+        return *this;
     }
 
     __jule_Ptr<T> &operator=(const __jule_Ptr<T> &src) noexcept
