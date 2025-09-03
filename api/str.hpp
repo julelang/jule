@@ -69,10 +69,10 @@ public:
     __jule_Str(const __jule_U8 *src, const __jule_Int &len) : __jule_Str(src, src + len) {}
     __jule_Str(const __jule_U8 *src) : __jule_Str(src, src + std::strlen(reinterpret_cast<const char *>(src))) {}
     __jule_Str(const std::string &src) : __jule_Str(reinterpret_cast<const __jule_U8 *>(src.c_str()),
-                                      reinterpret_cast<const __jule_U8 *>(src.c_str() + src.size())) {}
+                                                    reinterpret_cast<const __jule_U8 *>(src.c_str() + src.size())) {}
 
     __jule_Str(const char *src) : __jule_Str(reinterpret_cast<const __jule_U8 *>(src),
-                               reinterpret_cast<const __jule_U8 *>(src) + std::strlen(src)) {}
+                                             reinterpret_cast<const __jule_U8 *>(src) + std::strlen(src)) {}
 
     __jule_Str(const __jule_U8 *begin, const __jule_U8 *end)
     {
@@ -169,85 +169,6 @@ public:
         this->dealloc();
     }
 
-    void mut_slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file,
-#endif
-        const __jule_Int &start,
-        const __jule_Int &end) noexcept
-    {
-#ifndef __JULE_DISABLE__SAFETY
-        if (start < 0 || end < 0 || start > end || end > this->len())
-        {
-            __jule_Str error;
-            __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->len(), "length");
-            error += "\nruntime: string slicing with out of range indexes";
-#ifndef __JULE_ENABLE__PRODUCTION
-            error += "\nfile:";
-            error += file;
-#endif
-            __jule_panicStr(error);
-        }
-#endif
-        this->_slice += start;
-        this->_len = end - start;
-    }
-
-    inline void mut_slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file,
-#endif
-        const __jule_Int &start) noexcept
-    {
-        this->mut_slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-            file,
-#endif
-            start, this->_len);
-    }
-
-    inline void mut_slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file
-#else
-        void
-#endif
-        ) noexcept
-    {
-        this->mut_slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-            file,
-#endif
-            0, this->_len);
-    }
-
-    __jule_Str slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file,
-#endif
-        const __jule_Int &start,
-        const __jule_Int &end) const noexcept
-    {
-#ifndef __JULE_DISABLE__SAFETY
-        if (start < 0 || end < 0 || start > end || end > this->_len)
-        {
-            __jule_Str error;
-            __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->_len, "length");
-            error += "\nruntime: string slicing with out of range indexes";
-#ifndef __JULE_ENABLE__PRODUCTION
-            error += "\nfile:";
-            error += file;
-#endif
-            __jule_panicStr(error);
-        }
-#endif
-        __jule_Str s;
-        s.buffer = this->buffer;
-        s._len = end - start;
-        s._slice = this->_slice + start;
-        return s;
-    }
-
     // Low-level access to buffer.
     // No boundary checking, push byte to end of the buffer.
     // It will increase length.
@@ -256,63 +177,92 @@ public:
         this->_slice[this->_len++] = b;
     }
 
-    inline __jule_Str slice(
-#ifndef __JULE_ENABLE__PRODUCTION
+    void mut_slice(
+        const __jule_Int &start,
+        const __jule_Int &end) noexcept
+    {
+        this->_slice += start;
+        this->_len = end - start;
+    }
+
+    inline void mut_slice(const __jule_Int &start) noexcept
+    {
+        this->mut_slice(start, this->_len);
+    }
+
+    inline void mut_slice(void) noexcept
+    {
+        this->mut_slice(0, this->_len);
+    }
+
+    inline void safe_mut_slice(
         const char *file,
-#endif
-        const __jule_Int &start) const noexcept
+        const __jule_Int &start,
+        const __jule_Int &end) noexcept
     {
-        return this->slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-            file,
-#endif
-            start, this->_len);
+        this->slice_boundary_check(file, start, end);
+        this->mut_slice(start, end);
     }
 
-    inline __jule_Str slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file
-#else
-        void
-#endif
-    ) const noexcept
+    inline void safe_mut_slice(const char *file, const __jule_Int &start) noexcept
     {
-        return this->slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-            file,
-#endif
-            0, this->_len);
+        this->safe_mut_slice(file, start, this->_len);
     }
 
-    // Returns element by index.
-    // Not includes safety checking.
-    constexpr __jule_U8 &__at(const __jule_Int &index) noexcept
+    inline void safe_mut_slice(const char *file) noexcept
+    {
+        this->safe_mut_slice(file, 0, this->_len);
+    }
+
+    __jule_Str slice(
+        const __jule_Int &start,
+        const __jule_Int &end) const noexcept
+    {
+        __jule_Str s;
+        s.buffer = this->buffer;
+        s._len = end - start;
+        s._slice = this->_slice + start;
+        return s;
+    }
+
+    inline __jule_Str slice(const __jule_Int &start) const noexcept
+    {
+        return this->slice(start, this->_len);
+    }
+
+    inline __jule_Str slice(void) const noexcept
+    {
+        return this->slice(0, this->_len);
+    }
+
+    inline __jule_Str safe_slice(
+        const char *file,
+        const __jule_Int &start,
+        const __jule_Int &end) const noexcept
+    {
+        this->slice_boundary_check(file, start, end);
+        return this->slice(start, end);
+    }
+
+    inline __jule_Str safe_slice(const char *file, const __jule_Int &start) const noexcept
+    {
+        return this->safe_slice(file, start, this->_len);
+    }
+
+    inline __jule_Str safe_slice(const char *file) const noexcept
+    {
+        return this->safe_slice(file, 0, this->_len);
+    }
+
+    inline __jule_U8 &at(const __jule_Int &index) noexcept
     {
         return this->_slice[index];
     }
 
-    // Returns element by index.
-    // Includes safety checking.
-    inline __jule_U8 &at(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file,
-#endif
-        const __jule_Int &index) noexcept
+    inline __jule_U8 &safe_at(const char *file, const __jule_Int &index) noexcept
     {
-#ifndef __JULE_DISABLE__SAFETY
-        if (this->empty() || index < 0 || this->len() <= index)
-        {
-            __jule_Str error;
-            __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index, this->len());
-            error += "\nruntime: string indexing with out of range index";
-#ifndef __JULE_ENABLE__PRODUCTION
-            error += "\nfile: ";
-            error += file;
-#endif
-            __jule_panicStr(error);
-        }
-#endif
-        return this->__at(index);
+        this->boundary_check(file, index);
+        return this->_slice[index];
     }
 
     inline __jule_Bool equal(const char *s, const __jule_Int n) const noexcept
@@ -324,11 +274,7 @@ public:
 
     inline __jule_U8 &operator[](const __jule_Int &index) noexcept
     {
-#ifndef __JULE_ENABLE__PRODUCTION
-        return this->at("/api/str.hpp", index);
-#else
         return this->at(index);
-#endif
     }
 
     operator char *(void) const noexcept
@@ -429,6 +375,42 @@ public:
     inline __jule_Bool operator>=(const __jule_Str &str) const noexcept
     {
         return __jule_compareStr((__jule_Str *)this, (__jule_Str *)&str) >= 0;
+    }
+
+    inline void boundary_check(
+        const char *file,
+        const __jule_Int &index) noexcept
+    {
+#ifndef __JULE_DISABLE__SAFETY
+        if (this->empty() || index < 0 || this->len() <= index)
+        {
+            __jule_Str error;
+            __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index, this->len());
+            error += "\nruntime: string indexing with out of range index";
+            error += "\nfile: ";
+            error += file;
+            __jule_panicStr(error);
+        }
+#endif
+    }
+
+    inline void
+    slice_boundary_check(
+        const char *file,
+        const __jule_Int &start,
+        const __jule_Int &end) const noexcept
+    {
+#ifndef __JULE_DISABLE__SAFETY
+        if (start < 0 || end < 0 || start > end || end > this->_len)
+        {
+            __jule_Str error;
+            __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->_len, "length");
+            error += "\nruntime: string slicing with out of range indexes";
+            error += "\nfile:";
+            error += file;
+            __jule_panicStr(error);
+        }
+#endif
     }
 };
 

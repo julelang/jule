@@ -197,7 +197,7 @@ struct __jule_Ptr
         return this->alloc;
     }
 
-    inline __jule_Ptr<T>& must_ok(const char *file) noexcept
+    inline __jule_Ptr<T> &must_ok(const char *file) noexcept
     {
         if (this->operator==(nullptr))
         {

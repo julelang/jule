@@ -85,24 +85,6 @@ public:
         this->_slice = src._slice;
     }
 
-    inline void check(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file
-#endif
-    ) const noexcept
-    {
-        if (this->operator==(nullptr))
-        {
-#ifndef __JULE_ENABLE__PRODUCTION
-            __jule_Str error = __JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil\nfile: ";
-            error += file;
-            __jule_panicStr(error);
-#else
-            __jule_panicStr(__JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil");
-#endif
-        }
-    }
-
     // Frees memory. Unsafe function, not includes any safety checking for
     // heap allocations are valid or something like that.
     void __free(void) noexcept
@@ -193,124 +175,68 @@ public:
     }
 
     inline void mut_slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file,
-#endif
         const __jule_Int &start,
         const __jule_Int &end,
         const __jule_Int &cap) const noexcept
     {
-#ifndef __JULE_DISABLE__SAFETY
-        if (start != 0 && end != 0)
-            this->check(
-#ifndef __JULE_ENABLE__PRODUCTION
-                file
-#endif
-            );
-        if (start < 0 || end < 0 || cap < 0 || start > end || end > this->_cap || end > cap || cap > this->_cap)
-        {
-            __jule_Str error;
-            __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE3(error, start, end, cap, this->cap(), "capacity");
-            error += "\nruntime: slice slicing with out of range indexes";
-#ifndef __JULE_ENABLE__PRODUCTION
-            error += "\nfile: ";
-            error += file;
-#endif
-            __jule_panicStr(error);
-        }
-#endif
         this->_slice = this->_slice + start;
         this->_len = end - start;
         this->_cap = cap - start;
     }
 
     inline void mut_slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file,
-#endif
         const __jule_Int &start,
         const __jule_Int &end) const noexcept
     {
-#ifndef __JULE_DISABLE__SAFETY
-        if (start != 0 && end != 0)
-            this->check(
-#ifndef __JULE_ENABLE__PRODUCTION
-                file
-#endif
-            );
-        if (start < 0 || end < 0 || start > end || end > this->_cap)
-        {
-            __jule_Str error;
-            __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->cap(), "capacity");
-            error += "\nruntime: slice slicing with out of range indexes";
-#ifndef __JULE_ENABLE__PRODUCTION
-            error += "\nfile: ";
-            error += file;
-#endif
-            __jule_panicStr(error);
-        }
-#endif
         this->_slice += start;
         this->_cap -= start;
         this->_len = end - start;
     }
 
-    inline void mut_slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file,
-#endif
-        const __jule_Int &start) const noexcept
+    inline void mut_slice(const __jule_Int &start) const noexcept
     {
-        this->mut_slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-            file,
-#endif
-            start, this->len());
+        this->mut_slice(start, this->len());
     }
 
-    inline void mut_slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file
-#else
-        void
-#endif
-    ) const noexcept
+    inline void mut_slice(void) const noexcept
     {
-        return this->mut_slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-            file,
-#endif
-            0,
-            this->len());
+        return this->mut_slice(0, this->len());
     }
 
-    inline __jule_Slice<Item> slice(
-#ifndef __JULE_ENABLE__PRODUCTION
+    inline void safe_mut_slice(
         const char *file,
-#endif
         const __jule_Int &start,
         const __jule_Int &end,
         const __jule_Int &cap) const noexcept
     {
-#ifndef __JULE_DISABLE__SAFETY
-        if (start != 0 && end != 0)
-            this->check(
-#ifndef __JULE_ENABLE__PRODUCTION
-                file
-#endif
-            );
-        if (start < 0 || end < 0 || cap < 0 || start > end || end > this->_cap || end > cap || cap > this->_cap)
-        {
-            __jule_Str error;
-            __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE3(error, start, end, cap, this->cap(), "capacity");
-            error += "\nruntime: slice slicing with out of range indexes";
-#ifndef __JULE_ENABLE__PRODUCTION
-            error += "\nfile: ";
-            error += file;
-#endif
-            __jule_panicStr(error);
-        }
-#endif
+        this->slice3_boundary_check(file, start, end, cap);
+        this->mut_slice(start, end, cap);
+    }
+
+    inline void safe_mut_slice(
+        const char *file,
+        const __jule_Int &start,
+        const __jule_Int &end) const noexcept
+    {
+        this->slice_boundary_check(file, start, end);
+        this->mut_slice(start, end);
+    }
+
+    inline void safe_mut_slice(const char *file, const __jule_Int &start) const noexcept
+    {
+        this->safe_mut_slice(file, start, this->len());
+    }
+
+    inline void safe_mut_slice(const char *file) const noexcept
+    {
+        return this->safe_mut_slice(file, 0, this->len());
+    }
+
+    inline __jule_Slice<Item> slice(
+        const __jule_Int &start,
+        const __jule_Int &end,
+        const __jule_Int &cap) const noexcept
+    {
         __jule_Slice<Item> slice;
         slice.data = this->data;
         slice._slice = this->_slice + start;
@@ -319,32 +245,8 @@ public:
         return slice;
     }
 
-    inline __jule_Slice<Item> slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file,
-#endif
-        const __jule_Int &start,
-        const __jule_Int &end) const noexcept
+    inline __jule_Slice<Item> slice(const __jule_Int &start, const __jule_Int &end) const noexcept
     {
-#ifndef __JULE_DISABLE__SAFETY
-        if (start != 0 && end != 0)
-            this->check(
-#ifndef __JULE_ENABLE__PRODUCTION
-                file
-#endif
-            );
-        if (start < 0 || end < 0 || start > end || end > this->_cap)
-        {
-            __jule_Str error;
-            __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->cap(), "capacity");
-            error += "\nruntime: slice slicing with out of range indexes";
-#ifndef __JULE_ENABLE__PRODUCTION
-            error += "\nfile: ";
-            error += file;
-#endif
-            __jule_panicStr(error);
-        }
-#endif
         __jule_Slice<Item> slice;
         slice.data = this->data;
         slice._slice = this->_slice + start;
@@ -353,33 +255,45 @@ public:
         return slice;
     }
 
-    inline __jule_Slice<Item> slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file,
-#endif
-        const __jule_Int &start) const noexcept
+    inline __jule_Slice<Item> slice(const __jule_Int &start) const noexcept
     {
-        return this->slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-            file,
-#endif
-            start, this->len());
+        return this->slice(start, this->len());
     }
 
-    inline __jule_Slice<Item> slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file
-#else
-        void
-#endif
-    ) const noexcept
+    inline __jule_Slice<Item> slice(void) const noexcept
     {
-        return this->slice(
-#ifndef __JULE_ENABLE__PRODUCTION
-            file,
-#endif
-            0,
-            this->len());
+        return this->slice(0, this->len());
+    }
+
+    inline __jule_Slice<Item> safe_slice(
+        const char *file,
+        const __jule_Int &start,
+        const __jule_Int &end,
+        const __jule_Int &cap) const noexcept
+    {
+        this->slice3_boundary_check(file, start, end, cap);
+        return this->slice(start, end, cap);
+    }
+
+    inline __jule_Slice<Item> safe_slice(
+        const char *file,
+        const __jule_Int &start,
+        const __jule_Int &end) const noexcept
+    {
+        this->slice_boundary_check(file, start, end);
+        return this->slice(start, end);
+    }
+
+    inline __jule_Slice<Item> safe_slice(
+        const char *file,
+        const __jule_Int &start) const noexcept
+    {
+        return this->safe_slice(file, start, this->len());
+    }
+
+    inline __jule_Slice<Item> safe_slice(const char *file) const noexcept
+    {
+        return this->safe_slice(file, 0, this->len());
     }
 
     constexpr __jule_Int len(void) const noexcept
@@ -443,49 +357,20 @@ public:
         return !this->operator==(nullptr);
     }
 
-    // Returns element by index.
-    // Not includes safety checking.
-    inline Item &__at(const __jule_Int &index) const noexcept
+    inline Item &at(const __jule_Int &index) const noexcept
     {
         return this->_slice[index];
     }
 
-    // Returns element by index.
-    // Includes safety checking.
-    inline Item &at(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file,
-#endif
-        const __jule_Int &index) const noexcept
+    inline Item &safe_at(const char *file, const __jule_Int &index) const noexcept
     {
-#ifndef __JULE_DISABLE__SAFETY
-        this->check(
-#ifndef __JULE_ENABLE__PRODUCTION
-            file
-#endif
-        );
-        if (this->empty() || index < 0 || this->len() <= index)
-        {
-            __jule_Str error;
-            __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index, this->len());
-            error += "\nruntime: slice indexing with out of range index";
-#ifndef __JULE_ENABLE__PRODUCTION
-            error += "\nfile: ";
-            error += file;
-#endif
-            __jule_panicStr(error);
-        }
-#endif
-        return this->__at(index);
+        this->boundary_check(file, index);
+        return this->_slice[index];
     }
 
     inline Item &operator[](const __jule_Int &index) const noexcept
     {
-        return this->at(
-#ifndef __JULE_ENABLE__PRODUCTION
-            "/api/slice.hpp",
-#endif
-            index);
+        return this->at(index);
     }
 
     __jule_Slice<Item> &operator=(const __jule_Slice<Item> &src) noexcept
@@ -514,6 +399,86 @@ public:
     {
         this->dealloc();
         return *this;
+    }
+
+    inline void must_ok(const char *file) const noexcept
+    {
+        if (this->operator==(nullptr))
+        {
+            if (file != nullptr)
+            {
+                __jule_Str error = __JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil\nfile: ";
+                error += file;
+                __jule_panicStr(error);
+            }
+            else
+            {
+                __jule_panicStr(__JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil");
+            }
+        }
+    }
+
+    inline void boundary_check(
+        const char *file,
+        const __jule_Int &index) const noexcept
+    {
+#ifndef __JULE_DISABLE__SAFETY
+        this->must_ok(file);
+        if (this->empty() || index < 0 || this->len() <= index)
+        {
+            __jule_Str error;
+            __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index, this->len());
+            error += "\nruntime: slice indexing with out of range index";
+            error += "\nfile: ";
+            error += file;
+            __jule_panicStr(error);
+        }
+#endif
+    }
+
+    inline void slice_boundary_check(
+        const char *file,
+        const __jule_Int &start,
+        const __jule_Int &end) const noexcept
+    {
+#ifndef __JULE_DISABLE__SAFETY
+        if (start != 0 && end != 0)
+        {
+            this->must_ok(file);
+        }
+        if (start < 0 || end < 0 || start > end || end > this->_cap)
+        {
+            __jule_Str error;
+            __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->cap(), "capacity");
+            error += "\nruntime: slice slicing with out of range indexes";
+            error += "\nfile: ";
+            error += file;
+            __jule_panicStr(error);
+        }
+#endif
+    }
+
+    inline void slice3_boundary_check(
+        const char *file,
+        const __jule_Int &start,
+        const __jule_Int &end,
+        const __jule_Int &cap) const noexcept
+    {
+#ifndef __JULE_DISABLE__SAFETY
+        if (start != 0 && end != 0)
+        {
+            this->must_ok(file);
+        }
+        if (start < 0 || end < 0 || cap < 0 || start > end || end > this->_cap || end > cap || cap > this->_cap)
+        {
+            __jule_Str error;
+            __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE3(error, start, end, cap, this->cap(), "capacity");
+            error += "\nruntime: slice slicing with out of range indexes";
+            error += "\nfile: ";
+            error += file;
+            __jule_panicStr(error);
+        }
+#endif
     }
 };
 
