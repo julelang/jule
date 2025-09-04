@@ -959,24 +959,21 @@ impl exprCoder {
 	}
 
 	fn pushCallInf(mut &self, m: &sema::FuncCallExpr) {
-		if env::Production || !m.Func.Anon {
+		if !m.Func.Anon {
 			self.oc.write("(")
 			ret
 		}
-		if m.Func.Anon {
-			ssie, _ := m.Expr.(&sema::StructSubIdentExpr)
-			if ssie != nil && obj::IsBindStruct(ssie.Field.Owner) {
-				self.oc.write("(")
-				ret
-			}
-			self.oc.write(".call")
+
+		// Skip methods/function-fields of the bind struct.
+		ssie, _ := m.Expr.(&sema::StructSubIdentExpr)
+		if ssie != nil && obj::IsBindStruct(ssie.Field.Owner) {
+			self.oc.write("(")
+			ret
 		}
-		self.oc.write("(\"")
+
+		self.oc.write(".must_ok(\"")
 		self.oc.locInfo(m.Token)
-		self.oc.write("\"")
-		if len(m.Args) != 0 {
-			self.oc.write(", ")
-		}
+		self.oc.write("\").call(")
 	}
 
 	fn isWrapped(mut &self, mut m: &sema::FuncCallExpr): bool {
