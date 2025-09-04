@@ -50,31 +50,26 @@ public:
         this->dealloc();
     }
 
-    template <typename... Arguments>
-    Ret call(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file,
-#endif
-        Args... args)
+    inline __jule_Fn<Ret, Args...> &must_ok(const char *file) noexcept
     {
 #ifndef __JULE_DISABLE__SAFETY
         if (this->f == nullptr)
-#ifndef __JULE_ENABLE__PRODUCTION
+        {
             __jule_panicStr(__jule_Str(__JULE_ERROR__INVALID_MEMORY "\nfile: ") + file);
-#else
-            __jule_panicStr(__JULE_ERROR__INVALID_MEMORY);
-#endif // PRODUCTION
+        }
 #endif // SAFETY
+        return *this;
+    }
+
+    template <typename... Arguments>
+    Ret call(Args... args) noexcept
+    {
         return this->f((void *)(this->ctx.alloc), args...);
     }
 
     inline auto operator()(Args... args)
     {
-#ifndef __JULE_ENABLE__PRODUCTION
-        return this->call<Args...>("/api/fn.hpp", args...);
-#else
         return this->call<Args...>(args...);
-#endif
     }
 
     inline __jule_Fn<Ret, Args...> &operator=(std::nullptr_t) noexcept
