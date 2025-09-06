@@ -683,9 +683,14 @@ impl exprCoder {
 	}
 
 	fn typeAssertion(mut &self, mut m: &sema::TypeAssertionExpr) {
+		self.possibleRefExpr(m.Expr.Model)
+		self.oc.write(".must_ok_type(\"")
+		self.oc.locInfo(m.Token)
+		self.oc.write("\", ")
 		if obj::IsAny(m.Expr.Type) {
-			self.possibleRefExpr(m.Expr.Model)
-			self.oc.write(".")
+			self.oc.write("&" + anyTypeIdent)
+			self.oc.write(conv::Itoa(self.oc.pushAnyType(m.Type)))
+			self.oc.write(").")
 			// We handling map and channel types as smart pointer,
 			// because this kind types implemented as smart pointers
 			// at machine code level.
@@ -707,52 +712,37 @@ impl exprCoder {
 				self.oc.write("cast<")
 				self.oc.tc.kind(&self.oc.Buf, m.Type)
 			}
-			self.oc.write(">(")
-			if !env::Production {
-				self.oc.write("\"")
-				self.oc.locInfo(m.Token)
-				self.oc.write("\", ")
-			}
-			self.oc.write("&" + anyTypeIdent)
-			self.oc.write(conv::Itoa(self.oc.pushAnyType(m.Type)))
-			self.oc.write(")")
+			self.oc.write(">()")
 			ret
 		}
 		if m.Expr.Type.Trait() != nil {
-			self.possibleRefExpr(m.Expr.Model)
-			self.oc.write(".")
-			// We handling map and channel types as smart pointer,
-			// because this kind types implemented as smart pointers
-			// at machine code level.
-			match {
-			| m.Type.Sptr() != nil:
-				self.oc.write("cast_ptr<")
-				self.oc.tc.kind(&self.oc.Buf, m.Type.Sptr().Value)
-			| m.Type.Map() != nil:
-				self.oc.write("cast_ptr<")
-				mp := m.Type.Map()
-				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Value)
-				self.oc.tc.structureIns(&self.oc.Buf, mps)
-			| m.Type.Chan() != nil:
-				self.oc.write("cast_ptr<")
-				ch := m.Type.Chan()
-				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
-				self.oc.tc.structureIns(&self.oc.Buf, chs)
-			|:
-				self.oc.write("cast<")
-				self.oc.tc.kind(&self.oc.Buf, m.Type)
-			}
-			self.oc.write(">(")
-			if !env::Production {
-				self.oc.write("\"")
-				self.oc.locInfo(m.Token)
-				self.oc.write("\", ")
-			}
 			self.oc.write("(__jule_TypeMeta*)&")
 			identCoder.traitDecl(&self.oc.Buf, m.Expr.Type.Trait())
 			self.oc.write("_mptr_data")
 			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Expr.Type.Trait(), m.Type)))
-			self.oc.write(")")
+			self.oc.write(").")
+			// We handling map and channel types as smart pointer,
+			// because this kind types implemented as smart pointers
+			// at machine code level.
+			match {
+			| m.Type.Sptr() != nil:
+				self.oc.write("cast_ptr<")
+				self.oc.tc.kind(&self.oc.Buf, m.Type.Sptr().Value)
+			| m.Type.Map() != nil:
+				self.oc.write("cast_ptr<")
+				mp := m.Type.Map()
+				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Value)
+				self.oc.tc.structureIns(&self.oc.Buf, mps)
+			| m.Type.Chan() != nil:
+				self.oc.write("cast_ptr<")
+				ch := m.Type.Chan()
+				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
+				self.oc.tc.structureIns(&self.oc.Buf, chs)
+			|:
+				self.oc.write("cast<")
+				self.oc.tc.kind(&self.oc.Buf, m.Type)
+			}
+			self.oc.write(">()")
 			ret
 		}
 		panic("unreachable")
@@ -1520,15 +1510,11 @@ impl exprCoder {
 		self.oc.write("((")
 		identCoder.traitDecl(&self.oc.Buf, m.Trt)
 		self.oc.write("MptrData")
-		self.oc.write("*)")
+		self.oc.write("*)(")
 		self.possibleRefExpr(m.Expr)
-		self.oc.write(".safe_type(")
-		if !env::Production {
-			self.oc.write("\"")
-			self.oc.locInfo(m.Token)
-			self.oc.write("\"")
-		}
-		self.oc.write("))->")
+		self.oc.write(".must_ok(\"")
+		self.oc.locInfo(m.Token)
+		self.oc.write("\").type))->")
 		identCoder.func(&self.oc.Buf, m.Method)
 	}
 
@@ -2129,20 +2115,20 @@ impl exprCoder {
 			// at machine code level.
 			match {
 			| m.Base.Type.Sptr() != nil:
-				self.oc.write(".unsafe_cast_ptr<")
+				self.oc.write(".cast_ptr<")
 				self.oc.tc.kind(&self.oc.Buf, m.Base.Type.Sptr().Value)
 			| m.Base.Type.Map() != nil:
-				self.oc.write(".unsafe_cast_ptr<")
+				self.oc.write(".cast_ptr<")
 				mp := m.Base.Type.Map()
 				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Value)
 				self.oc.tc.structureIns(&self.oc.Buf, mps)
 			| m.Base.Type.Chan() != nil:
-				self.oc.write(".unsafe_cast_ptr<")
+				self.oc.write(".cast_ptr<")
 				ch := m.Base.Type.Chan()
 				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
 				self.oc.tc.structureIns(&self.oc.Buf, chs)
 			|:
-				self.oc.write(".unsafe_cast<")
+				self.oc.write(".cast<")
 				self.oc.tc.kind(&self.oc.Buf, m.Base.Type)
 			}
 			self.oc.write(">()")
