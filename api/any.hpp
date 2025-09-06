@@ -78,24 +78,27 @@ public:
         this->__free();
     }
 
-    inline void must_ok(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file
-#else
-        void
-#endif
-    ) const noexcept
+    inline __jule_Any &must_ok(const char *file) noexcept
     {
         if (this->operator==(nullptr))
         {
-#ifndef __JULE_ENABLE__PRODUCTION
             __jule_Str error = __JULE_ERROR__INVALID_MEMORY "\nfile: ";
             error += file;
             __jule_panicStr(error);
-#else
-            __jule_panicStr(__JULE_ERROR__INVALID_MEMORY "\nfile: /api/any.hpp");
-#endif
         }
+        return *this;
+    }
+
+    inline __jule_Any &must_ok_type(const char *file, __jule_TypeMeta *type) noexcept
+    {
+        this->must_ok(file);
+        if (this->type != type)
+        {
+            __jule_Str error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: dynamic-type casted to incompatible type\nfile: ";
+            error += file;
+            __jule_panicStr(error);
+        }
+        return *this;
     }
 
     inline __jule_Any &operator=(const std::nullptr_t) noexcept
@@ -105,67 +108,13 @@ public:
     }
 
     template <typename T>
-    inline T cast(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file,
-#endif
-        __jule_TypeMeta *type) const noexcept
-    {
-#ifndef __JULE_DISABLE__SAFETY
-        this->must_ok(
-#ifndef __JULE_ENABLE__PRODUCTION
-            file
-#endif
-        );
-        if (this->type != type)
-        {
-#ifndef __JULE_ENABLE__PRODUCTION
-            __jule_Str error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: dynamic-type casted to incompatible type\nfile: ";
-            error += file;
-            __jule_panicStr(error);
-#else
-            __jule_panicStr(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: dynamic-type casted to incompatible type");
-#endif
-        }
-#endif
-        return *reinterpret_cast<T *>(this->data.alloc);
-    }
-
-    template <typename T>
-    __jule_Ptr<T> cast_ptr(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file,
-#endif
-        __jule_TypeMeta *type) const noexcept
-    {
-#ifndef __JULE_DISABLE__SAFETY
-        this->must_ok(
-#ifndef __JULE_ENABLE__PRODUCTION
-            file
-#endif
-        );
-        if (this->type != type)
-        {
-#ifndef __JULE_ENABLE__PRODUCTION
-            __jule_Str error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: dynamic-type casted to incompatible type\nfile: ";
-            error += file;
-            __jule_panicStr(error);
-#else
-            __jule_panicStr(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: dynamic-type casted to incompatible type");
-#endif
-        }
-#endif
-        return this->data.template as<T>();
-    }
-
-    template <typename T>
-    inline T unsafe_cast(void) const noexcept
+    inline T cast(void) const noexcept
     {
         return *reinterpret_cast<T *>(this->data.alloc);
     }
 
     template <typename T>
-    inline __jule_Ptr<T> unsafe_cast_ptr(void) const noexcept
+    __jule_Ptr<T> cast_ptr(void) const noexcept
     {
         return this->data.template as<T>();
     }
@@ -177,25 +126,6 @@ public:
         newAny.type = (__jule_TypeMeta *)typeMapper((void *)this->type);
         newAny.data = this->data;
         return newAny;
-    }
-
-    // Returns the type data pointer with safety checks.
-    inline __jule_TypeMeta *safe_type(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file
-#else
-        void
-#endif
-    )
-    {
-#ifndef __JULE_DISABLE__SAFETY
-        this->must_ok(
-#ifndef __JULE_ENABLE__PRODUCTION
-            file
-#endif
-        );
-#endif
-        return this->type;
     }
 
     inline __jule_Any &operator=(const __jule_Any &src) noexcept
@@ -232,7 +162,7 @@ public:
         return this->type->eq(this->data.alloc, other.data.alloc);
     }
 
-    inline __jule_Bool operator!=(const __jule_Any &other) const
+    inline __jule_Bool operator!=(const __jule_Any &other) const noexcept
     {
         return !this->operator==(other);
     }
