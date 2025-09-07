@@ -40,11 +40,7 @@ public:
     // Returns element by index.
     // Includes safety checking.
     // Designed for constant strings.
-    static __jule_U8 at(
-#ifndef __JULE_ENABLE__PRODUCTION
-        const char *file,
-#endif
-        const __jule_U8 *s, const __jule_Int n, const __jule_Int i) noexcept
+    static __jule_U8 at(const char *file, const __jule_U8 *s, const __jule_Int n, const __jule_Int i) noexcept
     {
 #ifndef __JULE_DISABLE__SAFETY
         if (n == 0 || i < 0 || n <= i)
@@ -52,10 +48,8 @@ public:
             __jule_Str error;
             __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, i, n);
             error += "\nruntime: string indexing with out of range index";
-#ifndef __JULE_ENABLE__PRODUCTION
             error += "\nfile: ";
             error += file;
-#endif
             __jule_panicStr(error);
         }
 #endif
