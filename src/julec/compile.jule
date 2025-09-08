@@ -454,7 +454,7 @@ fn checkCppStdFlag() {
 	}
 }
 
-fn checkFlags(&args: *[]str): []str {
+fn checkFlags(args: []str): []str {
 	mut opt := "L0"
 	mut target := "native-native"
 
@@ -491,7 +491,7 @@ fn checkFlags(&args: *[]str): []str {
 	fs.AddVar[bool](unsafe { (&bool)(&opt::Len) }, "opt-len", 0, "Len optimizations")
 	fs.AddVar[bool](unsafe { (&bool)(&opt::StdStrings) }, "opt-std-strings", 0, "Special optimizations for the std/strings package")
 
-	mut content := fs.Parse(*args) else {
+	mut content := fs.Parse(args) else {
 		handle::Throw(error.(str))
 		use nil // Avoid error.
 	}
@@ -510,7 +510,7 @@ fn setupSemaFlags(mut &flags: *int) {
 	}
 }
 
-fn buildIR(&args: *[]str): &obj::IR {
+fn buildIR(args: []str): &obj::IR {
 	content := checkFlags(args)
 
 	mut semaFlags := sema::Default
@@ -549,12 +549,14 @@ fn buildIR(&args: *[]str): &obj::IR {
 	ret ir
 }
 
-// Process compile command by "ARGS" global.
-fn compileCommand(mut &args: *[]str) {
-	*args = (*args)[1:] // Remove program path.
-	if (*args)[0] == "test" {
+// Process build command by "ARGS" global.
+// The "build" command must be removed from the arguments.
+// Only build arguments needed.
+fn build(mut args: []str) {
+	args = args[1:] // Remove program path.
+	if args[0] == "test" {
 		env::Test = true
-		*args = (*args)[1:]
+		args = args[1:]
 	}
 	mut ir := buildIR(args)
 

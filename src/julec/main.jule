@@ -17,6 +17,7 @@ use "std/strings"
 // Compiler commands.
 const (
 	CmdHelp    = "help"
+	CmdBuild   = "build"
 	CmdVersion = "version"
 	CmdTool    = "tool"
 	CmdJulenv  = "julenv"
@@ -26,6 +27,7 @@ const (
 // Map for "julec help" command.
 let HelpMap: [...][2]str = [
 	[CmdHelp, "Show the list of available commands"],
+	[CmdBuild, "Compiles a program"],
 	[CmdVersion, "Show version"],
 	[CmdTool, "Tools for effective Jule"],
 	[CmdJulenv, "Show information about native jule environment"],
@@ -174,10 +176,14 @@ fn mod(args: []str) {
 
 // Try to process compiler commands.
 // Reports whether "ARGS" is command and processed.
-fn processCommand(args: []str): bool {
+fn processCommand(mut args: []str) {
 	match args[1] {
 	| CmdHelp:
 		help(args, 0)
+	| CmdBuild:
+		// Remove the "build" command from arguments before execute the command.
+		args = args[1:]
+		build(args)
 	| CmdVersion:
 		version(args)
 	| CmdTool:
@@ -187,10 +193,8 @@ fn processCommand(args: []str): bool {
 	| CmdMod:
 		mod(args)
 	|:
-		ret false
+		handle::Throw("unknown command: " + args[1])
 	}
-
-	ret true
 }
 
 fn showInfo(args: []str) {
@@ -227,9 +231,5 @@ fn main() {
 		ret
 	}
 
-	if processCommand(args) {
-		ret
-	}
-
-	compileCommand(&args)
+	processCommand(args)
 }
