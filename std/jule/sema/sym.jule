@@ -8,6 +8,7 @@ use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/directive"
 use "std/jule/log"
+use "std/jule/mod"
 use "std/jule/token"
 use "std/os"
 use "std/os/filepath"
@@ -374,38 +375,34 @@ impl symBuilder {
 	fn checkAbsPath(mut &self, mut filepath: str, mut decl: &ast::Use): str {
 		// If there is no module, no common directories.
 		// For the local packages, the root package needs a module.
-		mut modPath := self.importer.GetModPath()
-		if len(modPath) == 0 {
+		mut mod := self.importer.GetMod()
+		if mod == nil {
 			self.pushErr(decl.Path, "module not found")
-			self.pushSuggestion(`run "julec mod init" to initialize a module in the current directory`)
+			self.pushSuggestion(`run "julec mod init <modulename>" to initialize a module in the current directory`)
 			ret ""
 		}
-
-		// Get module name.
-		modName := getModNameFromPath(modPath)
 
 		// Get module name of the filepath.
 		mut filepathModName := filepath
 		i := strings::IndexByte(filepath, os::PathSeparator)
 		if i > 0 {
 			filepathModName = filepath[:i]
+			// Remove the module name from the import filepath.
+			// The module name will be replaced with module path.
+			// The following path is submodule path, must remain.
+			filepath = filepath[i+1:]
 		}
 
 		// All import filepaths are must be start with module name.
-		if modName != filepathModName {
+		if mod.Name != filepathModName {
 			self.pushErr(decl.Path, "import path must use the root name of the module")
-			self.pushSuggestion("module name of this package is: " + conv::Quote(modName))
+			self.pushSuggestion("module name of this package is: " + conv::Quote(mod.Name))
 			ret ""
 		}
 
-		// To handle absolute package path correct,
-		// select the previous directory of the module.
-		// Because filepath is already starts with the module path.
-		modPath = filepath::Dir(modPath)
-
 		// Join filepath with the absolute module path and
 		// make sure we have an absolute path to the package.
-		filepath = filepath::Join(modPath, filepath)
+		filepath = filepath::Join(mod.Path, filepath)
 		filepath = filepath::Abs(filepath) else {
 			self.pushErr(decl.Path, "path not found or cannot be accessed: "+decl.Path.Kind)
 			ret ""
@@ -576,8 +573,8 @@ impl symBuilder {
 	//	- decl: relevant use declaration.
 	//	- mod: module that imports relevant package.
 	//	- path: path of package that importing.
-	fn checkPackageAccessibility(mut *self, decl: &ast::Use, mod: str, path: str) {
-		if self.importer.GetModPath() == mod {
+	fn checkPackageAccessibility(mut *self, decl: &ast::Use, mod: &mod::Mod, path: str) {
+		if self.importer.GetMod() == mod {
 			ret
 		}
 		const InternalName = "internal"
@@ -616,19 +613,19 @@ impl symBuilder {
 			imp.Package = port.Package
 			imp.Duplicate = true
 
-			oldMod := self.importer.GetModPath()
-			self.importer.SetModPath(self.importer.ModById(port.ModId))
+			mut oldMod := self.importer.GetMod()
+			self.importer.SetMod(self.importer.ModById(port.ModId))
 			self.checkPackageAccessibility(decl, oldMod, port.Path)
-			self.importer.SetModPath(oldMod)
+			self.importer.SetMod(oldMod)
 		} else {
 			if !self.checkImportCycles(imp, decl) {
 				ret false
 			}
 
-			oldMod := self.importer.GetModPath()
-			defer { self.importer.SetModPath(oldMod) }
+			mut oldMod := self.importer.GetMod()
+			defer { self.importer.SetMod(oldMod) }
 			if imp.Std {
-				self.importer.SetModPath(build::PathStdlib())
+				self.importer.SetMod(build::ModStdlib())
 			}
 			mut asts, mut errors := self.importer.ImportPackage(imp.Path, !imp.Std)
 			if len(errors) > 0 {
@@ -791,22 +788,4 @@ impl symBuilder {
 // See developer reference (6).
 fn isImplicitImport(imp: &ImportInfo): bool {
 	ret imp.Decl.Token == nil
-}
-
-// Returns module name by module path provided by importer.
-// Returns "." if module path is empty.
-fn getModName(importer: Importer): str {
-	ret getModNameFromPath(importer.GetModPath())
-}
-
-// Returns module name by module path.
-// Returns "." if module path is empty.
-fn getModNameFromPath(path: str): str {
-	// This path is the absolute path, it should be.
-	// So, the module name is the base name of the absolute module path.
-	//
-	// Example:
-	//	"foo"         -> "foo"
-	//	"foo/bar/baz" -> "baz"
-	ret filepath::Base(path)
 }

@@ -1,0 +1,192 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/bufio"
+use "std/jule"
+use "std/jule/log"
+use "std/os"
+use "std/os/filepath"
+use "std/strings"
+use "std/unicode"
+use "std/unicode/utf8"
+use "std/unsafe"
+
+const (
+	bom = 0xFEFF // byte order mark, only permitted as very first character
+	eof = -1     // end of file
+
+	spaces = "\r\t\v\n\b "
+)
+
+// Module file parser.
+struct parser {
+	mod:      &Mod
+	buf:      []byte
+	r:        rune
+	offset:   int
+	rdOffset: int
+	row:      int
+	logs:     []log::Log
+}
+
+impl parser {
+	// Pushes new error log to logs.
+	#disable nilptr
+	fn pushErr(mut *self, fmt: str, args: ...any) {
+		self.logs = append(self.logs, log::Log{
+			Kind: log::Error,
+			Row: self.row,
+			Column: 1,
+			Path: self.mod.Path,
+			Text: log::Logf(fmt, args...),
+		})
+	}
+
+	// Adds new line.
+	#disable nilptr
+	fn addLine(mut *self) {
+		self.row++
+	}
+
+	// Read the next Unicode char into self.r.
+	// self.r < 0 means end-of-file.
+	//
+	// For optimization, there is some overlap between this method and self.scanName.
+	#disable nilptr boundary
+	fn next(mut *self) {
+		if self.rdOffset >= len(self.buf) {
+			if self.r == '\n' {
+				self.addLine()
+			}
+			self.offset = len(self.buf)
+			self.r = eof
+			ret
+		}
+		if self.r == '\n' {
+			self.addLine()
+		}
+		self.offset = self.rdOffset
+		mut r, mut w := rune(self.buf[self.rdOffset]), 1
+		match {
+		| r == 0:
+			self.pushErr("illegal character NUL")
+		| r >= utf8::RuneSelf:
+			// not ASCII
+			r, w = utf8::DecodeRune(self.buf[self.rdOffset:])
+			if r == utf8::RuneError && w == 1 {
+				self.pushErr("illegal UTF-8 encoding")
+			} else if r == bom && self.offset > 0 {
+				self.pushErr("illegal byte order mask")
+			}
+		}
+		self.rdOffset += w
+		self.r = r
+	}
+
+	#disable nilptr
+	fn getLine(mut *self): str {
+		for self.r == ' ' || self.r == '\t' || self.r == '\n' || self.r == '\r' {
+			self.next()
+		}
+		offset := self.offset
+		for self.r != eof && self.r != '\n' {
+			self.next()
+		}
+		ret unsafe::BytesStr(self.buf[offset:self.offset])
+	}
+
+	// module <name>
+	#disable nilptr
+	fn parseModule(mut *self, mut line: str) {
+		line = strings::Trim(line[len("module"):], spaces)
+		if len(line) == 0 {
+			self.pushErr("module name is missing")
+			ret
+		}
+		self.mod.Name = line
+		if !IsName(self.mod.Name) {
+			self.pushErr("module name is invalid")
+		}
+	}
+
+	#disable nilptr
+	fn parse(mut *self) {
+		for self.r != eof {
+			line := self.getLine()
+			if len(line) == 0 {
+				continue
+			}
+			match {
+			| strings::HasPrefix(line, "module"):
+				self.parseModule(line)
+			|:
+				self.pushErr("invalid content")
+			}
+		}
+	}
+}
+
+// Checks the mandatory module information.
+#disable nilptr
+fn checkMod(mod: &Mod, mut &logs: *[]log::Log) {
+	if mod.Name == "" {
+		*logs = append(*logs, log::Log{
+			Kind: log::Flat,
+			Text: "module file must be have name",
+		})
+	}
+}
+
+// Parse module from the module file path.
+fn ParseFile(path: str): (&Mod, []log::Log) {
+	mut bytes := os::ReadFile(filepath::Join(path, jule::ModuleFile)) else {
+		ret nil, [{
+				Kind: log::Flat,
+				Text: "module file could not checked because of a problem",
+			}]
+	}
+	mut parser := parser{
+		mod: &Mod{
+			Path: path,
+		},
+		buf: bytes,
+		row: 1,
+		r: ' ',
+	}
+	parser.parse()
+	if len(parser.logs) > 0 {
+		ret parser.mod, parser.logs
+	}
+	checkMod(parser.mod, &parser.logs)
+	ret parser.mod, parser.logs
+}
+
+// Reports whether the name is valid to become module name.
+fn IsName(name: str): bool {
+	if len(name) == 0 {
+		ret false
+	}
+	for i, r in name {
+		if i == 0 {
+			if r != '_' && !isLetter(r) {
+				ret false
+			}
+		} else if !isSpecial(r) && !isLetter(r) && !isDigit(r) {
+			ret false
+		}
+	}
+	ret true
+}
+
+fn lower(ch: rune): rune { ret ('a' - 'A') | ch }
+fn isDecimal(ch: rune): bool { ret '0' <= ch && ch <= '9' }
+fn isSpecial(ch: rune): bool { ret ch == '_' || ch == '.' }
+
+fn isLetter(ch: rune): bool {
+	ret 'a' <= lower(ch) && lower(ch) <= 'z' || ch == '_' || ch >= utf8::RuneSelf && unicode::IsLetter(ch)
+}
+
+fn isDigit(ch: rune): bool {
+	ret isDecimal(ch) || ch >= utf8::RuneSelf && unicode::IsDigit(ch)
+}

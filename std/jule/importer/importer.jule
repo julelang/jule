@@ -6,8 +6,9 @@ use "std/jule"
 use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/directive"
-use "std/jule/internal/mod"
+use imod "std/jule/internal/mod"
 use "std/jule/log"
+use "std/jule/mod"
 use "std/jule/parser"
 use "std/jule/sema"
 use "std/jule/token"
@@ -36,22 +37,22 @@ fn flatCompilerErr(text: str): log::Log {
 
 // Default importer for the reference Jule compiler.
 struct importer {
-	mods: []str
-	mod:  str
+	mods: []&mod::Mod
+	mod:  &mod::Mod
 	pkgs: []&sema::ImportInfo
 	vars: []str
 }
 
 impl sema::Importer for importer {
-	fn SetModPath(mut *self, path: str) {
-		self.mod = path
+	fn SetMod(mut *self, mut mod: &mod::Mod) {
+		self.mod = mod
 	}
 
-	fn GetModPath(*self): str {
+	fn GetMod(mut *self): &mod::Mod {
 		ret self.mod
 	}
 
-	fn ModById(*self, id: int): str {
+	fn ModById(mut *self, id: mod::ID): &mod::Mod {
 		ret self.mods[id]
 	}
 
@@ -71,13 +72,15 @@ impl sema::Importer for importer {
 		}
 
 		if updateMod {
-			newMod := mod::FindModuleFileDeep(path)
-			if newMod != self.mod {
-				self.mod = newMod
-				mut errs := mod::CheckModuleFile(self.mod)
+			mut newModPath := imod::FindModuleFileDeep(path)
+			if len(newModPath) == 0 {
+				self.mod = nil
+			} else if self.mod == nil || newModPath != self.mod.Path {
+				mut newMod, mut errs := mod::ParseFile(newModPath)
 				if len(errs) != 0 {
 					ret nil, errs
 				}
+				self.mod = newMod
 			}
 		}
 
@@ -132,14 +135,14 @@ impl sema::Importer for importer {
 			}
 		}
 
-		if len(self.mod) != 0 {
+		if self.mod != nil {
 			for i, mod in self.mods {
 				if self.mod == mod {
-					imp.ModId = i
+					imp.ModId = mod::ID(i)
 					goto Append
 				}
 			}
-			imp.ModId = len(self.mods)
+			imp.ModId = mod::ID(len(self.mods))
 			self.mods = append(self.mods, self.mod)
 		}
 
@@ -181,7 +184,7 @@ impl importer {
 // Returns new default Jule package importer by the compile information.
 fn New(info: CompileInfo): sema::Importer {
 	mut imp := new(importer)
-	imp.mods = [build::PathStdlib()]
+	imp.mods = [build::ModStdlib()]
 	initVars(&imp.vars, info)
 	ret imp
 }

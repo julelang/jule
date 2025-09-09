@@ -10,6 +10,7 @@ use "std/fmt"
 use "std/jule"
 use "std/jule/build"
 use "std/jule/dist"
+use "std/jule/mod"
 use "std/os"
 use "std/runtime"
 use "std/strings"
@@ -157,15 +158,27 @@ fn mod(args: []str) {
 		ret
 	}
 
-	if len(args) > 3 {
-		printErrorMessage("invalid command: " + args[3])
-		ret
-	}
-
 	match args[2] {
 	| "init": // julec mod init
+		if len(args) > 4 {
+			printErrorMessage("invalid command: " + args[4])
+			ret
+		}
+		if len(args) < 4 {
+			printErrorMessage("module name is missing\nuse command like: mod init <modulename>")
+			break
+		}
+		name := args[3]
+		if !mod::IsName(name) {
+			printErrorMessage("module name is invalid")
+			break
+		}
 		os::Stat(jule::ModuleFile) else {
-			os::WriteFile(jule::ModuleFile, [], 0o660) else {
+			mut sb := strings::Builder{}
+			sb.WriteStr("module ")!
+			sb.WriteStr(name)!
+			data := []byte(sb.Str())
+			os::WriteFile(jule::ModuleFile, data, 0o660) else {
 				printErrorMessage("module could not be generated")
 			}
 			break
