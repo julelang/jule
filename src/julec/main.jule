@@ -22,7 +22,7 @@ const (
 	CmdTest    = "test"
 	CmdVersion = "version"
 	CmdTool    = "tool"
-	CmdJulenv  = "julenv"
+	CmdEnv     = "env"
 	CmdMod     = "mod"
 )
 
@@ -33,7 +33,7 @@ let HelpMap: [...][2]str = [
 	[CmdTest, "Compiles a test program"],
 	[CmdVersion, "Show version"],
 	[CmdTool, "Tools for effective Jule"],
-	[CmdJulenv, "Show information about native jule environment"],
+	[CmdEnv, "Show information about jule environment"],
 	[CmdMod, "Module management"],
 ]
 
@@ -41,13 +41,7 @@ fn printErrorMessage(msg: str) {
 	println(msg)
 }
 
-// Command: julec help
-fn help(args: []str, pan: int) {
-	if len(args) > 2 {
-		printErrorMessage("invalid command: " + args[2])
-		ret
-	}
-
+fn writeCommandsList(mut &s: *strings::Builder, pads: str, pad: int) {
 	mut max := len(HelpMap[0][0])
 	for _, k in HelpMap {
 		n := len(k[0])
@@ -56,19 +50,175 @@ fn help(args: []str, pan: int) {
 		}
 	}
 
-	mut s := strings::Builder{}
-	s.Grow(1 << 5)
-	const Space = 5 // Space of between command name and description.
-	for i, part in HelpMap {
-		s.WriteStr(strings::Repeat(" ", pan))!
+	const Space = 3 // Space of between command name and description.
+	for _, part in HelpMap {
+		s.WriteStr(strings::Repeat(pads, pad))!
 		s.WriteStr(part[0])!
 		s.WriteStr(strings::Repeat(" ", (max-len(part[0]))+Space))!
 		s.WriteStr(part[1])!
-		if i+1 < len(HelpMap) {
-			s.WriteByte('\n')!
-		}
+		s.WriteByte('\n')!
 	}
-	println(s.Str())
+}
+
+// Command: julec help
+fn help(args: []str, pads: str, pad: int) {
+	if len(args) == 2 { // julec help
+		mut max := len(HelpMap[0][0])
+		for _, k in HelpMap {
+			n := len(k[0])
+			if n > max {
+				max = n
+			}
+		}
+
+		mut s := strings::Builder{}
+		s.WriteStr("The help command shows information about the julec tool and commands.\n\nThe commands are:\n")!
+		writeCommandsList(&s, pads, pad)
+		s.WriteByte('\n')!
+		s.WriteStr(`Use "julec help <command>" to see information about a command.`)!
+		println(s.Str())
+		ret
+	}
+	if len(args) > 3 { // julec help <command> [unknown]
+		printErrorMessage("invalid command: " + args[3])
+		ret
+	}
+	// julec help <command>
+	command := args[2]
+	match command {
+	| CmdHelp:
+		println(`The help command shows information about the julec tool and commands.
+
+julec help             Show the general help information about the julec tool
+julec help <command>   Show the information about a command`)
+	| CmdBuild:
+		println(`The build command compiles the packages named by the import paths.
+
+Usage:
+	julec build [arguments] <path>
+
+The compile path must be the main package directory of the program.
+When compiling packages, build ignores files that end in '_test.jule'.
+The main package must have the entry point "main" function.
+
+The most common arguments are:
+	-t --tranpile
+		Enables transpilation mode.
+		Code will be compiled to IR but object file will not be created.
+		It may be useful for debugging.
+	-o --out <path>
+		Forces build to write the resulting executable file to the named output file.
+		It is "main" by default (with ".exe" extension on Windows).
+		On Windows, the ".exe" extension will be appended for executable files if
+		path is not have the extension.
+	-p --production
+		Enables production compilation.
+		Compiles for production build, not recommended for debug compilations.
+		It may increase compilation time significantly but will improve performance.
+	--opt <level>
+		Enables optimizations. It uses L0 by default.
+		Levels are L0, L1, and L2. For debug compilations, L0 is recommended.
+		Every level enables all optimizations of the previous levels.
+	--compiler <value>
+		Selects the back-end compiler standard. It uses "clang" by default.
+		Supported values are "clang" for Clang and "gcc" for GNU Compiler Collection.
+		Recommended compiler is the Clang.
+	--compiler-path <path>
+		The path of the back-end compiler. It uses "clang++" for Clang and "g++" for GCC.
+		If the back-end compiler path is not different, this option is not
+		requires extra attention. Setting with the [--compiler] option is enough.
+	--target <target>
+		Changes the target of the build. The default value is "native-native".
+		Value format is <os>-<arch>, like darwin-arm64 or linux-amd64.
+		This will not be used by the back-end compiler. It will enables target
+		architecture imititation and IR will be generated accordingly.
+		But it will be compiled with your native target.
+		Use the "julec tool targets" to see valid targets.
+		The value "native-native" equals to your native target.`)
+	| CmdTest:
+		println(`The test command compiles the packages named by the import paths for testing.
+
+Usage:
+	julec test [arguments] <path>
+
+The compile path must be the package directory of the program to be tested.
+When compiling packages for testing, it will include files that end in '_test.jule'.
+The package may have not the entry point "main" function, it will not be used.
+Test compilations uses implicitly generated entry point for testing.
+
+The most common arguments are:
+	-t --tranpile
+		Enables transpilation mode.
+		Code will be compiled to IR but object file will not be created.
+		It may be useful for debugging.
+	-o --out <path>
+		Forces build to write the resulting executable file to the named output file.
+		It is "main" by default (with ".exe" extension on Windows).
+		On Windows, the ".exe" extension will be appended for executable files if
+		path is not have the extension.
+	-p --production
+		Enables production compilation.
+		Compiles for production build, not recommended for debug compilations.
+		It may increase compilation time significantly but will improve performance.
+	--opt <level>
+		Enables optimizations. It uses L0 by default.
+		Levels are L0, L1, and L2. For debug compilations, L0 is recommended.
+		Every level enables all optimizations of the previous levels.
+	--compiler <value>
+		Selects the back-end compiler standard. It uses "clang" by default.
+		Supported values are "clang" for Clang and "gcc" for GNU Compiler Collection.
+		Recommended compiler is the Clang.
+	--compiler-path <path>
+		The path of the back-end compiler. It uses "clang++" for Clang and "g++" for GCC.
+		If the back-end compiler path is not different, this option is not
+		requires extra attention. Setting with the [--compiler] option is enough.
+	--target <target>
+		Changes the target of the build. The default value is "native-native".
+		Value format is <os>-<arch>, like darwin-arm64 or linux-amd64.
+		This will not be used by the back-end compiler. It will enables target
+		architecture imititation and IR will be generated accordingly.
+		But it will be compiled with your native target.
+		Use the "julec tool targets" to see valid targets.
+		The value "native-native" equals to your native target.`)
+	| CmdMod:
+		println(`The mod command is a tool managing your jule modules.
+
+Usage:
+	julec mod <command>
+
+The commands are:` + modCommandsList + `
+
+Modules Names
+	A module name may only consist of letters, digits, '_', or '.' characters.
+	The first character must be either a letter or an '_'.
+	`)
+	| CmdVersion:
+		println(`The version command shows your julec tool version.
+
+Usage:
+	julec version
+
+This is the version of the julec tool, standard library and API.`)
+	| CmdTool:
+		println(`The tool command provides several minimal tools for the Jule programming language.
+
+Usage:
+	julec tool <tool>
+
+With no arguments it prints the list of known tools.
+
+The tools are:` + toolsList)
+	| CmdEnv:
+		println(`The env command provides information about your jule environment.
+
+Usage:
+	julec env
+
+It shows information about your native jule environment.`)
+	|:
+		printErrorMessage("invalid command: " + command + `
+write "julec help" to see commands`)
+	}
 }
 
 // Command: julec version
@@ -112,13 +262,15 @@ fn toolDistarch() {
 	println("")
 }
 
+const toolsList = `
+	targets    List all supported target pairs
+	distos     List all supported operating systems
+	distarch   List all supported architects`
+
 // Command: julec tool
 fn tool(args: []str) {
 	if len(args) == 2 {
-		println(`tool commands:
- targets    List all supported target pairs
- distos     List all supported operating systems
- distarch   List all supported architects`)
+		println("The tools are:" + toolsList)
 		ret
 	} else if len(args) > 3 {
 		printErrorMessage("invalid command: " + args[3])
@@ -138,8 +290,8 @@ fn tool(args: []str) {
 	}
 }
 
-// Command: julec julenv
-fn julenv(args: []str) {
+// Command: julec env
+fn env(args: []str) {
 	if len(args) > 2 {
 		printErrorMessage("invalid command: " + args[2])
 		ret
@@ -151,10 +303,15 @@ fn julenv(args: []str) {
 	println("default C++ standard: " + env::CppStd)
 }
 
+const modCommandsList = `
+	init <modulename>   Initializes a new module in the current path`
+
 // Command: julec mod
 fn mod(args: []str) {
 	if len(args) == 2 {
-		println("no command given, try julec mod init")
+		println(`julec mod is a tool for managing Jule modules.
+
+The commands are:` + modCommandsList)
 		ret
 	}
 
@@ -194,15 +351,15 @@ fn mod(args: []str) {
 fn processCommand(mut args: []str) {
 	match args[1] {
 	| CmdHelp:
-		help(args, 0)
+		help(args, "\t", 1)
 	| CmdBuild | CmdTest:
 		build(args)
 	| CmdVersion:
 		version(args)
 	| CmdTool:
 		tool(args)
-	| CmdJulenv:
-		julenv(args)
+	| CmdEnv:
+		env(args)
 	| CmdMod:
 		mod(args)
 	|:
@@ -212,13 +369,20 @@ fn processCommand(mut args: []str) {
 
 fn showInfo(args: []str) {
 	println(
-		`JuleC is the Jule programming language compiler.
+		`JuleC is a tool for managing Jule source code.
 
-Commands:`)
-	help(args, 4)
+Usage:
+	julec <command> [arguments]
+
+The commands are:`)
+	mut s := strings::Builder{}
+	writeCommandsList(&s, "\t", 1)
+	print(s.Str())
 	println(`
+Use "julec help <command>" for more information about a command.
+
 Compilation:
-    julec [OPTIONS] INPUT`)
+	julec build [arguments] <path>`)
 }
 
 fn init() {
