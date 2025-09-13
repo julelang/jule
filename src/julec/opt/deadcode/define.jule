@@ -67,8 +67,7 @@ impl ObjectDeadCode {
 		if self.isLive[&sema::StructIns](s) {
 			ret
 		}
-		self.pushLive[&sema::StructIns](s)
-		self.setReferencesAsLive(s.Refers)
+		self.fusePushLive(s)
 		allLive := isAllMethodsLive(s.Decl)
 		for (_, mut m) in s.Methods {
 			for (_, mut ins) in m.Instances {
@@ -78,8 +77,7 @@ impl ObjectDeadCode {
 
 				// Push all methods as live if s is requires all methods should be live.
 				if allLive {
-					self.pushLive[&sema::FuncIns](ins)
-					self.setReferencesAsLive(ins.Refers)
+					self.fusePushLive(ins)
 					continue
 				}
 
@@ -88,8 +86,7 @@ impl ObjectDeadCode {
 				// Other methods will be marked as live by referenced defines,
 				// no need for special tracking algorithm to caught.
 				if obj::IsTraitMethod(s, ins) {
-					self.pushLive[&sema::FuncIns](ins)
-					self.setReferencesAsLive(ins.Refers)
+					self.fusePushLive(ins)
 				}
 
 				// Set reserved methods as live.
@@ -100,8 +97,7 @@ impl ObjectDeadCode {
 				mut _str := s.FindMethod("Str", Binded)
 				if _str != nil && sema::FuncPattern.Str(_str) {
 					mut fins := _str.Instances[0]
-					self.pushLive[&sema::FuncIns](fins)
-					self.setReferencesAsLive(fins.Refers)
+					self.fusePushLive(fins)
 				}
 			}
 		}
@@ -126,8 +122,7 @@ impl ObjectDeadCode {
 						if self.isLive[&sema::FuncIns](mins) {
 							continue
 						}
-						self.pushLive[&sema::FuncIns](mins)
-						self.setReferencesAsLive(mins.Refers)
+						self.fusePushLive(mins)
 					}
 				}
 			| &sema::FuncIns:
@@ -137,19 +132,16 @@ impl ObjectDeadCode {
 				}
 				if f.Owner != nil && !f.Decl.Static {
 					if !self.isLive[&sema::StructIns](f.Owner) {
-						self.pushLive[&sema::StructIns](f.Owner)
-						self.setReferencesAsLive(f.Owner.Refers)
+						self.fusePushLive(f.Owner)
 					}
 				}
-				self.pushLive[&sema::FuncIns](f)
-				self.setReferencesAsLive(f.Refers)
+				self.fusePushLive(f)
 			| &sema::Var:
 				mut v := ref.(&sema::Var)
 				if self.isLive[&sema::Var](v) {
 					break
 				}
-				self.pushLive[&sema::Var](v)
-				self.setReferencesAsLive(v.Refers)
+				self.fusePushLive(v)
 			| &sema::StructIns:
 				mut s := ref.(&sema::StructIns)
 				self.pushStructAsLive(s)
@@ -163,9 +155,8 @@ impl ObjectDeadCode {
 				if f.Name == jule::InitFunc {
 					mut ins := f.Instances[0]
 					if !self.isLive[&sema::FuncIns](ins) {
-						self.pushLive[&sema::FuncIns](ins)
+						self.fusePushLive(ins)
 					}
-					self.setReferencesAsLive(ins.Refers)
 				}
 			}
 		}
@@ -180,8 +171,7 @@ impl ObjectDeadCode {
 			for (_, mut v) in file.Vars {
 				if obj::HasDirective(v.Directives, directive::Export) {
 					if !self.isLive[&sema::Var](v) {
-						self.pushLive[&sema::Var](v)
-						self.setReferencesAsLive(v.Refers)
+						self.fusePushLive(v)
 					}
 				}
 			}
@@ -189,8 +179,7 @@ impl ObjectDeadCode {
 				if obj::HasDirective(f.Directives, directive::Export) {
 					for (_, mut ins) in f.Instances {
 						if !self.isLive[&sema::FuncIns](ins) {
-							self.pushLive[&sema::FuncIns](ins)
-							self.setReferencesAsLive(ins.Refers)
+							self.fusePushLive(ins)
 						}
 					}
 				}
@@ -206,11 +195,9 @@ impl ObjectDeadCode {
 				self.pushStructAsLive(ins)
 				for (_, mut m) in ins.Methods {
 					for (_, mut mins) in m.Instances {
-						if self.isLive[&sema::FuncIns](mins) {
-							continue
+						if !self.isLive[&sema::FuncIns](mins) {
+							self.fusePushLive(mins)
 						}
-						self.pushLive[&sema::FuncIns](mins)
-						self.setReferencesAsLive(mins.Refers)
 					}
 				}
 			}
@@ -219,55 +206,40 @@ impl ObjectDeadCode {
 					if obj::HasDirective(f.Directives, directive::Test) {
 						mut ins := f.Instances[0]
 						if !self.isLive[&sema::FuncIns](ins) {
-							self.pushLive[&sema::FuncIns](ins)
+							self.fusePushLive(ins)
 						}
-						self.setReferencesAsLive(ins.Refers)
 					}
 				}
 			}
 		}
 	}
 
+	fn fusePushLive[T](mut &self, mut t: &T) {
+		self.pushLive(t)
+		self.setReferencesAsLive(t.Refers)
+	}
+
 	fn collectLive(mut &self) {
 		// Special cases.
-		self.pushLive[&sema::FuncIns](meta::Program.Runtime.Init)
-		self.setReferencesAsLive(meta::Program.Runtime.Init.Refers)
-		self.pushLive[&sema::FuncIns](meta::Program.Runtime.CloseThread)
-		self.setReferencesAsLive(meta::Program.Runtime.CloseThread.Refers)
-		self.pushLive[&sema::FuncIns](meta::Program.Runtime.CheckNilRef)
-		self.setReferencesAsLive(meta::Program.Runtime.CheckNilRef.Refers)
-		self.pushLive[&sema::FuncIns](meta::Program.Runtime.Cmplx64Eq)
-		self.setReferencesAsLive(meta::Program.Runtime.Cmplx64Eq.Refers)
-		self.pushLive[&sema::FuncIns](meta::Program.Runtime.Cmplx64Neg)
-		self.setReferencesAsLive(meta::Program.Runtime.Cmplx64Neg.Refers)
-		self.pushLive[&sema::FuncIns](meta::Program.Runtime.Cmplx64Add)
-		self.setReferencesAsLive(meta::Program.Runtime.Cmplx64Add.Refers)
-		self.pushLive[&sema::FuncIns](meta::Program.Runtime.Cmplx64Sub)
-		self.setReferencesAsLive(meta::Program.Runtime.Cmplx64Sub.Refers)
-		self.pushLive[&sema::FuncIns](meta::Program.Runtime.Cmplx64Mul)
-		self.setReferencesAsLive(meta::Program.Runtime.Cmplx64Mul.Refers)
-		self.pushLive[&sema::FuncIns](meta::Program.Runtime.Cmplx64Div)
-		self.setReferencesAsLive(meta::Program.Runtime.Cmplx64Div.Refers)
-		self.pushLive[&sema::FuncIns](meta::Program.Runtime.Cmplx128Eq)
-		self.setReferencesAsLive(meta::Program.Runtime.Cmplx128Eq.Refers)
-		self.pushLive[&sema::FuncIns](meta::Program.Runtime.Cmplx128Neg)
-		self.setReferencesAsLive(meta::Program.Runtime.Cmplx128Neg.Refers)
-		self.pushLive[&sema::FuncIns](meta::Program.Runtime.Cmplx128Add)
-		self.setReferencesAsLive(meta::Program.Runtime.Cmplx128Add.Refers)
-		self.pushLive[&sema::FuncIns](meta::Program.Runtime.Cmplx128Sub)
-		self.setReferencesAsLive(meta::Program.Runtime.Cmplx128Sub.Refers)
-		self.pushLive[&sema::FuncIns](meta::Program.Runtime.Cmplx128Mul)
-		self.setReferencesAsLive(meta::Program.Runtime.Cmplx128Mul.Refers)
-		self.pushLive[&sema::FuncIns](meta::Program.Runtime.Cmplx128Div)
-		self.setReferencesAsLive(meta::Program.Runtime.Cmplx128Div.Refers)
-		self.pushLive[&sema::FuncIns](meta::Program.Runtime.Cmplx128cmplx64)
-		self.setReferencesAsLive(meta::Program.Runtime.Cmplx128cmplx64.Refers)
-		self.pushLive[&sema::FuncIns](meta::Program.Runtime.Cmplx64cmplx128)
-		self.setReferencesAsLive(meta::Program.Runtime.Cmplx64cmplx128.Refers)
-		self.pushLive[&sema::StructIns](meta::Program.Runtime.Cmplx64)
-		self.setReferencesAsLive(meta::Program.Runtime.Cmplx64.Refers)
-		self.pushLive[&sema::StructIns](meta::Program.Runtime.Cmplx128)
-		self.setReferencesAsLive(meta::Program.Runtime.Cmplx128.Refers)
+		self.fusePushLive(meta::Program.Runtime.Init)
+		self.fusePushLive(meta::Program.Runtime.CloseThread)
+		self.fusePushLive(meta::Program.Runtime.CheckNilRef)
+		self.fusePushLive(meta::Program.Runtime.Cmplx64Eq)
+		self.fusePushLive(meta::Program.Runtime.Cmplx64Neg)
+		self.fusePushLive(meta::Program.Runtime.Cmplx64Add)
+		self.fusePushLive(meta::Program.Runtime.Cmplx64Sub)
+		self.fusePushLive(meta::Program.Runtime.Cmplx64Mul)
+		self.fusePushLive(meta::Program.Runtime.Cmplx64Div)
+		self.fusePushLive(meta::Program.Runtime.Cmplx128Eq)
+		self.fusePushLive(meta::Program.Runtime.Cmplx128Neg)
+		self.fusePushLive(meta::Program.Runtime.Cmplx128Add)
+		self.fusePushLive(meta::Program.Runtime.Cmplx128Sub)
+		self.fusePushLive(meta::Program.Runtime.Cmplx128Mul)
+		self.fusePushLive(meta::Program.Runtime.Cmplx128Div)
+		self.fusePushLive(meta::Program.Runtime.Cmplx128cmplx64)
+		self.fusePushLive(meta::Program.Runtime.Cmplx64cmplx128)
+		self.fusePushLive(meta::Program.Runtime.Cmplx64)
+		self.fusePushLive(meta::Program.Runtime.Cmplx128)
 
 		for (_, mut used) in self.ir.Used {
 			if !used.Bind {
@@ -281,9 +253,8 @@ impl ObjectDeadCode {
 		if main != nil {
 			mut ins := main.Instances[0]
 			if !self.isLive[&sema::FuncIns](ins) {
-				self.pushLive[&sema::FuncIns](ins)
+				self.fusePushLive(ins)
 			}
-			self.setReferencesAsLive(ins.Refers)
 		}
 
 		// Finally analysis is done. We have to mark as live methods of the
@@ -302,8 +273,7 @@ impl ObjectDeadCode {
 						mut m := ins.FindMethod(tm.Name, Static)
 						for (_, mut mins) in m.Instances {
 							if !self.isLive[&sema::FuncIns](mins) {
-								self.pushLive[&sema::FuncIns](mins)
-								self.setReferencesAsLive(mins.Refers)
+								self.fusePushLive(mins)
 							}
 						}
 					}
