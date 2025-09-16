@@ -22,6 +22,7 @@ const (
 // Module file parser.
 struct parser {
 	mod:      &Mod
+	modfile:  str
 	buf:      []byte
 	r:        rune
 	offset:   int
@@ -38,7 +39,7 @@ impl parser {
 			Kind: log::Error,
 			Row: self.row,
 			Column: 1,
-			Path: self.mod.Path,
+			Path: self.modfile,
 			Text: log::Logf(fmt, args...),
 		})
 	}
@@ -129,27 +130,38 @@ impl parser {
 
 // Checks the mandatory module information.
 #disable nilptr
-fn checkMod(mod: &Mod, mut &logs: *[]log::Log) {
+fn checkMod(modfile: str, mod: &Mod, mut &logs: *[]log::Log) {
 	if mod.Name == "" {
 		*logs = append(*logs, log::Log{
-			Kind: log::Flat,
+			Kind: log::Error,
 			Text: "module file must be have name",
+			Path: modfile,
+		})
+	} else if mod.Name == "std" {
+		*logs = append(*logs, log::Log{
+			Kind: log::Error,
+			Text: "module name \"std\" is a reseved name",
+			Suggestion: "use a different module name",
+			Path: modfile,
 		})
 	}
 }
 
 // Parse module from the module file path.
 fn ParseFile(path: str): (&Mod, []log::Log) {
-	mut bytes := os::ReadFile(filepath::Join(path, jule::ModuleFile)) else {
+	modfile := filepath::Join(path, jule::ModuleFile)
+	mut bytes := os::ReadFile(modfile) else {
 		ret nil, [{
-				Kind: log::Flat,
+				Kind: log::Error,
 				Text: "module file could not checked because of a problem",
+				Path: modfile,
 			}]
 	}
 	mut parser := parser{
 		mod: &Mod{
 			Path: path,
 		},
+		modfile: modfile,
 		buf: bytes,
 		row: 1,
 		r: ' ',
@@ -158,11 +170,12 @@ fn ParseFile(path: str): (&Mod, []log::Log) {
 	if len(parser.logs) > 0 {
 		ret parser.mod, parser.logs
 	}
-	checkMod(parser.mod, &parser.logs)
+	checkMod(parser.modfile, parser.mod, &parser.logs)
 	ret parser.mod, parser.logs
 }
 
 // Reports whether the name is valid to become module name.
+// It does not checks for reserved names.
 fn IsName(name: str): bool {
 	if len(name) == 0 {
 		ret false
