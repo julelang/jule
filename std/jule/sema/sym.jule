@@ -346,7 +346,33 @@ impl symBuilder {
 		mut path := decl.Path.Kind[1 : len(decl.Path.Kind)-1] // remove quotes
 
 		if !build::IsStdHeaderPath(path) {
-			path = filepath::Join(decl.Token.File.Dir(), path)
+			// If there is no module, no common directories.
+			// For the local packages, the root package needs a module.
+			mut mod := self.importer.GetMod()
+			if mod == nil {
+				self.pushErr(decl.Path, "module not found")
+				self.pushSuggestion(`run "julec mod init <modulename>" to initialize a bind module in the current directory`)
+				ret nil
+			}
+
+			// Take module name and submodule path from the path.
+			pathModName, (path) := splitModuleNameFromFilepath(path)
+
+			// All import filepaths are must be start with module name.
+			if mod.Name != pathModName {
+				self.pushErr(decl.Path, "import path must use the root name of the module")
+				self.pushSuggestion("module name of this package is: " + conv::Quote(mod.Name))
+				ret nil
+			}
+
+			// Join path with the absolute module path and
+			// make sure we have an absolute path to the package.
+			path = filepath::Join(mod.Path, path)
+			path = filepath::Abs(path) else {
+				self.pushErr(decl.Path, "path not found or cannot be accessed: "+decl.Path.Kind)
+				ret nil
+			}
+
 			mut ok := self.checkCppUseDeclPath(decl, path)
 			if !ok {
 				ret nil
@@ -382,21 +408,8 @@ impl symBuilder {
 			ret ""
 		}
 
-		// Get module name of the filepath.
-		mut filepathModName := filepath
-		i := strings::IndexByte(filepath, os::PathSeparator)
-		if i > 0 {
-			filepathModName = filepath[:i]
-			// Remove the module name from the import filepath.
-			// The module name will be replaced with module path.
-			// The following path is submodule path, must remain.
-			filepath = filepath[i+1:]
-		} else {
-			// The filepath is entirely is the module name.
-			// The module name will be replaced with module path.
-			// There is no submodules in path, so set to empty string.
-			filepath = ""
-		}
+		// Take module name and submodule path from the filepath.
+		filepathModName, filepath := splitModuleNameFromFilepath(filepath)
 
 		// All import filepaths are must be start with module name.
 		if mod.Name != filepathModName {
@@ -793,4 +806,25 @@ impl symBuilder {
 // See developer reference (6).
 fn isImplicitImport(imp: &ImportInfo): bool {
 	ret imp.Decl.Token == nil
+}
+
+// Takes filepath and returns module name from the path and submodule path if exist.
+// For example: "std/jule/sema" -> ("std", "jule/sema")
+// Returns empty if there is no submodule path.
+fn splitModuleNameFromFilepath(filepath: str): (modName: str, submodulePath: str) {
+	i := strings::IndexByte(filepath, os::PathSeparator)
+	if i > 0 {
+		modName = filepath[:i]
+		// Remove the module name from the import filepath.
+		// The module name will be replaced with module path.
+		// The following path is submodule path, must remain.
+		submodulePath = filepath[i+utf8::RuneLen(os::PathSeparator):]
+	} else {
+		// The filepath is entirely is the module name.
+		// The module name will be replaced with module path.
+		// There is no submodules in the path, so set to empty string.
+		modName = filepath
+		submodulePath = ""
+	}
+	ret
 }
