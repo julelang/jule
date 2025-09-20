@@ -8,7 +8,7 @@ It is also used by the official reference compiler JuleC and is developed in par
 - [`ast`](./ast): AST things.
 - [`importer`](./importer): Default Jule importer.
 - [`parser`](./parser): Parser
-- [`sema`](./sema): Semantic analyzer and CAST (Compilation Abstract Syntax Tree) components.
+- [`sema`](./sema): Semantic analyzer and HIR (High-Level Intermediate Representation) components.
 - [`token`](./token): Lexical analyzer.
 - [`types`](./types): Elementary package for type safety.
 
@@ -35,13 +35,13 @@ Typical uses are things like capturing or tracing private behavior. For example,
     - **(8.2)** Semantic analyzer will ignore implicit use declaration for duplication analysis. So, built-in implicit imported packages may be duplicated if placed source file contains separate use declaration for the same package.
     - **(8.3)** These packages should be placed as first use declarations of the main package's first file.
     - **(8.4)** Semantic analyzer will not collect references for some defines of these packages. So any definition will not have a collection of references if not supported. But references may collected if used in ordinary way unlike implicit instantiation by semantic anlayzer.
-- **(7)** Jule can handle supported types bidirectionally for binary expressions (`s == nil || nil == s` or etc.). However, when creating CAST, some types in binary expressions must always be left operand. These types are; `any`, type enums, enums, smart pointers, raw pointers and traits.
+- **(7)** Jule can handle supported types bidirectionally for binary expressions (`s == nil || nil == s` or etc.). However, when creating HIR, some types in binary expressions must always be left operand. These types are; `any`, type enums, enums, smart pointers, raw pointers and traits.
     - **(7.1)** For these special types, the type that is the left operand can normally be left or right operand. It is only guaranteed if the expression of the relevant type is in the left operand. There may be a shift in the original order.
     - **(7.2)** In the case of a `nil` comparison, the right operand should always be `nil`.
 
 - **(8)** The `Scope` field of iteration or match expressions must be the first one. Accordingly, coverage data of the relevant type can be obtained by reinterpreting types such as `uintptr` with Unsafe Jule.
 
-- **(9)** Strict type aliases behave very similar to structs. For this reason, they are treated as a struct on CAST. They always have an instance. The data structure that represents a structure instance provides source type data that essentially contains what type it refers to. This data is only set if the structure was created by a strict type alias.
+- **(9)** Strict type aliases behave very similar to structs. For this reason, they are treated as a struct on HIR. They always have an instance. The data structure that represents a structure instance provides source type data that essentially contains what type it refers to. This data is only set if the structure was created by a strict type alias.
     - **(9.1)** If a struct instance is created by a strict type alias (easily identified by looking at the source type data) and declared binded, the binded indicates that it was created by a strict type alias defined for a type. If a structure does not have source type data and the declaration is described as binded, this is a ordinary binded struct declaration.
     - **(9.2)** To ensure that the created structure instance can be used consistently, the type should be checked using a type alias for the instance's type. If a strict type alias is used in the type check, the source type of the created structure instance should be assigned as the source to the structure instance encapsulated by the type alias. While this type alias is being checked, it provides the same struct instance to those referencing it, even though the analysis has not yet been completed. The type is distributed consistently, duplication is prevented, and type errors are avoided.
 
@@ -91,7 +91,7 @@ An example of a faulty analysis scenario:
 
 - **(12)** Grouped variables represented by the root (first) variable of the group in the AST. For the all members of group, the `Group` field holds them including the root member. The `GroupIndex` field holds the index of the variable, counting starts from zero.
 
-- **(13)** Grouped variables represented by themselves (not only the root one) in the CAST, unlike AST. CAST declares variables in the same order of the group. For the all members of group, they still have the `Group` field holds them including the root member. The `GroupIndex` field holds the index of the variable, counting starts from zero.
+- **(13)** Grouped variables represented by themselves (not only the root one) in the HIR, unlike AST. HIR declares variables in the same order of the group. For the all members of group, they still have the `Group` field holds them including the root member. The `GroupIndex` field holds the index of the variable, counting starts from zero.
 
 - **(14)** For enums, all enum items handled like grouped constant variable declaration. To determine if the grouped variable is declared in the enum, the `Group` field is holds trailing `nil` pointer for the enum groups.
 

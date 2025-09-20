@@ -15,7 +15,7 @@ JuleC has a structure that handles processes step by step. \
 The working principle of the compiler roughly consists of the steps described below.
 
 After obtaining the source code, the first step is to perform lexical analysis.
-As a result of lexical analysis, the tokens of the source code are obtained. 
+As a result of lexical analysis, the tokens of the source code are obtained.
 These tokens will be used to generate AST by parser.
 
 Parser, which performs the syntax check and builds the AST tree of the code, is responsible for the next step.
@@ -24,17 +24,16 @@ The compiler does not use AST as intermediate representation (IR) for generating
 The AST acts as a tool for the compiler to generate the compiler IR.
 
 The next stage is semantic analysis.
-In the semantic analysis process, type checking is performed for type safety purposes, declarations and definitions are checked, object binding (associating references to a definition with the definition) and some operations are performed.
-As a result of the semantic analysis, the IR to be used by the compiler is also built.
-This IR is different representation from the AST and contains additional information such as references for object binding.
+In the semantic analysis process, type checking is performed for type safety purposes, declarations and definitions are checked, object binding (associating references to a definition) and some operations are performed.
+As a result of the semantic analysis, the HIR (High-Level Intermediate Representation) to be used by the compiler is also built.
+This HIR is different representation from the AST and contains additional information such as references for object binding.
 
 After the front-end is complete, the middle-end comes into play.
-The middle-end performs possible optimizations on the IR independent of the target system and is transferred to the optimized IR back-end.
+The middle-end performs possible optimizations on the HIR independent of the target system and is transferred to the optimized HIR back-end.
 Depending on the middle-end compiler configurations, it may produce different optimizations or not optimize at all.
 
-
 The final stage is code generation. \
-This stage is the stage where the compiler generates object code from IR.
+This stage is the stage where the compiler generates object code from HIR.
 
 ### 1. Lexer
 
