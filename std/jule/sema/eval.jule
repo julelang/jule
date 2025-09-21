@@ -519,8 +519,10 @@ impl eval {
 					ret nil
 				}
 			}
+			// Add reference if define is not generic.
+			// Otherwise, add a reference when it is instantiated.
+			self.pushReference(ins)
 		}
-		self.pushReference(ins)
 		ret self._evalStruct(ins)
 	}
 
@@ -551,8 +553,10 @@ impl eval {
 			if exist != nil {
 				ins = exist
 			}
+			// Add reference if define is not generic.
+			// Otherwise, add a reference when it is instantiated.
+			self.pushReference(ins)
 		}
-		self.pushReference(ins)
 		ret self.evalFuncIns(ins)
 	}
 
@@ -1162,21 +1166,24 @@ impl eval {
 	// If recheckNeed is not nil, function will checked with recheck strategy.
 	fn checkGenericFunc(mut &self, mut &f: *&FuncIns, mut et: &token::Token,
 		mut &model: *Expr, mut recheckNeed: []recheckableType): (ok: bool, exist: bool) {
-		mut old := *f
 		if recheckNeed == nil {
 			ok, exist = self.s.checkGenericFunc(f, et)
 		} else {
 			ok, exist = self.s.checkGenericFuncRecheck(f, et, recheckNeed)
 		}
-		if ok && exist {
-			// Update model by exist function instance.
-			// Generic functions returns always new instance, because might be
-			// generics are inferred. Therefore, always returns new instance for requests.
-			// So, if this absolute instance is already exist, update model.
-			// Otherwise, model's instance will be a dangling, because it never
-			// be appended into instances of function declaration since already exist.
-			updateModelToGenericIns(model, *f)
-			updateRefer(self.getOwnerRefers(), old, *f)
+		if ok {
+			// If function is generic, reference will not be appended.
+			// So append a reference for this generic instance.
+			self.pushReference(*f)
+			if exist {
+				// Update model by exist function instance.
+				// Generic functions returns always new instance, because might be
+				// generics are inferred. Therefore, always returns new instance for requests.
+				// So, if this absolute instance is already exist, update model.
+				// Otherwise, model's instance will be a dangling, because it never
+				// be appended into instances of function declaration since already exist.
+				updateModelToGenericIns(model, *f)
+			}
 		}
 		ret
 	}
@@ -5422,15 +5429,6 @@ fn makeImplicitDeref(mut v: &Value, mut baseToken: &token::Token) {
 	unary.Op.ID = token::MUL
 	unary.Op.Kind = "*"
 	v.Model = unary
-}
-
-// Updates ref's old references to new.
-fn updateRefer[T](mut ref: &ReferenceStack, old: &T, mut new: &T) {
-	for i, sym in ref.buffer {
-		if sym == old {
-			ref.buffer[i] = new
-		}
-	}
 }
 
 fn makeVariadic(mut v: &Value, mut elem: &Type) {
