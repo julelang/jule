@@ -251,13 +251,11 @@ fn structToStr[T](x: T): str {
 	ret unsafe::StrFromBytes(buf)
 }
 
-// Returns x in string form with default format.
-// It designed for general-purpose string conversion for built-in behavior.
-fn toStr[T](x: T): str {
+// Implementation of the toStr function, but only for Jule types.
+// Any bind type must not be passed to this function.
+fn juleToStr[T](x: T): str {
 	const t = comptime::TypeOf(T)
 	const match {
-	| t.Bind():
-		ret t.Str()
 	| t.CanNil():
 		if x == nil {
 			ret "<nil>"
@@ -326,4 +324,16 @@ fn toStr[T](x: T): str {
 		ret unsafe { ptrToStr((*unsafe)(uintptr(*(*&uintptr)(&x)))) }
 	}
 	panic("runtime: unsupported type for toStr")
+}
+
+// Returns x in string form with default format.
+// It designed for general-purpose string conversion for built-in behavior.
+fn toStr[T](x: T): str {
+	const t = comptime::TypeOf(T)
+	const match {
+	| t.Bind():
+		ret t.Str()
+	|:
+		ret juleToStr(x)
+	}
 }
