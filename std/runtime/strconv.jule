@@ -261,18 +261,6 @@ fn juleToStr[T](x: T): str {
 			ret "<nil>"
 		}
 	}
-	// Check strict case separately.
-	// Because the type T may be CanNil and Strict at a time.
-	const match {
-	| t.Strict():
-		// Lookup for the reserved Str method for the strict type like structures.
-		r, ok := tryToCallStr(x)
-		if ok {
-			ret r
-		}
-		// If strict type have not the reserved Str method, handle by the source type.
-		// Following analysis will do that.
-	}
 
 	const match t.Kind() {
 	| comptime::Str:
@@ -330,6 +318,18 @@ fn juleToStr[T](x: T): str {
 // It designed for general-purpose string conversion for built-in behavior.
 fn toStr[T](x: T): str {
 	const t = comptime::TypeOf(T)
+	// Check strict case first.
+	// Because type may have custom string conversion function.
+	const match {
+	| t.Strict():
+		// Lookup for the reserved Str method for the strict type like structures.
+		r, ok := tryToCallStr(x)
+		if ok {
+			ret r
+		}
+		// If strict type have not the reserved Str method, handle by the source type.
+		// Following analysis will do that.
+	}
 	const match {
 	| t.Bind():
 		ret t.Str()
