@@ -322,116 +322,14 @@ impl symBuilder {
 		unsafe { pushSuggestion(&self.errors[len(self.errors)-1], fmt, args...) }
 	}
 
-	fn checkCppUseDeclPath(mut *self, decl: &ast::Use, path: str): (ok: bool) {
-		ext := filepath::Ext(path)
-		if !build::IsValidHeaderExt(ext) && !build::IsValidCppExt(ext) {
-			self.pushErr(decl.Token, "invalid C/C++ extension: "+conv::Quote(ext))
-			ret false
-		}
-
-		// Exist?
-		info := os::Stat(path) else {
-			self.pushErr(decl.Token, "path not found or cannot be accessed: "+decl.Path.Kind)
-			ret false
-		}
-		if !info.Mode().IsRegular() {
-			self.pushErr(decl.Token, "path not found or cannot be accessed: "+decl.Path.Kind)
-			ret false
-		}
-
-		ret true
-	}
-
-	fn buildCppHeaderImport(mut *self, mut decl: &ast::Use): &ImportInfo {
-		mut path := decl.Path.Kind[1 : len(decl.Path.Kind)-1] // remove quotes
-
-		if !build::IsStdHeaderPath(path) {
-			// If there is no module, no common directories.
-			// For the local packages, the root package needs a module.
-			mut mod := self.importer.GetMod()
-			if mod == nil {
-				self.pushErr(decl.Path, "module not found")
-				self.pushSuggestion(`run "julec mod init <modulename>" to initialize a bind module in the current directory`)
-				ret nil
-			}
-
-			// Take module name and submodule path from the path.
-			pathModName, (path) := splitModuleNameFromFilepath(path)
-
-			// All import filepaths are must be start with module name.
-			if mod.Name != pathModName {
-				self.pushErr(decl.Path, "import path must use the root name of the module")
-				self.pushSuggestion("module name of this package is: " + conv::Quote(mod.Name))
-				ret nil
-			}
-
-			// Join path with the absolute module path and
-			// make sure we have an absolute path to the package.
-			path = filepath::Join(mod.Path, path)
-			path = filepath::Abs(path) else {
-				self.pushErr(decl.Path, "path not found or cannot be accessed: "+decl.Path.Kind)
-				ret nil
-			}
-
-			mut ok := self.checkCppUseDeclPath(decl, path)
-			if !ok {
-				ret nil
-			}
-
-			// Set to absolute path for correct include path.
-			path = filepath::Abs(path) else {
-				self.pushErr(decl.Token, "path not found or cannot be accessed: "+decl.Path.Kind)
-				use ""
-			}
-		}
-
-		ret &ImportInfo{
-			Decl: decl,
-			Path: path,
-			LinkPath: decl.Path.Kind,
-			Bind: true,
-			Std: false,
-			Package: nil, // Cpp headers haven't symbol table.
-		}
-	}
-
 	// Checks and returns absolute path of import filepath.
 	// Designed for non-std package paths.
 	// Returns empty string if error occurs.
-	fn checkAbsPath(mut &self, mut filepath: str, mut decl: &ast::Use): str {
-		// If there is no module, no common directories.
-		// For the local packages, the root package needs a module.
-		mut mod := self.importer.GetMod()
-		if mod == nil {
-			self.pushErr(decl.Path, "module not found")
-			self.pushSuggestion(`run "julec mod init <modulename>" to initialize a module in the current directory`)
-			ret ""
-		}
-
-		// Take module name and submodule path from the filepath.
-		filepathModName, filepath := splitModuleNameFromFilepath(filepath)
-
-		// All import filepaths are must be start with module name.
-		if mod.Name != filepathModName {
-			self.pushErr(decl.Path, "import path must use the root name of the module")
-			self.pushSuggestion("module name of this package is: " + conv::Quote(mod.Name))
-			ret ""
-		}
-
+	fn checkAbsPath(mut &self, mut filepath: str, mut decl: &ast::Use, mod: &mod::Mod): str {
 		// Join filepath with the absolute module path and
 		// make sure we have an absolute path to the package.
 		filepath = filepath::Join(mod.Path, filepath)
 		filepath = filepath::Abs(filepath) else {
-			self.pushErr(decl.Path, "path not found or cannot be accessed: "+decl.Path.Kind)
-			ret ""
-		}
-
-		// Check the absolute path is exist and a directory (package).
-		info := os::Stat(filepath) else {
-			self.pushErr(decl.Path, "path not found or cannot be accessed: "+decl.Path.Kind)
-			ret ""
-		}
-		if !info.IsDir() {
 			self.pushErr(decl.Path, "path not found or cannot be accessed: "+decl.Path.Kind)
 			ret ""
 		}
@@ -441,23 +339,12 @@ impl symBuilder {
 
 	// Same as the [checkAbsPath] method but designed for std package paths.
 	fn checkStdAbsPath(mut &self, mut filepath: str, mut decl: &ast::Use): str {
-		if filepath == "std" {
+		if filepath == "" {
 			self.pushErr(decl.Path, "invalid import path: "+decl.Path.Kind)
 			ret ""
 		}
-		filepath = filepath[len("std")+1:] // cut "std" + pathsep prefix
 		filepath = filepath::Join(build::PathStdlib(), filepath)
 		filepath = filepath::Abs(filepath) else {
-			self.pushErr(decl.Path, "path not found or cannot be accessed: "+decl.Path.Kind)
-			ret ""
-		}
-
-		// Exist?
-		info := os::Stat(filepath) else {
-			self.pushErr(decl.Path, "path not found or cannot be accessed: "+decl.Path.Kind)
-			ret ""
-		}
-		if !info.IsDir() {
 			self.pushErr(decl.Path, "path not found or cannot be accessed: "+decl.Path.Kind)
 			ret ""
 		}
@@ -468,30 +355,63 @@ impl symBuilder {
 	// Checks import path and returns as filepath if no error exist.
 	fn checkImpPath(mut &self, mut decl: &ast::Use): (std: bool, filepath: str) {
 		path := decl.Path.Kind[1 : len(decl.Path.Kind)-1] // remove quotes
-		if strings::HasSuffix(path, jule::ImportPathSep) {
-			self.pushErr(decl.Path, "invalid import path: "+decl.Path.Kind)
-			ret
+		if decl.Bind && build::IsStdHeaderPath(path) {
+			ret false, path
 		}
-		parts := strings::Split(path, jule::ImportPathSep)
-		if len(parts) == 0 {
+
+		// Take module name and submodule path from the import path.
+		pathModName, submodulePath := splitModuleNameFromFilepath(path)
+		std = pathModName == build::ModStdlib().Name
+
+		filepath = checkImportPathValidity(submodulePath)
+		if filepath == "" {
 			self.pushErr(decl.Path, "invalid import path: "+decl.Path.Kind)
-			ret
-		}
-		std = parts[0] == "std"
-		for _, part in parts {
-			if part == "" || jule::IsBlank(part) || strings::ContainsRune(part, '.') {
-				self.pushErr(decl.Path, "invalid import path: "+decl.Path.Kind)
-				ret false, ""
-			}
-			filepath = filepath::Join(filepath, part)
+			ret false, ""
 		}
 
 		// build absolute path
 		if std {
 			filepath = self.checkStdAbsPath(filepath, decl)
 		} else {
-			filepath = self.checkAbsPath(filepath, decl)
+			// If there is no module, no common directories.
+			// For the local packages, the root package needs a module.
+			mut mod := self.importer.GetMod()
+			if mod == nil {
+				self.pushErr(decl.Path, "module not found")
+				self.pushSuggestion(`run "julec mod init <modulename>" to initialize a module in the current directory`)
+				ret false, ""
+			}
+
+			// All import filepaths are must be start with module name.
+			if mod.Name != pathModName {
+				self.pushErr(decl.Path, "import path must use the root name of the module")
+				self.pushSuggestion("module name of this package is: " + conv::Quote(mod.Name))
+				ret false, ""
+			}
+
+			filepath = self.checkAbsPath(filepath, decl, mod)
 		}
+
+		if decl.Bind {
+			ext := filepath::Ext(filepath)
+			if !build::IsValidHeaderExt(ext) && !build::IsValidCppExt(ext) {
+				self.pushErr(decl.Token, "invalid C/C++ extension: "+conv::Quote(ext))
+				ret false, ""
+			}
+		}
+
+		// Exist?
+		info := os::Stat(filepath) else {
+			self.pushErr(decl.Token, "path not found or cannot be accessed: "+decl.Path.Kind)
+			ret false, ""
+		}
+		exist := !decl.Bind && info.IsDir() ||
+			decl.Bind && info.Mode().IsRegular()
+		if !exist {
+			self.pushErr(decl.Token, "path not found or cannot be accessed: "+decl.Path.Kind)
+			ret false, ""
+		}
+
 		ret
 	}
 
@@ -504,9 +424,6 @@ impl symBuilder {
 	}
 
 	fn buildImport(mut &self, mut decl: &ast::Use): &ImportInfo {
-		if decl.Bind {
-			ret self.buildCppHeaderImport(decl)
-		}
 		std, filepath := self.checkImpPath(decl)
 		if filepath == "" { // error occurred
 			ret nil
@@ -516,11 +433,17 @@ impl symBuilder {
 			Decl: decl,
 			Path: filepath,
 			LinkPath: decl.Path.Kind[1 : len(decl.Path.Kind)-1],
-			Bind: false,
 			Std: std,
-			Package: &Package{
-				Files: nil, // Appends by import algorithm.
-			},
+		}
+
+		if decl.Bind {
+			imp.Bind = true
+			imp.Package = nil // Cpp headers haven't symbol table.
+			ret imp
+		}
+
+		imp.Package = &Package{
+			Files: nil, // Appends by import algorithm.
 		}
 		if decl.Alias != nil {
 			imp.Alias = decl.Alias.Kind
@@ -827,4 +750,23 @@ fn splitModuleNameFromFilepath(filepath: str): (modName: str, submodulePath: str
 		submodulePath = ""
 	}
 	ret
+}
+
+// Checks validity of the import path and returns it as filepath.
+// Returns empty string if path is invalid.
+fn checkImportPathValidity(path: str): (filepath: str) {
+	if strings::HasSuffix(path, jule::ImportPathSep) {
+		ret ""
+	}
+	parts := strings::Split(path, jule::ImportPathSep)
+	if len(parts) == 0 {
+		ret ""
+	}
+	for _, part in parts {
+		if part == "" || jule::IsBlank(part) || strings::ContainsAny(part, "\\") {
+			ret ""
+		}
+		filepath = filepath::Join(filepath, part)
+	}
+	ret filepath
 }
