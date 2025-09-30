@@ -88,11 +88,11 @@ impl Scanner {
 	}
 
 	// Pushes new error log to logs.
-	fn pushErr(mut *self, i: int, fmt: str, args: ...any) {
+	fn pushErr(mut *self, col: int, fmt: str, args: ...any) {
 		self.Logs = append(self.Logs, log::Log{
 			Kind: log::Error,
 			Row: self.row,
-			Column: i + 1,
+			Column: col,
 			Path: self.f.Path,
 			Text: log::Logf(fmt, args...),
 		})
@@ -150,14 +150,14 @@ impl Scanner {
 		mut r, mut w := rune(self.buf.Get(self.rdOffset)), 1
 		match {
 		| r == 0:
-			self.pushErr(self.offset, "illegal character NUL")
+			self.pushErr(self.col, "illegal character NUL")
 		| r >= utf8::RuneSelf:
 			// not ASCII
 			r, w = utf8::DecodeRune(self.buf.Slice1(self.rdOffset))
 			if r == utf8::RuneError && w == 1 {
-				self.pushErr(self.offset, "illegal UTF-8 encoding")
+				self.pushErr(self.col, "illegal UTF-8 encoding")
 			} else if r == bom && self.offset > 0 {
-				self.pushErr(self.offset, "illegal byte order mask")
+				self.pushErr(self.col, "illegal byte order mask")
 			}
 		}
 		self.rdOffset += w
@@ -200,7 +200,7 @@ impl Scanner {
 				}
 			}
 		}
-		self.pushErr(offs, "missing block comment close, expected */")
+		self.pushErr(self.col, "missing block comment close, expected */")
 	}
 
 	// Reads the string of valid identifier characters at self.offset.
@@ -271,7 +271,7 @@ impl Scanner {
 				if self.r == '_' {
 					ds = 2
 				} else if self.r >= max && *invalid < 0 {
-					*invalid = self.offset // record invalid rune offset
+					*invalid = self.col // record invalid rune offset
 				}
 				digsep |= ds
 				self.next()
@@ -323,14 +323,14 @@ impl Scanner {
 		if self.r == '.' {
 			tok = FLOAT
 			if prefix == 'o' || prefix == 'b' {
-				self.pushErr(self.offset, "invalid radix point in "+litname(prefix))
+				self.pushErr(self.col, "invalid radix point in "+litname(prefix))
 			}
 			self.next()
 			digsep |= self.digits(base, &invalid)
 		}
 
 		if digsep&1 == 0 {
-			self.pushErr(self.offset, litname(prefix)+" has no digits")
+			self.pushErr(self.col, litname(prefix)+" has no digits")
 		}
 
 		// exponent
@@ -338,9 +338,9 @@ impl Scanner {
 		if e == 'e' || e == 'p' {
 			match {
 			| e == 'e' && prefix != 0 && prefix != '0':
-				self.pushErr(self.offset, "{} exponent requires decimal mantissa", self.r)
+				self.pushErr(self.col, "{} exponent requires decimal mantissa", self.r)
 			| e == 'p' && prefix != 'x':
-				self.pushErr(self.offset, "{} exponent requires hexadecimal mantissa", self.r)
+				self.pushErr(self.col, "{} exponent requires hexadecimal mantissa", self.r)
 			}
 			self.next()
 			tok = FLOAT
@@ -351,10 +351,10 @@ impl Scanner {
 			ds := self.digits(10, &_invalid)
 			digsep |= ds
 			if ds&1 == 0 {
-				self.pushErr(self.offset, "exponent has no digits")
+				self.pushErr(self.col, "exponent has no digits")
 			}
 		} else if prefix == 'x' && tok == FLOAT {
-			self.pushErr(self.offset, "hexadecimal mantissa requires a 'p' exponent")
+			self.pushErr(self.col, "hexadecimal mantissa requires a 'p' exponent")
 		}
 
 		// suffix 'i'
@@ -370,7 +370,7 @@ impl Scanner {
 		if digsep&2 != 0 {
 			i := invalidSep(lit)
 			if i >= 0 {
-				self.pushErr(offs+i, "'_' must separate successive digits")
+				self.pushErr(self.col+i, "'_' must separate successive digits")
 			}
 		}
 
@@ -383,7 +383,7 @@ impl Scanner {
 	// character (without consuming it) and returns false. Otherwise
 	// it returns true.
 	fn scanEscape(mut *self, quote: rune): bool {
-		offs := self.offset
+		col := self.col
 
 		let mut n: int
 		let mut base: u32
@@ -408,7 +408,7 @@ impl Scanner {
 			if self.r < 0 {
 				msg = "escape sequence not terminated"
 			}
-			self.pushErr(offs, msg)
+			self.pushErr(col, msg)
 			ret false
 		}
 
@@ -422,7 +422,7 @@ impl Scanner {
 				} else {
 					msg = "escape sequence not terminated"
 				}
-				self.pushErr(self.offset, msg)
+				self.pushErr(self.col, msg)
 				ret false
 			}
 			x = x*base + d
@@ -431,7 +431,7 @@ impl Scanner {
 		}
 
 		if x > max || 0xD800 <= x && x < 0xE000 {
-			self.pushErr(offs, "escape sequence is invalid Unicode code point")
+			self.pushErr(col, "escape sequence is invalid Unicode code point")
 			ret false
 		}
 
@@ -450,7 +450,7 @@ impl Scanner {
 			if r == '\n' || r < 0 {
 				// only report error if we don't have one already
 				if valid {
-					self.pushErr(offs, "rune literal not terminated")
+					self.pushErr(self.col, "rune literal not terminated")
 					valid = false
 				}
 				break
@@ -470,7 +470,7 @@ impl Scanner {
 
 		if valid {
 			if n != 1 {
-				self.pushErr(offs, "illegal rune literal")
+				self.pushErr(self.col, "illegal rune literal")
 			}
 			token.ID = RUNE
 			token.Kind = unsafe::StrFromBytes(self.buf.Slice2(offs, self.offset))
@@ -486,7 +486,7 @@ impl Scanner {
 		for {
 			r := self.r
 			if r == '\n' || r < 0 {
-				self.pushErr(offs, "string literal not terminated")
+				self.pushErr(self.col, "string literal not terminated")
 				valid = false
 				break
 			}
@@ -515,7 +515,7 @@ impl Scanner {
 		for {
 			r := self.r
 			if r < 0 {
-				self.pushErr(offs, "raw string literal not terminated")
+				self.pushErr(self.col, "raw string literal not terminated")
 				valid = false
 				break
 			}
@@ -561,6 +561,7 @@ impl Scanner {
 		|:
 			// Save the current rune and advance.
 			r := self.r
+			col := self.col
 			self.next()
 			match r {
 			| '"':
@@ -784,7 +785,7 @@ impl Scanner {
 					token.Kind = "="
 				}
 			|:
-				self.pushErr(self.offset, "invalid token "+conv::QuoteRune(self.r))
+				self.pushErr(col, "invalid token "+conv::QuoteRune(r))
 				self.next()
 			}
 		}
