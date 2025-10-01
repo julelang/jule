@@ -110,14 +110,14 @@ impl exprOptimizer {
 		| token::GEQ:
 			// Operators used with itself: ==, <=, >=.
 			// Evaluation will be always true.
-			*self.model = constant::Const.NewBool(true)
+			*self.model = constant::NewBool(true)
 			ret true
 		| token::NEQ
 		| token::LSS
 		| token::GTR:
 			// Operators used with itself: !=, <, >.
 			// Evaluation will be always false.
-			*self.model = constant::Const.NewBool(false)
+			*self.model = constant::NewBool(false)
 			ret true
 		|:
 			ret false
@@ -185,7 +185,7 @@ impl exprOptimizer {
 		// type of the right operand should be the same array type with the left operand
 		// there is no element to compare, so simplify expression to "true" expression
 		// because arrays have same types and size with no element, this always results as "true"
-		*self.model = constant::Const.NewBool(true)
+		*self.model = constant::NewBool(true)
 		ret true
 	}
 
@@ -421,7 +421,7 @@ impl exprOptimizer {
 				mut rc, constant := m.Right.Model.(&constant::Const)
 				if constant {
 					mut c := new(constant::Const, *rc) // Do not mutate binary operand.
-					c.Sub(*constant::Const.NewI64(1))
+					c.SUB(*constant::NewI64(1))
 					self.data.boundary.pushVar(getBoundaryVar(blc.Expr.Model), c)
 				}
 				ret
@@ -443,7 +443,7 @@ impl exprOptimizer {
 				mut lc, constant := m.Left.Model.(&constant::Const)
 				if constant {
 					mut c := new(constant::Const, *lc) // Do not mutate binary operand.
-					c.Sub(*constant::Const.NewI64(1))
+					c.SUB(*constant::NewI64(1))
 					self.data.boundary.pushVar(getBoundaryVar(blc.Expr.Model), c)
 				}
 				ret
@@ -494,7 +494,7 @@ impl exprOptimizer {
 		if s >= u64(z) {
 			// shifting greater than bitsize of the left operand
 			// discard all bits, result always equals to zero
-			*self.model = constant::Const.NewU64(0)
+			*self.model = constant::NewU64(0)
 			ret
 		}
 		// Set model to unsafe binary.
@@ -531,7 +531,7 @@ impl exprOptimizer {
 			m.Op = new(token::Token, *m.Op)
 			m.Op.ID = token::SHL
 			m.Op.Kind = "<<"
-			m.Right.Model = constant::Const.NewU64(1)
+			m.Right.Model = constant::NewU64(1)
 			// Set model to unsafe expression model. Because it is safe.
 			// We can remove runtime cost of shifter checking.
 			mut model := any(&UnsafeBinaryExpr{Node: m})
@@ -543,7 +543,7 @@ impl exprOptimizer {
 			if !types::IsInt(lp.Kind) || !obj::EqualModels(m.Left.Model, m.Right.Model) {
 				break
 			}
-			mut c := constant::Const.NewU64(0)
+			mut c := constant::NewU64(0)
 			c.Kind = lp.Kind
 			*self.model = c
 			ret true
@@ -553,7 +553,7 @@ impl exprOptimizer {
 			if ok {
 				s := c.AsF64()
 				if s == 0 {
-					c = constant::Const.NewI64(0)
+					c = constant::NewI64(0)
 					c.Kind = lp.Kind
 					*self.model = c
 					ret true
@@ -563,7 +563,7 @@ impl exprOptimizer {
 			if ok {
 				s := c.AsF64()
 				if s == 0 {
-					c = constant::Const.NewI64(0)
+					c = constant::NewI64(0)
 					c.Kind = rp.Kind
 					*self.model = c
 					ret true

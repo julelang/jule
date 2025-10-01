@@ -6,37 +6,37 @@ use "std/conv"
 use "std/math/big"
 
 // Constant data.
-// Use Const.new_nil function instead of Const{} for nil literal.
+// Use NewNil function instead of Const{} for nil literal.
 struct Const {
 	Kind: str
 	data: any
 }
 
-impl Const {
-	// Returns new constant value instance from big-integer.
-	fn NewInt(i: big::Int): &Const { ret &Const{data: i} }
+// Returns new constant value instance from big-integer.
+fn NewInt(i: big::Int): &Const { ret &Const{data: i} }
 
-	// Returns new constant value instance from 64-bit signed integer.
-	fn NewI64(x: i64): &Const { ret &Const{data: big::Int.FromI64(x)} }
+// Returns new constant value instance from 64-bit signed integer.
+// Value will have big-integer precision.
+fn NewI64(x: i64): &Const { ret &Const{data: big::Int.FromI64(x)} }
 
-	// Returns new constant value instance from 64-bit unsigned integer.
-	fn NewU64(x: u64): &Const { ret &Const{data: big::Int.FromU64(x)} }
+// Returns new constant value instance from 64-bit unsigned integer.
+// Value will have big-integer precision.
+fn NewU64(x: u64): &Const { ret &Const{data: big::Int.FromU64(x)} }
 
-	// Returns new constant value instance from boolean.
-	fn NewBool(x: bool): &Const { ret &Const{data: x} }
+// Returns new constant value instance from boolean.
+fn NewBool(x: bool): &Const { ret &Const{data: x} }
 
-	// Returns new constant value instance from string.
-	fn NewStr(x: str): &Const { ret &Const{data: x} }
+// Returns new constant value instance from string.
+fn NewStr(x: str): &Const { ret &Const{data: x} }
 
-	// Returns new constant value instance from 64-bit floating-point.
-	fn NewF64(x: f64): &Const { ret &Const{data: x} }
+// Returns new constant value instance from 64-bit floating-point.
+fn NewF64(x: f64): &Const { ret &Const{data: x} }
 
-	// Returns new constant value instance from 128-bit floating-point complex.
-	fn NewCmplx128(x: cmplx128): &Const { ret &Const{data: x} }
+// Returns new constant value instance from 128-bit floating-point complex.
+fn NewCmplx128(x: cmplx128): &Const { ret &Const{data: x} }
 
-	// Returns new constant value instance with nil.
-	fn NewNil(): &Const { ret &Const{data: nil} }
-}
+// Returns new constant value instance with nil.
+fn NewNil(): &Const { ret &Const{data: nil} }
 
 impl Const {
 	//
@@ -154,10 +154,6 @@ impl Const {
 		}
 	}
 
-	//
-	// Set
-	//
-
 	// Sets constant value from big-integer.
 	fn SetInt(mut *self, x: big::Int) { self.data = x }
 
@@ -181,10 +177,6 @@ impl Const {
 
 	// Sets constant value to nil.
 	fn SetNil(mut *self) { self.data = nil }
-
-	//
-	// Types
-	//
 
 	// Reports whether data is integer.
 	fn IsInt(*self): bool {
@@ -239,13 +231,9 @@ impl Const {
 		}
 	}
 
-	//
-	// Logical
-	//
-
 	// Reports whether self and x are true.
 	// Returns false if type is not supported.
-	fn And(*self, x: Const): bool {
+	fn LAND(*self, x: Const): bool {
 		match {
 		| self.IsBool() && x.IsBool():
 			ret self.ReadBool() && x.ReadBool()
@@ -256,7 +244,7 @@ impl Const {
 
 	// Reports whether self or x is true.
 	// Returns false if type is not supported.
-	fn Or(*self, x: Const): bool {
+	fn LOR(*self, x: Const): bool {
 		match {
 		| self.IsBool() && x.IsBool():
 			ret self.ReadBool() || x.ReadBool()
@@ -267,7 +255,7 @@ impl Const {
 
 	// Reports whether self and x are equals.
 	// Returns false if type is not supported.
-	fn Eq(*self, x: Const): bool {
+	fn EQL(*self, x: Const): bool {
 		match {
 		| self.IsNil():
 			ret x.IsNil()
@@ -301,7 +289,7 @@ impl Const {
 	//	- 64-bit signed integer
 	//	- 64-bit unsigned integer
 	//	- 64-bit floating-point
-	fn Lt(*self, x: Const): bool {
+	fn LSS(*self, x: Const): bool {
 		match {
 		| self.IsStr():
 			ret x.IsStr() && self.ReadStr() < x.ReadStr()
@@ -329,7 +317,7 @@ impl Const {
 	//	- 64-bit signed integer
 	//	- 64-bit unsigned integer
 	//	- 64-bit floating-point
-	fn LtEq(*self, x: Const): bool {
+	fn LEQ(*self, x: Const): bool {
 		match {
 		| self.IsStr():
 			ret x.IsStr() && self.ReadStr() <= x.ReadStr()
@@ -357,7 +345,7 @@ impl Const {
 	//	- 64-bit signed integer
 	//	- 64-bit unsigned integer
 	//	- 64-bit floating-point
-	fn Gt(*self, x: Const): bool {
+	fn GTR(*self, x: Const): bool {
 		match {
 		| self.IsStr():
 			ret x.IsStr() && self.ReadStr() > x.ReadStr()
@@ -385,7 +373,7 @@ impl Const {
 	//	- 64-bit signed integer
 	//	- 64-bit unsigned integer
 	//	- 64-bit floating-point
-	fn GtEq(*self, x: Const): bool {
+	fn GEQ(*self, x: Const): bool {
 		match {
 		| self.IsStr():
 			ret x.IsStr() && self.ReadStr() >= x.ReadStr()
@@ -405,13 +393,9 @@ impl Const {
 		}
 	}
 
-	//
-	// Ops
-	//
-
 	// Adds x's value to itself value.
 	// Reports whether operation is success.
-	fn Add(mut *self, x: Const): bool {
+	fn ADD(mut *self, x: Const): bool {
 		match {
 		| self.IsStr():
 			if !x.IsStr() {
@@ -444,7 +428,7 @@ impl Const {
 
 	// Subs x's value from itself value.
 	// Reports whether operation is success.
-	fn Sub(mut *self, x: Const): bool {
+	fn SUB(mut *self, x: Const): bool {
 		match {
 		| self.IsF64():
 			self.SetF64(self.ReadF64() - x.AsF64())
@@ -472,7 +456,7 @@ impl Const {
 
 	// Multiplies x's value to c's value.
 	// Reports whether operation is success.
-	fn Mul(mut *self, x: Const): bool {
+	fn MUL(mut *self, x: Const): bool {
 		match {
 		| self.IsF64():
 			self.SetF64(self.ReadF64() * x.AsF64())
@@ -504,7 +488,7 @@ impl Const {
 	//
 	// NOTICE
 	//	This operation makes constant value is floating-point.
-	fn Div(mut *self, x: Const): bool {
+	fn DIV(mut *self, x: Const): bool {
 		match {
 		| self.IsF64():
 			l := x.AsF64()
@@ -545,7 +529,7 @@ impl Const {
 	// Mods itself value to x's value.
 	// Reports whether operation is success.
 	// Reports false if divided-by-zero.
-	fn Mod(mut *self, x: Const): bool {
+	fn REM(mut *self, x: Const): bool {
 		i, mut ok := self.data.(big::Int)
 		if !ok {
 			ret false
@@ -561,7 +545,7 @@ impl Const {
 
 	// Bitwise and itself value to x's value.
 	// Reports whether operation is success.
-	fn BitwiseAnd(mut *self, x: Const): bool {
+	fn AND(mut *self, x: Const): bool {
 		i, mut ok := self.data.(big::Int)
 		if !ok {
 			ret false
@@ -576,7 +560,7 @@ impl Const {
 
 	// Bitwise or itself value to x's value.
 	// Reports whether operation is success.
-	fn BitwiseOr(mut *self, x: Const): bool {
+	fn OR(mut *self, x: Const): bool {
 		i, mut ok := self.data.(big::Int)
 		if !ok {
 			ret false
@@ -591,7 +575,7 @@ impl Const {
 
 	// Bitwise xor itself value to x's value.
 	// Reports whether operation is success.
-	fn Xor(mut *self, x: Const): bool {
+	fn XOR(mut *self, x: Const): bool {
 		i, mut ok := self.data.(big::Int)
 		if !ok {
 			ret false
@@ -606,7 +590,7 @@ impl Const {
 
 	// Left shifts itself value to x's value.
 	// Reports whether operation is success.
-	fn Lshift(mut *self, x: Const): bool {
+	fn SHL(mut *self, x: Const): bool {
 		i, mut ok := self.data.(big::Int)
 		if !ok {
 			ret false
@@ -621,7 +605,7 @@ impl Const {
 
 	// Right shifts itself value to x's value.
 	// Reports whether operation is success.
-	fn Rshift(mut *self, x: Const): bool {
+	fn SHR(mut *self, x: Const): bool {
 		i, mut ok := self.data.(big::Int)
 		if !ok {
 			ret false
