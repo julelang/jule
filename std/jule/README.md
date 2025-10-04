@@ -6,11 +6,18 @@ It is also used by the official reference compiler JuleC and is developed in par
 ## Packages
 
 - [`ast`](./ast): AST things.
+- [`build`](./build): Environment and elementary helpers for the compilation process.
+- [`constant`](./constant): Elementary package to handle and eval constant expressions.
+- [`constant/lit`](./constant/lit): Literal handling such as rune or string literals.
+- [`directive`](./directive): Elementary package for directives.
+- [`dist`](./dist): Elementary package for targets.
 - [`importer`](./importer): Default Jule importer.
+- [`log`](./log): Elementary package for logs.
+- [`mod`](./mod): Module file parsing and module handling.
 - [`parser`](./parser): Parser
 - [`sema`](./sema): Semantic analyzer and HIR (High-Level Intermediate Representation) components.
 - [`token`](./token): Lexical analyzer.
-- [`types`](./types): Elementary package for type safety.
+- [`types`](./types): Elementary package for types.
 
 ## Developer Reference
 
