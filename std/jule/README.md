@@ -14,9 +14,9 @@ It is also used by the official reference compiler JuleC and is developed in par
 - [`importer`](./importer): Default Jule importer.
 - [`log`](./log): Elementary package for logs.
 - [`mod`](./mod): Module file parsing and module handling.
-- [`parser`](./parser): Parser
+- [`parser`](./parser): Parser. Makes syntax analysis, builds AST.
 - [`sema`](./sema): Semantic analyzer and HIR (High-Level Intermediate Representation) components.
-- [`token`](./token): Lexical analyzer.
+- [`token`](./token): Lexical analyzer. Segments Jule source code into tokens.
 - [`types`](./types): Elementary package for types.
 
 ## Developer Reference
