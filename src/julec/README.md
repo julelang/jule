@@ -67,7 +67,7 @@ Actually, JuleC just generates C++ code for now.
 
     - **(1.1)** Since the sorting algorithm maintains the current record of the definitions of all packets and does not update them prospectively, it should always be sorted after deadcode elimination optimization. Otherwise, eliminated "dead" definitions may remain in the sorted data and lead to faulty code generation.
 
-- **(2)** Definition elemination can performed before other optimizations. Because it's independent from other optimizations. It might be increase performance because of eliminated definitions if performed before other optimizations.
+- **(2)** Definition elimination can performed before other optimizations. Because it's independent from other optimizations. It might be increase performance because of eliminated definitions if performed before other optimizations.
 
 - **(3)** Scope part of deadcoe elimination optimizations, should be executed after other optimizations. Because other optimizations may will change code structure, so some scope deadcode elimination cases may occur. This possible optimizations cannot caught by scope optimizer if scope deadcode elimination optimizations applied before other independent middle-end optimizations.
 
