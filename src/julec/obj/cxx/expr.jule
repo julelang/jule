@@ -1732,8 +1732,19 @@ impl exprCoder {
 	}
 
 	fn capCall(mut &self, mut m: &sema::BuiltinCapCallExpr) {
-		self.possibleRefExpr(m.Expr.Model)
-		self.oc.write(".cap()")
+		mut chanType := m.Expr.Type.Chan()
+		if chanType != nil { // Channel
+			mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, chanType.Value)
+			const Static = false
+			mut stdcap := ins.FindMethod("stdcap", Static).Instances[0]
+			identCoder.funcIns(&self.oc.Buf, stdcap)
+			self.oc.write("(")
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write(".alloc)")
+		} else { // Slice
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write(".cap()")
+		}
 	}
 
 	fn deleteCall(mut &self, mut m: &sema::BuiltinDeleteCallExpr) {

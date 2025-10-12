@@ -847,6 +847,11 @@ fn callerCapSlice(mut expr: &Value, mut v: &Value): &Value {
 	ret v
 }
 
+fn callerCapChan(mut expr: &Value, mut v: &Value): &Value {
+	// Channels handled as same as slices.
+	ret callerCapSlice(expr, v)
+}
+
 fn builtinCallerCap(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, "expression is missing for cap")
@@ -866,6 +871,8 @@ fn builtinCallerCap(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value
 		ret nil
 	| dest.Type.Slice() != nil:
 		ret callerCapSlice(dest, v)
+	| dest.Type.Chan() != nil:
+		ret callerCapChan(dest, v)
 	|:
 		e.pushErr(fc.Args[0].Token, "invalid expression")
 		e.pushSuggestion("expected slice type")
