@@ -469,6 +469,27 @@ fn builtinCallerMake(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Valu
 			model.Cap = capExpr.Model
 		}
 		ret v
+	| t.Type.Map() != nil:
+		// Type is map. Make map allocation.
+		if len(fc.Args) > 2 {
+			// The map type variants can take up to 2 arguments, but we have more.
+			e.pushErr(fc.Token, "passed more argument than expected to make")
+			e.pushSuggestion("call like; make(Type, ...)")
+			ret nil
+		}
+		mut model := &BuiltinMakeCallExpr{Type: t.Type}
+		v.Model = model
+		v.Type = t.Type
+		if len(fc.Args) == 2 {
+			// We have size argument, evaluate it.
+			mut capExpr := e.s.eval(e.lookup).evalExpr(fc.Args[1], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+			if capExpr == nil {
+				ret v
+			}
+			e.checkIntegerIndexByData(capExpr, fc.Args[1].Token)
+			model.Cap = capExpr.Model
+		}
+		ret v
 	|:
 		// Type is not supported by the make function.
 		// Push an error and return as nil immediately.

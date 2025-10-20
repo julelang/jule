@@ -1857,14 +1857,32 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
-	fn makeCall(mut &self, mut m: &sema::BuiltinMakeCallExpr) {
-		if m.Type.Slice() != nil {
-			self.makeCallSlice(m)
-			ret
+	fn makeCallMap(mut &self, mut m: &sema::BuiltinMakeCallExpr) {
+		_map := m.Type.Map()
+		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Value)
+		const Static = true
+		mut maker := ins.FindMethod("make", Static).Instances[0]
+		identCoder.funcIns(&self.oc.Buf, maker)
+		self.oc.write("(")
+		if m.Cap == nil {
+			// No size argument.
+			self.oc.write("0")
+		} else {
+			self.possibleRefExpr(m.Cap)
 		}
-		if m.Type.Chan() != nil {
+		self.oc.write(")")
+	}
+
+	fn makeCall(mut &self, mut m: &sema::BuiltinMakeCallExpr) {
+		match {
+		| m.Type.Slice() != nil:
+			self.makeCallSlice(m)
+		| m.Type.Chan() != nil:
 			self.makeCallChan(m)
-			ret
+		| m.Type.Map() != nil:
+			self.makeCallMap(m)
+		|:
+			panic("unimplemented type for the built-in make function")
 		}
 	}
 
