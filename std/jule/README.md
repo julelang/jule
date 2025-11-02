@@ -27,7 +27,7 @@ It is also used by the official reference compiler JuleC and is developed in par
 
 - **(3)** The `Generics` field of `sema::TypeAlias` stores generic type declaration of the type alias. They also will be used for the underlying structure type for the generic handling. The `alias` field of the underlying `sema::Struct` will point to the owner `sema::TypeAlias`.
 
-- **(4)** If the `referencer.owner` field of `sema::TypeChecker` structure is type alias which is uses `TypeChecker` instance to build it's own destination type kind. This is the hard reference to owner. Always points to root type alias of this build even in nested type builds. Used to collect generic dependencies (see (3)) and etc. of type aliaes.
+- **(4)** If the `referencer.owner` field of `sema::TypeChecker` structure is type alias which is uses `TypeChecker` instance to build it's own destination type kind. This is the hard reference to owner. Always points to root type alias of this build even in nested type builds. Used to collect generic dependencies (see (3)) and etc. of type aliases.
 
 - **(5)** Enum types should be checked first. They handled like grouped constant variable declarations with minor differences. Enum types does not supports analysis during evaluation if needed. Therefore we need to check/set-up enums first. All enum items should be use type of enum. For circular references, this metadata should be assigned before evaluation. That's why we need to handle enums first before the analysis.
 
@@ -41,7 +41,7 @@ Typical uses are things like capturing or tracing private behavior. For example,
     - **(8.1)** The `Token` field is used to distinguish specific packages. If the `Token` field of the AST element is set to `nil`, the package built-in use declaration is considered. Accordingly, AST must always set the `Token` field for each use declaration which is not implicitly imported.
     - **(8.2)** Semantic analyzer will ignore implicit use declaration for duplication analysis. So, built-in implicit imported packages may be duplicated if placed source file contains separate use declaration for the same package.
     - **(8.3)** These packages should be placed as first use declarations of the main package's first file.
-    - **(8.4)** Semantic analyzer will not collect references for some defines of these packages. So any definition will not have a collection of references if not supported. But references may collected if used in ordinary way unlike implicit instantiation by semantic anlayzer.
+    - **(8.4)** Semantic analyzer will not collect references for some defines of these packages. So any definition will not have a collection of references if not supported. But references may collected if used in ordinary way unlike implicit instantiation by semantic analyzer.
 - **(7)** Jule can handle supported types bidirectionally for binary expressions (`s == nil || nil == s` or etc.). However, when creating HIR, some types in binary expressions must always be left operand. These types are; `any`, type enums, enums, smart pointers, raw pointers and traits.
     - **(7.1)** For these special types, the type that is the left operand can normally be left or right operand. It is only guaranteed if the expression of the relevant type is in the left operand. There may be a shift in the original order.
     - **(7.2)** In the case of a `nil` comparison, the right operand should always be `nil`.
