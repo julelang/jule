@@ -305,7 +305,7 @@ fn pushCompCmdGcc(mut args: []str): []str {
 }
 
 // Generate compile command for backend-compiler.
-fn genCompileCmd(sourcePath: str, ir: &obj::IR): (compiler: str, args: []str) {
+fn genCompileCmd(sourcePath: str, mut ir: &obj::IR): (compiler: str, args: []str) {
 	compiler = env::CompilerPath
 
 	match env::Compiler {
@@ -337,12 +337,8 @@ fn genCompileCmd(sourcePath: str, ir: &obj::IR): (compiler: str, args: []str) {
 	args = append(args, sourcePath)
 
 	// Push passes.
+	ir.CollectPasses()
 	args = append(args, ir.Passes...)
-
-	// Link necessary libraries for Windows.
-	if build::OS == dist::Windows {
-		args = append(args, "-lshell32")
-	}
 
 	ret
 }

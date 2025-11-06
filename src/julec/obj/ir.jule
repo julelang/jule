@@ -33,6 +33,9 @@ impl IR {
 	// - Returns (nil, nil) logs if path has not any Jule file.
 	// - Returns (nil, logs) if exist any log.
 	// - Returns IR and nil logs if everything is fine.
+	//
+	// The pass directives will not be handled.
+	// To handle them properly, use the [CollectPasses].
 	fn Build(path: str, flags: int): (&IR, []log::Log) {
 		mut importer := importer::New(buildCompileInfo())
 		const UpdateMod = true // Detect and use the root module for the main package if exist.
@@ -61,7 +64,6 @@ impl IR {
 			Main: pkg,
 			Used: importer.AllPackages(),
 		}
-		ir.Passes = getAllUniquePasses(ir.Main, ir.Used)
 
 		// Set up special packages.
 		ir.Runtime = pkg.Files[0].Imports[0] // runtime package
@@ -71,6 +73,18 @@ impl IR {
 }
 
 impl IR {
+	// Collects all pass directives of the IR and stores them in [Passes].
+	// Eliminates duplicated directives.
+	// Appending custom directives before this function is allowed.
+	fn CollectPasses(mut *self) {
+		pushPasses(self.Main, &self.Passes)
+		for (_, mut u) in self.Used {
+			if !u.Bind {
+				pushPasses(u.Package, &self.Passes)
+			}
+		}
+	}
+
 	fn appendStructs(*self, mut p: &sema::Package, mut &buffer: *[]&sema::Struct) {
 		for (_, mut f) in p.Files {
 			for (_, mut s) in f.Structs {
@@ -159,6 +173,7 @@ impl IR {
 	}
 }
 
+// Package-based implementation of the [IR.CollectPasses].
 fn pushPasses(mut p: &sema::Package, mut &passes: *[]str) {
 	for (_, mut f) in p.Files {
 	push:
@@ -174,19 +189,6 @@ fn pushPasses(mut p: &sema::Package, mut &passes: *[]str) {
 			*passes = append(*passes, pass.Text)
 		}
 	}
-}
-
-fn getAllUniquePasses(mut pkg: &sema::Package, mut uses: []&sema::ImportInfo): []str {
-	let mut passes: []str = nil
-
-	pushPasses(pkg, &passes)
-	for (_, mut u) in uses {
-		if !u.Bind {
-			pushPasses(u.Package, &passes)
-		}
-	}
-
-	ret passes
 }
 
 fn buildCompileInfo(): importer::CompileInfo {
