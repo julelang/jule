@@ -2,27 +2,28 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use integ "std/jule/integrated"
+use "std/integ"
+use "std/integ/c"
 use "std/sys"
 
 cpp use "<mach-o/dyld.h>"
 
-cpp unsafe fn _NSGetExecutablePath(b: *integ::Char, *u32): bool
-cpp unsafe fn realpath(path: *integ::Char, resolved: *integ::Char): *integ::Char
+cpp unsafe fn _NSGetExecutablePath(b: *c::Char, *u32): bool
+cpp unsafe fn realpath(path: *c::Char, resolved: *c::Char): *c::Char
 
 fn executable(): str {
 	let mut buf: [sys::PATH_MAX]byte
 	size := u32(len(buf))
 	mut p := &buf[0]
 	unsafe {
-		if cpp._NSGetExecutablePath((*integ::Char)(p), &size) {
+		if cpp._NSGetExecutablePath((*c::Char)(p), &size) {
 			panic("runtime: executable path read error")
 		}
 		// The _NSGetExecutablePath function may returns symlink path for the real executable.
 		// We should resolve path with the realpath function to reach the real path of the executable file.
 		let mut real: [sys::PATH_MAX]byte
 		mut rp := &real[0]
-		if cpp.realpath((*integ::Char)(p), (*integ::Char)(rp)) == nil {
+		if cpp.realpath((*c::Char)(p), (*c::Char)(rp)) == nil {
 			panic("runtime: executable path read error")
 		}
 		ret integ::BytePtrToStr(rp)

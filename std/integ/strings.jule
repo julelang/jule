@@ -1,9 +1,10 @@
-// Copyright 2023-2025 The Jule Programming Language.
+// Copyright 2025 The Jule Programming Language.
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
 use "std/unicode/utf16"
 use "std/unicode/utf8"
+use "std/unsafe"
 
 // Windows UTF-16 strings can contain unpaired surrogates, which can't be
 // decoded into a valid UTF-8 string. This file defines a set of functions
@@ -36,6 +37,7 @@ const (
 )
 
 // Returns the potentially ill-formed UTF-16 encoding of s.
+#disable boundary
 fn encodeWTF16(s: str, mut buf: []u16): []u16 {
 	mut i := 0
 	for i < len(s) {
@@ -59,6 +61,7 @@ fn encodeWTF16(s: str, mut buf: []u16): []u16 {
 }
 
 // Returns the WTF-8 encoding of the potentially ill-formed UTF-16 s.
+#disable boundary
 fn decodeWTF16(s: []u16, mut buf: []byte): []byte {
 	mut i := 0
 	for i < len(s); i++ {
@@ -88,9 +91,6 @@ fn decodeWTF16(s: []u16, mut buf: []byte): []byte {
 	}
 	ret buf
 }
-
-// Same as [unsafe::StrFromBytes].
-fn strFromBytes(b: []byte): str { ret unsafe { *(*str)(&b) } }
 
 // Returns the UTF-16 encoding of the UTF-8 string
 // s, with a terminating NULL added. If s includes NULL
@@ -143,20 +143,20 @@ fn UTF16ToStr(s: []u16): str {
 		}
 	}
 	buf := decodeWTF16(s, make([]byte, 0, maxLen))
-	ret strFromBytes(buf)
+	ret unsafe::StrFromBytes(buf)
 }
 
 // Returns the UTF-8 encoding of the UTF-16 sequence s in *u16 form,
 // with a terminating NULL removed. Returns empty string if s is nil.
-unsafe fn UTF16PtrToStr(s: *u16): str {
+fn UTF16PtrToStr(s: *u16): str {
 	if s == nil {
 		ret ""
 	}
 	const NUL = 0
 	let mut codePage: []u16
-	mut i := 0
+	mut i := unsafe { *(&s) } // Break immutability to iterate, but do not mutate content.
 	for ; i++ {
-		r := s[i]
+		r := unsafe { *i }
 		if r == NUL {
 			ret UTF16ToStr(codePage)
 		}
@@ -167,7 +167,8 @@ unsafe fn UTF16PtrToStr(s: *u16): str {
 
 // Returns the string of s, with a terminating NULL removed.
 // Returns empty string if pointer is nil.
-unsafe fn BytePtrToStr(s: *byte): str {
+#disable boundary
+fn BytePtrToStr(s: *byte): str {
 	if s == nil {
 		ret ""
 	}
@@ -192,7 +193,7 @@ unsafe fn BytePtrToStr(s: *byte): str {
 // Returns s as NULL terminated byte slice which is able to be used safely as
 // NULL terminated string pointer. If s contains NULL termination at any location,
 // accepts NULL termination is the end of s and skips following bytes.
-fn StrToBytes(s: str): []byte {
+fn BytesFromStr(s: str): []byte {
 	for i, c in []byte(s) {
 		if c == 0 {
 			mut bytes := make([]byte, i+1)

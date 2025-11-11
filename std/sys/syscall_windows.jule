@@ -4,7 +4,8 @@
 
 #pass "-lshell32" // Link shell32.lib
 
-use integ "std/jule/integrated"
+use "std/integ"
+use "std/integ/c"
 use "std/mem"
 
 cpp use "<fcntl.h>"
@@ -43,15 +44,15 @@ cpp let FreeLibrary: *unsafe
 cpp fn ExitProcess(exitcode: u32)
 cpp fn GetStdHandle(stdh: uintptr): *unsafe
 cpp unsafe fn CloseHandle(stdh: *unsafe): bool
-cpp unsafe fn GetEnvironmentVariableW(key: *integ::Wchar, mut out: *integ::Wchar, nSize: cpp.DWORD): cpp.DWORD
-cpp unsafe fn SetEnvironmentVariableW(key: *integ::Wchar, val: *integ::Wchar): bool
+cpp unsafe fn GetEnvironmentVariableW(key: *c::Wchar, mut out: *c::Wchar, nSize: cpp.DWORD): cpp.DWORD
+cpp unsafe fn SetEnvironmentVariableW(key: *c::Wchar, val: *c::Wchar): bool
 cpp fn GetLastError(): u32
-cpp unsafe fn GetCurrentDirectoryW(bufflen: u32, buff: *integ::Wchar): u32
-cpp unsafe fn SetCurrentDirectoryW(path: *integ::Wchar): bool
-cpp unsafe fn GetFullPathNameW(path: *integ::Wchar, bufflen: u32, buff: *integ::Wchar, fname: **integ::Wchar): u32
-cpp unsafe fn DeleteFileW(path: *integ::Wchar): bool
-cpp unsafe fn CreateDirectoryW(path: *integ::Wchar, passNullHere: *bool): bool
-cpp unsafe fn RemoveDirectoryW(path: *integ::Wchar): bool
+cpp unsafe fn GetCurrentDirectoryW(bufflen: u32, buff: *c::Wchar): u32
+cpp unsafe fn SetCurrentDirectoryW(path: *c::Wchar): bool
+cpp unsafe fn GetFullPathNameW(path: *c::Wchar, bufflen: u32, buff: *c::Wchar, fname: **c::Wchar): u32
+cpp unsafe fn DeleteFileW(path: *c::Wchar): bool
+cpp unsafe fn CreateDirectoryW(path: *c::Wchar, passNullHere: *bool): bool
+cpp unsafe fn RemoveDirectoryW(path: *c::Wchar): bool
 cpp unsafe fn GetConsoleMode(handle: cpp.HANDLE, mut mode: *cpp.DWORD): bool
 cpp unsafe fn SetConsoleMode(handle: cpp.HANDLE, mode: cpp.DWORD): bool
 cpp unsafe fn WriteConsoleW(handle: cpp.HANDLE, buffer: *unsafe,
@@ -59,11 +60,11 @@ cpp unsafe fn WriteConsoleW(handle: cpp.HANDLE, buffer: *unsafe,
 cpp unsafe fn ReadConsoleW(handle: cpp.HANDLE, mut buffer: *unsafe,
 	toRead: cpp.DWORD, read: *cpp.DWORD, inputControl: *unsafe): bool
 cpp fn WSAGetLastError(): int
-cpp unsafe fn FindFirstFileW(*integ::Wchar, *cpp.WIN32_FIND_DATAW): cpp.HANDLE
+cpp unsafe fn FindFirstFileW(*c::Wchar, *cpp.WIN32_FIND_DATAW): cpp.HANDLE
 cpp unsafe fn FindNextFileW(cpp.HANDLE, *cpp.WIN32_FIND_DATAW): int
 cpp fn FindClose(cpp.HANDLE): int
-cpp unsafe fn GetFileAttributesExW(name: *integ::Wchar, infoLevel: cpp.GET_FILEEX_INFO_LEVELS, info: *unsafe): bool
-cpp unsafe fn CreateFileW(path: *integ::Wchar, desiredAccess: cpp.DWORD, shareMode: cpp.DWORD, securityAttrs: *cpp.SECURITY_ATTRIBUTES, creationDisposition: cpp.DWORD, flagsAndAttrs: cpp.DWORD, templateFile: cpp.HANDLE): cpp.HANDLE
+cpp unsafe fn GetFileAttributesExW(name: *c::Wchar, infoLevel: cpp.GET_FILEEX_INFO_LEVELS, info: *unsafe): bool
+cpp unsafe fn CreateFileW(path: *c::Wchar, desiredAccess: cpp.DWORD, shareMode: cpp.DWORD, securityAttrs: *cpp.SECURITY_ATTRIBUTES, creationDisposition: cpp.DWORD, flagsAndAttrs: cpp.DWORD, templateFile: cpp.HANDLE): cpp.HANDLE
 cpp unsafe fn GetFileType(h: cpp.HANDLE): cpp.DWORD
 cpp unsafe fn GetFileInformationByHandle(h: cpp.HANDLE, *cpp.BY_HANDLE_FILE_INFORMATION): bool
 cpp unsafe fn ReadFile(h: cpp.HANDLE, buf: *unsafe, bytesToRead: cpp.DWORD, mut bytesRead: *cpp.DWORD, overlap: *cpp.OVERLAPPED): bool
@@ -72,7 +73,7 @@ cpp unsafe fn SetEndOfFile(h: cpp.HANDLE): bool
 cpp unsafe fn FlushFileBuffers(h: cpp.HANDLE): bool
 cpp unsafe fn CreatePipe(r: *cpp.HANDLE, w: *cpp.HANDLE, attrs: *cpp.SECURITY_ATTRIBUTES, size: cpp.DWORD): bool
 cpp unsafe fn SetFilePointerEx(h: cpp.HANDLE, toMove: cpp.LARGE_INTEGER, mut newPointer: *cpp.LARGE_INTEGER, moveMethod: cpp.DWORD): bool
-cpp unsafe fn GetFileAttributesW(name: *integ::Wchar): cpp.DWORD
+cpp unsafe fn GetFileAttributesW(name: *c::Wchar): cpp.DWORD
 cpp unsafe fn SetHandleInformation(hObject: cpp.HANDLE, dwMask: cpp.DWORD, dwFlags: cpp.DWORD): bool
 cpp fn GetCurrentProcess(): cpp.HANDLE
 cpp unsafe fn DuplicateHandle(hSourceProcessHandle: cpp.HANDLE, hSourceHandle: cpp.HANDLE, hTargetProcessHandle: cpp.HANDLE, lpTargetHandle: *cpp.HANDLE, dwDesiredAccess: cpp.DWORD, bInheritHandle: bool, dwOptions: cpp.DWORD): bool
@@ -172,19 +173,19 @@ fn GetLastError(): u32 { ret cpp.GetLastError() }
 // Reads working directory into buff and returns read
 // rune count of current process. Returns 0 if fail.
 unsafe fn GetCurrentDirectory(bufflen: u32, mut buff: *u16): u32 {
-	ret cpp.GetCurrentDirectoryW(bufflen, (*integ::Wchar)(buff))
+	ret cpp.GetCurrentDirectoryW(bufflen, (*c::Wchar)(buff))
 }
 
 // Sets working directory to path.
 // Reports operation is success.
 unsafe fn SetCurrentDirectory(path: *u16): bool {
-	ret cpp.SetCurrentDirectoryW((*integ::Wchar)(path))
+	ret cpp.SetCurrentDirectoryW((*c::Wchar)(path))
 }
 
 // Create file.
 unsafe fn CreateFile(path: *u16, desiredAccess: u32, shareMode: u32, securityAttrs: *SecurityAttributes, creationDisposition: u32, flagsAndAttrs: u32, templateFile: Handle): Handle {
 	ret Handle(cpp.CreateFileW(
-		(*integ::Wchar)(path),
+		(*c::Wchar)(path),
 		cpp.DWORD(desiredAccess),
 		cpp.DWORD(shareMode),
 		(*cpp.SECURITY_ATTRIBUTES)(securityAttrs),
@@ -229,23 +230,23 @@ unsafe fn GetFileInformationByHandle(h: Handle, info: *ByHandleFileInformation):
 
 // Delete file.
 unsafe fn DeleteFile(path: *u16): bool {
-	ret cpp.DeleteFileW((*integ::Wchar)(path))
+	ret cpp.DeleteFileW((*c::Wchar)(path))
 }
 
 // Creates directory.
 unsafe fn CreateDirectory(path: *u16): bool {
-	ret cpp.CreateDirectoryW((*integ::Wchar)(path), nil)
+	ret cpp.CreateDirectoryW((*c::Wchar)(path), nil)
 }
 
 // Removes empty directory.
 unsafe fn RemoveDirectory(path: *u16): bool {
-	ret cpp.RemoveDirectoryW((*integ::Wchar)(path))
+	ret cpp.RemoveDirectoryW((*c::Wchar)(path))
 }
 
 // Calls Windows's GetFullPathNameW function.
 unsafe fn GetFullPathName(path: *u16, bufflen: u32,
 	buff: *u16, fname: **u16): u32 {
-	ret cpp.GetFullPathNameW((*integ::Wchar)(path), bufflen, (*integ::Wchar)(buff), (**integ::Wchar)(fname))
+	ret cpp.GetFullPathNameW((*c::Wchar)(path), bufflen, (*c::Wchar)(buff), (**c::Wchar)(fname))
 }
 
 // Calls Windows's GetConsoleMode function.
@@ -285,7 +286,7 @@ fn WSAGetLastError(): int {
 
 // Call's Windows FindFirstFileW function.
 unsafe fn FindFirstFile(path: *u16, mut data: *Win32FindData): Handle {
-	ret Handle(cpp.FindFirstFileW((*integ::Wchar)(path), (*cpp.WIN32_FIND_DATAW)(data)))
+	ret Handle(cpp.FindFirstFileW((*c::Wchar)(path), (*cpp.WIN32_FIND_DATAW)(data)))
 }
 
 // Call's Windows FindNextFileW function.
@@ -300,22 +301,22 @@ fn FindClose(h: Handle): int {
 
 // Windows's GetEnvironmentVariableW function.
 unsafe fn GetEnvironmentVariable(key: *u16, mut out: *u16, outLen: u32): u32 {
-	ret u32(cpp.GetEnvironmentVariableW((*integ::Wchar)(key), (*integ::Wchar)(out), cpp.DWORD(outLen)))
+	ret u32(cpp.GetEnvironmentVariableW((*c::Wchar)(key), (*c::Wchar)(out), cpp.DWORD(outLen)))
 }
 
 // Windows's SetEnvironmentVariableW function.
 unsafe fn SetEnvironmentVariable(key: *u16, val: *u16): bool {
-	ret cpp.SetEnvironmentVariableW((*integ::Wchar)(key), (*integ::Wchar)(val))
+	ret cpp.SetEnvironmentVariableW((*c::Wchar)(key), (*c::Wchar)(val))
 }
 
 // Windows's GetFileAttributesExW function.
 unsafe fn GetFileAttributesEx(name: *u16, infoLevel: int, info: *unsafe): bool {
-	ret cpp.GetFileAttributesExW((*integ::Wchar)(name), cpp.GET_FILEEX_INFO_LEVELS(infoLevel), info)
+	ret cpp.GetFileAttributesExW((*c::Wchar)(name), cpp.GET_FILEEX_INFO_LEVELS(infoLevel), info)
 }
 
 // Windows's GetFileAttributes function.
 unsafe fn GetFileAttributesW(name: *u16): u32 {
-	ret u32(cpp.GetFileAttributesW((*integ::Wchar)(name)))
+	ret u32(cpp.GetFileAttributesW((*c::Wchar)(name)))
 }
 
 // Windows's SetHandleInformation function.
@@ -507,7 +508,7 @@ fn LoadLibraryEx(libname: str, zero: Handle, flags: uintptr)!: Handle {
 }
 
 fn GetProcAddress(module: Handle, procname: str)!: (proc: uintptr) {
-	_procname := integ::StrToBytes(procname)
+	_procname := integ::BytesFromStr(procname)
 	procp := Addrcall[*unsafe](uintptr(cpp.GetProcAddress), unsafe { (*unsafe)(module) }, &_procname[0])
 	if procp == nil {
 		error(GetLastErrno())

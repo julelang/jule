@@ -2,20 +2,21 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use integ "std/jule/integrated"
+use "std/integ"
+use "std/integ/c"
 use "std/sys"
 
-cpp fn GetCommandLineW(): *integ::Wchar
-cpp unsafe fn CommandLineToArgvW(*integ::Wchar, *integ::Int): **integ::Wchar
+cpp fn GetCommandLineW(): *c::Wchar
+cpp unsafe fn CommandLineToArgvW(*c::Wchar, *c::Int): **c::Wchar
 cpp unsafe fn LocalFree(*unsafe)
-cpp fn GetEnvironmentStringsW(): *integ::Wchar
-cpp unsafe fn FreeEnvironmentStringsW(*integ::Wchar)
-cpp unsafe fn GetModuleFileNameW(*unsafe, *integ::Wchar, int): int
+cpp fn GetEnvironmentStringsW(): *c::Wchar
+cpp unsafe fn FreeEnvironmentStringsW(*c::Wchar)
+cpp unsafe fn GetModuleFileNameW(*unsafe, *c::Wchar, int): int
 
 #disable boundary
 fn args(): []str {
 	mut cmdl := cpp.GetCommandLineW()
-	mut argvw := unsafe { cpp.CommandLineToArgvW(cmdl, (*integ::Int)(&argc)) }
+	mut argvw := unsafe { cpp.CommandLineToArgvW(cmdl, (*c::Int)(&argc)) }
 	mut args := make([]str, argc)
 	for i in args {
 		args[i] = unsafe { integ::UTF16PtrToStr((*u16)(argvw[i])) }
@@ -47,7 +48,7 @@ fn env(): []str {
 fn executable(): str {
 	const NULL = 0
 	mut buf := make([]u16, sys::MAX_PATH)
-	n := unsafe { cpp.GetModuleFileNameW(nil, (*integ::Wchar)(&buf[0]), sys::MAX_PATH) }
+	n := unsafe { cpp.GetModuleFileNameW(nil, (*c::Wchar)(&buf[0]), sys::MAX_PATH) }
 	if n > 0 {
 		buf[n] = NULL
 		ret unsafe { integ::UTF16PtrToStr(&buf[0]) }

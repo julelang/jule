@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use integ "std/jule/integrated"
+use "std/integ"
 
 const (
 	AAFS_MAGIC                                  = 0x5a3c69f0
@@ -3755,7 +3755,7 @@ fn unlinkat(dirfd: int, path: []byte, flags: int)! {
 }
 
 fn Unlinkat(dirfd: int, path: str, flags: int)! {
-	cpath := integ::StrToBytes(path)
+	cpath := integ::BytesFromStr(path)
 	unlinkat(dirfd, cpath, flags)?
 }
 
@@ -3779,7 +3779,7 @@ fn mkdirat(dirfd: int, path: []byte, mode: u32)! {
 
 // Path should be NUL-terminated if it is not empty.
 fn Mkdirat(dirfd: int, path: str, mode: u32)! {
-	cpath := integ::StrToBytes(path)
+	cpath := integ::BytesFromStr(path)
 	mkdirat(dirfd, cpath, mode)?
 }
 
@@ -3803,7 +3803,7 @@ fn Getcwd(mut buf: []byte)!: (n: int) {
 }
 
 fn Chdir(path: str)! {
-	cpath := integ::StrToBytes(path)
+	cpath := integ::BytesFromStr(path)
 	_, e := syscall(SYS_CHDIR, uintptr(&cpath[0]), 0, 0, 0, 0, 0)
 	if e != _NO_ERROR {
 		error(e)
@@ -3837,7 +3837,7 @@ fn pselect6(nfd: int, &r: *FdSet, &w: *FdSet, &e: *FdSet, &timeout: *Timespec, &
 }
 
 fn openat(dirfd: int, path: str, flags: int, mode: u32)!: (fd: int) {
-	cpath := integ::StrToBytes(path)
+	cpath := integ::BytesFromStr(path)
 	r0, e1 := syscall(SYS_OPENAT, uintptr(dirfd), uintptr(&cpath[0]), uintptr(flags), uintptr(mode), 0, 0)
 	fd = int(r0)
 	if e1 != _NO_ERROR {
@@ -3875,7 +3875,7 @@ fn Capget(hdr: CapUserHeader, mut &data: *CapUserData)! {
 }
 
 fn faccessat(dirfd: int, path: str, mode: u32)! {
-	cpath := integ::StrToBytes(path)
+	cpath := integ::BytesFromStr(path)
 	_, e1 := syscall(SYS_FACCESSAT, uintptr(dirfd), uintptr(&cpath[0]), uintptr(mode), 0, 0, 0)
 	if e1 != _NO_ERROR {
 		error(e1)
@@ -3883,7 +3883,7 @@ fn faccessat(dirfd: int, path: str, mode: u32)! {
 }
 
 fn Faccessat2(dirfd: int, path: str, mode: u32, flags: int)! {
-	cpath := integ::StrToBytes(path)
+	cpath := integ::BytesFromStr(path)
 	_, e1 := syscall(SYS_FACCESSAT2, uintptr(dirfd), uintptr(&cpath[0]), uintptr(mode), uintptr(flags), 0, 0)
 	if e1 != _NO_ERROR {
 		error(e1)
@@ -4021,7 +4021,7 @@ fn strSliceToCstrSlice(&s: *[]str, mut &args: *[][]byte): []*byte {
 	mut p_args := make([]*byte, len(*s)+1)
 	*args = make([][]byte, len(*s))
 	for i, arg in *s {
-		mut p_arg := integ::StrToBytes(arg)
+		mut p_arg := integ::BytesFromStr(arg)
 		(*args)[i] = p_arg
 		p_args[i] = &p_arg[0]
 	}
@@ -4032,7 +4032,7 @@ fn strSliceToCstrSlice(&s: *[]str, mut &args: *[][]byte): []*byte {
 fn Exec(file: str, args: []str, env: []str)! {
 	let mut c_args2: [][]byte // Avoid deallocation of converted args for safety.
 	let mut c_env2: [][]byte  // Avoid deallocation of converted env for safety.
-	c_file := integ::StrToBytes(file)
+	c_file := integ::BytesFromStr(file)
 	c_args := strSliceToCstrSlice(&args, &c_args2)
 	c_env := strSliceToCstrSlice(&env, &c_env2)
 	_, e1 := syscall(SYS_EXECVE, uintptr(&c_file[0]), uintptr(&c_args[0]), uintptr(&c_env[0]), 0, 0, 0)
@@ -4062,7 +4062,7 @@ fn Dup3(oldfd: int, newfd: int, flags: int)! {
 }
 
 fn Readlinkat(dirfd: int, path: str, mut buf: []byte)!: (n: int) {
-	cpath := integ::StrToBytes(path)
+	cpath := integ::BytesFromStr(path)
 	mut _p0 := uintptr(0)
 	if len(buf) > 0 {
 		_p0 = uintptr(&buf[0])

@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/integ"
+use "std/integ/c"
 use "std/internal/os/filepathlite"
 use "std/internal/sys/windows"
-use integ "std/jule/integrated"
 use "std/mem"
 use "std/strings"
 use "std/sys"
@@ -16,10 +17,10 @@ cpp struct STARTUPINFOW{}
 #typedef
 cpp struct PROCESS_INFORMATION{}
 
-cpp unsafe fn CreateProcessW(*integ::Wchar, *integ::Wchar, *unsafe, *unsafe, integ::Int, integ: cpp.DWORD, *unsafe, *integ::Wchar, *cpp.STARTUPINFOW, *cpp.PROCESS_INFORMATION): int
+cpp unsafe fn CreateProcessW(*c::Wchar, *c::Wchar, *unsafe, *unsafe, c::Int, integ: cpp.DWORD, *unsafe, *c::Wchar, *cpp.STARTUPINFOW, *cpp.PROCESS_INFORMATION): int
 cpp unsafe fn ZeroMemory(*unsafe, uint)
 cpp unsafe fn TerminateProcess(pid: cpp.HANDLE, code: int): bool
-cpp unsafe fn GetExitCodeProcess(cpp.HANDLE, mut *integ::LongLong): bool
+cpp unsafe fn GetExitCodeProcess(cpp.HANDLE, mut *c::LongLong): bool
 cpp unsafe fn WaitForSingleObject(cpp.HANDLE, u32)
 
 struct startupInfo {
@@ -108,11 +109,11 @@ impl Cmd {
 		unsafe { cpp.ZeroMemory(&pi, mem::SizeOf(pi)) }
 
 		flags := u32(_CREATE_UNICODE_ENVIRONMENT)
-		willInheritHandles := unsafe { integ::Int(1) } // True
+		willInheritHandles := unsafe { c::Int(1) } // True
 		unsafe {
-			if cpp.CreateProcessW((*integ::Wchar)(&utf16path[0]),
-				(*integ::Wchar)(&argv[0]), nil, nil, willInheritHandles,
-				cpp.DWORD(flags), envp, (*integ::Wchar)(dirp),
+			if cpp.CreateProcessW((*c::Wchar)(&utf16path[0]),
+				(*c::Wchar)(&argv[0]), nil, nil, willInheritHandles,
+				cpp.DWORD(flags), envp, (*c::Wchar)(dirp),
 				(*cpp.STARTUPINFOW)(&si),
 				(*cpp.PROCESS_INFORMATION)(&pi)) == 0 {
 				error(sys::GetLastErrno())
@@ -133,7 +134,7 @@ impl Cmd {
 
 	fn wait(*self)!: int {
 		unsafe { cpp.WaitForSingleObject(cpp.HANDLE(self.attrs.hProcess), windows::INFINITE) }
-		mut exitCode := unsafe { integ::LongLong(0) }
+		mut exitCode := unsafe { c::LongLong(0) }
 		unsafe {
 			cpp.GetExitCodeProcess(cpp.HANDLE(self.attrs.hProcess), &exitCode)
 			sys::CloseHandle(sys::Handle(self.attrs.hProcess))?

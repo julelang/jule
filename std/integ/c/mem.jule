@@ -1,18 +1,18 @@
-// Copyright 2023-2025 The Jule Programming Language.
+// Copyright 2025 The Jule Programming Language.
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
 cpp fn malloc(size: uint): *unsafe
 cpp fn calloc(size: uint, n: uint): *unsafe
-cpp unsafe fn realloc(mut ptr: *unsafe, size: uint): *unsafe
-cpp unsafe fn free(mut ptr: *unsafe)
+cpp fn realloc(mut ptr: *unsafe, size: uint): *unsafe
+cpp fn free(mut ptr: *unsafe)
 
 // Allocates size bytes of memory.
 // Memory does not initialize.
 // Returns pointer to allocation if success, nil if not.
 //
 // This function is part of the C-style memory management.
-// It can be very dangerous.
+// It might be very dangerous.
 fn Malloc(size: uint): *unsafe {
 	ret cpp.malloc(size)
 }
@@ -32,7 +32,7 @@ fn Calloc(size: uint, n: uint): *unsafe {
 //
 // This function is part of the C-style memory management.
 // It can be very dangerous.
-unsafe fn Realloc(mut ptr: *unsafe, size: uint): *unsafe {
+fn Realloc(mut ptr: *unsafe, size: uint): *unsafe {
 	ret cpp.realloc(ptr, size)
 }
 
@@ -42,34 +42,6 @@ unsafe fn Realloc(mut ptr: *unsafe, size: uint): *unsafe {
 //
 // This function is part of the C-style memory management.
 // It can be very dangerous.
-unsafe fn Free(mut ptr: *unsafe) {
+fn Free(mut ptr: *unsafe) {
 	cpp.free(ptr)
-}
-
-// Allocates new memory.
-// Equivalent to: new T in C++
-fn New[T](): *T {
-	unsafe {
-		ret Emit[*T]("new (std::nothrow) {}", T)
-	}
-}
-
-// Allocates new array memory.
-// Equivalent to: new T[size] in C++
-fn NewArray[T](size: int): *T {
-	unsafe {
-		ret Emit[*T]("new (std::nothrow) {}[{}]", T, size)
-	}
-}
-
-// Deallocates memory allocation.
-// Equivalent to: delete heap in C++
-unsafe fn Delete[T](heap: *T) {
-	Emit("delete {}", heap)
-}
-
-// Deallocates array memory allocation.
-// Equivalent to: delete[] heap in C++
-unsafe fn DeleteArray[T](heap: *T) {
-	Emit("delete[] {}", heap)
 }

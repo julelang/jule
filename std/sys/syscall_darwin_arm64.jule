@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use integ "std/jule/integrated"
+use "std/integ"
+use "std/integ/c"
 
 const PATH_MAX = 1024
 
@@ -1671,14 +1672,14 @@ fn unlinkat(dirfd: int, path: []byte, flags: int)! {
 	} else {
 		_p0 = uintptr(&_zero)
 	}
-	e := unsafe { cpp.unlinkat(dirfd, (*integ::Char)(_p0), flags) }
+	e := unsafe { cpp.unlinkat(dirfd, (*c::Char)(_p0), flags) }
 	if e < _NO_ERROR {
 		error(GetLastErrno())
 	}
 }
 
 fn Unlinkat(dirfd: int, path: str, flags: int)! {
-	cpath := integ::StrToBytes(path)
+	cpath := integ::BytesFromStr(path)
 	unlinkat(dirfd, cpath, flags)?
 }
 
@@ -1694,7 +1695,7 @@ fn mkdirat(dirfd: int, path: []byte, mode: u32)! {
 	} else {
 		_p0 = uintptr(&_zero)
 	}
-	e := unsafe { cpp.mkdirat(dirfd, (*integ::Char)(_p0), mode) }
+	e := unsafe { cpp.mkdirat(dirfd, (*c::Char)(_p0), mode) }
 	if e < _NO_ERROR {
 		error(GetLastErrno())
 	}
@@ -1702,7 +1703,7 @@ fn mkdirat(dirfd: int, path: []byte, mode: u32)! {
 
 // Path should be NUL-terminated if it is not empty.
 fn Mkdirat(dirfd: int, path: str, mode: u32)! {
-	cpath := integ::StrToBytes(path)
+	cpath := integ::BytesFromStr(path)
 	mkdirat(dirfd, cpath, mode)?
 }
 
@@ -1711,8 +1712,8 @@ fn Mkdir(path: str, mode: u32)! {
 }
 
 fn Openat(dirfd: int, path: str, mode: int, perm: u32)!: (fd: int) {
-	cpath := integ::StrToBytes(path)
-	fd = unsafe { cpp.openat(dirfd, (*integ::Char)(&cpath[0]), mode, perm) }
+	cpath := integ::BytesFromStr(path)
+	fd = unsafe { cpp.openat(dirfd, (*c::Char)(&cpath[0]), mode, perm) }
 	if fd < _NO_ERROR {
 		error(GetLastErrno())
 	}
@@ -1736,8 +1737,8 @@ fn Getcwd(mut buf: []byte)!: (n: int) {
 }
 
 fn Chdir(path: str)! {
-	cpath := integ::StrToBytes(path)
-	e := unsafe { cpp.chdir((*integ::Char)(&cpath[0])) }
+	cpath := integ::BytesFromStr(path)
+	e := unsafe { cpp.chdir((*c::Char)(&cpath[0])) }
 	if e < _NO_ERROR {
 		error(GetLastErrno())
 	}
@@ -1752,8 +1753,8 @@ fn Fcntl(fd: int, cmd: int, arg: int)!: int {
 }
 
 fn Fstatat(fd: int, path: str, mut &stat: *SysStat, flags: int)! {
-	cpath := integ::StrToBytes(path)
-	e := unsafe { cpp.fstatat(fd, (*integ::Char)(&cpath[0]), (*cpp.stat)(stat), flags) }
+	cpath := integ::BytesFromStr(path)
+	e := unsafe { cpp.fstatat(fd, (*c::Char)(&cpath[0]), (*cpp.stat)(stat), flags) }
 	if e < _NO_ERROR {
 		error(GetLastErrno())
 	}
@@ -1854,7 +1855,7 @@ fn Sendto(s: int, buf: []byte, flags: int, to: uintptr, addrlen: Socklen)! {
 }
 
 fn Getsockopt(s: int, level: int, name: int, val: uintptr, vallen: Socklen)! {
-	e := unsafe { cpp.getsockopt(s, level, name, (*unsafe)(val), (*integ::UnsignedInt)(&vallen)) }
+	e := unsafe { cpp.getsockopt(s, level, name, (*unsafe)(val), (*c::UnsignedInt)(&vallen)) }
 	if e < _NO_ERROR {
 		error(GetLastErrno())
 	}
@@ -1881,23 +1882,23 @@ fn Sysctl(name: []i32, oldp: uintptr, oldplen: uintptr, newp: uintptr, newplen: 
 	} else {
 		_p0 = uintptr(&_zero)
 	}
-	e := unsafe { cpp.sysctl((*integ::Int)(_p0), uint(len(name)), (*unsafe)(oldp), (*cpp.size_t)(oldplen), (*unsafe)(newp), newplen) }
+	e := unsafe { cpp.sysctl((*c::Int)(_p0), uint(len(name)), (*unsafe)(oldp), (*cpp.size_t)(oldplen), (*unsafe)(newp), newplen) }
 	if e < _NO_ERROR {
 		error(GetLastErrno())
 	}
 }
 
 fn Faccessat(dirfd: int, path: str, mode: u32, flags: int)! {
-	cpath := integ::StrToBytes(path)
-	e := unsafe { cpp.faccessat(dirfd, (*integ::Char)(&cpath[0]), mode, flags) }
+	cpath := integ::BytesFromStr(path)
+	e := unsafe { cpp.faccessat(dirfd, (*c::Char)(&cpath[0]), mode, flags) }
 	if e < _NO_ERROR {
 		error(GetLastErrno())
 	}
 }
 
 fn Open(path: str, mode: int, perm: u32)!: (fd: int) {
-	cpath := integ::StrToBytes(path)
-	fd = unsafe { cpp.open((*integ::Char)(&cpath[0]), mode, perm) }
+	cpath := integ::BytesFromStr(path)
+	fd = unsafe { cpp.open((*c::Char)(&cpath[0]), mode, perm) }
 	if fd < _NO_ERROR {
 		error(GetLastErrno())
 	}
@@ -1910,7 +1911,7 @@ fn Pipe(mut p: []int)! {
 	}
 	let mut p2: [2]i32
 	unsafe {
-		if cpp.pipe((*integ::Int)(&p2[0])) == -1 {
+		if cpp.pipe((*c::Int)(&p2[0])) == -1 {
 			error(GetLastErrno())
 		}
 		p[0] = int(p2[0])
@@ -1937,7 +1938,7 @@ fn strSliceToCstrSlice(&s: *[]str, mut &args: *[][]byte): []*byte {
 	mut p_args := make([]*byte, len(*s)+1)
 	*args = make([][]byte, len(*s))
 	for i, arg in *s {
-		mut p_arg := integ::StrToBytes(arg)
+		mut p_arg := integ::BytesFromStr(arg)
 		(*args)[i] = p_arg
 		p_args[i] = &p_arg[0]
 	}
@@ -1948,10 +1949,10 @@ fn strSliceToCstrSlice(&s: *[]str, mut &args: *[][]byte): []*byte {
 fn Exec(file: str, args: []str, env: []str)! {
 	let mut c_args2: [][]byte // Avoid deallocation of converted args for safety.
 	let mut c_env2: [][]byte  // Avoid deallocation of converted env for safety.
-	c_file := integ::StrToBytes(file)
+	c_file := integ::BytesFromStr(file)
 	c_args := strSliceToCstrSlice(&args, &c_args2)
 	c_env := strSliceToCstrSlice(&env, &c_env2)
-	unsafe { cpp.execve((*integ::Char)(&c_file[0]), (**integ::Char)(&c_args[0]), (**integ::Char)(&c_env[0])) }
+	unsafe { cpp.execve((*c::Char)(&c_file[0]), (**c::Char)(&c_args[0]), (**c::Char)(&c_env[0])) }
 	// If execve was successful, this statement would not be reached.
 	error(GetLastErrno())
 }
@@ -1964,7 +1965,7 @@ fn Kill(pid: int, sig: Signal)! {
 }
 
 fn Waitpid(pid: int, mut &status: *i32, options: int)! {
-	r := unsafe { cpp.waitpid(pid, (*integ::Int)(status), options) }
+	r := unsafe { cpp.waitpid(pid, (*c::Int)(status), options) }
 	if r < _NO_ERROR {
 		error(GetLastErrno())
 	}
@@ -1978,14 +1979,14 @@ fn Dup2(oldfd: int, newfd: int)! {
 }
 
 fn Readlinkat(dirfd: int, path: str, mut buf: []byte)!: (n: int) {
-	cpath := integ::StrToBytes(path)
+	cpath := integ::BytesFromStr(path)
 	mut _p0 := uintptr(0)
 	if len(buf) > 0 {
 		_p0 = uintptr(&buf[0])
 	} else {
 		_p0 = uintptr(&_zero)
 	}
-	r := unsafe { cpp.readlinkat(dirfd, (*integ::Char)(&cpath[0]), (*integ::Char)(_p0), len(buf)) }
+	r := unsafe { cpp.readlinkat(dirfd, (*c::Char)(&cpath[0]), (*c::Char)(_p0), len(buf)) }
 	if r < _NO_ERROR {
 		error(GetLastErrno())
 	}
@@ -1994,14 +1995,14 @@ fn Readlinkat(dirfd: int, path: str, mut buf: []byte)!: (n: int) {
 }
 
 fn Readlink(path: str, mut buf: []byte)!: (n: int) {
-	cpath := integ::StrToBytes(path)
+	cpath := integ::BytesFromStr(path)
 	mut _p0 := uintptr(0)
 	if len(buf) > 0 {
 		_p0 = uintptr(&buf[0])
 	} else {
 		_p0 = uintptr(&_zero)
 	}
-	r := unsafe { cpp.readlink((*integ::Char)(&cpath[0]), (*integ::Char)(_p0), len(buf)) }
+	r := unsafe { cpp.readlink((*c::Char)(&cpath[0]), (*c::Char)(_p0), len(buf)) }
 	if r < _NO_ERROR {
 		error(GetLastErrno())
 	}
