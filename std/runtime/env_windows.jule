@@ -6,22 +6,22 @@ use "std/integ"
 use "std/integ/c"
 use "std/sys"
 
-cpp fn GetCommandLineW(): *c::Wchar
-cpp unsafe fn CommandLineToArgvW(*c::Wchar, *c::Int): **c::Wchar
-cpp unsafe fn LocalFree(*unsafe)
-cpp fn GetEnvironmentStringsW(): *c::Wchar
-cpp unsafe fn FreeEnvironmentStringsW(*c::Wchar)
-cpp unsafe fn GetModuleFileNameW(*unsafe, *c::Wchar, int): int
+extern fn GetCommandLineW(): *c::Wchar
+extern unsafe fn CommandLineToArgvW(*c::Wchar, *c::Int): **c::Wchar
+extern unsafe fn LocalFree(*unsafe)
+extern fn GetEnvironmentStringsW(): *c::Wchar
+extern unsafe fn FreeEnvironmentStringsW(*c::Wchar)
+extern unsafe fn GetModuleFileNameW(*unsafe, *c::Wchar, int): int
 
 #disable boundary
 fn args(): []str {
-	mut cmdl := cpp.GetCommandLineW()
-	mut argvw := unsafe { cpp.CommandLineToArgvW(cmdl, (*c::Int)(&argc)) }
+	mut cmdl := extern.GetCommandLineW()
+	mut argvw := unsafe { extern.CommandLineToArgvW(cmdl, (*c::Int)(&argc)) }
 	mut args := make([]str, argc)
 	for i in args {
 		args[i] = unsafe { integ::UTF16PtrToStr((*u16)(argvw[i])) }
 	}
-	unsafe { cpp.LocalFree(argvw) }
+	unsafe { extern.LocalFree(argvw) }
 	ret args
 }
 
@@ -29,7 +29,7 @@ fn env(): []str {
 	const avgEnvVars = 20
 	const NULL = 0
 	mut env := make([]str, 0, avgEnvVars)
-	mut envS := cpp.GetEnvironmentStringsW()
+	mut envS := extern.GetEnvironmentStringsW()
 	mut np := envS
 	mut latest := envS
 	unsafe {
@@ -41,14 +41,14 @@ fn env(): []str {
 			latest = np
 		}
 	}
-	unsafe { cpp.FreeEnvironmentStringsW(envS) }
+	unsafe { extern.FreeEnvironmentStringsW(envS) }
 	ret env
 }
 
 fn executable(): str {
 	const NULL = 0
 	mut buf := make([]u16, sys::MAX_PATH)
-	n := unsafe { cpp.GetModuleFileNameW(nil, (*c::Wchar)(&buf[0]), sys::MAX_PATH) }
+	n := unsafe { extern.GetModuleFileNameW(nil, (*c::Wchar)(&buf[0]), sys::MAX_PATH) }
 	if n > 0 {
 		buf[n] = NULL
 		ret unsafe { integ::UTF16PtrToStr(&buf[0]) }

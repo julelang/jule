@@ -14,19 +14,19 @@ const (
 )
 
 #cdef
-cpp unsafe fn __atomic_store(*unsafe, *unsafe, MemoryOrder)
+extern unsafe fn __atomic_store(*unsafe, *unsafe, MemoryOrder)
 
 #cdef
-cpp unsafe fn __atomic_load(*unsafe, *unsafe, MemoryOrder)
+extern unsafe fn __atomic_load(*unsafe, *unsafe, MemoryOrder)
 
 #cdef
-cpp unsafe fn __atomic_exchange[T](*unsafe, *unsafe, *unsafe, MemoryOrder): T
+extern unsafe fn __atomic_exchange[T](*unsafe, *unsafe, *unsafe, MemoryOrder): T
 
 #cdef
-cpp unsafe fn __atomic_compare_exchange_n[T](*unsafe, *unsafe, T, int, MemoryOrder, MemoryOrder): bool
+extern unsafe fn __atomic_compare_exchange_n[T](*unsafe, *unsafe, T, int, MemoryOrder, MemoryOrder): bool
 
 #cdef
-cpp unsafe fn __atomic_fetch_add[T](*unsafe, T, MemoryOrder): T
+extern unsafe fn __atomic_fetch_add[T](*unsafe, T, MemoryOrder): T
 
 // Atomically stores new value to p with memory order mo, and returns the old value.
 fn Swap[T](mut p: *T, new: T, mo: MemoryOrder): (old: T) {
@@ -66,7 +66,7 @@ fn Store[T](mut p: *T, val: T, mo: MemoryOrder) {
 // T1 is a base pointer type, T2 is the output type.
 fn SwapZ[T1, T2](mut p: *T1, new: T2, mo: MemoryOrder): (old: T2) {
 	let mut tmp: T2
-	unsafe { cpp.__atomic_exchange[T2](p, &new, &tmp, mo) }
+	unsafe { extern.__atomic_exchange[T2](p, &new, &tmp, mo) }
 	ret tmp
 }
 
@@ -74,7 +74,7 @@ fn SwapZ[T1, T2](mut p: *T1, new: T2, mo: MemoryOrder): (old: T2) {
 // T1 is a base pointer type, T2 is the output type.
 fn LoadZ[T1, T2](p: *T1, mo: MemoryOrder): T2 {
 	let mut tmp: T2
-	unsafe { cpp.__atomic_load(p, &tmp, mo) }
+	unsafe { extern.__atomic_load(p, &tmp, mo) }
 	ret tmp
 }
 
@@ -84,7 +84,7 @@ fn LoadZ[T1, T2](p: *T1, mo: MemoryOrder): T2 {
 // T1 is a base pointer type, T2 is the output type.
 fn CompareAndSwapZ[T1, T2](mut p: *T1, old: T2, new: T2, succ: MemoryOrder, fail: MemoryOrder): (swapped: bool) {
 	const Strong = 0 // strong atomicity
-	ret unsafe { cpp.__atomic_compare_exchange_n[T2](p, &old, new, Strong, succ, fail) }
+	ret unsafe { extern.__atomic_compare_exchange_n[T2](p, &old, new, Strong, succ, fail) }
 }
 
 // Atomically reads value of the p and compares it with old.
@@ -93,17 +93,17 @@ fn CompareAndSwapZ[T1, T2](mut p: *T1, old: T2, new: T2, succ: MemoryOrder, fail
 // T1 is a base pointer type, T2 is the output type.
 fn CompareAndSwapWeakZ[T1, T2](mut p: *T1, old: T2, new: T2, succ: MemoryOrder, fail: MemoryOrder): (swapped: bool) {
 	const Weak = 1 // weak atomicity
-	ret unsafe { cpp.__atomic_compare_exchange_n[T2](p, &old, new, Weak, succ, fail) }
+	ret unsafe { extern.__atomic_compare_exchange_n[T2](p, &old, new, Weak, succ, fail) }
 }
 
 // Atomically adds delta to p with memory order mo and returns the new value.
 // T1 is a base pointer type, T2 is the output type.
 fn AddZ[T1, T2](mut p: *T1, delta: T2, mo: MemoryOrder): (new: T2) {
-	ret unsafe { cpp.__atomic_fetch_add[T2](p, delta, mo) } + delta
+	ret unsafe { extern.__atomic_fetch_add[T2](p, delta, mo) } + delta
 }
 
 // Atomically stores new value to p with memory order mo.
 // T1 is a base pointer type, T2 is the output type.
 fn StoreZ[T1, T2](mut p: *T1, val: T2, mo: MemoryOrder) {
-	unsafe { cpp.__atomic_store(p, &val, mo) }
+	unsafe { extern.__atomic_store(p, &val, mo) }
 }

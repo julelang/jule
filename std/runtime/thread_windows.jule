@@ -4,9 +4,9 @@
 
 use "std/sys"
 
-cpp let CreateThread: *unsafe
-cpp let GetCurrentThreadId: *unsafe
-cpp let SwitchToThread: *unsafe
+extern let CreateThread: *unsafe
+extern let GetCurrentThreadId: *unsafe
+extern let SwitchToThread: *unsafe
 
 // Wrapper for operating system thread.
 struct osthread {
@@ -39,7 +39,7 @@ struct threadData {
 unsafe fn coSpawn(func: *unsafe, mut args: *unsafe): bool {
 	mut t := pushNewThread()
 	(*threadData)(args).handle = &t.os.handle
-	t.os.handle = sys::Addrcall[*unsafe](uintptr(cpp.CreateThread),
+	t.os.handle = sys::Addrcall[*unsafe](uintptr(extern.CreateThread),
 		(*unsafe)(nil), int(0), func, args, _DWORD(0), &t.os.id)
 	if t.os.handle == nil {
 		ret false
@@ -50,11 +50,11 @@ unsafe fn coSpawn(func: *unsafe, mut args: *unsafe): bool {
 }
 
 fn currentThreadID(): _DWORD {
-	ret sys::Addrcall[_DWORD](uintptr(cpp.GetCurrentThreadId))
+	ret sys::Addrcall[_DWORD](uintptr(extern.GetCurrentThreadId))
 }
 
 fn osyield() {
-	sys::Addrcall(uintptr(cpp.SwitchToThread))
+	sys::Addrcall(uintptr(extern.SwitchToThread))
 }
 
 fn threadinit() {

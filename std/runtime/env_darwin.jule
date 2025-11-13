@@ -6,24 +6,24 @@ use "std/integ"
 use "std/integ/c"
 use "std/sys"
 
-cpp use "<mach-o/dyld.h>"
+extern use "<mach-o/dyld.h>"
 
-cpp unsafe fn _NSGetExecutablePath(b: *c::Char, *u32): bool
-cpp unsafe fn realpath(path: *c::Char, resolved: *c::Char): *c::Char
+extern unsafe fn _NSGetExecutablePath(b: *c::Char, *u32): bool
+extern unsafe fn realpath(path: *c::Char, resolved: *c::Char): *c::Char
 
 fn executable(): str {
 	let mut buf: [sys::PATH_MAX]byte
 	size := u32(len(buf))
 	mut p := &buf[0]
 	unsafe {
-		if cpp._NSGetExecutablePath((*c::Char)(p), &size) {
+		if extern._NSGetExecutablePath((*c::Char)(p), &size) {
 			panic("runtime: executable path read error")
 		}
 		// The _NSGetExecutablePath function may returns symlink path for the real executable.
 		// We should resolve path with the realpath function to reach the real path of the executable file.
 		let mut real: [sys::PATH_MAX]byte
 		mut rp := &real[0]
-		if cpp.realpath((*c::Char)(p), (*c::Char)(rp)) == nil {
+		if extern.realpath((*c::Char)(p), (*c::Char)(rp)) == nil {
 			panic("runtime: executable path read error")
 		}
 		ret integ::BytePtrToStr(rp)

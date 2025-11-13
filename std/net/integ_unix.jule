@@ -8,24 +8,24 @@ use "std/runtime"
 use "std/sys"
 use "std/time"
 
-cpp use "<netdb.h>"
+extern use "<netdb.h>"
 
-cpp let getaddrinfo: *unsafe
-cpp let freeaddrinfo: *unsafe
+extern let getaddrinfo: *unsafe
+extern let freeaddrinfo: *unsafe
 
-cpp struct addrinfo {
+extern struct addrinfo {
 	ai_flags:    int
 	ai_family:   int
 	ai_socktype: int
 	ai_protocol: int
 	ai_addrlen:  sys::Socklen
-	ai_next:     *cpp.addrinfo
+	ai_next:     *extern.addrinfo
 	ai_addr:     *unsafe
 }
 
 #disable boundary
 fn integLookupIP(net: Network, host: str)!: (addrs: []IPAddr) {
-	let mut hints: cpp.addrinfo
+	let mut hints: extern.addrinfo
 	unsafe { runtime::memset(&hints, 0, mem::SizeOf(hints)) }
 	hints.ai_flags = integAddrInfoFlags
 	hints.ai_socktype = sys::SOCK_STREAM
@@ -38,8 +38,8 @@ fn integLookupIP(net: Network, host: str)!: (addrs: []IPAddr) {
 		hints.ai_family = sys::AF_INET6
 	}
 	hostb := integ::BytesFromStr(host)
-	let mut res: *cpp.addrinfo
-	e := sys::Addrcall[int](uintptr(cpp.getaddrinfo), uintptr(&hostb[0]), uintptr(0), uintptr(&hints), uintptr(&res))
+	let mut res: *extern.addrinfo
+	e := sys::Addrcall[int](uintptr(extern.getaddrinfo), uintptr(&hostb[0]), uintptr(0), uintptr(&hints), uintptr(&res))
 	if e != 0 {
 		error(sys::Errno(e))
 	}
@@ -64,13 +64,13 @@ fn integLookupIP(net: Network, host: str)!: (addrs: []IPAddr) {
 		}
 	}
 
-	sys::Addrcall(uintptr(cpp.freeaddrinfo), uintptr(res))
+	sys::Addrcall(uintptr(extern.freeaddrinfo), uintptr(res))
 	ret addrs
 }
 
 #disable boundary
 fn integLookupPortMap(network: Network, service: str)!: (port: int) {
-	let mut hints: cpp.addrinfo
+	let mut hints: extern.addrinfo
 	match network {
 	| IP:
 		hints.ai_family = sys::AF_UNSPEC
@@ -110,13 +110,13 @@ fn integLookupPortMap(network: Network, service: str)!: (port: int) {
 	for i, b in serviceb[:len(service)] {
 		serviceb[i] = lowerASCII(b)
 	}
-	let mut res: *cpp.addrinfo
-	e := sys::Addrcall[int](uintptr(cpp.getaddrinfo), uintptr(0), uintptr(&serviceb[0]), uintptr(&hints), uintptr(&res))
+	let mut res: *extern.addrinfo
+	e := sys::Addrcall[int](uintptr(extern.getaddrinfo), uintptr(0), uintptr(&serviceb[0]), uintptr(&hints), uintptr(&res))
 	if e != 0 {
 		error(sys::Errno(e))
 	}
 
-	defer { sys::Addrcall(uintptr(cpp.freeaddrinfo), uintptr(res)) }
+	defer { sys::Addrcall(uintptr(extern.freeaddrinfo), uintptr(res)) }
 
 	unsafe {
 		mut r := res

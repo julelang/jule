@@ -7,12 +7,12 @@ use "std/internal/sys/windows"
 use "std/sys"
 use "std/time"
 
-cpp use "<ws2tcpip.h>"
+extern use "<ws2tcpip.h>"
 
 const integAddrInfoFlags = windows::AI_CANONNAME | windows::AI_V4MAPPED | windows::AI_ALL
 
-cpp let GetAddrInfoW: *unsafe
-cpp let FreeAddrInfoW: *unsafe
+extern let GetAddrInfoW: *unsafe
+extern let FreeAddrInfoW: *unsafe
 
 #disable boundary
 fn integLookupIP(net: Network, host: str)!: (addrs: []IPAddr) {
@@ -29,7 +29,7 @@ fn integLookupIP(net: Network, host: str)!: (addrs: []IPAddr) {
 	}
 	utf16host := integ::UTF16FromStr(host)
 	let mut res: *windows::AddrinfoW
-	e := sys::Addrcall[int](uintptr(cpp.GetAddrInfoW), uintptr(&utf16host[0]), uintptr(0), uintptr(&hints), uintptr(&res))
+	e := sys::Addrcall[int](uintptr(extern.GetAddrInfoW), uintptr(&utf16host[0]), uintptr(0), uintptr(&hints), uintptr(&res))
 	if e != 0 {
 		error(sys::Errno(e))
 	}
@@ -54,6 +54,6 @@ fn integLookupIP(net: Network, host: str)!: (addrs: []IPAddr) {
 		}
 	}
 
-	sys::Addrcall(uintptr(cpp.FreeAddrInfoW), uintptr(res))
+	sys::Addrcall(uintptr(extern.FreeAddrInfoW), uintptr(res))
 	ret addrs
 }

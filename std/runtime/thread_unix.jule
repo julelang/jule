@@ -4,31 +4,31 @@
 
 use "std/sys"
 
-cpp use "<pthread.h>"
+extern use "<pthread.h>"
 
-cpp let pthread_create: *unsafe
-cpp let pthread_equal: *unsafe
-cpp let pthread_detach: *unsafe
-cpp let pthread_self: *unsafe
+extern let pthread_create: *unsafe
+extern let pthread_equal: *unsafe
+extern let pthread_detach: *unsafe
+extern let pthread_self: *unsafe
 
 #typedef
-cpp struct pthread_t{}
+extern struct pthread_t{}
 
 // Wrapper for operating system thread.
 struct osthread {
-	handle: cpp.pthread_t
+	handle: extern.pthread_t
 }
 
 impl osthread {
 	// Reports whether the threads are equal.
-	fn equal(*self, other: cpp.pthread_t): bool {
-		ret sys::Addrcall[i32](uintptr(cpp.pthread_equal), self.handle, other) != 0
+	fn equal(*self, other: extern.pthread_t): bool {
+		ret sys::Addrcall[i32](uintptr(extern.pthread_equal), self.handle, other) != 0
 	}
 }
 
 // Common head fields for a thread data.
 struct threadData {
-	handle: *cpp.pthread_t
+	handle: *extern.pthread_t
 }
 
 // A low level API function for threads.
@@ -44,16 +44,16 @@ struct threadData {
 unsafe fn coSpawn(func: *unsafe, mut args: *unsafe): bool {
 	mut t := pushNewThread()
 	(*threadData)(args).handle = &t.os.handle
-	if sys::Addrcall[i32](uintptr(cpp.pthread_create), &t.os.handle, (*unsafe)(nil), func, args) != 0 {
+	if sys::Addrcall[i32](uintptr(extern.pthread_create), &t.os.handle, (*unsafe)(nil), func, args) != 0 {
 		ret false
 	}
 	threadMutex.unlock()
-	sys::Addrcall(uintptr(cpp.pthread_detach), t.os.handle)
+	sys::Addrcall(uintptr(extern.pthread_detach), t.os.handle)
 	ret true
 }
 
-fn currentThreadID(): cpp.pthread_t {
-	ret sys::Addrcall[cpp.pthread_t](uintptr(cpp.pthread_self))
+fn currentThreadID(): extern.pthread_t {
+	ret sys::Addrcall[extern.pthread_t](uintptr(extern.pthread_self))
 }
 
 fn osyield() {

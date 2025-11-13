@@ -8,13 +8,13 @@
 use "std/integ"
 use "std/sys"
 
-cpp use "<iphlpapi.h>"
+extern use "<iphlpapi.h>"
 
-cpp let GetSystemDirectoryW: *unsafe
-cpp let GetAdaptersAddresses: *unsafe
-cpp let GetComputerNameExW: *unsafe
-cpp let WaitOnAddress: *unsafe
-cpp let WakeByAddressSingle: *unsafe
+extern let GetSystemDirectoryW: *unsafe
+extern let GetAdaptersAddresses: *unsafe
+extern let GetComputerNameExW: *unsafe
+extern let WaitOnAddress: *unsafe
+extern let WakeByAddressSingle: *unsafe
 
 const (
 	GAA_FLAG_INCLUDE_PREFIX   = 0x00000010
@@ -144,12 +144,12 @@ struct IpAdapterAddresses {
 
 fn GetSystemDirectory(): str {
 	mut path := make([]u16, sys::MAX_PATH)
-	n := sys::Addrcall[uint](uintptr(cpp.GetSystemDirectoryW), uintptr(&path[0]), uint(len(path)))
+	n := sys::Addrcall[uint](uintptr(extern.GetSystemDirectoryW), uintptr(&path[0]), uint(len(path)))
 	ret integ::UTF16ToStr(path[:n])
 }
 
 fn GetAdaptersAddresses(family: u32, flags: u32, reserved: uintptr, mut adapterAddresses: *IpAdapterAddresses, mut &sizePointer: *u32)! {
-	r := sys::Addrcall[u32](uintptr(cpp.GetAdaptersAddresses), family, flags, reserved, uintptr(adapterAddresses), uintptr(sizePointer))
+	r := sys::Addrcall[u32](uintptr(extern.GetAdaptersAddresses), family, flags, reserved, uintptr(adapterAddresses), uintptr(sizePointer))
 	if r != 0 {
 		error(sys::Errno(r))
 	}
@@ -175,7 +175,7 @@ const (
 )
 
 fn GetComputerNameEx(nameformat: u32, buf: *u16, mut n: *u32)! {
-	r := sys::Addrcall[bool](uintptr(cpp.GetComputerNameExW), uintptr(nameformat), uintptr(buf), uintptr(n))
+	r := sys::Addrcall[bool](uintptr(extern.GetComputerNameExW), uintptr(nameformat), uintptr(buf), uintptr(n))
 	if !r {
 		error(sys::GetLastErrno())
 	}
@@ -198,11 +198,11 @@ const INFINITE = 0xFFFFFFFF // 4294967295
 
 fn WaitOnAddress(&addr: *i8, compareAddr: i8, dwMilliseconds: DWORD): bool {
 	const I8InBytes = 1
-	ret sys::Addrcall[bool](uintptr(cpp.WaitOnAddress), addr, &compareAddr, I8InBytes, dwMilliseconds)
+	ret sys::Addrcall[bool](uintptr(extern.WaitOnAddress), addr, &compareAddr, I8InBytes, dwMilliseconds)
 }
 
 fn WakeByAddressSingle(&addr: *i8) {
-	sys::Addrcall(uintptr(cpp.WakeByAddressSingle), addr)
+	sys::Addrcall(uintptr(extern.WakeByAddressSingle), addr)
 }
 
 const (

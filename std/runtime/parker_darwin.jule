@@ -21,13 +21,13 @@ use "std/internal/runtime"
 use "std/internal/runtime/atomic"
 use "std/sys"
 
-cpp use "<dispatch/dispatch.h>"
+extern use "<dispatch/dispatch.h>"
 
 // Contained in libSystem.dylib, which is linked by default.
-cpp let dispatch_semaphore_create: *unsafe
-cpp let dispatch_semaphore_signal: *unsafe
-cpp let dispatch_semaphore_wait: *unsafe
-cpp let dispatch_release: *unsafe
+extern let dispatch_semaphore_create: *unsafe
+extern let dispatch_semaphore_signal: *unsafe
+extern let dispatch_semaphore_wait: *unsafe
+extern let dispatch_release: *unsafe
 
 const (
 	_PARK_EMPTY    = 0
@@ -53,7 +53,7 @@ impl parker {
 		if self.sema != nil {
 			ret
 		}
-		self.sema = sys::Addrcall[*unsafe](uintptr(cpp.dispatch_semaphore_create), 0)
+		self.sema = sys::Addrcall[*unsafe](uintptr(extern.dispatch_semaphore_create), 0)
 		if self.sema == nil {
 			panic("runtime: failed to create dispatch semaphore for thread parking")
 		}
@@ -75,7 +75,7 @@ impl parker {
 
 		// Ensure that the semaphore counter has actually been decremented, even
 		// if the call timed out for some reason.
-		for sys::Addrcall[int](uintptr(cpp.dispatch_semaphore_wait), self.sema, _DISPATCH_TIME_FOREVER) != 0 {
+		for sys::Addrcall[int](uintptr(extern.dispatch_semaphore_wait), self.sema, _DISPATCH_TIME_FOREVER) != 0 {
 		}
 
 		// At this point, the semaphore counter is zero again.
@@ -88,7 +88,7 @@ impl parker {
 
 	fn unpark(mut *self) {
 		if atomic::Swap(&self.state, _PARK_NOTIFIED, atomic::Release) == _PARK_PARKED {
-			sys::Addrcall(uintptr(cpp.dispatch_semaphore_signal), self.sema)
+			sys::Addrcall(uintptr(extern.dispatch_semaphore_signal), self.sema)
 		}
 	}
 
@@ -96,6 +96,6 @@ impl parker {
 		// SAFETY:
 		// We always ensure that the semaphore count is reset, so this will
 		// never cause an exception.
-		sys::Addrcall(uintptr(cpp.dispatch_release), self.sema)
+		sys::Addrcall(uintptr(extern.dispatch_release), self.sema)
 	}
 }

@@ -12,16 +12,16 @@ use "std/sys"
 use "std/unicode/utf16"
 
 #typedef
-cpp struct STARTUPINFOW{}
+extern struct STARTUPINFOW{}
 
 #typedef
-cpp struct PROCESS_INFORMATION{}
+extern struct PROCESS_INFORMATION{}
 
-cpp unsafe fn CreateProcessW(*c::Wchar, *c::Wchar, *unsafe, *unsafe, c::Int, integ: cpp.DWORD, *unsafe, *c::Wchar, *cpp.STARTUPINFOW, *cpp.PROCESS_INFORMATION): int
-cpp unsafe fn ZeroMemory(*unsafe, uint)
-cpp unsafe fn TerminateProcess(pid: cpp.HANDLE, code: int): bool
-cpp unsafe fn GetExitCodeProcess(cpp.HANDLE, mut *c::LongLong): bool
-cpp unsafe fn WaitForSingleObject(cpp.HANDLE, u32)
+extern unsafe fn CreateProcessW(*c::Wchar, *c::Wchar, *unsafe, *unsafe, c::Int, integ: extern.DWORD, *unsafe, *c::Wchar, *extern.STARTUPINFOW, *extern.PROCESS_INFORMATION): int
+extern unsafe fn ZeroMemory(*unsafe, uint)
+extern unsafe fn TerminateProcess(pid: extern.HANDLE, code: int): bool
+extern unsafe fn GetExitCodeProcess(extern.HANDLE, mut *c::LongLong): bool
+extern unsafe fn WaitForSingleObject(extern.HANDLE, u32)
 
 struct startupInfo {
 	cb:              u32
@@ -98,7 +98,7 @@ impl Cmd {
 		unsafe defer { sys::DuplicateHandle(proc, hStderr, 0, nil, 0, false, _DUPLICATE_CLOSE_SOURCE) }
 
 		mut si := startupInfo{}
-		unsafe { cpp.ZeroMemory(&si, mem::SizeOf(si)) }
+		unsafe { extern.ZeroMemory(&si, mem::SizeOf(si)) }
 		si.cb = u32(mem::SizeOf(si))
 		si.dwFlags |= _STARTF_USESTDHANDLES
 		si.hStdInput = hStdin
@@ -106,16 +106,16 @@ impl Cmd {
 		si.hStdError = hStderr
 
 		mut pi := processInformation{}
-		unsafe { cpp.ZeroMemory(&pi, mem::SizeOf(pi)) }
+		unsafe { extern.ZeroMemory(&pi, mem::SizeOf(pi)) }
 
 		flags := u32(_CREATE_UNICODE_ENVIRONMENT)
 		willInheritHandles := unsafe { c::Int(1) } // True
 		unsafe {
-			if cpp.CreateProcessW((*c::Wchar)(&utf16path[0]),
+			if extern.CreateProcessW((*c::Wchar)(&utf16path[0]),
 				(*c::Wchar)(&argv[0]), nil, nil, willInheritHandles,
-				cpp.DWORD(flags), envp, (*c::Wchar)(dirp),
-				(*cpp.STARTUPINFOW)(&si),
-				(*cpp.PROCESS_INFORMATION)(&pi)) == 0 {
+				extern.DWORD(flags), envp, (*c::Wchar)(dirp),
+				(*extern.STARTUPINFOW)(&si),
+				(*extern.PROCESS_INFORMATION)(&pi)) == 0 {
 				error(sys::GetLastErrno())
 			}
 		}
@@ -124,7 +124,7 @@ impl Cmd {
 	}
 
 	fn kill(*self)! {
-		if unsafe { cpp.TerminateProcess(cpp.HANDLE(self.attrs.hProcess), 0) } {
+		if unsafe { extern.TerminateProcess(extern.HANDLE(self.attrs.hProcess), 0) } {
 			sys::CloseHandle(sys::Handle(self.attrs.hProcess))?
 			self.attrs.hProcess = 0
 			ret
@@ -133,10 +133,10 @@ impl Cmd {
 	}
 
 	fn wait(*self)!: int {
-		unsafe { cpp.WaitForSingleObject(cpp.HANDLE(self.attrs.hProcess), windows::INFINITE) }
+		unsafe { extern.WaitForSingleObject(extern.HANDLE(self.attrs.hProcess), windows::INFINITE) }
 		mut exitCode := unsafe { c::LongLong(0) }
 		unsafe {
-			cpp.GetExitCodeProcess(cpp.HANDLE(self.attrs.hProcess), &exitCode)
+			extern.GetExitCodeProcess(extern.HANDLE(self.attrs.hProcess), &exitCode)
 			sys::CloseHandle(sys::Handle(self.attrs.hProcess))?
 		}
 		self.attrs.hProcess = 0
