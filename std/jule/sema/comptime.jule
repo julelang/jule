@@ -839,13 +839,13 @@ impl comptimeTypeInfo {
 		ret nil
 	}
 
-	fn _Bind(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
+	fn _Extern(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
-			e.pushErr(fc.Token, "passed more argument than expected to Bind")
-			e.pushSuggestion("call like; Bind()")
+			e.pushErr(fc.Token, "passed more argument than expected to Extern")
+			e.pushSuggestion("call like; Extern()")
 			ret nil
 		}
-		mut constant := constant::NewBool(self.base.Bind())
+		mut constant := constant::NewBool(self.base.Extern())
 		ret &Value{
 			untyped: true,
 			Type: primBool,
@@ -1102,9 +1102,9 @@ impl comptimeTypeInfo {
 				caller: fn|mut e, mut fc, _| self._Types(e, fc),
 			}
 			ret buildAsComptimeMethodData(method)
-		| "Bind":
+		| "Extern":
 			mut method := &FuncIns{
-				caller: fn|mut e, mut fc, _| self._Bind(e, fc),
+				caller: fn|mut e, mut fc, _| self._Extern(e, fc),
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Ordered":
@@ -1723,38 +1723,38 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _Bind(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
+	fn _Extern(mut &self, mut e: &eval, mut fc: &ast::CallExpr): &Value {
 		if len(fc.Args) > 0 {
-			e.pushErr(fc.Token, "passed more argument than expected to Bind")
-			e.pushSuggestion("call like; Bind()")
+			e.pushErr(fc.Token, "passed more argument than expected to Extern")
+			e.pushSuggestion("call like; Extern()")
 			ret nil
 		}
-		mut _bind := false
+		mut _extern := false
 		match type self.decl {
 		| &Enum
 		| &TypeEnum
 		| &Trait
 		| &Field
 		| &Param:
-			e.pushErr(fc.Args[0].Token, "type @ is invalid for function Bind", self.declAsStr())
+			e.pushErr(fc.Args[0].Token, "type @ is invalid for function Extern", self.declAsStr())
 			ret nil
 		| &Struct:
-			_bind = self.decl.(&Struct).Bind
+			_extern = self.decl.(&Struct).Extern
 		| &Func:
-			_bind = self.decl.(&Func).Bind
+			_extern = self.decl.(&Func).Extern
 		| &TypeAlias:
-			_bind = self.decl.(&TypeAlias).Bind
+			_extern = self.decl.(&TypeAlias).Extern
 		| &Var:
 			v := self.decl.(&Var)
 			if v.IsEnumField() {
-				e.pushErr(fc.Args[0].Token, "type @ is invalid for function Bind", self.declAsStr())
+				e.pushErr(fc.Args[0].Token, "type @ is invalid for function Extern", self.declAsStr())
 				ret nil
 			}
-			_bind = v.Bind
+			_extern = v.Extern
 		|:
-			panic("sema: comptimeDecl.Bind: unimplemented declaration kind")
+			panic("sema: comptimeDecl.Extern: unimplemented declaration kind")
 		}
-		mut constant := constant::NewBool(_bind)
+		mut constant := constant::NewBool(_extern)
 		ret &Value{
 			untyped: true,
 			Type: primBool,
@@ -2118,9 +2118,9 @@ impl comptimeDecl {
 				caller: fn|mut e, mut fc, _| self._Public(e, fc),
 			}
 			ret buildAsComptimeMethodData(method)
-		| "Bind":
+		| "Extern":
 			mut method := &FuncIns{
-				caller: fn|mut e, mut fc, _| self._Bind(e, fc),
+				caller: fn|mut e, mut fc, _| self._Extern(e, fc),
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Exceptional":

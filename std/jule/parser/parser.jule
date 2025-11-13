@@ -944,7 +944,7 @@ impl parser {
 		ret f
 	}
 
-	fn buildBindUseDecl(mut *self, mut decl: &ast::Use, mut tokens: []&token::Token) {
+	fn buildExternUseDecl(mut *self, mut decl: &ast::Use, mut tokens: []&token::Token) {
 		if len(tokens) > 1 {
 			self.pushErr(tokens[1], "invalid syntax")
 		}
@@ -954,13 +954,13 @@ impl parser {
 			self.pushSuggestion(`expected string literal, like "string"`)
 			ret
 		}
-		decl.Bind = true
+		decl.Extern = true
 		decl.Path = token
 	}
 
 	fn parseUseDecl(mut *self, mut decl: &ast::Use, mut tokens: []&token::Token) {
-		if decl.Bind {
-			self.buildBindUseDecl(decl, tokens)
+		if decl.Extern {
+			self.buildExternUseDecl(decl, tokens)
 			ret
 		}
 
@@ -992,10 +992,10 @@ impl parser {
 		decl.Path = token
 	}
 
-	fn buildUseDecl(mut *self, mut tokens: []&token::Token, _bind: bool): &ast::Use {
+	fn buildUseDecl(mut *self, mut tokens: []&token::Token, _extern: bool): &ast::Use {
 		mut decl := &ast::Use{
 			Token: tokens[0], // See developer reference (8).
-			Bind: _bind,
+			Extern: _extern,
 		}
 		if len(tokens) < 2 {
 			self.pushErr(decl.Token, "path is missing of use declaration")
@@ -1396,69 +1396,69 @@ impl parser {
 		ret t
 	}
 
-	fn buildBindFunc(mut &self, mut tokens: []&token::Token): &ast::Func {
+	fn buildExternFunc(mut &self, mut tokens: []&token::Token): &ast::Func {
 		mut i := 1 // Skip "cpp" keyword.
 		mut f := self.buildFunc(&i, tokens, false, true)
 		if f != nil {
 			f.Public = false
-			f.Bind = true
+			f.Extern = true
 		}
 		ret f
 	}
 
-	fn buildBindVar(mut &self, mut tokens: []&token::Token): &ast::Var {
+	fn buildExternVar(mut &self, mut tokens: []&token::Token): &ast::Var {
 		tokens = tokens[1:] // Remove "cpp" keyword.
 		mut v := self.buildVar(tokens)
 		if v != nil {
 			v.Public = false
-			v.Bind = true
+			v.Extern = true
 			v.Static = true
 			if v.Const {
-				self.pushErr(v.Token, "bind variables cannot be constant")
+				self.pushErr(v.Token, "external variables cannot be constant")
 			}
 			if v.X != nil {
-				self.pushErr(v.Token, "bind variables cannot have expressions")
+				self.pushErr(v.Token, "external variables cannot have expressions")
 			}
 		}
 		ret v
 	}
 
-	fn buildBindStruct(mut &self, mut tokens: []&token::Token): &ast::Struct {
+	fn buildExternStruct(mut &self, mut tokens: []&token::Token): &ast::Struct {
 		tokens = tokens[1:] // Remove "cpp" keyword.
 		mut s := self.buildStructDecl(tokens)
 		if s != nil {
 			s.Public = false
 			for (_, mut f) in s.Fields {
-				// Bind structure's fields are always public by default.
+				// External structure's fields are always public by default.
 				f.Public = true
 			}
-			s.Bind = true
+			s.Extern = true
 		}
 		ret s
 	}
 
-	fn buildBindTypeAlias(mut &self, mut tokens: []&token::Token): &ast::TypeAlias {
+	fn buildExternTypeAlias(mut &self, mut tokens: []&token::Token): &ast::TypeAlias {
 		tokens = tokens[1:] // Remove "cpp" keyword.
 		mut t := self.buildTypeAliasDecl(tokens)
 		if t != nil {
 			t.Public = false
-			t.Bind = true
+			t.Extern = true
 		}
 		ret t
 	}
 
-	fn buildBindUse(mut &self, mut tokens: []&token::Token): &ast::Use {
+	fn buildExternUse(mut &self, mut tokens: []&token::Token): &ast::Use {
 		if len(tokens) == 1 {
 			self.pushErr(tokens[0], "invalid syntax")
 			ret nil
 		}
-		tokens = tokens[1:] // Remove the bind keyword.
+		tokens = tokens[1:] // Remove the extern keyword.
 
-		const Binded = true
-		ret self.buildUseDecl(tokens, Binded)
+		const Extern = true
+		ret self.buildUseDecl(tokens, Extern)
 	}
 
-	fn buildBind(mut &self, mut tokens: []&token::Token): (data: ast::NodeData) {
+	fn buildExtern(mut &self, mut tokens: []&token::Token): (data: ast::NodeData) {
 		mut token := tokens[0]
 		if len(tokens) == 1 {
 			self.pushErr(token, "invalid syntax")
@@ -1467,7 +1467,7 @@ impl parser {
 
 		// Save mode to restore and set additional required modes.
 		mode := self.mode
-		// Bind defines are may defined by a Jule keyword. It should be valid.
+		// Extern defines are may defined by a Jule keyword. It should be valid.
 		// Since they accessed and defined via keyword, it should be safe and clear.
 		self.mode |= allowKeywordIdentifiers
 
@@ -1475,14 +1475,14 @@ impl parser {
 		match token.ID {
 		| token::FN
 		| token::UNSAFE:
-			data = self.buildBindFunc(tokens)
+			data = self.buildExternFunc(tokens)
 		| token::CONST
 		| token::LET:
-			data = self.buildBindVar(tokens)
+			data = self.buildExternVar(tokens)
 		| token::STRUCT:
-			data = self.buildBindStruct(tokens)
+			data = self.buildExternStruct(tokens)
 		| token::TYPE:
-			data = self.buildBindTypeAlias(tokens)
+			data = self.buildExternTypeAlias(tokens)
 		|:
 			self.pushErr(token, "invalid syntax")
 		}
@@ -1634,8 +1634,8 @@ impl parser {
 			ret self.buildTraitDecl(tokens)
 		| token::IMPL:
 			ret self.buildImpl(tokens)
-		| token::BIND:
-			ret self.buildBind(tokens)
+		| token::EXTERN:
+			ret self.buildExtern(tokens)
 		|:
 			self.pushErr(token, "invalid syntax")
 			ret nil
@@ -1684,13 +1684,13 @@ impl parser {
 	fn pushMetaNodes(mut &self, mut tokens: []&token::Token): bool {
 		match tokens[0].ID {
 		| token::USE:
-			const Binded = false
-			mut decl := self.buildUseDecl(tokens, Binded)
+			const Extern = false
+			mut decl := self.buildUseDecl(tokens, Extern)
 			self.pushUseDecl(decl)
 			ret true
-		| token::BIND:
+		| token::EXTERN:
 			if len(tokens) > 1 && tokens[1].ID == token::USE {
-				mut decl := self.buildBindUse(tokens)
+				mut decl := self.buildExternUse(tokens)
 				self.pushUseDecl(decl)
 				ret true
 			}

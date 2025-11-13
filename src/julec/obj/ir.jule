@@ -79,7 +79,7 @@ impl IR {
 	fn CollectPasses(mut *self) {
 		pushPasses(self.Main, &self.Passes)
 		for (_, mut u) in self.Used {
-			if !u.Bind {
+			if !u.Extern {
 				pushPasses(u.Package, &self.Passes)
 			}
 		}
@@ -88,12 +88,12 @@ impl IR {
 	fn appendStructs(*self, mut p: &sema::Package, mut &buffer: *[]&sema::Struct) {
 		for (_, mut f) in p.Files {
 			for (_, mut s) in f.Structs {
-				if !s.Bind {
+				if !s.Extern {
 					*buffer = append(*buffer, s)
 				}
 			}
 			for (_, mut ta) in f.TypeAliases {
-				if !ta.Bind && ta.Strict {
+				if !ta.Extern && ta.Strict {
 					*buffer = append(*buffer, ta.TypeSym.Type.Kind.(&sema::StructIns).Decl)
 				}
 			}
@@ -101,12 +101,12 @@ impl IR {
 	}
 
 	// Returns all structures of main package and used packages.
-	// Ignores binded declarations, but appends strict type alias structures also.
+	// Ignores external declarations, but appends strict type alias structures also.
 	// Appends used packages first, then the main package.
 	fn GetAllStructures(mut *self): []&sema::Struct {
 		let mut buffer: []&sema::Struct = nil
 		for (_, mut u) in self.Used {
-			if !u.Bind {
+			if !u.Extern {
 				self.appendStructs(u.Package, &buffer)
 			}
 		}
@@ -117,7 +117,7 @@ impl IR {
 	fn appendGlobals(*self, mut p: &sema::Package, mut &buffer: *[]&sema::Var) {
 		for (_, mut f) in p.Files {
 			for (_, mut v) in f.Vars {
-				if v.Token != nil && !v.Bind && !v.Constant {
+				if v.Token != nil && !v.Extern && !v.Constant {
 					*buffer = append(*buffer, v)
 				}
 			}
@@ -125,7 +125,7 @@ impl IR {
 	}
 
 	// Returns all globals of main package and used packages.
-	// Ignores binded declarations and constants.
+	// Ignores external declarations and constants.
 	// If orderDefs is true, orders defines of each package.
 	// Appends used packages first, then the main package.
 	fn GetAllGlobals(mut *self, orderDefs: bool): []&sema::Var {
@@ -140,7 +140,7 @@ impl IR {
 		let mut buffer: []&sema::Var = nil
 		mut n := len(buffer)
 		for (_, mut u) in self.Used {
-			if !u.Bind {
+			if !u.Extern {
 				self.appendGlobals(u.Package, &buffer)
 				if orderDefs {
 					order(buffer[n:], true)
@@ -225,7 +225,7 @@ fn pushRuntimeToAST(mut f: &ast::AST) {
 			Kind: `"std/runtime"`,
 		},
 		Alias: nil,
-		Bind: false,
+		Extern: false,
 	}
 	f.UseDecls = append(f.UseDecls, decl)
 	if len(f.UseDecls) > 1 {

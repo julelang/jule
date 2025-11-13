@@ -521,7 +521,7 @@ impl exprCoder {
 				ret
 			}
 		}
-		if m.Bind {
+		if m.Extern {
 			d := obj::FindDirective(m.Directives, directive::Namespace)
 			if d != nil {
 				self.oc.writeBytes(concatAllParts(d.Args...))
@@ -606,12 +606,12 @@ impl exprCoder {
 	}
 
 	fn structureLit(mut &self, mut m: &sema::StructLitExpr) {
-		binded := obj::IsBindStruct(m.Strct)
-		if binded {
+		_extern := obj::IsExternStruct(m.Strct)
+		if _extern {
 			self.oc.write("(")
 		}
 		self.structureIns(m.Strct)
-		if binded {
+		if _extern {
 			self.oc.write(")")
 		}
 		self.oc.write("{")
@@ -634,8 +634,8 @@ impl exprCoder {
 					continue fields
 				}
 			}
-			if binded {
-				// Do not initialize field of binded struct.
+			if _extern {
+				// Do not initialize field of external struct.
 				inited = false
 				continue
 			}
@@ -954,9 +954,9 @@ impl exprCoder {
 			ret
 		}
 
-		// Skip methods/function-fields of the bind struct.
+		// Skip methods/function-fields of the external struct.
 		ssie, _ := m.Expr.(&sema::StructSubIdentExpr)
-		if ssie != nil && obj::IsBindStruct(ssie.Field.Owner) {
+		if ssie != nil && obj::IsExternStruct(ssie.Field.Owner) {
 			self.oc.write("(")
 			ret
 		}
@@ -1009,7 +1009,7 @@ impl exprCoder {
 		wrapped := self.isWrapped(m)
 		self.modelForCall(m.Expr)
 		if !m.Func.IsBuiltin() {
-			if m.Func.Decl.Bind && len(m.Func.Generics) > 0 {
+			if m.Func.Decl.Extern && len(m.Func.Generics) > 0 {
 				if !obj::HasDirective(m.Func.Decl.Directives, directive::Cdef) {
 					self.oc.write("<")
 					for (i, mut g) in m.Func.Generics {
@@ -1226,7 +1226,7 @@ impl exprCoder {
 		}
 
 		let mut destData: sema::Expr = &sema::Var{
-			Bind: true, // to use identifier directly
+			Extern: true, // to use identifier directly
 			Name: exceptName + ".result",
 		}
 
@@ -1373,7 +1373,7 @@ impl exprCoder {
 			self.possibleRefExpr(m.Index.Model)
 			self.oc.write(")")
 		| m.Expr.Type.Ptr() != nil
-		| obj::IsExprComesFromBind(m.Expr):
+		| obj::IsExprComesFromExtern(m.Expr):
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write("[")
 			self.possibleRefExpr(m.Index.Model)
@@ -1581,7 +1581,7 @@ impl exprCoder {
 	}
 
 	fn funcIns(mut &self, mut m: &sema::FuncIns) {
-		if m.Decl != nil && m.Decl.Bind {
+		if m.Decl != nil && m.Decl.Extern {
 			d := obj::FindDirective(m.Decl.Directives, directive::Namespace)
 			if d != nil {
 				self.oc.writeBytes(concatAllParts(d.Args...))
@@ -2339,7 +2339,7 @@ impl exprCoder {
 
 	// Writes default struct literal expression to initialize it by default.
 	fn initStructLit(mut &self, mut s: &sema::StructIns) {
-		if obj::IsBindStruct(s) {
+		if obj::IsExternStruct(s) {
 			self.oc.write("(")
 			self.structureIns(s)
 			self.oc.write("){}")

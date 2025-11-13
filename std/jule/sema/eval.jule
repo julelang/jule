@@ -365,7 +365,7 @@ impl eval {
 		ret findBuiltinDef(name)
 	}
 
-	fn getDef(mut *self, name: str, _bind: bool): any {
+	fn getDef(mut *self, name: str, _extern: bool): any {
 		// Return nil for blank identifiers.
 		if jule::IsBlank(name) {
 			ret nil
@@ -375,17 +375,17 @@ impl eval {
 		// Because self.lookup might be a scopeChecker, and shadowing may occurred.
 		// If any variable or type aliases is shadowing other declarations such us structure,
 		// it will result as wrong expression evaluation.
-		mut v := self.lookup.FindVar(name, _bind)
+		mut v := self.lookup.FindVar(name, _extern)
 		if v != nil {
 			ret v
 		}
 
-		mut ta := self.lookup.FindTypeAlias(name, _bind)
+		mut ta := self.lookup.FindTypeAlias(name, _extern)
 		if ta != nil {
 			ret ta
 		}
 
-		if !_bind {
+		if !_extern {
 			mut t := self.lookup.FindTrait(name)
 			if t != nil {
 				ret t
@@ -402,12 +402,12 @@ impl eval {
 			}
 		}
 
-		mut f := self.lookup.FindFunc(name, _bind)
+		mut f := self.lookup.FindFunc(name, _extern)
 		if f != nil {
 			ret f
 		}
 
-		mut s := self.lookup.FindStruct(name, _bind)
+		mut s := self.lookup.FindStruct(name, _extern)
 		if s != nil {
 			ret s
 		}
@@ -610,7 +610,7 @@ impl eval {
 		// Do not check if v.Used is true. It means it already analyzed.
 		// If variable is global, it should be have initialize expression.
 		// So, nil value means something may be wrong.
-		if !v.Checked && !v.Bind && v.Scope == nil && (v.ValueSym == nil || v.ValueSym.Value == nil) {
+		if !v.Checked && !v.Extern && v.Scope == nil && (v.ValueSym == nil || v.ValueSym.Value == nil) {
 			// Save source file of global variable.
 			// Use it for evaluation and checking for correct analysis.
 			// Otherwise, evaluation problems may occur.
@@ -645,7 +645,7 @@ impl eval {
 			Model: v,
 		}
 		if v.ValueSym != nil && v.ValueSym.Value != nil {
-			if !v.Bind && v.IsInitialized() {
+			if !v.Extern && v.IsInitialized() {
 				val.IsRune = v.ValueSym.Value.IsRune
 			}
 			if v.Constant && v.ValueSym.Value.Constant != nil {
@@ -760,7 +760,7 @@ impl eval {
 	}
 
 	fn evalName(mut *self, mut name: &ast::NameExpr): &Value {
-		mut def := self.getDef(name.Name, name.Bind)
+		mut def := self.getDef(name.Name, name.Extern)
 		ret self.evalDef(def, name.Token)
 	}
 
@@ -1867,13 +1867,13 @@ impl eval {
 		}
 		// casting applied successfully
 
-		if t.Bind() || v.Type.Bind() {
-			// if destination or expression type is binded, it requires Unsafe Jule for this.
+		if t.Extern() || v.Type.Extern() {
+			// if destination or expression type is external, it requires Unsafe Jule for this.
 			// Push error if Unsafe Jule is not available. But do not return nil data,
 			// casting is valid, just Unsafe Jule is missing. Push only information error for that.
 			// Allow untyped constant literals for casting with no Unsafe Jule.
 			if !self.isUnsafe() && (!v.IsConst() || !v.untyped) {
-				self.pushErr(errorToken, "casting bind type cannot be done without Unsafe Jule")
+				self.pushErr(errorToken, "casting external type cannot be done without Unsafe Jule")
 				self.pushSuggestion(`use unsafe Jule with "unsafe { ... }"`)
 			}
 		}
@@ -1957,9 +1957,9 @@ impl eval {
 		mut lookup := self.lookup
 		self.lookup = imp
 
-		const Binded = false
+		const Extern = false
 		self.disallowBuiltin()
-		mut def := self.getDef(s.Name.Kind, Binded)
+		mut def := self.getDef(s.Name.Kind, Extern)
 		self.allowBuiltin()
 		self.lookup = lookup
 		ret self.evalDef(def, s.Name)

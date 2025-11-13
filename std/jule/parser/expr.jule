@@ -296,7 +296,7 @@ impl exprBuilder {
 			Data: &ast::NameExpr{
 				Token: t,
 				Name: name,
-				Bind: false,
+				Extern: false,
 			},
 		}
 
@@ -312,7 +312,7 @@ impl exprBuilder {
 			ret nil
 		}
 		match self.t.ID {
-		| token::BIND:
+		| token::EXTERN:
 			t := self.t
 			self.next()
 			if !self.expect(token::PERIOD, "expected period") {
@@ -322,9 +322,9 @@ impl exprBuilder {
 				}
 				mut name := self.t
 				self.next()
-				// Special case: allow using keywords as identifier for bind defines.
+				// Special case: allow using keywords as identifier for external defines.
 				if name.ID != token::NAME && !token::IsKeyword(name.Kind) {
-					self.pushErr(name, "expected identifier for bind namespace type")
+					self.pushErr(name, "expected identifier for external namespace type")
 					ret &ast::Expr{} // bad expression
 				}
 				mut typ := self.parseNameType(name, name.Kind)
@@ -332,12 +332,12 @@ impl exprBuilder {
 					match type typ.Data {
 					| &ast::NameExpr:
 						// Plain identifier.
-						typ.Data.(&ast::NameExpr).Bind = true
+						typ.Data.(&ast::NameExpr).Extern = true
 					| &ast::IndexExpr:
 						// Identifier with generics.
-						typ.Data.(&ast::IndexExpr).X.Data.(&ast::NameExpr).Bind = true
+						typ.Data.(&ast::IndexExpr).X.Data.(&ast::NameExpr).Extern = true
 					|:
-						self.pushErr(t, "expected identifier for bind namespace type")
+						self.pushErr(t, "expected identifier for external namespace type")
 					}
 				}
 				ret typ
@@ -681,7 +681,7 @@ impl exprBuilder {
 			self.err = false
 			fall
 		| token::LAND | token::AND | token::MUL | token::ARROW
-		| token::NAME | token::CHAN | token::MAP | token::FN | token::BIND | token::UNSAFE:
+		| token::NAME | token::CHAN | token::MAP | token::FN | token::EXTERN | token::UNSAFE:
 			isTyp = true
 			self.i--         // Back to ]
 			self.t = self.lt // Back to ]
@@ -974,7 +974,7 @@ impl exprBuilder {
 				Data: &ast::NameExpr{
 					Token: t,
 					Name: name,
-					Bind: false,
+					Extern: false,
 				},
 			}
 		| token::STR | token::INT | token::FLOAT | token::IMAG | token::RUNE:

@@ -97,7 +97,7 @@ fn buildTypeAlias(mut decl: &ast::TypeAlias): &TypeAlias {
 		Scope: decl.Scope,
 		Strict: decl.Strict,
 		Public: decl.Public,
-		Bind: decl.Bind,
+		Extern: decl.Extern,
 		Token: decl.Token,
 		Name: decl.Name,
 		TypeSym: buildType(decl.Type),
@@ -130,7 +130,7 @@ fn buildStruct(mut decl: &ast::Struct): &Struct {
 		Name: decl.Name,
 		Fields: buildFields(decl.Fields),
 		Public: decl.Public,
-		Bind: decl.Bind,
+		Extern: decl.Extern,
 		Directives: decl.Directives,
 		Generics: decl.Generics,
 	}
@@ -171,7 +171,7 @@ fn buildFunc(mut decl: &ast::Func): &Func {
 		Global: decl.Global,
 		Unsafe: decl.Unsafe,
 		Public: decl.Public,
-		Bind: decl.Bind,
+		Extern: decl.Extern,
 		Static: decl.Static,
 		Exceptional: decl.Exceptional,
 		Name: decl.Name,
@@ -267,7 +267,7 @@ fn buildVar(mut decl: &ast::Var): &Var {
 	ret &Var{
 		Token: decl.Token,
 		Name: decl.Name,
-		Bind: decl.Bind,
+		Extern: decl.Extern,
 		Constant: decl.Const,
 		Mutable: decl.Mutable,
 		Public: decl.Public,
@@ -355,7 +355,7 @@ impl symBuilder {
 	// Checks import path and returns as filepath if no error exist.
 	fn checkImpPath(mut &self, mut decl: &ast::Use): (std: bool, filepath: str) {
 		path := decl.Path.Kind[1 : len(decl.Path.Kind)-1] // remove quotes
-		if decl.Bind && build::IsStdHeaderPath(path) {
+		if decl.Extern && build::IsStdHeaderPath(path) {
 			ret false, path
 		}
 
@@ -392,7 +392,7 @@ impl symBuilder {
 			filepath = self.checkAbsPath(filepath, decl, mod)
 		}
 
-		if decl.Bind {
+		if decl.Extern {
 			ext := filepath::Ext(filepath)
 			if !build::IsValidHeaderExt(ext) && !build::IsValidCppExt(ext) {
 				self.pushErr(decl.Token, "invalid C/C++ extension: "+conv::Quote(ext))
@@ -405,8 +405,8 @@ impl symBuilder {
 			self.pushErr(decl.Token, "path not found or cannot be accessed: "+decl.Path.Kind)
 			ret false, ""
 		}
-		exist := !decl.Bind && info.IsDir() ||
-			decl.Bind && info.Mode().IsRegular()
+		exist := !decl.Extern && info.IsDir() ||
+			decl.Extern && info.Mode().IsRegular()
 		if !exist {
 			self.pushErr(decl.Token, "path not found or cannot be accessed: "+decl.Path.Kind)
 			ret false, ""
@@ -436,8 +436,8 @@ impl symBuilder {
 			Std: std,
 		}
 
-		if decl.Bind {
-			imp.Bind = true
+		if decl.Extern {
+			imp.Extern = true
 			imp.Package = nil // Cpp headers haven't symbol table.
 			ret imp
 		}
@@ -545,7 +545,7 @@ impl symBuilder {
 	}
 
 	fn importPackage(mut &self, mut imp: &ImportInfo, mut decl: &ast::Use): (ok: bool) {
-		if imp.Bind {
+		if imp.Extern {
 			ret true
 		}
 

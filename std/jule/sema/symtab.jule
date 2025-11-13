@@ -36,34 +36,34 @@ impl Lookup for SymTab {
 		ret nil
 	}
 
-	// Returns variable by identifier and bind state.
+	// Returns variable by identifier and external state.
 	// Returns nil if refenrece not exist any variable in this identifier.
-	fn FindVar(mut *self, name: str, _bind: bool): &Var {
-		ret self.findVar(name, _bind, false)
+	fn FindVar(mut *self, name: str, _extern: bool): &Var {
+		ret self.findVar(name, _extern, false)
 	}
 
-	// Returns type alias by identifier and bind state.
+	// Returns type alias by identifier and external state.
 	// Returns nil if not exist any type alias in this identifier.
-	fn FindTypeAlias(mut *self, name: str, _bind: bool): &TypeAlias {
-		ret self.findTypeAlias(name, _bind, false)
+	fn FindTypeAlias(mut *self, name: str, _extern: bool): &TypeAlias {
+		ret self.findTypeAlias(name, _extern, false)
 	}
 
-	// Returns struct by identifier and bind state.
+	// Returns struct by identifier and external state.
 	// Returns nil if not exist any struct in this identifier.
-	fn FindStruct(mut *self, name: str, _bind: bool): &Struct {
+	fn FindStruct(mut *self, name: str, _extern: bool): &Struct {
 		for (_, mut s) in self.Structs {
-			if s.Name == name && s.Bind == _bind {
+			if s.Name == name && s.Extern == _extern {
 				ret s
 			}
 		}
 		ret nil
 	}
 
-	// Returns function by identifier and bind state.
+	// Returns function by identifier and external state.
 	// Returns nil if not exist any function in this identifier.
-	fn FindFunc(mut *self, name: str, _bind: bool): &Func {
+	fn FindFunc(mut *self, name: str, _extern: bool): &Func {
 		for (_, mut f) in self.Funcs {
-			if f.Name == name && f.Bind == _bind {
+			if f.Name == name && f.Extern == _extern {
 				ret f
 			}
 		}
@@ -114,18 +114,18 @@ impl SymTab {
 		ret -1
 	}
 
-	fn findVar(mut *self, name: str, _bind: bool, reverse: bool): &Var {
+	fn findVar(mut *self, name: str, _extern: bool, reverse: bool): &Var {
 		if reverse {
 			mut i := len(self.Vars) - 1
 			for i >= 0; i-- {
 				mut v := self.Vars[i]
-				if v.Name == name && v.Bind == _bind {
+				if v.Name == name && v.Extern == _extern {
 					ret v
 				}
 			}
 		} else {
 			for (_, mut v) in self.Vars {
-				if v.Name == name && v.Bind == _bind {
+				if v.Name == name && v.Extern == _extern {
 					ret v
 				}
 			}
@@ -133,18 +133,18 @@ impl SymTab {
 		ret nil
 	}
 
-	fn findTypeAlias(mut *self, name: str, _bind: bool, reverse: bool): &TypeAlias {
+	fn findTypeAlias(mut *self, name: str, _extern: bool, reverse: bool): &TypeAlias {
 		if reverse {
 			mut i := len(self.TypeAliases) - 1
 			for i >= 0; i-- {
 				mut ta := self.TypeAliases[i]
-				if ta.Name == name && ta.Bind == _bind {
+				if ta.Name == name && ta.Extern == _extern {
 					ret ta
 				}
 			}
 		} else {
 			for (_, mut ta) in self.TypeAliases {
-				if ta.Name == name && ta.Bind == _bind {
+				if ta.Name == name && ta.Extern == _extern {
 					ret ta
 				}
 			}
@@ -154,32 +154,32 @@ impl SymTab {
 
 	// Returns define by identifier.
 	// Returns nil if not exist any define in this identifier.
-	fn defByIdent(mut *self, name: str, _bind: bool): any {
+	fn defByIdent(mut *self, name: str, _extern: bool): any {
 		for (_, mut v) in self.Vars {
-			if v.Name == name && v.Bind == _bind {
+			if v.Name == name && v.Extern == _extern {
 				ret v
 			}
 		}
 
 		for (_, mut ta) in self.TypeAliases {
-			if ta.Name == name && ta.Bind == _bind {
+			if ta.Name == name && ta.Extern == _extern {
 				ret ta
 			}
 		}
 
 		for (_, mut s) in self.Structs {
-			if s.Name == name && s.Bind == _bind {
+			if s.Name == name && s.Extern == _extern {
 				ret s
 			}
 		}
 
 		for (_, mut f) in self.Funcs {
-			if f.Name == name && f.Bind == _bind {
+			if f.Name == name && f.Extern == _extern {
 				ret f
 			}
 		}
 
-		if _bind {
+		if _extern {
 			ret nil
 		}
 
@@ -207,32 +207,32 @@ impl SymTab {
 	// Reports this identifier duplicated in symbol table.
 	// The "self" parameter represents address of exception identifier.
 	// If founded identifier address equals to self, will be skipped.
-	fn isDuplicatedName(*self, itself: uintptr, name: str, _bind: bool): bool {
+	fn isDuplicatedName(*self, itself: uintptr, name: str, _extern: bool): bool {
 		for _, v in self.Vars {
-			if uintptr(v) != itself && v.Name == name && v.Bind == _bind {
+			if uintptr(v) != itself && v.Name == name && v.Extern == _extern {
 				ret true
 			}
 		}
 
 		for _, ta in self.TypeAliases {
-			if uintptr(ta) != itself && ta.Name == name && ta.Bind == _bind {
+			if uintptr(ta) != itself && ta.Name == name && ta.Extern == _extern {
 				ret true
 			}
 		}
 
 		for _, s in self.Structs {
-			if uintptr(s) != itself && s.Name == name && s.Bind == _bind {
+			if uintptr(s) != itself && s.Name == name && s.Extern == _extern {
 				ret true
 			}
 		}
 
 		for _, f in self.Funcs {
-			if uintptr(f) != itself && f.Name == name && f.Bind == _bind {
+			if uintptr(f) != itself && f.Name == name && f.Extern == _extern {
 				ret true
 			}
 		}
 
-		if _bind {
+		if _extern {
 			ret false
 		}
 

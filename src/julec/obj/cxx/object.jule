@@ -804,7 +804,7 @@ impl ObjectCoder {
 			self.write("#define __JULE_DISABLE__SAFETY\n")
 		}
 
-		// Include binded standard library headers here, before the API header.
+		// Include external standard library headers here, before the API header.
 		// See developer reference (4).
 		self.links(true)
 
@@ -819,7 +819,7 @@ impl ObjectCoder {
 	fn links(mut &self, std: bool) {
 		for _, used in self.ir.Used {
 			match {
-			| !used.Bind:
+			| !used.Extern:
 				continue
 			| build::IsStdHeaderPath(used.Path):
 				if !std {
@@ -900,9 +900,9 @@ impl ObjectCoder {
 		mut rmodel := "_other_."
 
 		for (_, mut f) in s.Fields {
-			// Skip binded struct kinds.
+			// Skip external struct kinds.
 			strct := f.Type.Struct()
-			if strct != nil && strct.Decl != nil && strct.Decl.Bind {
+			if strct != nil && strct.Decl != nil && strct.Decl.Extern {
 				continue
 			}
 			if written {
@@ -1040,7 +1040,7 @@ impl ObjectCoder {
 		obj::IterPackages(self.ir, fn|mut pkg| {
 			obj::IterFiles(pkg, fn|mut file| {
 				for (_, mut f) in file.Funcs {
-					if !f.Bind && f.Token != nil {
+					if !f.Extern && f.Token != nil {
 						self.pushResult(f)
 						self.funcDecl(f, false)
 					}
@@ -1521,7 +1521,7 @@ impl ObjectCoder {
 							continue
 						}
 					}
-					if !f.Bind && f.Token != nil {
+					if !f.Extern && f.Token != nil {
 						self.func(f)
 						self.write("\n\n")
 					}

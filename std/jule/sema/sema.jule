@@ -325,60 +325,60 @@ impl Lookup for sema {
 		ret self.file.SelectPackage(selector)
 	}
 
-	// Returns variable by identifier and bind state.
+	// Returns variable by identifier and external state.
 	// Returns nil if not exist any variable in this identifier.
 	//
 	// Lookups:
 	//	- Package file's symbol table.
 	//	- Current file's public denifes of imported packages.
-	fn FindVar(mut *self, name: str, _bind: bool): &Var {
+	fn FindVar(mut *self, name: str, _extern: bool): &Var {
 		// Lookup package files.
-		mut v := findVarInPackage(self.files, name, _bind)
+		mut v := findVarInPackage(self.files, name, _extern)
 		if v != nil {
 			ret v
 		}
 		ret nil
 	}
 
-	// Returns type alias by identifier and bind state.
+	// Returns type alias by identifier and external state.
 	// Returns nil if not exist any type alias in this identifier.
 	//
 	// Lookups:
 	//	- Package file's symbol table.
 	//	- Current file's public denifes of imported packages.
-	fn FindTypeAlias(mut *self, name: str, _bind: bool): &TypeAlias {
+	fn FindTypeAlias(mut *self, name: str, _extern: bool): &TypeAlias {
 		// Lookup package files.
-		mut ta := findTypeAliasInPackage(self.files, name, _bind)
+		mut ta := findTypeAliasInPackage(self.files, name, _extern)
 		if ta != nil {
 			ret ta
 		}
 		ret nil
 	}
 
-	// Returns struct by identifier and bind state.
+	// Returns struct by identifier and external state.
 	// Returns nil if not exist any struct in this identifier.
 	//
 	// Lookups:
 	//	- Package file's symbol table.
 	//	- Current file's public denifes of imported packages.
-	fn FindStruct(mut *self, name: str, _bind: bool): &Struct {
+	fn FindStruct(mut *self, name: str, _extern: bool): &Struct {
 		// Lookup package files.
-		mut s := findStructInPackage(self.files, name, _bind)
+		mut s := findStructInPackage(self.files, name, _extern)
 		if s != nil {
 			ret s
 		}
 		ret nil
 	}
 
-	// Returns function by identifier and bind state.
+	// Returns function by identifier and external state.
 	// Returns nil if not exist any function in this identifier.
 	//
 	// Lookups:
 	//	- Package file's symbol table.
 	//	- Current file's public denifes of imported packages.
-	fn FindFunc(mut *self, name: str, _bind: bool): &Func {
+	fn FindFunc(mut *self, name: str, _extern: bool): &Func {
 		// Lookup package files.
-		mut f := findFuncInPackage(self.files, name, _bind)
+		mut f := findFuncInPackage(self.files, name, _extern)
 		if f != nil {
 			ret f
 		}
@@ -489,9 +489,9 @@ impl sema {
 	// Reports this identifier duplicated in package's global scope.
 	// The "self" parameter represents address of exception identifier.
 	// If founded identifier address equals to self, will be skipped.
-	fn isDuplicatedName(*self, itself: uintptr, name: str, _bind: bool): bool {
+	fn isDuplicatedName(*self, itself: uintptr, name: str, _extern: bool): bool {
 		for _, f in self.files {
-			if f.isDuplicatedName(itself, name, _bind) {
+			if f.isDuplicatedName(itself, name, _extern) {
 				ret true
 			}
 		}
@@ -531,9 +531,9 @@ impl sema {
 			ret true
 		}
 		for (_, mut f) in imp.Package.Files {
-			// Binded defines can't export.
-			const Bind = false
-			mut def := f.defByIdent(name, Bind)
+			// External defines can't export.
+			const Extern = false
+			mut def := f.defByIdent(name, Extern)
 			if def != nil {
 				ret def
 			}
@@ -572,7 +572,7 @@ impl sema {
 	}
 
 	fn checkImport(mut *self, mut imp: &ImportInfo): bool {
-		if imp.Bind {
+		if imp.Extern {
 			ret true
 		}
 
@@ -615,7 +615,7 @@ impl sema {
 	fn checkPackages(mut &self, mut imports: []&ImportInfo): (ok: bool) {
 		mut semas := make([]&sema, len(imports))
 		for (i, mut imp) in imports {
-			if !imp.Bind {
+			if !imp.Extern {
 				mut s := &sema{
 					files: imp.Package.Files,
 					flags: self.flags,
@@ -626,7 +626,7 @@ impl sema {
 			}
 		}
 		for (i, mut imp) in imports {
-			if !imp.Bind {
+			if !imp.Extern {
 				mut sema := semas[i]
 				sema.check()
 				if len(sema.errors) != 0 {
@@ -1264,13 +1264,13 @@ impl sema {
 		if ta.Strict {
 			mut s := initNewStructType(ta.Name, pseudoSource)
 			s.Decl.sema = self
-			s.Decl.Bind = ta.Bind
+			s.Decl.Extern = ta.Extern
 			s.Decl.Token = ta.Token
 			s.Decl.Public = ta.Public
 			ta.TypeSym.Type = &Type{Kind: s}
 			if len(ta.Generics) > 0 {
-				if ta.Bind {
-					self.pushErr(ta.Token, "bind strict type alias cannot have generics")
+				if ta.Extern {
+					self.pushErr(ta.Token, "external strict type alias cannot have generics")
 					ret false
 				}
 				ok = self.checkDeclGenerics(ta.Generics)
@@ -1298,8 +1298,8 @@ impl sema {
 		if !ok {
 			ret false
 		}
-		if !ta.Strict && ta.Bind {
-			self.pushErr(ta.Token, "bind types cannot be soft type alias")
+		if !ta.Strict && ta.Extern {
+			self.pushErr(ta.Token, "external types cannot be soft type alias")
 			self.pushSuggestion("define as strict type alias, like; type @: Type", ta.Name)
 		}
 		ret true
@@ -1307,7 +1307,7 @@ impl sema {
 
 	// Checks type alias declaration with duplicated identifiers.
 	fn checkTypeAliasDeclDup(mut &self, mut ta: &TypeAlias) {
-		if self.isDuplicatedName(uintptr(ta), ta.Name, ta.Bind) {
+		if self.isDuplicatedName(uintptr(ta), ta.Name, ta.Extern) {
 			self.pushErr(ta.Token, "identifier @ is duplicated in this scope", ta.Name)
 		}
 		self.checkTypeAliasDecl(ta, nil, self)
@@ -1612,8 +1612,8 @@ impl sema {
 	// Checks generics, parameters and return type.
 	// Not checks scope, and other things.
 	fn checkFuncDeclPrototype(mut &self, mut f: &Func) {
-		if f.Exceptional && f.Bind {
-			self.pushErr(f.Token, "bind functions cannot be exceptional")
+		if f.Exceptional && f.Extern {
+			self.pushErr(f.Token, "external functions cannot be exceptional")
 			ret
 		}
 
@@ -1960,7 +1960,7 @@ impl sema {
 			if groupError {
 				self.pushErr(decl.Token, "constant variable must be initialized explicitly")
 			}
-			if !decl.Bind && decl.Static {
+			if !decl.Extern && decl.Static {
 				self.pushErr(decl.Token, "static variable must be initialized explicitly")
 			}
 			if decl.Reference {
@@ -1972,13 +1972,13 @@ impl sema {
 	// Checks variable declaration for global scope.
 	// Checks duplicated identifiers by Sema.
 	fn checkGlobalVarDecl(mut &self, mut decl: &Var) {
-		if self.isDuplicatedName(uintptr(decl), decl.Name, decl.Bind) {
+		if self.isDuplicatedName(uintptr(decl), decl.Name, decl.Extern) {
 			self.pushErr(decl.Token, "identifier @ is duplicated in this scope", decl.Name)
 		}
-		if decl.Bind && decl.Constant {
-			self.pushErr(decl.Token, "bind variable cannot be constant")
+		if decl.Extern && decl.Constant {
+			self.pushErr(decl.Token, "external variable cannot be constant")
 		}
-		if !decl.Bind && !decl.Constant && !decl.Static {
+		if !decl.Extern && !decl.Constant && !decl.Static {
 			self.pushErr(decl.Token, "global variable must be static")
 		}
 		self.checkDirectives(decl.Directives, decl)
@@ -2063,7 +2063,7 @@ impl sema {
 	fn checkStructDecl(mut &self, mut s: &Struct) {
 		if jule::IsBlank(s.Name) {
 			self.pushErr(s.Token, "blank identifier cannot be used as an identifier for this declaration")
-		} else if self.isDuplicatedName(uintptr(s), s.Name, s.Bind) {
+		} else if self.isDuplicatedName(uintptr(s), s.Name, s.Extern) {
 			self.pushErr(s.Token, "identifier @ is duplicated in this scope", s.Name)
 		}
 
@@ -2127,7 +2127,7 @@ impl sema {
 		self.checkDirectives(f.Directives, f)
 		self.checkAnonFuncDecl(f)
 
-		if f.Owner == nil && self.isDuplicatedName(uintptr(f), f.Name, f.Bind) {
+		if f.Owner == nil && self.isDuplicatedName(uintptr(f), f.Name, f.Extern) {
 			if f.Name == jule::InitFunc {
 				init := self.FindFunc(jule::InitFunc, false)
 				if init != nil {
@@ -2405,9 +2405,9 @@ impl sema {
 	// Checks current package file's global variables.
 	fn checkGlobals(mut &self) {
 		for (_, mut decl) in self.file.Vars {
-			// Skip if variable is binded or already used.
+			// Skip if variable is external or already used.
 			// If it is already used, should already analyzed.
-			if decl.Bind || decl.Used {
+			if decl.Extern || decl.Used {
 				continue
 			}
 			self.checkVar(decl, self)
@@ -2558,7 +2558,7 @@ impl sema {
 		}
 
 		ok = true
-		s.Comparable = !s.Decl.Bind
+		s.Comparable = !s.Decl.Extern
 		for (_, mut f) in s.Fields {
 			// Set instance for referencer if field declaration is not mutable.
 			// But field declared as mutable, do not set.
@@ -2651,7 +2651,7 @@ impl sema {
 	}
 
 	fn checkTypeStruct(mut &self, mut s: &Struct) {
-		if s.Bind {
+		if s.Extern {
 			ret
 		}
 		s.checked = true
@@ -2685,7 +2685,7 @@ impl sema {
 	}
 
 	fn precheckStructType(mut &self, mut s: &Struct) {
-		if s.Bind {
+		if s.Extern {
 			ret
 		}
 
@@ -2749,7 +2749,7 @@ impl sema {
 	}
 
 	fn checkFuncInsCaller(mut &self, mut f: &FuncIns, mut caller: &token::Token) {
-		if f.Decl.Bind || f.checked {
+		if f.Decl.Extern || f.checked {
 			ret
 		}
 		f.checked = true
@@ -2777,7 +2777,7 @@ impl sema {
 	}
 
 	fn checkFunc(mut &self, mut f: &Func) {
-		if f.Bind {
+		if f.Extern {
 			ret
 		}
 		for (_, mut ins) in f.Instances {

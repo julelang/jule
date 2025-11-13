@@ -92,9 +92,9 @@ impl ObjectDeadCode {
 				// Set reserved methods as live.
 				// So, removing these methods may cause compilation problems,
 				// or unexpected program bavior.
-				const Binded = false
+				const Extern = false
 
-				mut _str := s.FindMethod("Str", Binded)
+				mut _str := s.FindMethod("Str", Extern)
 				if _str != nil && sema::FuncPattern.Str(_str) {
 					mut fins := _str.Instances[0]
 					self.fusePushLive(fins)
@@ -189,8 +189,8 @@ impl ObjectDeadCode {
 		// Collect test functions and the testing::T struct if test compilation is enabled.
 		if env::Test {
 			if len(pkg.Files) > 0 && obj::IsStdPackage(pkg.Files[0].File.Path, "testing") {
-				const Binded = false
-				mut s := pkg.FindStruct("T", Binded)
+				const Extern = false
+				mut s := pkg.FindStruct("T", Extern)
 				mut ins := s.Instances[0]
 				self.pushStructAsLive(ins)
 				for (_, mut m) in ins.Methods {
@@ -242,7 +242,7 @@ impl ObjectDeadCode {
 		self.fusePushLive(meta::Program.Runtime.Cmplx128)
 
 		for (_, mut used) in self.ir.Used {
-			if !used.Bind {
+			if !used.Extern {
 				self.collectLivePackage(used.Package)
 			}
 		}
@@ -399,7 +399,7 @@ impl ObjectDeadCode {
 
 	fn removeDeads(mut &self) {
 		for (_, mut used) in self.ir.Used {
-			if !used.Bind {
+			if !used.Extern {
 				self.removeDeadsPackage(used.Package)
 			}
 		}

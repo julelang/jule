@@ -314,67 +314,67 @@ impl Lookup for scopeChecker {
 		ret self.s.SelectPackage(selector)
 	}
 
-	// Returns variable by identifier and bind state.
+	// Returns variable by identifier and external state.
 	// Returns nil if not exist any variable in this identifier.
 	//
 	// Lookups:
 	//	- Current scope.
 	//	- Parent scopes.
 	//	- Sema.
-	fn FindVar(mut *self, name: str, _bind: bool): &Var {
+	fn FindVar(mut *self, name: str, _extern: bool): &Var {
 		const Closure = true // allow capturing variables from parent scope
-		if !_bind { // Local variables cannot be bind.
+		if !_extern { // Local variables cannot be external.
 			mut v := self.findVar(name, Closure)
 			if v != nil {
 				ret v
 			}
 		}
-		ret self.s.FindVar(name, _bind)
+		ret self.s.FindVar(name, _extern)
 	}
 
-	// Returns type alias by identifier and bind state.
+	// Returns type alias by identifier and external state.
 	// Returns nil if not exist any type alias in this identifier.
 	//
 	// Lookups:
 	//	- Current scope.
 	//	- Parent scopes.
 	//	- Sema.
-	fn FindTypeAlias(mut *self, name: str, _bind: bool): &TypeAlias {
+	fn FindTypeAlias(mut *self, name: str, _extern: bool): &TypeAlias {
 		// Search reverse for correct shadowing.
 		const Reverse = true
-		mut ta := self.table.findTypeAlias(name, _bind, Reverse)
+		mut ta := self.table.findTypeAlias(name, _extern, Reverse)
 		if ta != nil {
 			ret ta
 		}
 
 		mut parent := self.parent
 		for parent != nil {
-			ta = parent.table.findTypeAlias(name, _bind, Reverse)
+			ta = parent.table.findTypeAlias(name, _extern, Reverse)
 			if ta != nil {
 				ret ta
 			}
 			parent = parent.parent
 		}
 
-		ret self.s.FindTypeAlias(name, _bind)
+		ret self.s.FindTypeAlias(name, _extern)
 	}
 
-	// Returns struct by identifier and bind state.
+	// Returns struct by identifier and external state.
 	// Returns nil if not exist any struct in this identifier.
 	//
 	// Lookups:
 	//	- Sema.
-	fn FindStruct(mut *self, name: str, _bind: bool): &Struct {
-		ret self.s.FindStruct(name, _bind)
+	fn FindStruct(mut *self, name: str, _extern: bool): &Struct {
+		ret self.s.FindStruct(name, _extern)
 	}
 
-	// Returns function by identifier and bind state.
+	// Returns function by identifier and external state.
 	// Returns nil if not exist any function in this identifier.
 	//
 	// Lookups:
 	//	- Sema.
-	fn FindFunc(mut *self, name: str, _bind: bool): &Func {
-		ret self.s.FindFunc(name, _bind)
+	fn FindFunc(mut *self, name: str, _extern: bool): &Func {
+		ret self.s.FindFunc(name, _extern)
 	}
 
 	// Returns trait by identifier.
@@ -511,7 +511,7 @@ impl scopeChecker {
 	// Like [Lookup.FindVar] but designed for local variables only.
 	fn findVar(mut *self, name: str, closure: bool): &Var {
 		const Reverse = true // Search reverse for correct shadowing.
-		const Bind = false   // Local variables cannot be bind.
+		const Extern = false // Local variables cannot be external.
 		mut parent := unsafe { (&scopeChecker)(self) }
 		for parent != nil {
 			// Closure limitation mode is disabled and we are in the closure.
@@ -519,7 +519,7 @@ impl scopeChecker {
 			if !closure && parent.parent != nil && parent.owner != nil {
 				ret nil
 			}
-			mut v := parent.table.findVar(name, Bind, Reverse)
+			mut v := parent.table.findVar(name, Extern, Reverse)
 			if v != nil {
 				ret v
 			}

@@ -145,7 +145,7 @@ impl typeCoder {
 
 	// Generates C++ code of Struct instance type.
 	fn structureIns(mut *self, mut &buf: *strings::Builder, mut s: &sema::StructIns) {
-		if !s.Decl.Bind {
+		if !s.Decl.Extern {
 			if s.Source != nil {
 				self.kind(buf, s.Source)
 			} else {
@@ -279,11 +279,11 @@ impl typeCoder {
 		| k.Struct() != nil:
 			self.structureIns(buf, k.Struct())
 			ret
-		| k.Bind():
-			// As we can see here, bind defines use pure identifiers directly.
+		| k.Extern():
+			// As we can see here, external defines use pure identifiers directly.
 			// So, if you hesitate about a type that causes wrong code generation,
 			// write relevant algorithms above this case.
-			buf.WriteStr(obj::GetBindName(k))!
+			buf.WriteStr(obj::GetExternName(k))!
 			ret
 		| k.Prim() != nil:
 			self.prim(buf, k.Prim())
@@ -329,14 +329,14 @@ impl typeCoder {
 }
 
 const (
-	resultMap        = "m"
-	resultSlice      = "s"
-	resultPtr        = "p"
-	resultSptr       = "x"
-	resultArray      = "a"
-	resultFunc       = "f"
-	resultChan       = "c"
-	resultBindPrefix = "b"
+	resultMap          = "m"
+	resultSlice        = "s"
+	resultPtr          = "p"
+	resultSptr         = "x"
+	resultArray        = "a"
+	resultFunc         = "f"
+	resultChan         = "c"
+	resultExternPrefix = "e"
 )
 
 struct resultCoder {
@@ -398,7 +398,7 @@ impl resultCoder {
 	}
 
 	fn codeMut(mut *self, mut &s: *strings::Builder, mut t: &sema::Type) {
-		if t.Bind() {
+		if t.Extern() {
 			// TODO:
 			//	this method should be handle structures separately
 			//	because they are may use namespace directive,
@@ -406,8 +406,8 @@ impl resultCoder {
 			//	this makes the result identifier is non-unique
 			//	if namespace directive will not be removed in the future,
 			//	fix this conflict issues
-			s.WriteStr(resultBindPrefix)!
-			s.WriteStr(obj::GetBindName(t))!
+			s.WriteStr(resultExternPrefix)!
+			s.WriteStr(obj::GetExternName(t))!
 			ret
 		}
 		match type t.Kind {
@@ -465,7 +465,7 @@ impl resultCoder {
 
 // Reports whether type supports initialization.
 fn ableToInit(mut t: &sema::Type): bool {
-	ret !t.Bind()
+	ret !t.Extern()
 }
 
 // Reports whether type should initialized.

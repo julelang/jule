@@ -20,13 +20,13 @@ fn IsForwarded(s: &sema::Scope): bool {
 	ret isValue
 }
 
-// Reports whether expression comes from bind define.
-fn IsExprComesFromBind(v: &sema::Value): bool {
+// Reports whether expression comes from external define.
+fn IsExprComesFromExtern(v: &sema::Value): bool {
 	match type v.Model {
 	| &sema::Var:
-		ret v.Model.(&sema::Var).Bind
+		ret v.Model.(&sema::Var).Extern
 	| &sema::StructSubIdentExpr:
-		ret IsBindStruct(v.Model.(&sema::StructSubIdentExpr).Owner)
+		ret IsExternStruct(v.Model.(&sema::StructSubIdentExpr).Owner)
 	|:
 		ret false
 	}
@@ -73,16 +73,16 @@ fn IsImplicitImport(imp: &sema::ImportInfo): bool {
 	ret imp.Decl.Token == nil
 }
 
-// Reports whether structure is represents bind type.
+// Reports whether structure is represents external type.
 // Assumes the source type is struct if exist.
-fn IsBindStruct(s: &sema::StructIns): bool {
-	if s.Decl.Bind {
+fn IsExternStruct(s: &sema::StructIns): bool {
+	if s.Decl.Extern {
 		ret true
 	}
 	if s.Source != nil {
 		match type s.Source.Kind {
 		| &sema::StructIns:
-			ret IsBindStruct(s.Source.Kind.(&sema::StructIns))
+			ret IsExternStruct(s.Source.Kind.(&sema::StructIns))
 		}
 	}
 	ret false

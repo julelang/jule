@@ -39,7 +39,7 @@ struct TypeAlias {
 	Scope:    &ast::ScopeTree
 	Strict:   bool
 	Public:   bool
-	Bind:     bool
+	Extern:   bool
 	Used:     bool
 	Generic:  bool
 	Token:    &token::Token
@@ -96,15 +96,15 @@ impl Kind for Type {
 }
 
 impl Type {
-	// Reports whether type is bind kind.
-	fn Bind(*self): bool {
+	// Reports whether type is external kind.
+	fn Extern(*self): bool {
 		s, ok := self.Kind.(&StructIns)
 		if ok {
-			if s.Decl.Bind {
+			if s.Decl.Extern {
 				ret true
 			}
 			if s.Source != nil {
-				ret s.Source.Bind()
+				ret s.Source.Extern()
 			}
 		}
 		ret false
@@ -136,7 +136,7 @@ impl Type {
 		if self.IsNil() {
 			ret other.IsNil()
 		}
-		if self.Bind() || other.Bind() {
+		if self.Extern() || other.Extern() {
 			ret self.Equal(other)
 		}
 		l := unsafe { (*(&self)).ActualKind() }
@@ -146,7 +146,7 @@ impl Type {
 		ret (unsafe { (&Type)(&lt) }).Equal(unsafe { (&Type)(&rt) })
 	}
 
-	// Same as the ActualEqual, but ignores the binded types.
+	// Same as the ActualEqual, but ignores the external types.
 	fn deepActualEqual(&self, other: &Type): bool {
 		if self.IsNil() {
 			ret other.IsNil()
@@ -804,7 +804,7 @@ struct typeChecker {
 	disBuiltin: bool
 
 	// Name selection is enabled.
-	// No bind definitions, no generic type representation.
+	// No external definitions, no generic type representation.
 	// Only typename selection.
 	//
 	// If selection is a struct, returns invalid instance that only has decl field.
@@ -999,11 +999,11 @@ impl typeChecker {
 		match type decl {
 		| &StructIns:
 			s := decl.(&StructIns)
-			if s.Decl != nil && s.Decl.Bind {
+			if s.Decl != nil && s.Decl.Extern {
 				ret true
 			}
 		| &TypeAlias:
-			if decl.(&TypeAlias).Bind {
+			if decl.(&TypeAlias).Extern {
 				ret true
 			}
 		}
@@ -1457,7 +1457,7 @@ impl typeChecker {
 	// If another lookup nedeed, uses internal lookup, so any generic type build
 	// process will use internal lookup. This might be useful for building
 	// genericed type from another package.
-	fn getDef(mut *self, mut decl: &token::Token, _bind: bool): Kind {
+	fn getDef(mut *self, mut decl: &token::Token, _extern: bool): Kind {
 		if self.isIgnoredGeneric(decl.Kind) {
 			ret buildPrimType(decl.Kind)
 		}
@@ -1484,7 +1484,7 @@ impl typeChecker {
 			}
 		}
 
-		if !_bind {
+		if !_extern {
 			mut e := self.lookup.FindEnum(decl.Kind)
 			if e != nil {
 				ret self.fromEnum(decl, e)
@@ -1500,16 +1500,16 @@ impl typeChecker {
 				ret self.fromTrait(decl, t)
 			}
 		} else if self.selection {
-			self.pushErr(decl, "bind types are not allowed in this scope")
+			self.pushErr(decl, "external types are not allowed in this scope")
 			ret nil
 		}
 
-		mut s := self.lookup.FindStruct(decl.Kind, _bind)
+		mut s := self.lookup.FindStruct(decl.Kind, _extern)
 		if s != nil {
 			ret self.fromStruct(decl, s)
 		}
 
-		mut ta := self.lookup.FindTypeAlias(decl.Kind, _bind)
+		mut ta := self.lookup.FindTypeAlias(decl.Kind, _extern)
 		if ta == nil && !self.disBuiltin {
 			ta = findBuiltinTypeAlias(decl.Kind)
 			if ta != nil && ta.Name == types::Any {
@@ -1524,8 +1524,8 @@ impl typeChecker {
 		ret nil
 	}
 
-	fn buildName(mut *self, mut decl: &token::Token, _bind: bool): Kind {
-		ret self.getDef(decl, _bind)
+	fn buildName(mut *self, mut decl: &token::Token, _extern: bool): Kind {
+		ret self.getDef(decl, _extern)
 	}
 
 	fn buildSptrFromType(mut *self, mut valueTyp: &Type): &Sptr {
@@ -1886,7 +1886,7 @@ impl typeChecker {
 			ret self.build(r.X.Data)
 		| &ast::NameExpr:
 			mut name := declKind.(&ast::NameExpr)
-			mut t := self.buildName(name.Token, name.Bind)
+			mut t := self.buildName(name.Token, name.Extern)
 			if t != nil {
 				kind = t
 			}
