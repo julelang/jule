@@ -1,4 +1,4 @@
-// Copyright 2025 The Jule Programming Language.
+// Copyright 2025 The Jule Authors. All rights reserved.
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
