@@ -246,8 +246,15 @@ impl caseOwner {
 struct Case {
 	Owner: CaseOwner
 	Scope: &Scope
-	Exprs: []&Value
+	Exprs: []&Value // Nil for select statements. Refer to Stmt field.
 	Next:  &Case
+
+	// Possible in select statements;
+	//  - "<-chan", represented as &Value
+	//  - "chan<-foo", represented as &Value
+	//	- "x = <-chan", represented as &Assign
+	//	- "x := <-chan", represented as &Var
+	Stmt: Stmt
 }
 
 impl Case {
@@ -628,13 +635,16 @@ impl scopeChecker {
 		}
 	}
 
-	fn checkVarDecl(mut &self, mut decl: &ast::Var) {
+	fn checkVarDecl(mut &self, mut decl: &ast::Var, mut &out: *&Var) {
 		if jule::IsBlank(decl.Name) {
 			self.s.pushErr(decl.Token, "blank identifier cannot be used as an identifier for this declaration")
 			ret
 		}
 		n := len(self.s.errors)
 		mut v := buildVar(decl)
+		if out != nil {
+			*out = v
+		}
 		v.Scope = self.scope
 		self.checkVarDecl1(v)
 		// Do not continue to analysis of this scope, variable declaration have error(s).
@@ -2006,19 +2016,75 @@ impl scopeChecker {
 		mut case := slct.Cases[i]
 		case.Exprs = make([]&Value, 0, len(c.X))
 		mut eval := self.s.eval(self)
-		for (_, mut e) in c.X {
-			mut v := eval.evalExpr(e, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
-			if v == nil {
-				continue
-			}
-			match type v.Model {
-			| &ChanRecv | &ChanSend:
-				case.Exprs = append(case.Exprs, v)
+
+		mut ssc := self.newChildChecker()
+		mut scope := self.getChild()
+		ssc.scope = scope
+
+		if c.Stmt != nil {
+			match type c.Stmt {
+			| &ast::Var:
+				mut sv := c.Stmt.(&ast::Var)
+				let mut var: &Var
+				ssc.checkVarDecl((&ast::Var)(sv), &var)
+				if ssc.stopped() || var == nil {
+					ret nil
+				}
+				match type var.ValueSym.Value.Model {
+				| &ChanRecv | &ChanSend:
+					ssc.scope.Stmts = ssc.scope.Stmts[:len(ssc.scope.Stmts)-1]
+					case.Stmt = var
+				|:
+					self.s.pushErr(var.ValueSym.Expr.Token, "invalid select expression, expected channel receive or send")
+				}
+			| &ast::Assign:
+				mut assign := c.Stmt.(&ast::Assign)
+				ssc.checkAssign(assign, checkNodeDefault|checkNodeNoExceptional)
+				if self.stopped() {
+					ret nil
+				}
+				mut stmt := ssc.scope.Stmts[len(ssc.scope.Stmts)-1]
+				match type stmt {
+				| &Value:
+					mut v := stmt.(&Value)
+					match type v.Model {
+					| &ChanRecv | &ChanSend:
+						ssc.scope.Stmts = ssc.scope.Stmts[:len(ssc.scope.Stmts)-1]
+						case.Stmt = v
+					|:
+						self.s.pushErr(assign.Y.Token, "invalid select expression, expected channel receive or send")
+					}
+				| &Assign:
+					mut assignStmt := stmt.(&Assign)
+					match type assignStmt.Right.Model {
+					| &ChanRecv | &ChanSend:
+						ssc.scope.Stmts = ssc.scope.Stmts[:len(ssc.scope.Stmts)-1]
+						case.Stmt = stmt
+					|:
+						self.s.pushErr(assign.Y.Token, "invalid select expression, expected channel receive or send")
+					}
+				|:
+					panic("unreachable")
+				}
 			|:
-				self.s.pushErr(e.Token, "invalid select expression, expected channel receive or send")
+				panic("unreachable")
+			}
+		} else {
+			mut e := c.X[0]
+			mut v := eval.evalExpr(e, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+			if v != nil {
+				match type v.Model {
+				| &ChanRecv | &ChanSend:
+					case.Stmt = v
+				|:
+					self.s.pushErr(e.Token, "invalid select expression, expected channel receive or send")
+				}
 			}
 		}
-		case.Scope = self.checkCaseScope(case, c.Scope)
+
+		self.checkChildSsc(c.Scope, scope, ssc)
+		case.Scope = scope
+
 		ret case
 	}
 
@@ -2235,7 +2301,7 @@ impl scopeChecker {
 		| &ast::ScopeTree:
 			self.checkAnonScope(node.(&ast::ScopeTree))
 		| &ast::Var:
-			self.checkVarDecl(node.(&ast::Var))
+			self.checkVarDecl(node.(&ast::Var), nil)
 		| &ast::TypeAlias:
 			self.checkTypeAliasDecl(node.(&ast::TypeAlias))
 		| &ast::Expr:

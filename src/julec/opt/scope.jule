@@ -300,8 +300,6 @@ impl scopeOptimizer {
 	}
 
 	fn optimizeSelect(mut &self, mut slct: &sema::Select) {
-		mut var := invalidDynamic
-
 		// Handle like optimizeChildHard(), but avoid calling this method for each scope.
 		// So wrap same functionality and apply optimizations by calling the optimizeChild().
 		// See documentation of the optimizeChildHard() for more information about difference.
@@ -312,17 +310,18 @@ impl scopeOptimizer {
 		mut checkpoint := self.data.getCheckpoint()
 
 		for (_, mut case) in slct.Cases {
-			for (_, mut expr) in case.Exprs {
-				exprOptimizer.optimizeValue(&expr.Model, self.data, self)
-			}
-			if len(case.Exprs) == 1 && self.data.dynamic != nil {
-				// We can know the exact kind of dynamic type if expression is single.
-				mut kind := isTypeGuaranteedDynamicValue(self.data.dynamic, case.Exprs[0].Type, nil)
-				if kind != nil {
-					self.data.dynamic.pushVar(var, kind)
-				} else {
-					self.data.dynamic.removeVar(var)
-				}
+			match type case.Stmt {
+			| &sema::Value:
+				mut v := case.Stmt.(&sema::Value)
+				exprOptimizer.optimizeValue(&v.Model, self.data, self)
+			| &sema::Var:
+				mut v := case.Stmt.(&sema::Var)
+				exprOptimizer.optimizeValue(&v.ValueSym.Value.Model, self.data, self)
+			| &sema::Assign:
+				mut assign := case.Stmt.(&sema::Assign)
+				exprOptimizer.optimizeValue(&assign.Right.Model, self.data, self)
+			|:
+				panic("unreachable")
 			}
 			self.optimizeChild(case.Scope)
 			alive.removeDeads(self.data)

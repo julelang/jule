@@ -758,8 +758,10 @@ impl scopeParser {
 		ret m
 	}
 
-	fn buildSelectCaseExpr(mut *self, mut &tokens: *[]&token::Token, mut &colon: *&token::Token): ([]&ast::Expr, bool) {
+	fn buildSelectCaseExpr(mut *self, mut &tokens: *[]&token::Token, mut &colon: *&token::Token): ([]&ast::Expr, ast::StmtData, &token::Token, bool) {
 		mut exprs := make([]&ast::Expr, 0, 1)
+		mut stmt := ast::StmtData(nil)
+		mut stmtToken := (&token::Token)(nil)
 		mut braceN := 0
 		mut j := 0
 		for (i, mut tok) in *tokens {
@@ -783,32 +785,56 @@ impl scopeParser {
 			| tok.ID == token::OR:
 				self.pushErr(tok, "missing expression after |")
 				*tokens = nil
-				ret nil, false
+				ret nil, nil, nil, false
 			| tok.ID == token::COLON:
 				*colon = tok
 				mut exprTokens := (*tokens)[j:i]
 				if len(exprTokens) > 0 {
-					mut stmt, ok := self.buildAssignSt(exprTokens)
+					mut assignStmt, ok := self.buildAssignSt(exprTokens)
 				StmtCheck:
 					match {
 					| ok:
-						mut expr, _ := stmt.(&ast::Expr)
-						if expr != nil {
+						match type assignStmt {
+						| &ast::Expr:
+							mut expr := assignStmt.(&ast::Expr)
 							exprs = append(exprs, expr)
 							break StmtCheck
+						| &ast::Var: // Catch inline variables, like; x := <-chan
+							mut v := assignStmt.(&ast::Var)
+							if v.X == nil || v.Op == nil || v.Op.ID != token::DEFINE {
+								self.pushErr(v.Token, "must be single short variable declaration")
+								ret nil, nil, nil, false
+							}
+							stmt = v
+							stmtToken = exprTokens[0]
+							break StmtCheck
+						| &ast::Assign: // Catch inline assignments, like; x = <-chan
+							mut assign := assignStmt.(&ast::Assign)
+							if assign.Decl || assign.Op.ID != token::ASSIGN || len(assign.X) != 1 {
+								self.pushErr(assign.Op, "must be single short variable declaration or assignment")
+								ret nil, nil, nil, false
+							}
+							stmt = assign
+							stmtToken = exprTokens[0]
+							break StmtCheck
+						|:
+							break
 						}
 						fall
 					|:
-						exprs = append(exprs, self.p.buildExpr(exprTokens))
+						mut e := self.p.buildExpr(exprTokens)
+						if e != nil {
+							exprs = append(exprs, e)
+						}
 					}
 				}
 				*tokens = (*tokens)[i+1:]
-				ret exprs, i-j == 0 || len(exprs) != 0
+				ret exprs, stmt, stmtToken, i-j == 0 || len(exprs) != 0
 			}
 		}
-		self.pushErr((*tokens)[0], "invalid syntax")
+		self.pushErr((*tokens)[0], "expected chan send or chan receive expression")
 		*tokens = nil
-		ret nil, false
+		ret nil, nil, nil, false
 	}
 
 	fn buildSelectCase(mut *self, mut &tokens: *[]&token::Token): (&ast::Case, bool) {
@@ -821,7 +847,7 @@ impl scopeParser {
 			self.pushErr(c.Token, "invalid syntax")
 			ret nil, false
 		}
-		c.X, ok := self.buildSelectCaseExpr(tokens, &colon)
+		c.X, c.Stmt, c.StmtToken, ok := self.buildSelectCaseExpr(tokens, &colon)
 		c.Scope = self.buildCaseScope(tokens)
 		if c.Scope.End == nil {
 			c.Scope.End = colon

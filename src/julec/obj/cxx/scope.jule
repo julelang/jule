@@ -1225,14 +1225,49 @@ impl scopeCoder {
 
 		// Single case. No need for complex handling.
 		if block && len(slct.Cases) == 1 {
+			self.oc.write("{\n")
+			self.oc.addIndent()
+			self.oc.indent()
 			mut case := slct.Cases[0]
-			self.oc.ec.possibleRefExpr(case.Exprs[0].Model)
+			match type case.Stmt {
+			| &sema::Value:
+				mut v := case.Stmt.(&sema::Value)
+				self.oc.ec.possibleRefExpr(v.Model)
+			| &sema::Var:
+				mut v := case.Stmt.(&sema::Var)
+				self.oc.varInitExpr(v, fn|| self.oc.ec.possibleRefExpr(v.ValueSym.Value.Model))
+			| &sema::Assign:
+				mut assign := case.Stmt.(&sema::Assign)
+				self.assign(assign)
+			|:
+				panic("unreachable")
+			}
 			if len(case.Scope.Stmts) > 0 {
 				self.oc.write(";\n")
 				self.oc.indent()
 				self.scope(case.Scope)
 			}
+			self.oc.doneIndent()
+			self.oc.write("\n")
+			self.oc.indent()
+			self.oc.write("}")
 			ret
+		}
+
+		writeChanExpr := fn(mut v: sema::Expr) {
+			match type v {
+			| &sema::ChanRecv:
+				mut recv := v.(&sema::ChanRecv)
+				self.oc.ec.chanRecv(recv, fn|| self.oc.write("&ok"), false)
+				self.oc.write(";\n")
+			| &sema::ChanSend:
+				mut send := v.(&sema::ChanSend)
+				self.oc.write("ok = ")
+				self.oc.ec.chanSend(send, false)
+				self.oc.write(";\n")
+			|:
+				panic("unreachable")
+			}
 		}
 
 		self.oc.write("{\n")
@@ -1268,38 +1303,69 @@ impl scopeCoder {
 		self.oc.write(lencases)
 		self.oc.write(";\n")
 		self.oc.indent()
-		self.oc.indent()
 		self.oc.write(typeBool)
 		self.oc.write(" ok = false;\n")
+		self.oc.indent()
 		self.oc.write("switch (__offset) {\n")
 		for (i, mut case) in slct.Cases {
+			caseNum := conv::Itoa(i)
 			self.oc.indent()
 			self.oc.write("case ")
-			self.oc.write(conv::Itoa(i))
+			self.oc.write(caseNum)
 			self.oc.write("LL:\n")
 			self.oc.addIndent()
 			self.oc.indent()
-			match type case.Exprs[0].Model {
-			| &sema::ChanRecv:
-				mut recv := case.Exprs[0].Model.(&sema::ChanRecv)
-				self.oc.ec.chanRecv(recv, fn|| self.oc.write("&ok"), false)
-				self.oc.write(";\n")
-			| &sema::ChanSend:
-				mut send := case.Exprs[0].Model.(&sema::ChanSend)
-				self.oc.write("ok = ")
-				self.oc.ec.chanSend(send, false)
-				self.oc.write(";\n")
+			self.oc.write("{\n")
+			self.oc.indent()
+			let mut varRecv: &sema::Var
+			let mut assignRecv: &sema::Assign
+			match type case.Stmt {
+			| &sema::Value:
+				mut v := case.Stmt.(&sema::Value)
+				writeChanExpr(v.Model)
+			| &sema::Var:
+				// Variable declaration. Only possible with receive expression.
+				varRecv = case.Stmt.(&sema::Var)
+				self.oc.tc.kind(&self.oc.Buf, varRecv.ValueSym.Value.Type)
+				self.oc.write(" __recv_data")
+				self.oc.write(caseNum)
+				self.oc.write(" = ")
+				writeChanExpr(varRecv.ValueSym.Value.Model)
+			| &sema::Assign:
+				assignRecv = case.Stmt.(&sema::Assign)
+				self.oc.tc.kind(&self.oc.Buf, assignRecv.Right.Type)
+				self.oc.write(" __recv_data")
+				self.oc.write(caseNum)
+				self.oc.write(" = ")
+				writeChanExpr(assignRecv.Right.Model)
 			|:
 				panic("unreachable")
 			}
 			self.oc.indent()
 			self.oc.write("if (!ok) continue;\n")
 			self.oc.indent()
+			if varRecv != nil {
+				self.oc.varInitExpr(varRecv, fn|| {
+					self.oc.write("__recv_data")
+					self.oc.write(caseNum)
+				})
+				self.oc.write("\n")
+				self.oc.indent()
+			}
+			if assignRecv != nil {
+				mut expr := compExpr("__recv_data" + caseNum)
+				assignRecv.Right.Model = unsafe { *(*sema::Expr)(&expr) }
+				self.assign(assignRecv)
+				self.oc.write(";\n")
+				self.oc.indent()
+			}
 			if len(case.Scope.Stmts) > 0 {
 				self.scope(case.Scope)
 				self.oc.write("\n")
 				self.oc.indent()
 			}
+			self.oc.write("}\n")
+			self.oc.indent()
 			self.oc.write("goto ")
 			self.oc.write(endLabel.Str())
 			self.oc.write(";\n")
