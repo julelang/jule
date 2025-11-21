@@ -26,6 +26,7 @@ struct paddedU64 {
 // Implementation based on the Dmitry Vyukov's MPMC queue.
 struct mpmcQueue[T] {
 	cap:    u64
+	act:    u64
 	closed: u32
 	buf:    []mpmcCell[T]
 
@@ -38,12 +39,14 @@ struct mpmcQueue[T] {
 }
 
 impl mpmcQueue {
+	#disable boundary
 	fn new(mut cap: u64): (q: mpmcQueue[T]) {
-		if cap < 2 {
-			cap = 2
-		}
+		q.act = cap
 		q.cap = cap
-		q.buf = make([]mpmcCell[T], cap)
+		if q.cap < 2 {
+			q.cap = 2
+		}
+		q.buf = make([]mpmcCell[T], q.cap)
 
 		// Initialize per-slot sequence numbers to their indices
 		mut i := u64(0)
@@ -56,11 +59,11 @@ impl mpmcQueue {
 	// Attempts to enqueue val; returns false if the queue appears full.
 	// Non-blocking; uses polite backoff on contention.
 	#disable boundary nilptr
-	fn enqueue(mut *self, mut &val: *T): (ok: bool, closed: bool) {
+	fn enqueue(mut *self, mut &val: *T): (ok: bool, closed: bool, full: bool) {
 		for {
 			closed = atomic::Load(&self.closed, atomic::Acquire) != 0
 			if closed {
-				ret false, true
+				ret false, true, false
 			}
 			pos := atomic::Load(&self.enqueuePos.v, atomic::Relaxed)
 			mut &c := unsafe { &(*(&self.buf[pos%self.cap])) }
@@ -69,17 +72,21 @@ impl mpmcQueue {
 
 			if dif == 0 {
 				// slot is EMPTY for this producer position: try to claim it
-				if atomic::CompareAndSwapWeak(&self.enqueuePos.v, pos, pos+1, atomic::SeqCst, atomic::Relaxed) {
+				newPos := pos + 1
+				if atomic::CompareAndSwapWeak(&self.enqueuePos.v, pos, newPos, atomic::SeqCst, atomic::Relaxed) {
 					// exclusive ownership of this slot
 					c.val = *val
+					// check if the buffer is full
+					deqPos := atomic::Load(&self.dequeuePos.v, atomic::Acquire)
+					full = newPos-deqPos == self.act
 					// publish for consumer at pos
-					atomic::Store(&c.seq, pos+1, atomic::Release)
-					ret true, false
+					atomic::Store(&c.seq, newPos, atomic::Release)
+					ret true, false, full
 				}
 				// lost race → retry
 			} else if dif < 0 {
 				// seq < pos ⇒ consumer has not yet advanced for this slot in this wrap; FULL
-				ret false, false
+				ret false, false, true
 			} else {
 				// another producer is ahead / not our turn yet → polite backoff
 				osyield()
