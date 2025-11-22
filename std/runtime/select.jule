@@ -161,8 +161,25 @@ unsafe fn unlockchans(mut chans: *&uintptr, mut nchan: int) {
 	}
 }
 
+// Implementation of the select statements.
+// Type-independent, single generic implementation for all select statements.
+//
+// The `chans` is pointer to the channel array. Stores all channels used in cases,
+// may include duplicated channels. The `nchan` is length of the `chans` array.
+// The `cases` is pointer to the array, which is contains cases of the select statement.
+// The default case is not included and receivers come first. So if `index < nrecv`,
+// then it is a receiver case. The `nrecv` is count of receiver cases,
+// while `nsend` is count of sender cases. Expression `nrecv + nsend` equals to
+// length of the `cases` array. If the `block` is true, then select statement
+// has no a default case, so blocking.
+//
+// Channels are represented as a generic smart pointer, like `&uintptr`.
+// The underlying type is `&pchan[T]`, it may be used like `&pchan[uintptr]` to
+// reach common fields of the channel. But receive/send methods are cannot be
+// used since this kind of methods are type-dependent. To solve the problem,
+// each case includes function pointers of the underlying channel type.
 #disable nilptr boundary
-unsafe fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scase, mut nrecv: int, nsend: int, block: bool): (index: int) {
+unsafe fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scase, mut nrecv: int, nsend: int, block: bool): int {
 	totalCases := nrecv + nsend
 	k := absint(int(rand()))
 
@@ -282,7 +299,6 @@ unsafe fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scase, mut
 	// First, parks the thread.
 	// When notified, returns immediately if channel notified after hand-off.
 	// If a channel notified spuriously, try again and park it, if it fails.
-
 	for {
 		// Unlock channels and park the thread.
 		unlockchans(chans, nchan)
