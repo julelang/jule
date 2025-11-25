@@ -1,0 +1,422 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/runtime/atomic"
+use "std/sys"
+
+// Select case.
+struct scase {
+	// General channel pointer. Can be cast to `&pchan[uintptr]`.
+	// Nil channels are allowed.
+	// The queue field must not be used in select statement.
+	// Algorithm must be type-independent.
+	ch: *&uintptr
+
+	// Method addresses of the specific channel type.
+	// This is an abstraction empowered by the compiler.
+	// `tryRecv` points to the `pchan[T].tryRecv`
+	// `tryRecvImmediate` points to the `pchan[T].tryRecvImmediate`
+	// `trySend` points to the `pchan[T].trySend`
+	// `trySendImmediate` points to the `pchan[T].trySendImmediate`
+	tryRecv:          uintptr
+	tryRecvImmediate: uintptr
+	trySend:          uintptr
+	trySendImmediate: uintptr
+
+	// Stack pointer to be received/sent data.
+	// For receive operations, recieved data will be ignored if it is zero.
+	// For send operations, zero pointer is undefined behavior.
+	data: uintptr
+}
+
+// Empty select statement implementation.
+#disable nilptr
+fn emptyselect() {
+	mut t := acquireThread()
+	t.state |= threadSuspended | reasonSelect | reasonSelectEmpty
+	// Add special case for empty select.
+	threadCases |= threadSC_EmptySelect
+	// Check deadlock before sleep and release mutex.
+	checkDeadlock(0, reasonSelect|reasonSelectEmpty)
+	threadMutex.unlock()
+	// Park thread indefinitely.
+	// We do not need to yield CPU with temporary parking,
+	// this thread will never continue to run.
+	// It always yields CPU due to empty select statement,
+	// so put it into deep sleep. Other threads can caught deadlocks,
+	// if any, after this stage. If this thread is the single thread,
+	// we already checked deadlocks. So put this thread into deep sleep
+	// indefinitely.
+	t.parker.park()
+	panic("unreachable")
+}
+
+// Basic QuickSort for generic chan array.
+#disable nilptr
+unsafe fn sortchans(mut chans: *&uintptr, nchan: int) {
+	// Base case: If the array has 0 or 1 element, it is already sorted.
+	if (nchan < 2) {
+		ret
+	}
+
+	// 1. Choose the pivot.
+	// We choose the last element as the pivot for simplicity.
+	// The pivot element is at chans[nchan - 1].
+	mut pivotPtr := chans + nchan - 1
+	pivotValue := uintptr(*pivotPtr)
+
+	// 2. Partitioning the array.
+	// 'iPtr' will track the boundary of elements smaller than the pivot.
+	// Start iPtr one position before the start of the current segment.
+	mut iPtr := chans - 1
+
+	// 'jPtr' iterates through all elements up to the pivot (chans[0] to chans[nchan-2]).
+	// Loop condition: jPtr < pivotPtr (equivalent to jPtr <= chans + nchan - 2)
+	mut jPtr := chans
+	for jPtr < pivotPtr; jPtr++ {
+		// If the current element is less than or equal to the pivot
+		if (uintptr(*jPtr) <= pivotValue) {
+			// Move the boundary 'iPtr' one step forward
+			iPtr++
+			// Swap the element at jPtr with the element at the new iPtr position.
+			// This moves elements smaller than the pivot to the front.
+			*iPtr, *jPtr = *jPtr, *iPtr
+		}
+	}
+
+	// 3. Place the pivot in its correct sorted position.
+	// The pivot should be placed right after the last element smaller than it,
+	// which is the element pointed to by 'iPtr'.
+	iPtr++                              // Move iPtr to the position where the pivot should go.
+	*iPtr, *pivotPtr = *pivotPtr, *iPtr // Swap the pivot (which was at chans[nchan-1]) with *iPtr.
+
+	// 'iPtr' now points to the pivot in its final, sorted position.
+	// This is the separation point for the two subproblems.
+
+	// Calculate the sizes for the two recursive calls.
+	// The first subarray is from 'chans' up to (but not including) the pivot.
+	// Its length is the difference between the pivot's new address and the start address.
+	lenLeft := int(iPtr - chans)
+
+	// The second subarray is from the element *after* the pivot to the end.
+	// Its length is the total length minus the length of the left part and minus the pivot itself.
+	lenRight := int(nchan - lenLeft - 1)
+
+	// 4. Recursive calls for the two subarrays.
+	// Recursively sort the elements to the left of the pivot.
+	sortchans(chans, lenLeft)
+
+	// Recursively sort the elements to the right of the pivot.
+	// The new starting pointer is the element right after the pivot (*iPtr + 1).
+	sortchans(iPtr+1, lenRight)
+}
+
+// Converts general pointer to the general channel type.
+unsafe fn unpackchan(mut p: *&uintptr): *&pchan[uintptr] {
+	ret (*&pchan[uintptr])(p)
+}
+
+// Locks channels.
+// Avois locking duplicate channels.
+// Must be sorted by address.
+#disable nilptr
+unsafe fn lockchans(mut chans: *&uintptr, mut nchan: int) {
+	let mut last: uintptr
+	nchan--
+	for nchan >= 0; nchan-- {
+		// Skip duplicate channels.
+		// Otherwise, we will try to lock already locked mutex.
+		// Deadlock.
+		if uintptr(chans[nchan]) == last {
+			continue
+		}
+		ch := unpackchan(chans + nchan)
+		if *ch != nil {
+			(*ch).lock.lock()
+			last = uintptr(chans[nchan])
+		}
+	}
+}
+
+// Unlocks channels.
+// Avois locking duplicate channels.
+// Must be sorted by address.
+#disable nilptr
+unsafe fn unlockchans(mut chans: *&uintptr, mut nchan: int) {
+	let mut last: uintptr
+	nchan--
+	for nchan >= 0; nchan-- {
+		// Skip duplicate channels.
+		// Otherwise, we will try to lock already locked mutex.
+		// Deadlock.
+		if uintptr(chans[nchan]) == last {
+			continue
+		}
+		ch := unpackchan(chans + nchan)
+		if *ch != nil {
+			(*ch).lock.unlock()
+			last = uintptr(chans[nchan])
+		}
+	}
+}
+
+// Implementation of the select statements.
+// Type-independent, single generic implementation for all select statements.
+//
+// The `chans` is pointer to the channel array. Stores all channels used in cases,
+// may include duplicated channels. The `nchan` is length of the `chans` array.
+// The `cases` is pointer to the array, which is contains cases of the select statement.
+// The default case is not included and receivers come first. So if `index < nrecv`,
+// then it is a receiver case. The `nrecv` is count of receiver cases,
+// while `nsend` is count of sender cases. Expression `nrecv + nsend` equals to
+// length of the `cases` array. If the `block` is true, then select statement
+// has no a default case, so blocking.
+//
+// Channels are represented as a generic smart pointer, like `&uintptr`.
+// The underlying type is `&pchan[T]`, it may be used like `&pchan[uintptr]` to
+// reach common fields of the channel. But receive/send methods are cannot be
+// used since this kind of methods are type-dependent. To solve the problem,
+// each case includes function pointers of the underlying channel type.
+#disable nilptr boundary
+unsafe fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scase, mut nrecv: int, nsend: int, block: bool): int {
+	totalCases := nrecv + nsend
+	k := absint(int(rand()))
+
+	// Fast-path: try channels for receive/send.
+	// If we hit a case, select it and return immediately.
+	// Use round-robin iteration to achieve randomness.
+	mut j := 0
+	for j < totalCases; j++ {
+		offset := (k + j) % totalCases
+		case := cases + offset
+
+		// Skip if channel is nil.
+		if *case.ch == nil {
+			continue
+		}
+
+		mut ok := false
+		if offset < nrecv {
+			// Case is a receive operation.
+			mut closed := false
+			sys::Addrcall(case.tryRecv, (*unsafe)(uintptr(*case.ch)), &ok, (*unsafe)(case.data), &closed)
+			ok = ok || closed
+		} else {
+			// Case is a send operation.
+			sys::Addrcall(case.trySend, (*unsafe)(uintptr(*case.ch)), &ok, (*unsafe)(case.data))
+		}
+		if ok {
+			ret offset
+		}
+	}
+	// No suitable candidate.
+	// Return if select statement is not blocking.
+	if !block {
+		ret totalCases
+	}
+	// Slow-path: we have to park the thread until one of the channels notify us.
+
+	// Sort channels. Thus, we can manage them easilly.
+	sortchans(chans, nchan)
+
+	// Lock channels.
+	lockchans(chans, nchan)
+
+	// Before we lock the channels, a new receiver/sender may be enqueued.
+	// Check for waiters and return immediately, if possible.
+	// Use round-robin iteration to achieve randomness.
+	j = 0
+	for j < totalCases; j++ {
+		offset := (k + j) % totalCases
+		mut case := cases + offset
+
+		// Skip if channel is nil.
+		if *case.ch == nil {
+			continue
+		}
+
+		mut ok := false
+		if offset < nrecv {
+			// Case is a receive operation.
+			mut closed := false
+			sys::Addrcall(case.tryRecvImmediate, (*unsafe)(uintptr(*case.ch)), &ok, (*unsafe)(case.data), &closed)
+			ok = ok || closed
+		} else {
+			// Case is a send operation.
+			sys::Addrcall(case.trySendImmediate, (*unsafe)(uintptr(*case.ch)), &ok, (*unsafe)(case.data))
+		}
+		if ok {
+			unlockchans(chans, nchan)
+			ret offset
+		}
+	}
+	// There is no waiter in the queue.
+	// We have to park this thread, eventually.
+
+	// Allocate and prepare a parker per operation.
+	// Do not assign thread yet, avoid making busy the mutex for a long time.
+	// Use round-robin iteration to achieve randomness.
+	mut parkers := make([]parkerList, nrecv+nsend)
+	mut state := parkerSelectWaiting
+	for i in parkers {
+		offset := ((k + i) % totalCases)
+		mut case := cases + offset
+		mut parker := &parkers[offset]
+
+		// Skip if channel is nil.
+		if *case.ch == nil {
+			continue
+		}
+
+		mut ch := unpackchan(case.ch)
+
+		// Skip if channel is closed.
+		if (*ch).closed != 0 {
+			continue
+		}
+
+		// Prepare and enqeueue parker.
+		parker.ticket = parkerSelect
+		parker.state = &state // Use shared state pointer for all parkers.
+		parker.stack = case.data
+		if i < nrecv {
+			(*ch).recvq.enqueue((&parkerList)(parker))
+		} else {
+			(*ch).sendq.enqueue((&parkerList)(parker))
+		}
+	}
+
+	// We can acquire the current thread and assign it to parkers.
+	// All parkers will use the current thread.
+	// Any notification will unpark the select statement.
+	mut thread := acquireThread()
+	for i in parkers {
+		parkers[i].parker = thread.parker
+	}
+
+	// Park and try iteration.
+	// First, parks the thread.
+	// When notified, returns immediately if channel notified after hand-off.
+	// If a channel notified spuriously, try again and park it, if it fails.
+	for {
+		// Unlock channels and park the thread.
+		unlockchans(chans, nchan)
+		park2(&(*thread), 0, &(*thread.parker), reasonSelect)
+
+		// Look for the selected channel.
+		for i in parkers {
+			if !isSpuriousWake(&(*(&parkers[i]))) {
+				ret i // Return position of the handled channel.
+			}
+		}
+
+		// Exact spurious wakeup.
+		// Try all possible channels.
+		// We can do it lock-free, spurious wakeups may occur only on buffered channels.
+		// Unbuffered channels may be notified spuriously when closing channel,
+		// but this will result as no-data receive. In the final, it is not spurious.
+		// We can try unbuffered channels only, which is lock-free.
+		// Use round-robin iteration to achieve randomness.
+		j = 0
+		for j < totalCases; j++ {
+			offset := (k + j) % totalCases
+			mut case := cases + offset
+
+			// Skip if channel is nil.
+			if *case.ch == nil {
+				continue
+			}
+
+			mut ch := unpackchan(case.ch)
+
+			// Skip if channel is unbuffered.
+			if (*ch).cap == 0 {
+				continue
+			}
+
+			mut ok := false
+			if offset < nrecv {
+				// Case is a receive operation.
+				mut closed := false
+				sys::Addrcall(case.tryRecv, (*unsafe)(uintptr(*case.ch)), &ok, (*unsafe)(case.data), &closed)
+				ok = ok || closed
+			} else {
+				// Case is a send operation.
+				sys::Addrcall(case.trySend, (*unsafe)(uintptr(*case.ch)), &ok, (*unsafe)(case.data))
+			}
+			if ok {
+				ret offset
+			}
+		}
+
+		// Lock channels.
+		lockchans(chans, nchan)
+
+		// Before we lock the channels, a new receiver/sender may be enqueued.
+		// Check for waiters and return immediately, if possible.
+		// Use round-robin iteration to achieve randomness.
+		j = 0
+		for j < totalCases; j++ {
+			offset := (k + j) % totalCases
+			mut case := cases + offset
+
+			// Skip if channel is nil.
+			if *case.ch == nil {
+				continue
+			}
+
+			mut ok := false
+			if offset < nrecv {
+				// Case is a receive operation.
+				mut closed := false
+				sys::Addrcall(case.tryRecvImmediate, (*unsafe)(uintptr(*case.ch)), &ok, (*unsafe)(case.data), &closed)
+				ok = ok || closed
+			} else {
+				// Case is a send operation.
+				sys::Addrcall(case.trySendImmediate, (*unsafe)(uintptr(*case.ch)), &ok, (*unsafe)(case.data))
+			}
+			if ok {
+				unlockchans(chans, nchan)
+				ret offset
+			}
+		}
+		// Failure. We have to park thread again, unfortunately.
+
+		// Update state as waiting for all channels.
+		// Since the state variable only handled in lock and we have locked all channels,
+		// there is no consumption risk before we park.
+		atomic::Store(&state, parkerSelectWaiting, atomic::Release)
+
+		// Enqueue parkers again, if needed.
+		// Some channels may drop our parkers while we try channels.
+		// Use round-robin iteration to achieve randomness.
+		for i in parkers {
+			offset := ((k + i) % totalCases)
+			mut case := cases + offset
+			mut parker := &parkers[offset]
+
+			// Skip if channel is nil.
+			if *case.ch == nil {
+				continue
+			}
+
+			mut ch := unpackchan(case.ch)
+
+			// Skip if channel is closed.
+			if (*ch).closed != 0 {
+				continue
+			}
+
+			// Use [enqueueAvoidDuplicate] to avoid enqueue same parker.
+			if i < nrecv {
+				(*ch).recvq.enqueueAvoidDuplicate((&parkerList)(parker))
+			} else {
+				(*ch).sendq.enqueueAvoidDuplicate((&parkerList)(parker))
+			}
+		}
+
+		// Acquire the thread mutex before park.
+		threadMutex.lock()
+	}
+}

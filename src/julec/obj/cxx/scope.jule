@@ -1255,148 +1255,270 @@ impl scopeCoder {
 			ret
 		}
 
-		writeChanExpr := fn(mut v: sema::Expr) {
-			match type v {
-			| &sema::ChanRecv:
-				mut recv := v.(&sema::ChanRecv)
-				self.oc.ec.chanRecv(recv, fn|| self.oc.write("&ok"), false)
-				self.oc.write(";\n")
-			| &sema::ChanSend:
-				mut send := v.(&sema::ChanSend)
-				self.oc.write("ok = ")
-				self.oc.ec.chanSend(send, false)
-				self.oc.write(";\n")
-			|:
-				panic("unreachable")
-			}
+		mut scase := ""
+		mut scaseCh := ""
+		mut scaseData := ""
+		mut scaseTryRecv := ""
+		mut scaseTryRecvImmediate := ""
+		mut scaseTrySend := ""
+		mut scaseTrySendImmediate := ""
+		{
+			mut scaseIns := meta::Program.Runtime.Scase
+			let mut scaseBuf: strings::Builder
+			self.oc.tc.structureIns(&scaseBuf, scaseIns)
+			scase = scaseBuf.Str()
+			scaseBuf.Clear()
+			identCoder.field(&scaseBuf, scaseIns.FindField("ch").Decl)
+			scaseCh = scaseBuf.Str()
+			scaseBuf.Clear()
+			identCoder.field(&scaseBuf, scaseIns.FindField("data").Decl)
+			scaseData = scaseBuf.Str()
+			scaseBuf.Clear()
+			identCoder.field(&scaseBuf, scaseIns.FindField("tryRecv").Decl)
+			scaseTryRecv = scaseBuf.Str()
+			scaseBuf.Clear()
+			identCoder.field(&scaseBuf, scaseIns.FindField("tryRecvImmediate").Decl)
+			scaseTryRecvImmediate = scaseBuf.Str()
+			scaseBuf.Clear()
+			identCoder.field(&scaseBuf, scaseIns.FindField("trySend").Decl)
+			scaseTrySend = scaseBuf.Str()
+			scaseBuf.Clear()
+			identCoder.field(&scaseBuf, scaseIns.FindField("trySendImmediate").Decl)
+			scaseTrySendImmediate = scaseBuf.Str()
 		}
+
+		let mut chanArr: strings::Builder
+		let mut recvArr: strings::Builder
+		let mut sendArr: strings::Builder
+		let mut nchan: int
+		let mut nrecv: int
+		let mut nsend: int
 
 		self.oc.write("{\n")
 		self.oc.addIndent()
+
 		self.oc.indent()
-		mut endLabel := strings::Builder{}
-		identCoder.matchEnd(&endLabel, uintptr(slct))
-		if block {
-			self.oc.write("while (true) {\n")
-			self.oc.addIndent()
-			self.oc.indent()
+		self.oc.write(typeInt)
+		self.oc.write(" __selectIndex;\n")
+
+		registerChan := fn(mut &buf: *strings::Builder, mut ch: &sema::Chan, data: str, n: int) {
+			buf.WriteStr(scase)!
+			buf.WriteStr("{.")!
+			buf.WriteStr(scaseCh)!
+			buf.WriteStr("=&__chanArr[")!
+			buf.WriteStr(conv::Itoa(n))!
+			buf.WriteStr("], .")!
+			if data != "" {
+				buf.WriteStr(scaseData)!
+				buf.WriteStr("=(")!
+				buf.WriteStr(typeUintptr)!
+				buf.WriteStr(")")!
+				if data[0] == '*' { // Data is pointer already.
+					buf.WriteStr(data[1:])!
+				} else {
+					buf.WriteByte('&')!
+					buf.WriteStr(data)!
+				}
+				buf.WriteStr(", .")!
+			}
+			mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
+			const Extern = false
+			mut tryRecv := ins.FindMethod("tryRecv", Extern).Instances[0]
+			mut tryRecvImmediate := ins.FindMethod("tryRecvImmediate", Extern).Instances[0]
+			mut trySend := ins.FindMethod("trySend", Extern).Instances[0]
+			mut trySendImmediate := ins.FindMethod("trySendImmediate", Extern).Instances[0]
+
+			buf.WriteStr(scaseTryRecv)!
+			buf.WriteStr("=(")!
+			buf.WriteStr(typeUintptr)!
+			buf.WriteByte(')')!
+			identCoder.funcIns(buf, tryRecv)
+			buf.WriteStr(", .")!
+			buf.WriteStr(scaseTryRecvImmediate)!
+			buf.WriteStr("=(")!
+			buf.WriteStr(typeUintptr)!
+			buf.WriteByte(')')!
+			identCoder.funcIns(buf, tryRecvImmediate)
+			buf.WriteStr(", .")!
+			buf.WriteStr(scaseTrySend)!
+			buf.WriteStr("=(")!
+			buf.WriteStr(typeUintptr)!
+			buf.WriteByte(')')!
+			identCoder.funcIns(buf, trySend)
+			buf.WriteStr(", .")!
+			buf.WriteStr(scaseTrySendImmediate)!
+			buf.WriteStr("=(")!
+			buf.WriteStr(typeUintptr)!
+			buf.WriteByte(')')!
+			identCoder.funcIns(buf, trySendImmediate)
+
+			buf.WriteByte('}')!
 		}
-		self.oc.write("for (int attempt = 0; attempt < 5; ++attempt) {\n")
-		self.oc.addIndent()
-		self.oc.indent()
-		self.oc.write(typeInt)
-		self.oc.write(" __randidx = (")
-		self.oc.write(typeInt)
-		self.oc.write(")")
-		identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Rand)
-		self.oc.write("();\n")
-		self.oc.indent()
-		self.oc.write("for (")
-		self.oc.write(typeInt)
-		self.oc.write(" __idx = 0; __idx < ")
-		lencases := conv::Itoa(len(slct.Cases))
-		self.oc.write(lencases)
-		self.oc.write("LL; ++__idx) {\n")
-		self.oc.addIndent()
-		self.oc.indent()
-		self.oc.write(typeInt)
-		self.oc.write(" __offset = (__randidx+__idx)%")
-		self.oc.write(lencases)
-		self.oc.write(";\n")
-		self.oc.indent()
-		self.oc.write(typeBool)
-		self.oc.write(" ok = false;\n")
-		self.oc.indent()
-		self.oc.write("switch (__offset) {\n")
-		for (i, mut case) in slct.Cases {
-			caseNum := conv::Itoa(i)
-			self.oc.indent()
-			self.oc.write("case ")
-			self.oc.write(caseNum)
-			self.oc.write("LL:\n")
-			self.oc.addIndent()
-			self.oc.indent()
-			self.oc.write("{\n")
-			self.oc.indent()
-			let mut varRecv: &sema::Var
-			let mut assignRecv: &sema::Assign
+
+		// We have to evaluate all expressions of the cases.
+		for (_, mut case) in slct.Cases {
+			caseHex := conv::FormatUint(u64(uintptr(case)), 16)
+			let mut data: str
+			let mut value: sema::Expr
 			match type case.Stmt {
 			| &sema::Value:
-				mut v := case.Stmt.(&sema::Value)
-				writeChanExpr(v.Model)
+				value = case.Stmt.(&sema::Value).Model
+				match type value {
+				| &sema::ChanSend:
+					mut cs := value.(&sema::ChanSend)
+
+					data = "__var_" + caseHex
+
+					// Evaluate the data to be sent.
+					self.oc.indent()
+					self.oc.tc.kind(&self.oc.Buf, cs.Data.Type)
+					self.oc.write(" ")
+					self.oc.write(data)
+					self.oc.write("=")
+					self.oc.ec.possibleRefExpr(cs.Data.Model)
+					self.oc.write(";\n")
+				| &sema::ChanRecv:
+					// no-op
+				|:
+					panic("unreachable")
+				}
 			| &sema::Var:
-				// Variable declaration. Only possible with receive expression.
-				varRecv = case.Stmt.(&sema::Var)
-				self.oc.tc.kind(&self.oc.Buf, varRecv.ValueSym.Value.Type)
-				self.oc.write(" __recv_data")
-				self.oc.write(caseNum)
-				self.oc.write(" = ")
-				writeChanExpr(varRecv.ValueSym.Value.Model)
+				mut v := case.Stmt.(&sema::Var)
+
+				// Declare the variable to receive the data.
+				self.oc.indent()
+				self.oc.varInitExpr(v, nil)
+				self.oc.write("\n")
+
+				let mut varBuf: strings::Builder
+				identCoder.var(&varBuf, v)
+				data = varBuf.Str()
+				value = v.ValueSym.Value.Model
 			| &sema::Assign:
-				assignRecv = case.Stmt.(&sema::Assign)
-				self.oc.tc.kind(&self.oc.Buf, assignRecv.Right.Type)
-				self.oc.write(" __recv_data")
-				self.oc.write(caseNum)
-				self.oc.write(" = ")
-				writeChanExpr(assignRecv.Right.Model)
+				mut assign := case.Stmt.(&sema::Assign)
+
+				data = "*__var_" + caseHex // * prefix is a placeholder for memory address data.
+				value = assign.Right.Model
+
+				// Evaluate the memory address to receive the data.
+				self.oc.indent()
+				self.oc.tc.kind(&self.oc.Buf, assign.Left.Type)
+				self.oc.write(" ")
+				self.oc.write(data)
+				self.oc.write("=&")
+				self.oc.ec.possibleRefExpr(assign.Left.Model)
+				self.oc.write(";\n")
 			|:
 				panic("unreachable")
 			}
-			self.oc.indent()
-			self.oc.write("if (!ok) continue;\n")
-			self.oc.indent()
-			if varRecv != nil {
-				self.oc.varInitExpr(varRecv, fn|| {
-					self.oc.write("__recv_data")
-					self.oc.write(caseNum)
-				})
-				self.oc.write("\n")
-				self.oc.indent()
+
+			let mut chanValue: &sema::Value
+			match type value {
+			| &sema::ChanSend:
+				if nsend > 0 {
+					sendArr.WriteStr(", ")!
+				}
+				nsend++
+
+				mut cs := value.(&sema::ChanSend)
+				chanValue = cs.Chan
+
+				registerChan(&sendArr, chanValue.Type.Chan(), data, nchan)
+			| &sema::ChanRecv:
+				if nrecv > 0 {
+					recvArr.WriteStr(", ")!
+				}
+				nrecv++
+
+				mut cr := value.(&sema::ChanRecv)
+				chanValue = cr.Expr
+
+				registerChan(&recvArr, chanValue.Type.Chan(), data, nchan)
+			|:
+				panic("unreachable")
 			}
-			if assignRecv != nil {
-				mut expr := compExpr("__recv_data" + caseNum)
-				assignRecv.Right.Model = unsafe { *(*sema::Expr)(&expr) }
-				self.assign(assignRecv)
-				self.oc.write(";\n")
-				self.oc.indent()
+
+			if nchan > 0 {
+				chanArr.WriteStr(", ")!
 			}
-			if len(case.Scope.Stmts) > 0 {
-				self.scope(case.Scope)
-				self.oc.write("\n")
-				self.oc.indent()
-			}
-			self.oc.write("}\n")
+			nchan++
+			n := self.oc.Buf.Len()
+			self.oc.ec.possibleRefExpr(chanValue.Model)
+			mut buf := unsafe { self.oc.Buf.Buf() }
+			chanArr.Write(buf[n:])!
+			unsafe { self.oc.Buf.SetBuf(buf[:n]) }
+			chanArr.WriteStr(".as<")!
+			chanArr.WriteStr(typeUintptr)!
+			chanArr.WriteStr(">()")!
+		}
+
+		self.oc.indent()
+		self.oc.write("{\n")
+		self.oc.addIndent()
+
+		self.oc.indent()
+		self.oc.tc.asSptr2(&self.oc.Buf, typeUintptr)
+		self.oc.write(" __chanArr[] = {")
+		self.oc.write(chanArr.Str())
+		self.oc.write("};\n")
+
+		self.oc.indent()
+		self.oc.write(scase)
+		self.oc.write(" __caseArr[] = {")
+		self.oc.write(recvArr.Str())
+		if nrecv > 0 && nsend > 0 {
+			self.oc.write(", ")
+			self.oc.write(sendArr.Str())
+		}
+		self.oc.write("};\n")
+
+		self.oc.indent()
+		self.oc.write("__selectIndex = ")
+		identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Runselect)
+		self.oc.write("(__chanArr, ")
+		self.oc.write(conv::Itoa(nchan))
+		self.oc.write(", __caseArr, ")
+		self.oc.write(conv::Itoa(nrecv))
+		self.oc.write(", ")
+		self.oc.write(conv::Itoa(nsend))
+		self.oc.write(", ")
+		self.oc.ec.boolean(block)
+		self.oc.write(");\n")
+
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("}\n")
+
+		self.oc.indent()
+		self.oc.write("switch (__selectIndex) {\n")
+		for (i, mut case) in slct.Cases {
 			self.oc.indent()
-			self.oc.write("goto ")
-			self.oc.write(endLabel.Str())
-			self.oc.write(";\n")
+			self.oc.write("case ")
+			self.oc.write(conv::Itoa(i))
+			self.oc.write(":\n")
+			self.oc.addIndent()
+			self.oc.indent()
+			self.scope(case.Scope)
+			self.oc.write("\n")
+			self.oc.indent()
+			self.oc.write("break;\n")
 			self.oc.doneIndent()
 		}
-		self.oc.indent()
-		self.oc.write("}\n")
-		self.oc.doneIndent()
-		self.oc.indent()
-		self.oc.write("}\n")
-		self.oc.doneIndent()
-		self.oc.indent()
-		self.oc.write("}\n")
-		self.oc.indent()
-		if block {
-			identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Osyield)
-			self.oc.write("();\n")
-			self.oc.doneIndent()
+		if slct.Default != nil {
 			self.oc.indent()
-			self.oc.write("}\n")
+			self.oc.write("default:\n")
+			self.oc.addIndent()
 			self.oc.indent()
-		} else if len(slct.Default.Scope.Stmts) > 0 {
 			self.scope(slct.Default.Scope)
 			self.oc.write("\n")
 			self.oc.indent()
+			self.oc.write("break;\n")
+			self.oc.doneIndent()
 		}
-		self.oc.doneIndent()
 		self.oc.indent()
-		self.oc.write(endLabel.Str())
-		self.oc.write(":;\n")
+		self.oc.write("}\n")
+
+		self.oc.doneIndent()
 		self.oc.indent()
 		self.oc.write("}")
 	}
