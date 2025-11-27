@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/sync/atomic"
+
 fn rangeIteration() {
 	c := make(chan int, 4)
 	c <- 10
@@ -70,6 +72,72 @@ fn capacity() {
 	}
 }
 
+fn t1() {
+	x := make(chan int, 1_000)
+	co fn() {
+		mut i := 0
+		for i < 1_000_000; i++ {
+			x <- 1
+		}
+		close(x)
+	}()
+	mut t := 0
+	for v in x {
+		t += v
+	}
+	if t != 1_000_000 {
+		panic("expected 1_000_000")
+	}
+}
+
+fn t2() {
+	x := make(chan int, 1)
+	co fn() {
+		mut i := 0
+		for i < 100_000; i++ {
+			x <- 1
+		}
+	}()
+	mut t := 0
+	mut j := 0
+	for j < 100_000; j++ {
+		t += <-x
+	}
+	if t != 100_000 {
+		panic("expected 100_000")
+	}
+}
+
+fn t3() {
+	x := make(chan int, 1_000)
+	co fn() {
+		mut i := 0
+		for i < 1_000_000; i++ {
+			x <- 1
+		}
+		close(x)
+	}()
+	mut t := 0
+	mut tp := &t
+	co fn() {
+		for i in x {
+			unsafe { atomic::Add(&*tp, i, atomic::Relaxed) }
+		}
+	}()
+	mut j := 0
+	for j < 2_000_000; j++ {
+		select {
+		| z := <-x:
+			atomic::Add(&t, z, atomic::Relaxed)
+		| p := <-x:
+			atomic::Add(&t, p, atomic::Relaxed)
+		}
+	}
+	if atomic::Load(&t, atomic::Relaxed) != 1_000_000 {
+		panic("expected 1_000_000")
+	}
+}
+
 fn main() {
 	rangeIteration()
 	unbuffered()
@@ -77,4 +145,7 @@ fn main() {
 	recvOnly()
 	blockingSelect()
 	capacity()
+	t1()
+	t2()
+	t3()
 }
