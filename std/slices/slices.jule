@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/runtime"
+
 // Reports whether slices are the same length and contains same elements.
 // The nil slices considered as zero-length slices.
 // The floating-point NaNs are not considered equal.
@@ -75,4 +77,20 @@ fn Reverse[S: ~[]E, E](mut s: S) {
 	for i < j; i, j = i+1, j-1 {
 		s[i], s[j] = s[j], s[i]
 	}
+}
+
+// Increases the slice's capacity, if necessary, to guarantee space for
+// another n elements. After Grow(n), at least n elements can be appended
+// to the slice without another allocation. If n is negative or too large to
+// allocate the memory, Grow panics.
+fn Grow[S: ~[]E, E](mut s: S, mut n: int): S {
+	if n < 0 {
+		panic("cannot be negative")
+	}
+	n -= cap(s) - len(s)
+	if n > 0 {
+		// Use runtime implementation to grow properly like `append` calls.
+		runtime::prememappend(&s, n)
+	}
+	ret s
 }
