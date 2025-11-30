@@ -106,7 +106,7 @@ impl Reader {
 	// to the default size.
 	// Calling self.Reset(self) (that is, resetting a [Reader] to itself) does nothing.
 	fn Reset(mut *self, mut r: io::Reader) {
-		// If a Reader r is passed to NewReader, NewReader will return r.
+		// If a Reader r is passed to Reader.New, Reader.New will return r.
 		// Different layers of code may do that, and then later pass r
 		// to Reset. Avoid infinite recursion in that case.
 		rr, ok := r.(&Reader)
@@ -171,8 +171,8 @@ impl Reader {
 
 	// Returns the next n bytes without advancing the reader. The bytes stop
 	// being valid at the next read call. If necessary, it will read more bytes
-	// into the buffer in order to make n bytes available. If it returns fewer
-	// than n bytes, it also returns an error explaining why the read is short.
+	// into the buffer in order to make n bytes available. If it reads fewer
+	// than n bytes, it throws an error explaining why the read is short.
 	// The error is [ErrBufferFull] if n is larger than self's buffer size.
 	// Returns `len(data)==0 && data!=nil` for EOF.
 	//
@@ -213,7 +213,7 @@ impl Reader {
 
 	// Skips the next n bytes, returning the number of bytes discarded.
 	//
-	// If Discard skips fewer than n bytes, it also returns an error.
+	// If Discard skips fewer than n bytes, it throws an error.
 	// If 0 <= n <= self.Buffered(), Discard is guaranteed to succeed without
 	// reading from the underlying io::Reader.
 	fn Discard(mut *self, n: int)!: (discarded: int) {
@@ -621,6 +621,237 @@ impl Reader {
 		}
 		self.r += n
 		ret i64(n)
+	}
+}
+
+// Buffered output.
+
+// Implements buffering for an [io::Writer] object.
+// If an error occurs writing to a [Writer], no more data will be
+// accepted and all subsequent writes, and [Writer.Flush], will throw the error.
+// After all data has been written, the client should call the
+// [Writer.Flush] method to guarantee all data has been forwarded to
+// the underlying [io::Writer].
+struct Writer {
+	err: any
+	buf: []byte
+	n:   int
+	wr:  io::Writer
+}
+
+impl io::Writer for Writer {}
+impl io::ByteWriter for Writer {}
+impl io::RuneWriter for Writer {}
+impl io::StrWriter for Writer {}
+impl io::ReaderFrom for Writer {}
+
+impl Writer {
+	// Returns a new [Writer] whose buffer has at least the specified
+	// size. If the argument io::Writer is already a [Writer] with large enough
+	// size, it returns the underlying [Writer].
+	fn NewSize(mut w: io::Writer, mut size: int): &Writer {
+		// Is it already a Writer?
+		mut b, ok := w.(&Writer)
+		if ok && len(b.buf) >= size {
+			ret b
+		}
+		if size <= 0 {
+			size = defaultBufSize
+		}
+		ret &Writer{
+			buf: make([]byte, size),
+			wr: w,
+		}
+	}
+
+	// Returns a new [Writer] whose buffer has the default size.
+	// If the argument io::Writer is already a [Writer] with large enough buffer size,
+	// it returns the underlying [Writer].
+	fn New(mut w: io::Writer): &Writer {
+		ret Writer.NewSize(w, defaultBufSize)
+	}
+
+	// Returns the size of the underlying buffer in bytes.
+	fn Size(*self): int { ret len(self.buf) }
+
+	// Discards any unflushed buffered data, clears any error, and
+	// resets writer to write its output to w.
+	// Calling Reset on the zero value of [Writer] initializes the internal buffer
+	// to the default size.
+	// Calling w.Reset(w) (that is, resetting a [Writer] to itself) does nothing.
+	fn Reset(mut *self, mut w: io::Writer) {
+		// If a Writer w is passed to Writer.New, Writer.New will return w.
+		// Different layers of code may do that, and then later pass w
+		// to Reset. Avoid infinite recursion in that case.
+		mut ww, ok := w.(&Writer)
+		if ok && uintptr(self) == uintptr(ww) {
+			ret
+		}
+		if self.buf == nil {
+			self.buf = make([]byte, defaultBufSize)
+		}
+		self.err = nil
+		self.n = 0
+		self.wr = w
+	}
+
+	// Writes any buffered data to the underlying [io::Writer].
+	fn Flush(mut *self)! {
+		if self.err != nil {
+			error(self.err)
+		}
+		if self.n == 0 {
+			ret
+		}
+		n := self.wr.Write(self.buf[0:self.n]) else {
+			self.err = error
+			error(self.err)
+		}
+		if n < self.n {
+			self.err = io::ErrShortWrite
+			error(self.err)
+		}
+		self.n = 0
+	}
+
+	// Returns how many bytes are unused in the buffer.
+	fn Available(*self): int { ret len(self.buf) - self.n }
+
+	// Returns an empty buffer with Reader.Available() capacity.
+	// This buffer is intended to be appended to and
+	// passed to an immediately succeeding [Writer.Write] call.
+	// The buffer is mutable and it si only valid until the next write operation.
+	fn AvailableBuffer(mut *self): []byte {
+		ret self.buf[self.n:][:0]
+	}
+
+	// Returns the number of bytes that have been written into the current buffer.
+	fn Buffered(*self): int { ret self.n }
+
+	// Writes the contents of p into the buffer.
+	// It returns the number of bytes written.
+	// If nn < len(p), it throws for short-write reason.
+	fn Write(mut *self, p: []byte)!: (nn: int) {
+		for len(p) > self.Available() && self.err == nil {
+			let mut n: int
+			if self.Buffered() == 0 {
+				// Large write, empty buffer.
+				// Write directly from p to avoid copy.
+				n = self.wr.Write(p) else {
+					self.err = error
+					use 0
+				}
+			} else {
+				n = copy(self.buf[self.n:], p)
+				self.n += n
+				self.Flush() else {}
+			}
+			nn += n
+			unsafe { *(&p) = (*(&p))[n:] }
+		}
+		if self.err != nil {
+			error(self.err)
+		}
+		n := copy(self.buf[self.n:], p)
+		self.n += n
+		nn += n
+		ret nn
+	}
+
+	// Writes a single byte.
+	fn WriteByte(mut *self, c: byte)! {
+		if self.err != nil {
+			error(self.err)
+		}
+		if self.Available() <= 0 {
+			self.Flush()?
+		}
+		self.buf[self.n] = c
+		self.n++
+	}
+
+	// Writes a single Unicode code point, returning
+	// the number of bytes written and throws any error.
+	fn WriteRune(mut *self, r: rune)!: (size: int) {
+		// Compare as u32 to correctly handle negative runes.
+		if u32(r) < utf8::RuneSelf {
+			self.WriteByte(byte(r))?
+			ret 1
+		}
+		if self.err != nil {
+			error(self.err)
+		}
+		mut n := self.Available()
+		if n < utf8::UTFMax {
+			self.Flush()?
+			n = self.Available()
+			if n < utf8::UTFMax {
+				// Can only happen if buffer is silly small.
+				ret self.WriteStr(str(r))?
+			}
+		}
+		size = utf8::EncodeRune(self.buf[self.n:], r)
+		self.n += size
+		ret size
+	}
+
+	// Writes a string.
+	// It returns the number of bytes written.
+	// If the count is less than len(s), it throws an error explaining
+	// why the write is short.
+	fn WriteStr(mut *self, mut s: str)!: int {
+		mut nn := 0
+		for len(s) > self.Available() && self.err == nil {
+			let mut n: int
+			n = copy(self.buf[self.n:], s)
+			self.n += n
+			self.Flush() else {}
+			nn += n
+			s = s[n:]
+		}
+		if self.err != nil {
+			error(self.err)
+		}
+		n := copy(self.buf[self.n:], s)
+		self.n += n
+		nn += n
+		ret nn
+	}
+
+	// Implements [io::ReaderFrom].
+	fn ReadFrom(mut *self, mut r: io::Reader)!: (n: i64) {
+		if self.err != nil {
+			error(self.err)
+		}
+		let mut m: int
+	Loop:
+		for {
+			if self.Available() == 0 {
+				self.Flush()?
+			}
+			mut nr := 0
+			for nr < maxConsecutiveEmptyReads {
+				m = r.Read(self.buf[self.n:])?
+				if m == io::EOF {
+					break Loop
+				} else if m != 0 {
+					break
+				}
+				nr++
+			}
+			if nr == maxConsecutiveEmptyReads {
+				error(io::ErrNoProgress)
+			}
+			self.n += m
+			n += i64(m)
+		}
+		if m == io::EOF {
+			// If we filled the buffer exactly, flush preemptively.
+			if self.Available() == 0 {
+				self.Flush()?
+			}
+		}
+		ret n
 	}
 }
 
