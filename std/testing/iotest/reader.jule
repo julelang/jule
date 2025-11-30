@@ -67,3 +67,40 @@ impl io::Reader for halfReader {
 		ret self.r.Read(p[0 : (len(p)+1)/2])?
 	}
 }
+
+// Changes the way errors are handled by a Reader. Normally, a
+// Reader returns an error from the first Read call after the
+// last piece of data is read. DataErrReader wraps a Reader and changes its
+// behavior so the final error is returned along with the final data, instead
+// of in the first call after the final data.
+fn DataErrReader(mut r: io::Reader): io::Reader { ret &dataErrReader{r, nil, make([]byte, 1024)} }
+
+struct dataErrReader {
+	r:      io::Reader
+	unread: []byte
+	data:   []byte
+}
+
+impl io::Reader for dataErrReader {
+	fn Read(mut *self, mut p: []byte)!: (n: int) {
+		// loop because first call needs two reads:
+		// one to get data and a second to look for an error.
+		n = io::EOF
+		for {
+			if len(self.unread) == 0 {
+				mut n1 := self.r.Read(self.data)?
+				if n1 == io::EOF {
+					self.unread = self.data[0:0]
+					ret
+				}
+				self.unread = self.data[0:n1]
+			}
+			if n > 0 {
+				break
+			}
+			n = copy(p, self.unread)
+			self.unread = self.unread[n:]
+		}
+		ret
+	}
+}

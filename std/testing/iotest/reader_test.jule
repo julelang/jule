@@ -131,3 +131,52 @@ fn testHalfReader_emptyReader(t: &testing::T) {
 		t.Errorf("expected EOF, got: {}", n)
 	}
 }
+
+#test
+fn testDataErrReader_nonEmptyReader(t: &testing::T) {
+	const msg = "Hello, World!"
+	mut buf := strings::Reader.New(msg)
+
+	mut der := DataErrReader(buf)
+
+	mut b := make([]byte, 3)
+	mut got := new(strings::Builder)
+	for {
+		n := der.Read(b) else {
+			t.Errorf("unexpected error: {}", error)
+			ret
+		}
+		if n == io::EOF {
+			break
+		}
+		got.Write(b[:n])!
+	}
+	g, w := got.Str(), "Hello, World!"
+	if g != w {
+		t.Errorf("Read mismatch\n\tGot:  {\n\tWant: {}", g, w)
+	}
+}
+
+#test
+fn testDataErrReader_emptyReader(t: &testing::T) {
+	mut r := strings::Reader.New("")
+
+	mut der := DataErrReader(r)
+	let mut b: []byte
+	mut n := der.Read(b) else {
+		t.Errorf("unexpected error: {}", error)
+		ret
+	}
+	if n != io::EOF {
+		t.Errorf("Empty buffer read returned n={}", n)
+	}
+
+	b = make([]byte, 5)
+	n = der.Read(b) else {
+		t.Errorf("unexpected error: {}", error)
+		ret
+	}
+	if n != io::EOF {
+		t.Errorf("expected EOF, got: {}", n)
+	}
+}
