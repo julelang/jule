@@ -1,0 +1,632 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// The Jule code is a modified version of the original Go code from
+// https://github.com/golang/go/blob/go1.25.0/src/bufio/bufio.go and came with this notice.
+//
+// ====================================================
+// Copyright (c) 2009 The Go Authors. All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// ====================================================
+
+use "std/bytes"
+use "std/errors"
+use "std/io"
+use "std/strings"
+use "std/unicode/utf8"
+
+const (
+	defaultBufSize = 4096
+)
+
+// Any mutation is undefined.
+let mut ErrInvalidUnreadByte = errors::New("bufio: invalid use of UnreadByte")
+let mut ErrInvalidUnreadRune = errors::New("bufio: invalid use of UnreadRune")
+let mut ErrBufferFull = errors::New("bufio: buffer full")
+let mut ErrNegativeCount = errors::New("bufio: negative count")
+
+// Buffered input.
+
+// Implements buffering for an io::Reader object.
+// A new Reader is created by calling [Reader.New] or [Reader.NewSize];
+// alternatively the zero value of a Reader may be used after calling [Reset]
+// on it.
+struct Reader {
+	buf:          []byte
+	rd:           io::Reader // reader provided by the client
+	r:            int        // buf write position
+	w:            int        // buf read position
+	err:          any
+	lastByte:     int // last byte read for UnreadByte; -1 means invalid
+	lastRuneSize: int // size of last rune read for UnreadRune; -1 means invalid
+}
+
+const minReadBufferSize = 16
+const maxConsecutiveEmptyReads = 100
+
+impl io::Reader for Reader {}
+impl io::ByteReader for Reader {}
+impl io::ByteScanner for Reader {}
+impl io::RuneReader for Reader {}
+impl io::RuneScanner for Reader {}
+impl io::WriterTo for Reader {}
+
+impl Reader {
+	// Returns a new [Reader] whose buffer has at least the specified
+	// size. If the argument io::Reader is already a [Reader] with large enough
+	// size, it returns the underlying [Reader].
+	fn NewSize(mut rd: io::Reader, size: int): &Reader {
+		// Is it already a Reader?
+		mut b, ok := rd.(&Reader)
+		if ok && len(b.buf) >= size {
+			ret b
+		}
+		mut r := new(Reader)
+		r.reset(make([]byte, max(size, minReadBufferSize)), rd)
+		ret r
+	}
+
+	// Returns a new [Reader] whose buffer has the default size.
+	fn New(mut rd: io::Reader): &Reader {
+		ret Reader.NewSize(rd, defaultBufSize)
+	}
+
+	// Returns the size of the underlying buffer in bytes.
+	fn Size(*self): int { ret len(self.buf) }
+
+	// Discards any buffered data, resets all state, and switches
+	// the buffered reader to read from r.
+	// Calling Reset on the zero value of [Reader] initializes the internal buffer
+	// to the default size.
+	// Calling self.Reset(self) (that is, resetting a [Reader] to itself) does nothing.
+	fn Reset(mut *self, mut r: io::Reader) {
+		// If a Reader r is passed to NewReader, NewReader will return r.
+		// Different layers of code may do that, and then later pass r
+		// to Reset. Avoid infinite recursion in that case.
+		rr, ok := r.(&Reader)
+		if ok && uintptr(self) == uintptr(rr) {
+			ret
+		}
+		if self.buf == nil {
+			self.buf = make([]byte, defaultBufSize)
+		}
+		self.reset(self.buf, r)
+	}
+
+	fn reset(mut *self, mut buf: []byte, mut r: io::Reader) {
+		*self = Reader{
+			buf: buf,
+			rd: r,
+			lastByte: -1,
+			lastRuneSize: -1,
+		}
+	}
+
+	// Reads a new chunk into the buffer.
+	fn fill(mut *self): (eof: bool) {
+		// Slide existing data to beginning.
+		if self.r > 0 {
+			copy(self.buf, self.buf[self.r:self.w])
+			self.w -= self.r
+			self.r = 0
+		}
+
+		if self.w >= len(self.buf) {
+			panic("bufio: tried to fill full buffer")
+		}
+
+		// Read new data: try a limited number of times.
+		mut i := maxConsecutiveEmptyReads
+		for i > 0; i-- {
+			n := self.rd.Read(self.buf[self.w:]) else {
+				self.err = error
+				ret false
+			}
+			if n == io::EOF {
+				ret true
+			}
+			if n < 0 {
+				panic("bufio: reader returned negative count from Read")
+			}
+			self.w += n
+			if n > 0 {
+				ret false
+			}
+		}
+		self.err = io::ErrNoProgress
+		ret false
+	}
+
+	fn readErr(mut *self): any {
+		mut err := self.err
+		self.err = nil
+		ret err
+	}
+
+	// Returns the next n bytes without advancing the reader. The bytes stop
+	// being valid at the next read call. If necessary, it will read more bytes
+	// into the buffer in order to make n bytes available. If it returns fewer
+	// than n bytes, it also returns an error explaining why the read is short.
+	// The error is [ErrBufferFull] if n is larger than self's buffer size.
+	// Returns `len(data)==0 && data!=nil` for EOF.
+	//
+	// Calling Peek prevents a [Reader.UnreadByte] or [Reader.UnreadRune] call from succeeding
+	// until the next read operation.
+	fn Peek(mut *self, n: int)!: (data: []byte) {
+		if n < 0 {
+			error(ErrNegativeCount)
+		}
+
+		self.lastByte = -1
+		self.lastRuneSize = -1
+
+		for self.w-self.r < n && self.w-self.r < len(self.buf) && self.err == nil {
+			eof := self.fill() // self.w-self.r < len(self.buf) => buffer is not full
+			if eof {
+				ret make([]byte, 0)
+			}
+		}
+
+		if n > len(self.buf) {
+			error(ErrBufferFull)
+		}
+
+		// 0 <= n <= len(self.buf)
+		if self.w-self.r < n {
+			// not enough data in buffer
+			mut err := self.readErr()
+			if err == nil {
+				error(ErrBufferFull)
+			} else {
+				// throw the error, probably buffer is not filled because of that
+				error(err)
+			}
+		}
+		ret self.buf[self.r : self.r+n]
+	}
+
+	// Skips the next n bytes, returning the number of bytes discarded.
+	//
+	// If Discard skips fewer than n bytes, it also returns an error.
+	// If 0 <= n <= self.Buffered(), Discard is guaranteed to succeed without
+	// reading from the underlying io::Reader.
+	fn Discard(mut *self, n: int)!: (discarded: int) {
+		if n < 0 {
+			error(ErrNegativeCount)
+		}
+		if n == 0 {
+			ret
+		}
+
+		self.lastByte = -1
+		self.lastRuneSize = -1
+
+		mut remain := n
+		for {
+			mut eof := false
+			mut skip := self.Buffered()
+			if skip == 0 {
+				eof = self.fill()
+				skip = self.Buffered()
+			}
+			if skip > remain {
+				skip = remain
+			}
+			self.r += skip
+			remain -= skip
+			if remain == 0 {
+				ret n
+			}
+			if eof {
+				ret n - remain
+			}
+			if self.err != nil {
+				error(self.readErr())
+			}
+		}
+	}
+
+	// Reads data into p.
+	// It returns the number of bytes read into p.
+	// The bytes are taken from at most one Read on the underlying [Reader],
+	// hence n may be less than len(p).
+	// To read exactly len(p) bytes, use io::ReadFull(self, p).
+	// If the underlying [Reader] can return a non-zero count,
+	// then this Read method can do so as well; see the [io::Reader] docs.
+	fn Read(mut *self, mut p: []byte)!: (n: int) {
+		n = len(p)
+		if n == 0 {
+			if self.Buffered() > 0 {
+				ret 0
+			}
+			if self.err != nil {
+				error(self.readErr())
+			}
+			ret 0
+		}
+		if self.r == self.w {
+			if self.err != nil {
+				error(self.readErr())
+			}
+			if len(p) >= len(self.buf) {
+				// Large read, empty buffer.
+				// Read directly into p to avoid copy.
+				n = self.rd.Read(p)?
+				if n == io::EOF {
+					ret n
+				}
+				if n < 0 {
+					panic("bufio: reader returned negative count from Read")
+				}
+				if n > 0 {
+					self.lastByte = int(p[n-1])
+					self.lastRuneSize = -1
+				}
+				ret n
+			}
+			// One read.
+			// Do not use self.fill, which will loop.
+			self.r = 0
+			self.w = 0
+			n = self.rd.Read(self.buf)?
+			if n == io::EOF {
+				ret io::EOF
+			}
+			if n < 0 {
+				panic("bufio: reader returned negative count from Read")
+			}
+			self.w += n
+		}
+
+		// copy as much as we can
+		// Note: if the slice panics here, it is probably because
+		// the underlying reader returned a bad count. See Go's issue 49795.
+		n = copy(p, self.buf[self.r:self.w])
+		self.r += n
+		self.lastByte = int(self.buf[self.r-1])
+		self.lastRuneSize = -1
+		ret n
+	}
+
+	// Reads and returns a single byte.
+	// If no byte is available, returns an error.
+	fn ReadByte(mut *self)!: (byte, int) {
+		self.lastRuneSize = -1
+		mut eof := false
+		for self.r == self.w {
+			if eof {
+				ret 0, io::EOF
+			}
+			if self.err != nil {
+				error(self.readErr())
+			}
+			eof = self.fill() // buffer is empty
+		}
+		c := self.buf[self.r]
+		self.r++
+		self.lastByte = int(c)
+		ret c, 1
+	}
+
+	// Unreads the last byte. Only the most recently read byte can be unread.
+	//
+	// Returns an error if the most recent method called on the
+	// [Reader] was not a read operation. Notably, [Reader.Peek], [Reader.Discard], and [Reader.WriteTo] are not
+	// considered read operations.
+	fn UnreadByte(mut *self)! {
+		if self.lastByte < 0 || self.r == 0 && self.w > 0 {
+			error(ErrInvalidUnreadByte)
+		}
+		// self.r > 0 || self.w == 0
+		if self.r > 0 {
+			self.r--
+		} else {
+			// self.r == 0 && self.w == 0
+			self.w = 1
+		}
+		self.buf[self.r] = byte(self.lastByte)
+		self.lastByte = -1
+		self.lastRuneSize = -1
+	}
+
+	// Reads a single UTF-8 encoded Unicode character and returns the
+	// rune and its size in bytes. If the encoded rune is invalid, it consumes one byte
+	// and returns unicode.ReplacementChar (U+FFFD) with a size of 1.
+	fn ReadRune(mut *self)!: (r: rune, size: int) {
+		for self.r+utf8::UTFMax > self.w && !utf8::FullRune(self.buf[self.r:self.w]) && self.err == nil && self.w-self.r < len(self.buf) {
+			eof := self.fill() // self.w-self.r < len(buf) => buffer is not full
+			if eof {
+				break
+			}
+		}
+		self.lastRuneSize = -1
+		if self.r == self.w {
+			if self.err != nil {
+				error(self.readErr())
+			}
+			ret 0, io::EOF
+		}
+		r, size = rune(self.buf[self.r]), 1
+		if r >= utf8::RuneSelf {
+			r, size = utf8::DecodeRune(self.buf[self.r:self.w])
+		}
+		self.r += size
+		self.lastByte = int(self.buf[self.r-1])
+		self.lastRuneSize = size
+		ret r, size
+	}
+
+	// Unreads the last rune. If the most recent method called on
+	// the [Reader] was not a [Reader.ReadRune], [Reader.UnreadRune] returns an error. (In this
+	// regard it is stricter than [Reader.UnreadByte], which will unread the last byte
+	// from any read operation.)
+	fn UnreadRune(mut *self)! {
+		if self.lastRuneSize < 0 || self.r < self.lastRuneSize {
+			error(ErrInvalidUnreadRune)
+		}
+		self.r -= self.lastRuneSize
+		self.lastByte = -1
+		self.lastRuneSize = -1
+		ret
+	}
+
+	// Returns the number of bytes that can be read from the current buffer.
+	fn Buffered(*self): int { ret self.w - self.r }
+
+	// Reads until the first occurrence of delim in the input,
+	// returning a slice pointing at the bytes in the buffer.
+	// The bytes stop being valid at the next read.
+	// If it encounters an error before finding a delimiter, forwards it.
+	// It fails with full=true if the buffer fills without a delim.
+	// Because the data returned from ReadSlice will be overwritten
+	// by the next I/O operation, most clients should use
+	// [Reader.ReadBytes] or ReadStr instead.
+	// Throws error if and only if line does not end in delim because of an error.
+	// Returns `len(line)==0 && line!=nil` for EOF.
+	// If it encounters EOF before finding a delimiter,
+	// it returns all the data in the buffer.
+	fn ReadSlice(mut *self, delim: byte)!: (line: []byte, full: bool) {
+		mut s := 0 // search start index
+		mut eof := false
+		for {
+			// Search buffer.
+			mut i := bytes::IndexByte(self.buf[self.r+s:self.w], delim)
+			if i >= 0 {
+				i += s
+				line = self.buf[self.r : self.r+i+1]
+				self.r += i + 1
+				break
+			}
+
+			// Pending error?
+			if self.err != nil {
+				self.r = self.w
+				error(self.readErr())
+			}
+
+			// EOF?
+			if eof {
+				line = self.buf[self.r:self.w]
+				self.r = self.w
+				ret
+			}
+
+			// Buffer full?
+			if self.Buffered() >= len(self.buf) {
+				self.r = self.w
+				line = self.buf
+				full = true
+				break
+			}
+
+			s = self.w - self.r // do not rescan area we scanned before
+
+			eof = self.fill() // buffer is not full
+		}
+
+		// Handle last byte, if any.
+		i := len(line) - 1
+		if i >= 0 {
+			self.lastByte = int(line[i])
+			self.lastRuneSize = -1
+		}
+
+		ret
+	}
+
+	// Low-level line-reading primitive. Most callers should use
+	// [Reader.ReadBytes]('\n') or [Reader.ReadStr]('\n') instead or use a [Scanner].
+	//
+	// It tries to return a single line, not including the end-of-line bytes.
+	// If the line was too long for the buffer then isPrefix is set and the
+	// beginning of the line is returned. The rest of the line will be returned
+	// from future calls. isPrefix will be false when returning the last fragment
+	// of the line. The returned buffer is only valid until the next call to
+	// ReadLine.
+	//
+	// The text returned from ReadLine does not include the line end ("\r\n" or "\n").
+	// No indication or error is given if the input ends without a final line end.
+	// Calling [Reader.UnreadByte] after ReadLine will always unread the last byte read
+	// (possibly a character belonging to the line end) even if that byte is not
+	// part of the line returned by ReadLine.
+	//
+	// It returns len(line)=0 and isPrefix=false for EOF.
+	fn ReadLine(mut *self)!: (line: []byte, isPrefix: bool) {
+		line, full := self.ReadSlice('\n')?
+		if full {
+			// Handle the case where "\r\n" straddles the buffer.
+			if len(line) > 0 && line[len(line)-1] == '\r' {
+				// Put the '\r' back on buf and drop it from line.
+				// Let the next call to ReadLine check for "\r\n".
+				if self.r == 0 {
+					// should be unreachable
+					panic("bufio: tried to rewind past start of buffer")
+				}
+				self.r--
+				line = line[:len(line)-1]
+			}
+			ret line, true
+		}
+
+		// Might be EOF.
+		if len(line) == 0 {
+			ret
+		}
+
+		if line[len(line)-1] == '\n' {
+			mut drop := 1
+			if len(line) > 1 && line[len(line)-2] == '\r' {
+				drop = 2
+			}
+			line = line[:len(line)-drop]
+		}
+		ret
+	}
+
+	// Reads until the first occurrence of delim in the input. It
+	// returns (slice of full buffers, remaining bytes before delim, total number
+	// of bytes in the combined first two elements).
+	// The complete result is equal to
+	// `bytes::Join(append(fullBuffers, finalFragment), nil)`, which has a
+	// length of `totalLen`. The result is structured in this way to allow callers
+	// to minimize allocations and copies.
+	fn collectFragments(mut *self, delim: byte)!: (fullBuffers: [][]byte, finalFragment: []byte, totalLen: int) {
+		let mut frag: []byte
+		// Use ReadSlice to look for delim, accumulating full buffers.
+		for {
+			(frag), full := self.ReadSlice(delim)? // unexpected error, if any
+			if !full || frag != nil && len(frag) == 0 { // got final fragment
+				break
+			}
+			// Make a copy of the buffer.
+			mut buf := bytes::Clone(frag)
+			fullBuffers = append(fullBuffers, buf)
+			totalLen += len(buf)
+		}
+
+		totalLen += len(frag)
+		ret fullBuffers, frag, totalLen
+	}
+
+	// Reads until the first occurrence of delim in the input,
+	// returning a slice containing the data up to and including the delimiter.
+	// If it encounters an error before finding a delimiter, forwards it.
+	// Throws error if and only if line does not end in delim because of an error.
+	// Returns `len(buf)==0 && buf!=nil` for EOF.
+	// If it encounters EOF before finding a delimiter,
+	// it returns all the data in the buffer.
+	// For simple uses, a Scanner may be more convenient.
+	fn ReadBytes(mut *self, delim: byte)!: (buf: []byte) {
+		full, frag, mut n := self.collectFragments(delim)?
+		if n == 0 { // EOF
+			ret make([]byte, 0)
+		}
+		// Allocate new buffer to hold the full pieces and the fragment.
+		buf = make([]byte, n)
+		n = 0
+		// Copy full pieces and fragment in.
+		for i in full {
+			n += copy(buf[n:], full[i])
+		}
+		copy(buf[n:], frag)
+		ret buf
+	}
+
+	// Reads until the first occurrence of delim in the input,
+	// returning a string containing the data up to and including the delimiter.
+	// If it encounters an error before finding a delimiter, forwards it.
+	// Throws error if and only if line does not end in delim because of an error.
+	// Returns empty string for EOF. If it encounters EOF before finding a delimiter,
+	// it returns all the data in the buffer.
+	// For simple uses, a Scanner may be more convenient.
+	fn ReadStr(mut *self, delim: byte)!: str {
+		full, frag, n := self.collectFragments(delim)?
+		if n == 0 { // EOF
+			ret ""
+		}
+		// Allocate new buffer to hold the full pieces and the fragment.
+		let mut buf: strings::Builder
+		buf.Grow(n)
+		// Copy full pieces and fragment in.
+		for _, fb in full {
+			buf.Write(fb)?
+		}
+		buf.Write(frag)?
+		ret buf.Str()
+	}
+
+	// Implements io::WriterTo.
+	// This may make multiple calls to the [Reader.Read] method of the underlying [Reader].
+	fn WriteTo(mut *self, mut w: io::Writer)!: (n: i64) {
+		self.lastByte = -1
+		self.lastRuneSize = -1
+
+		if self.r < self.w {
+			n = self.writeBuf(w)?
+		}
+
+		if self.w-self.r < len(self.buf) {
+			self.fill() // buffer not full
+		}
+
+		mut eof := false
+		for self.r < self.w {
+			// self.r < self.w => buffer is not empty
+			m := self.writeBuf(w)?
+			n += m
+			if eof {
+				break
+			}
+			eof = self.fill() // buffer is empty
+		}
+
+		if self.err != nil {
+			error(self.readErr())
+		}
+
+		ret n
+	}
+
+	// Writes the [Reader]'s buffer to the writer.
+	fn writeBuf(mut *self, mut w: io::Writer)!: i64 {
+		n := w.Write(self.buf[self.r:self.w])?
+		if n < 0 {
+			panic("bufio: reader returned negative count from Read")
+		}
+		self.r += n
+		ret i64(n)
+	}
+}
+
+fn max(a: int, b: int): int {
+	if a > b {
+		ret a
+	}
+	ret b
+}
