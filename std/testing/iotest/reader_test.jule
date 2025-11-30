@@ -1,0 +1,70 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/io"
+use "std/strings"
+use "std/testing"
+
+#test
+fn testOneByteReader_nonEmptyReader(t: &testing::T) {
+	const msg = "Hello, World!"
+	mut buf := strings::Reader.New(msg)
+
+	mut obr := OneByteReader(buf)
+	let mut b: []byte
+	mut n := obr.Read(b) else {
+		t.Errorf("unexpected error: {}", error)
+		ret
+	}
+	if n != 0 {
+		t.Errorf("Empty buffer read returned n={}", n)
+	}
+
+	b = make([]byte, 3)
+	// Read from obr until EOF.
+	mut got := new(strings::Builder)
+	mut i := 0
+	for ; i++ {
+		n = obr.Read(b) else {
+			t.Errorf("unexpected error: {}", error)
+			ret
+		}
+		if n == io::EOF {
+			break
+		}
+		g, w := n, 1
+		if g != w {
+			t.Errorf("Iteration #{} read {} bytes, want {}", i, g, w)
+		}
+		got.Write(b[:n])!
+	}
+	g, w := got.Str(), "Hello, World!"
+	if g != w {
+		t.Errorf("Read mismatch\n\tGot:  {\n\tWant: {}", g, w)
+	}
+}
+
+#test
+fn testOneByteReader_emptyReader(t: &testing::T) {
+	mut r := strings::Reader.New("")
+
+	mut obr := OneByteReader(r)
+	let mut b: []byte
+	mut n := obr.Read(b) else {
+		t.Errorf("unexpected error: {}", error)
+		ret
+	}
+	if n != 0 {
+		t.Errorf("Empty buffer read returned n={}", n)
+	}
+
+	b = make([]byte, 5)
+	n = obr.Read(b) else {
+		t.Errorf("unexpected error: {}", error)
+		ret
+	}
+	if n != io::EOF {
+		t.Errorf("expected EOF, got: {}", n)
+	}
+}
