@@ -408,12 +408,10 @@ impl Reader {
 	// by the next I/O operation, most clients should use
 	// [Reader.ReadBytes] or ReadStr instead.
 	// Throws error if and only if line does not end in delim because of an error.
-	// Returns `len(line)==0 && line!=nil` for EOF.
 	// If it encounters EOF before finding a delimiter,
 	// it returns all the data in the buffer.
-	fn ReadSlice(mut *self, delim: byte)!: (line: []byte, full: bool) {
+	fn ReadSlice(mut *self, delim: byte)!: (line: []byte, full: bool, eof: bool) {
 		mut s := 0 // search start index
-		mut eof := false
 		for {
 			// Search buffer.
 			mut i := bytes::IndexByte(self.buf[self.r+s:self.w], delim)
@@ -475,10 +473,8 @@ impl Reader {
 	// Calling [Reader.UnreadByte] after ReadLine will always unread the last byte read
 	// (possibly a character belonging to the line end) even if that byte is not
 	// part of the line returned by ReadLine.
-	//
-	// It returns len(line)=0 and isPrefix=false for EOF.
-	fn ReadLine(mut *self)!: (line: []byte, isPrefix: bool) {
-		line, full := self.ReadSlice('\n')?
+	fn ReadLine(mut *self)!: (line: []byte, isPrefix: bool, eof: bool) {
+		line, full, eof := self.ReadSlice('\n')?
 		if full {
 			// Handle the case where "\r\n" straddles the buffer.
 			if len(line) > 0 && line[len(line)-1] == '\r' {
@@ -491,10 +487,9 @@ impl Reader {
 				self.r--
 				line = line[:len(line)-1]
 			}
-			ret line, true
+			ret line, true, eof
 		}
 
-		// Might be EOF.
 		if len(line) == 0 {
 			ret
 		}
@@ -516,12 +511,12 @@ impl Reader {
 	// `bytes::Join(append(fullBuffers, finalFragment), nil)`, which has a
 	// length of `totalLen`. The result is structured in this way to allow callers
 	// to minimize allocations and copies.
-	fn collectFragments(mut *self, delim: byte)!: (fullBuffers: [][]byte, finalFragment: []byte, totalLen: int) {
+	fn collectFragments(mut *self, delim: byte)!: (fullBuffers: [][]byte, finalFragment: []byte, totalLen: int, eof: bool) {
 		let mut frag: []byte
 		// Use ReadSlice to look for delim, accumulating full buffers.
 		for {
-			(frag), full := self.ReadSlice(delim)? // unexpected error, if any
-			if !full || frag != nil && len(frag) == 0 { // got final fragment
+			frag, _, eof = self.ReadSlice(delim)? // unexpected error, if any
+			if eof { // got final fragment
 				break
 			}
 			// Make a copy of the buffer.
@@ -531,21 +526,20 @@ impl Reader {
 		}
 
 		totalLen += len(frag)
-		ret fullBuffers, frag, totalLen
+		ret fullBuffers, frag, totalLen, eof
 	}
 
 	// Reads until the first occurrence of delim in the input,
 	// returning a slice containing the data up to and including the delimiter.
 	// If it encounters an error before finding a delimiter, forwards it.
 	// Throws error if and only if line does not end in delim because of an error.
-	// Returns `len(buf)==0 && buf!=nil` for EOF.
-	// If it encounters EOF before finding a delimiter,
+	// Returns zero-length slice for EOF. If it encounters EOF before finding a delimiter,
 	// it returns all the data in the buffer.
 	// For simple uses, a Scanner may be more convenient.
-	fn ReadBytes(mut *self, delim: byte)!: (buf: []byte) {
-		full, frag, mut n := self.collectFragments(delim)?
-		if n == 0 { // EOF
-			ret make([]byte, 0)
+	fn ReadBytes(mut *self, delim: byte)!: (buf: []byte, eof: bool) {
+		full, frag, mut n, eof := self.collectFragments(delim)?
+		if n == 0 && eof {
+			ret
 		}
 		// Allocate new buffer to hold the full pieces and the fragment.
 		buf = make([]byte, n)
@@ -555,7 +549,7 @@ impl Reader {
 			n += copy(buf[n:], full[i])
 		}
 		copy(buf[n:], frag)
-		ret buf
+		ret buf, eof
 	}
 
 	// Reads until the first occurrence of delim in the input,
@@ -565,10 +559,10 @@ impl Reader {
 	// Returns empty string for EOF. If it encounters EOF before finding a delimiter,
 	// it returns all the data in the buffer.
 	// For simple uses, a Scanner may be more convenient.
-	fn ReadStr(mut *self, delim: byte)!: str {
-		full, frag, n := self.collectFragments(delim)?
-		if n == 0 { // EOF
-			ret ""
+	fn ReadStr(mut *self, delim: byte)!: (str, eof: bool) {
+		full, frag, n, eof := self.collectFragments(delim)?
+		if n == 0 && eof {
+			ret
 		}
 		// Allocate new buffer to hold the full pieces and the fragment.
 		let mut buf: strings::Builder
@@ -578,7 +572,7 @@ impl Reader {
 			buf.Write(fb)?
 		}
 		buf.Write(frag)?
-		ret buf.Str()
+		ret buf.Str(), eof
 	}
 
 	// Implements io::WriterTo.

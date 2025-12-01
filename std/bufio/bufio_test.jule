@@ -89,11 +89,11 @@ let readMakers: []readMaker = [
 fn readLines(mut b: &Reader): str {
 	mut s := ""
 	for {
-		s1 := b.ReadStr('\n')!
-		if s1 == "" {
+		s1, eof := b.ReadStr('\n')!
+		s += s1
+		if eof {
 			break
 		}
-		s += s1
 	}
 	ret s
 }
@@ -487,16 +487,16 @@ fn testUnreadRuneError(t: &testing::T) {
 	r.ReadRune() else {
 		t.Errorf("unexpected error on ReadRune (4): {}", error)
 	}
-	mut line, _ := r.ReadSlice(0) else {
+	mut line, _, _ := r.ReadSlice(0) else {
 		t.Errorf("unexpected error on ReadSlice (4):", error)
-		use buf, false
+		use buf, false, false
 	}
 	if line == nil || len(line) == 0 {
 		t.Errorf("unexpected result on ReadSlice (4)")
 	}
-	line, _ = r.ReadSlice(0) else {
+	line, _, _ = r.ReadSlice(0) else {
 		t.Errorf("unexpected error on ReadSlice (4):", error)
-		use make([]byte, 0), false
+		use make([]byte, 0), false, false
 	}
 	if line == nil || len(line) != 0 {
 		t.Errorf("expected EOF on ReadSlice (4)")
@@ -544,14 +544,14 @@ fn testReaderNewSizeIdempotent(t: &testing::T) {
 fn testBufferFull(t: &testing::T) {
 	const longString = "And now, hello, world! It is the time for all good men to come to the aid of their party"
 	mut buf := Reader.NewSize(strings::Reader.New(longString), minReadBufferSize)
-	mut line, mut full := buf.ReadSlice('!') else {
+	mut line, mut full, _ := buf.ReadSlice('!') else {
 		t.Errorf("unexpected error: {}", error)
 		ret
 	}
 	if str(line) != "And now, hello, " || !full {
 		t.Errorf("first ReadSlice(,) = {}, {}", line, full)
 	}
-	line, full = buf.ReadSlice('!') else {
+	line, full, _ = buf.ReadSlice('!') else {
 		t.Errorf("unexpected error: {}", error)
 		ret
 	}
@@ -717,7 +717,7 @@ fn _testReadLine(t: &testing::T, mut input: []byte) {
 		mut reader := &testReaderImpl{input, stride}
 		mut l := Reader.NewSize(reader, len(input)+1)
 		for {
-			line, isPrefix := l.ReadLine() else {
+			line, isPrefix, _ := l.ReadLine() else {
 				t.Errorf("unknown error: {}", error)
 				ret
 			}
@@ -755,32 +755,32 @@ fn testLineTooLong(t: &testing::T) {
 	mut data := unsafe { sb.Buf() }
 	mut buf := strings::Reader.New(sb.Str())
 	mut l := Reader.NewSize(buf, minReadBufferSize)
-	mut line, mut isPrefix := l.ReadLine() else {
+	mut line, mut isPrefix, _ := l.ReadLine() else {
 		t.Errorf("unexpected error: {}", error)
-		use nil, false
+		use nil, false, false
 	}
 	if !isPrefix || !bytes::Equal(line, data[:minReadBufferSize]) {
 		t.Errorf("bad result for first line: got {} want {}", line, data[:minReadBufferSize])
 	}
 	data = data[len(line):]
-	line, isPrefix = l.ReadLine() else {
+	line, isPrefix, _ = l.ReadLine() else {
 		t.Errorf("unexpected error: {}", error)
-		use nil, false
+		use nil, false, false
 	}
 	if !isPrefix || !bytes::Equal(line, data[:minReadBufferSize]) {
 		t.Errorf("bad result for second line: got {} want {}", line, data[:minReadBufferSize])
 	}
 	data = data[len(line):]
-	line, isPrefix = l.ReadLine() else {
+	line, isPrefix, _ = l.ReadLine() else {
 		t.Errorf("unexpected error: {}", error)
-		use nil, false
+		use nil, false, false
 	}
 	if isPrefix || !bytes::Equal(line, data[:minReadBufferSize/2]) {
 		t.Errorf("bad result for third line: got {} want {}", line, data[:minReadBufferSize/2])
 	}
-	line, isPrefix = l.ReadLine() else {
+	line, isPrefix, _ = l.ReadLine() else {
 		t.Errorf("unexpected error: {}", error)
-		use nil, false
+		use nil, false, false
 	}
 	if isPrefix || line == nil || len(line) > 0 {
 		t.Errorf("expected no more lines: {}", line)
@@ -795,9 +795,9 @@ fn testReadAfterLines(t: &testing::T) {
 	mut outbuf := new(strings::Builder)
 	maxLineLength := len(line1) + len(restData)/2
 	mut l := Reader.NewSize(inbuf, maxLineLength)
-	line, isPrefix := l.ReadLine() else {
+	line, isPrefix, _ := l.ReadLine() else {
 		t.Errorf("unexpected error: {}", error)
-		use nil, false
+		use nil, false, false
 	}
 	if isPrefix || str(line) != line1 {
 		t.Errorf("bad result for first line: isPrefix={} line={}", isPrefix, str(line))
@@ -817,7 +817,7 @@ fn testReadAfterLines(t: &testing::T) {
 #test
 fn testReadEmptyBuffer(t: &testing::T) {
 	mut l := Reader.NewSize(strings::Reader.New(""), minReadBufferSize)
-	line, isPrefix := l.ReadLine() else {
+	line, isPrefix, _ := l.ReadLine() else {
 		t.Errorf("unexpected error: {}", error)
 		ret
 	}
@@ -834,7 +834,7 @@ fn testLinesAfterRead(t: &testing::T) {
 		ret
 	}
 
-	line, isPrefix := l.ReadLine() else {
+	line, isPrefix, _ := l.ReadLine() else {
 		t.Errorf("unexpected error: {}", error)
 		ret
 	}
@@ -881,9 +881,9 @@ fn _testReadLineNewlines(t: &testing::T, input: str, expect: []readLineResult) {
 	mut b := Reader.NewSize(strings::Reader.New(input), minReadBufferSize)
 	for i, e in expect {
 		let mut err: any
-		line, isPrefix := b.ReadLine() else {
+		line, isPrefix, _ := b.ReadLine() else {
 			err = error
-			use e.line, e.isPrefix
+			use e.line, e.isPrefix, false
 		}
 		if !bytes::Equal(line, e.line) {
 			t.Errorf("{} call {}, line == {}, want {}", input, i, line, e.line)
