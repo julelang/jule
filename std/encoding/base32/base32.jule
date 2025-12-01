@@ -2,150 +2,557 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-// TODO: add encoder and decoder functionality like "std/encoding/ascii85".
+// The Jule code is a modified version of the original Go code from
+// https://github.com/golang/go/blob/go1.25.0/src/encoding/base32/base32.go and came with this notice.
+//
+// ====================================================
+// Copyright (c) 2009 The Go Authors. All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// ====================================================
 
 use "std/internal/byteslite"
+use "std/internal/conv"
+use "std/io"
+use "std/slices"
+use "std/unsafe"
 
-// Table for standard base32 encoding.
-let t32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+// The standard base32 encoding, as defined in RFC 4648.
+let mut StdEncoding = Encoding.New("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567", StdPadding)
 
-// Standard byte for padding.
-const paddingByte = '='
+// The “Extended Hex Alphabet” defined in RFC 4648.
+// It is typically used in DNS.
+let mut HexEncoding = Encoding.New("0123456789ABCDEFGHIJKLMNOPQRSTUV", StdPadding)
 
-fn lenNoPad(b: []byte): int {
+const (
+	StdPadding: byte = '=' // Standard padding character.
+	NoPadding:  byte = 0   // No padding.
+)
+
+const (
+	decodeMapInitialize = "" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff" +
+		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff"
+
+	invalidIndex = '\xff'
+)
+
+type CorruptInputError: i64
+
+impl CorruptInputError {
+	fn Str(*self): str {
+		ret "illegal base32 data at input byte " + conv::Itoa64(i64(*self))
+	}
+}
+
+// A radix 32 encoding/decoding scheme, defined by a 32-character alphabet.
+// The most common is the "base32" encoding introduced for SASL GSSAPI and
+// standardized in RFC 4648. The alternate "base32hex" encoding is used in DNSSEC.
+struct Encoding {
+	table:     str
+	decodeMap: [256]byte
+	padByte:   byte
+}
+
+impl Encoding {
+	// Returns a new padded Encoding defined by the given alphabet,
+	// which must be a 32-byte string that contains unique byte values and
+	// does not contain the padding character or CR / LF ('\r', '\n').
+	// The alphabet is treated as a sequence of byte values
+	// without any special treatment for multi-byte UTF-8.
+	fn New(table: str, padding: byte): &Encoding {
+		// Check for illegal padding.
+		match {
+		| padding < NoPadding || padding == '\r' || padding == '\n':
+			panic("invalid padding")
+		| byteslite::IndexByteStr(table, padding) != -1:
+			panic("padding contained in alphabet")
+		}
+
+		mut enc := new(Encoding)
+		enc.padByte = padding
+		enc.table = table
+		copy(enc.decodeMap[:], decodeMapInitialize)
+
+		// Check for illegal alphabet table.
+		if len(table) != 32 {
+			panic("encoding alphabet is not 32-bytes long")
+		}
+		mut i := 0
+		for i < len(table); i++ {
+			b := table[i]
+			match {
+			| b == '\n' || b == '\r':
+				panic("encoding alphabet contains newline character")
+			| enc.decodeMap[b] != invalidIndex:
+				panic("encoding alphabet includes duplicate symbols")
+			}
+			enc.decodeMap[b] = byte(i)
+		}
+
+		ret enc
+	}
+
+	// Returns the length in bytes of the base32 encoding
+	// of an input buffer of length n.
+	fn EncodedLen(*self, n: int): int {
+		if self.padByte == NoPadding {
+			ret n/5*8 + (n%5*8+4)/5
+		}
+		ret (n + 4) / 5 * 8
+	}
+
+	// Returns the maximum length in bytes of the decoded data
+	// corresponding to n bytes of base32-encoded data.
+	fn DecodedLen(*self, n: int): int {
+		ret decodedLen(n, self.padByte)
+	}
+
+	// Encodes src using the encoding,
+	// writing [Encoding.EncodedLen](len(src)) bytes to dst.
+	//
+	// The encoding pads the output to a multiple of 8 bytes,
+	// so Encode is not appropriate for use on individual blocks
+	// of a large data stream. Use [NewEncoder] instead.
+	//
+	// It panics if len(dst) is not enough for encoded length.
+	fn Encode(*self, mut dst: []byte, src: []byte) {
+		if len(src) == 0 {
+			ret
+		}
+		n := self.EncodedLen(len(src))
+		if n == 0 {
+			ret
+		}
+		if len(dst) < n {
+			panic("destination buffer have not enough space for encoded data")
+		}
+		t := &self.table[0]
+		mut bits := u64(0)
+		mut buffer := u32(0)
+		mut p := &dst[0]
+		pad := self.padByte != NoPadding
+		for _, b in src {
+			buffer <<= 8
+			buffer += u32(b)
+			bits += 8
+			for bits >= 5; p++ {
+				unsafe { *p = t[(buffer>>(bits-5))&0x3F] }
+				buffer &= ^(0x1F << (bits - 5))
+				bits -= 5
+			}
+		}
+
+		match len(src) % 5 {
+		| 1:
+			buffer <<= 2
+			unsafe { *p = t[buffer&0x1F] }
+			if pad {
+				p++
+				unsafe { *p = self.padByte }
+				p++
+				unsafe { *p = self.padByte }
+				p++
+				unsafe { *p = self.padByte }
+				p++
+				unsafe { *p = self.padByte }
+				p++
+				unsafe { *p = self.padByte }
+				p++
+				unsafe { *p = self.padByte }
+			}
+		| 2:
+			buffer <<= 4
+			unsafe { *p = t[buffer&0x1F] }
+			if pad {
+				p++
+				unsafe { *p = self.padByte }
+				p++
+				unsafe { *p = self.padByte }
+				p++
+				unsafe { *p = self.padByte }
+				p++
+				unsafe { *p = self.padByte }
+			}
+		| 3:
+			buffer <<= 1
+			unsafe { *p = t[buffer&0x1F] }
+			if pad {
+				p++
+				unsafe { *p = self.padByte }
+				p++
+				unsafe { *p = self.padByte }
+				p++
+				unsafe { *p = self.padByte }
+			}
+		| 4:
+			buffer <<= 3
+			unsafe { *p = t[buffer&0x1F] }
+			if pad {
+				p++
+				unsafe { *p = self.padByte }
+			}
+		}
+	}
+
+	//Appends the base32 encoded src to dst
+	// and returns the extended buffer.
+	fn AppendEncode(*self, mut dst: []byte, src: []byte): []byte {
+		n := self.EncodedLen(len(src))
+		dst = slices::Grow(dst, n)
+		self.Encode(dst[len(dst):][:n], src)
+		ret dst[:len(dst)+n]
+	}
+
+	// Returns the base32 encoding of src.
+	fn EncodeToStr(*self, src: []byte): str {
+		mut buf := make([]byte, self.EncodedLen(len(src)))
+		self.Encode(buf, src)
+		ret unsafe::StrFromBytes(buf)
+	}
+
+	// Decodes src using the encoding. It writes at most
+	// [Encoding.DecodedLen](len(src)) bytes to dst and returns the number of bytes
+	// written. The caller must ensure that dst is large enough to hold all
+	// the decoded data.
+	//
+	// It panics if len(dst) is not enough for decoded length.
+	fn Decode(*self, mut dst: []byte, src: []byte)!: (n: int) {
+		n, _ = self.decode(dst, src)?
+		ret
+	}
+
+	// Appends the base32 decoded src to dst and returns the extended buffer.
+	// If the input is malformed, it returns the partially decoded src and an error.
+	fn AppendDecode(*self, mut dst: []byte, src: []byte)!: []byte {
+		// Compute the output size without padding to avoid over allocating.
+		mut n := decodedLen(lenNoPad(src, self.padByte), NoPadding)
+		dst = slices::Grow(dst, n)
+		n = self.Decode(dst[len(dst):][:n], src)?
+		ret dst[:len(dst)+n]
+	}
+
+	// Returns the bytes represented by the base32 string s.
+	// If the input is malformed, it returns the partially decoded data.
+	fn DecodeStr(*self, s: str)!: []byte {
+		mut buf := []byte(s)
+		n, _ := self.decode(buf, buf)?
+		ret buf[:n]
+	}
+
+	fn decode(*self, mut dst: []byte, src: []byte)!: (n: int, end: bool) {
+		if len(src) == 0 {
+			ret
+		}
+		// Compute the exact bytes to be written.
+		n = decodedLen(lenNoPad(src, self.padByte), NoPadding)
+		if n == 0 {
+			ret
+		}
+		if len(dst) < n {
+			panic("destination buffer have not enough space for decoded data")
+		}
+		mut buffer := u32(0)
+		mut bits := u64(0)
+		mut dp := &dst[0]
+		mut sp := &src[0]
+		spf := sp
+		mut c := len(src)
+		mut i := 0
+		for c > 0 {
+			mut j := 0
+			for j < 8; j++ {
+				if c == 0 {
+					if self.padByte != NoPadding {
+						// We have reached the end and are missing padding
+						error(CorruptInputError(len(src) - c - j))
+					}
+					// We have reached the end and are not expecting any padding
+					end = true
+					ret
+				}
+				b := unsafe { *sp }
+				sp++
+				i++
+				c--
+				if b == self.padByte && j >= 2 && c < 8 {
+					// We've reached the end and there's padding
+					if len(src)+j < 8-1 {
+						// Not enough padding.
+						error(CorruptInputError(len(src)))
+					}
+					mut k := int(uintptr(sp - spf))
+					for k < 8-1-j; k++ {
+						if c > k && src[k] != self.padByte {
+							// Incorrect padding.
+							error(CorruptInputError(len(src) - c + k - 1))
+						}
+					}
+					// 7, 5 and 2 are not valid padding lengths, and so 1, 3 and 6 are not
+					// valid j values. See RFC 4648 Section 6 "Base 32 Encoding" listing
+					// the five valid padding lengths, and Section 9 "Illustrations and
+					// Examples" for an illustration for how the 1st, 3rd and 6th base32
+					// src bytes do not yield enough information to decode a dst byte.
+					if j == 1 || j == 3 || j == 6 {
+						error(CorruptInputError(len(src) - c - 1))
+					}
+					end = true
+					ret
+				}
+				d := self.decodeMap[b]
+				if d == invalidIndex {
+					error(CorruptInputError(len(src) - c - 1))
+				}
+				buffer <<= 5
+				bits += 5
+				buffer += u32(d)
+				if bits >= 8 {
+					unsafe { *dp = byte(buffer >> (bits - 8)) }
+					dp++
+					buffer &= ^(0xFF << (bits - 8))
+					bits -= 8
+				}
+			}
+		}
+		ret
+	}
+}
+
+fn decodedLen(n: int, padByte: byte): int {
+	if padByte == NoPadding {
+		ret n/8*5 + n%8*5/8
+	}
+	ret n / 8 * 5
+}
+
+fn lenNoPad(b: []byte, padByte: byte): int {
+	if padByte == NoPadding {
+		ret len(b)
+	}
 	mut i := len(b) - 1
-	for i >= 0 && b[i] == paddingByte; i-- {
+	for i >= 0 && b[i] == padByte {
+		i--
 	}
 	ret i + 1
 }
 
-fn encodeLen(n: int, pad: bool): int {
-	if pad {
-		ret (n + 4) / 5 << 3
-	}
-	ret n/5<<3 + (n%5<<3+4)/5
+struct encoder {
+	enc:  &Encoding
+	w:    io::Writer
+	buf:  [5]byte    // buffered data waiting to be encoded
+	nbuf: int        // number of bytes in buf
+	out:  [1024]byte // output buffer
 }
 
-// Returns length of encoded bytes of b.
-fn EncodeLen(b: []byte, pad: bool): int {
-	ret encodeLen(len(b), pad)
-}
+impl io::WriteCloser for encoder {
+	fn Write(mut *self, p: []byte)!: (n: int) {
+		mut out := unsafe::Slice(&self.out[0], len(self.out), len(self.out))
+		mut buf := unsafe::Slice(&self.buf[0], len(self.buf), len(self.buf))
 
-// Returns length of decoded bytes of b.
-fn DecodeLen(b: []byte): int {
-	if len(b) == 0 {
-		ret 0
-	}
-	n := lenNoPad(b)
-	ret n>>3*5 + n%8*5>>3
-}
-
-// Encodes source bytes into dest with standard base32 table.
-// Returns encoded base32 bytes if success, nil slice if not.
-// Adds padding if pad is true.
-// Algorithm will call the append function to append dest.
-fn Encode(src: []byte, pad: bool): []byte {
-	n := encodeLen(len(src), pad)
-	if n == 0 {
-		ret nil
-	}
-	t := &t32[0]
-	mut bits := u64(0)
-	mut buffer := u32(0)
-	mut dest := make([]byte, n)
-	mut p := &dest[0]
-	for _, b in src {
-		buffer <<= 8
-		buffer += u32(b)
-		bits += 8
-		for bits >= 5; p++ {
-			unsafe { *p = t[(buffer>>(bits-5))&0x3F] }
-			buffer &= ^(0x1F << (bits - 5))
-			bits -= 5
-		}
-	}
-
-	match len(src) % 5 {
-	| 1:
-		buffer <<= 2
-		unsafe { *p = t[buffer&0x1F] }
-		if pad {
-			p++
-			unsafe { *p = paddingByte }
-			p++
-			unsafe { *p = paddingByte }
-			p++
-			unsafe { *p = paddingByte }
-			p++
-			unsafe { *p = paddingByte }
-			p++
-			unsafe { *p = paddingByte }
-			p++
-			unsafe { *p = paddingByte }
-		}
-	| 2:
-		buffer <<= 4
-		unsafe { *p = t[buffer&0x1F] }
-		if pad {
-			p++
-			unsafe { *p = paddingByte }
-			p++
-			unsafe { *p = paddingByte }
-			p++
-			unsafe { *p = paddingByte }
-			p++
-			unsafe { *p = paddingByte }
-		}
-	| 3:
-		buffer <<= 1
-		unsafe { *p = t[buffer&0x1F] }
-		if pad {
-			p++
-			unsafe { *p = paddingByte }
-			p++
-			unsafe { *p = paddingByte }
-			p++
-			unsafe { *p = paddingByte }
-		}
-	| 4:
-		buffer <<= 3
-		unsafe { *p = t[buffer&0x1F] }
-		if pad {
-			p++
-			unsafe { *p = paddingByte }
-		}
-	}
-	ret dest
-}
-
-// Decodes source bytes into dest with standard base32 table.
-// Returns decoded bytes if success, nil slice if not.
-// Detects padding by default, no required padding specification.
-// Algorithm will call the append function to append dest.
-fn Decode(src: []byte): []byte {
-	n := DecodeLen(src)
-	if n == 0 {
-		ret nil
-	}
-	mut buffer := u32(0)
-	mut bits := u64(0)
-	mut dest := make([]byte, n)
-	mut p := &dest[0]
-	for _, b in src {
-		i := byteslite::IndexByteStr(t32, b)
-		buffer <<= 5
-		bits += 5
-		if i != -1 {
-			buffer += u32(31 - (31 - i))
-		}
-		if bits >= 8 {
-			if b != paddingByte {
-				unsafe { *p = byte(buffer >> (bits - 8)) }
-				p++
+		// Leading fringe.
+		if self.nbuf > 0 {
+			mut i := 0
+			for i < len(p) && self.nbuf < 5; i++ {
+				buf[self.nbuf] = p[i]
+				self.nbuf++
 			}
-			buffer &= ^(0xFF << (bits - 8))
-			bits -= 8
+			n += i
+			unsafe { *(&p) = (*(&p))[i:] }
+			if self.nbuf < 5 {
+				ret
+			}
+			self.enc.Encode(out[0:], buf[0:])
+			self.w.Write(out[0:8])?
+			self.nbuf = 0
+		}
+
+		// Large interior chunks.
+		for len(p) >= 5 {
+			mut nn := len(out) / 8 * 5
+			if nn > len(p) {
+				nn = len(p)
+				nn -= nn % 5
+			}
+			self.enc.Encode(out[0:], p[0:nn])
+			self.w.Write(out[0 : nn/5*8])?
+			n += nn
+			unsafe { *(&p) = (*(&p))[nn:] }
+		}
+
+		// Trailing fringe.
+		copy(buf[:], p)
+		self.nbuf = len(p)
+		n += len(p)
+		ret
+	}
+
+	// Flushes any pending output from the encoder.
+	// It is an error to call Write after calling Close.
+	#disable boundary
+	fn Close(mut *self)! {
+		// If there's anything left in the buffer, flush it out
+		if self.nbuf > 0 {
+			mut out := unsafe::Slice(&self.out[0], len(self.out), len(self.out))
+			mut buf := unsafe::Slice(&self.buf[0], len(self.buf), len(self.buf))
+
+			self.enc.Encode(out[0:], buf[0:self.nbuf])
+			encodedLen := self.enc.EncodedLen(self.nbuf)
+			self.nbuf = 0
+			self.w.Write(out[0:encodedLen])?
 		}
 	}
-	ret dest
+}
+
+// Returns a new base32 stream encoder. Data written to
+// the returned writer will be encoded using enc and then written to w.
+// Base32 encodings operate in 5-byte blocks; when finished
+// writing, the caller must Close the returned encoder to flush any
+// partially written blocks.
+fn NewEncoder(mut enc: &Encoding, mut w: io::Writer): io::WriteCloser {
+	ret &encoder{enc: enc, w: w}
+}
+
+struct decoder {
+	enc:    &Encoding
+	r:      io::Reader
+	end:    bool       // saw end of message
+	buf:    [1024]byte // leftover input
+	nbuf:   int
+	out:    []byte // leftover decoded output
+	outbuf: [1024 / 8 * 5]byte
+}
+
+fn readEncodedData(mut r: io::Reader, mut buf: []byte, min: int, expectsPadding: bool)!: (n: int) {
+	for n < min {
+		nn := r.Read(buf[n:])?
+		if nn == io::EOF {
+			// Data was read, less than min bytes could be read.
+			if n < min && n > 0 {
+				error(io::ErrUnexpectedEOF)
+			}
+			// No data was read, the buffer already contains some data
+			// when padding is disabled this is not an error, as the message can be of
+			// any length.
+			if expectsPadding && min < 8 && n == 0 {
+				error(io::ErrUnexpectedEOF)
+			}
+			break
+		}
+		n += nn
+	}
+	ret
+}
+
+impl io::Reader for decoder {
+	fn Read(mut *self, mut p: []byte)!: (n: int) {
+		// Use leftover decoded output from last read.
+		if len(self.out) > 0 {
+			n = copy(p, self.out)
+			self.out = self.out[n:]
+			if len(self.out) == 0 {
+				ret n
+			}
+			ret n
+		}
+
+		// Read a chunk.
+		mut nn := (len(p) + 4) / 5 * 8
+		if nn < 8 {
+			nn = 8
+		}
+		if nn > len(self.buf) {
+			nn = len(self.buf)
+		}
+
+		// Minimum amount of bytes that needs to be read each cycle
+		let mut min: int
+		let mut expectsPadding: bool
+		if self.enc.padByte == NoPadding {
+			min = 1
+			expectsPadding = false
+		} else {
+			min = 8 - self.nbuf
+			expectsPadding = true
+		}
+
+		mut buf := unsafe::Slice(&self.buf[0], len(self.buf), len(self.buf))
+
+		nn = readEncodedData(self.r, buf[self.nbuf:nn], min, expectsPadding)?
+		if nn != io::EOF {
+			self.nbuf += nn
+		}
+		if nn > 0 && self.end {
+			error(CorruptInputError(0))
+		}
+
+		// Decode chunk into p, or d.out and then p if p is too small.
+		let mut nr: int
+		if self.enc.padByte == NoPadding {
+			nr = self.nbuf
+		} else {
+			nr = self.nbuf / 8 * 8
+		}
+		mut nw := self.enc.DecodedLen(self.nbuf)
+
+		if nw > len(p) {
+			mut outbuf := unsafe::Slice(&self.outbuf[0], len(self.outbuf), len(self.outbuf))
+
+			nw, self.end = self.enc.decode(outbuf[0:], buf[0:nr])?
+			self.out = outbuf[0:nw]
+			n = copy(p, self.out)
+			self.out = self.out[n:]
+		} else {
+			n, self.end = self.enc.decode(p, buf[0:nr])?
+		}
+		self.nbuf -= nr
+		mut i := 0
+		for i < self.nbuf; i++ {
+			buf[i] = buf[i+nr]
+		}
+
+		ret n
+	}
+}
+
+// Constructs a new base32 stream decoder.
+fn NewDecoder(mut enc: &Encoding, mut r: io::Reader): io::Reader {
+	ret &decoder{enc: enc, r: r}
 }
