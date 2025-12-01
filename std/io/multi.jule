@@ -1,0 +1,51 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+struct eofReader{}
+
+impl Reader for eofReader {
+	fn Read(*self, []byte)!: int {
+		ret EOF
+	}
+}
+
+struct multiReader {
+	readers: []Reader
+}
+
+impl Reader for multiReader {
+	fn Read(mut *self, mut p: []byte)!: (n: int) {
+		for len(self.readers) > 0 {
+			// Optimization to flatten nested multiReaders (Go's issue 13558).
+			if len(self.readers) == 1 {
+				mut r, ok := self.readers[0].(&multiReader)
+				if ok {
+					self.readers = r.readers
+					continue
+				}
+			}
+			n = self.readers[0].Read(p)?
+			if n == EOF {
+				// Use eofReader instead of nil to avoid nil panic
+				// after performing flatten (Go's issue 18232).
+				self.readers[0] = eofReader{}
+				self.readers = self.readers[1:]
+				// Don't return EOF yet. More readers remain.
+			} else if n > 0 {
+				ret
+			}
+		}
+		ret EOF
+	}
+}
+
+// Returns a Reader that's the logical concatenation of
+// the provided input readers. They're read sequentially. Once all
+// inputs have returned EOF, Read will return EOF.  If any of the readers
+// return a non-nil, non-EOF error, Read will return that error.
+fn MultiReader(mut readers: ...Reader): Reader {
+	mut r := make([]Reader, len(readers))
+	copy(r, readers)
+	ret &multiReader{r}
+}

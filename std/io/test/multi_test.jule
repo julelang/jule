@@ -1,0 +1,164 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/io"
+use "std/strings"
+use "std/testing"
+
+#test
+fn testMultiReader(t: &testing::T) {
+	let mut mr: io::Reader
+	let mut buf: []byte
+	mut nread := 0
+	mut &_buf := &buf // for closure
+	mut &_mr := &mr   // for closure
+	mut &_nread := &nread
+	withFooBar := fn(tests: fn()) {
+		mut r1 := strings::Reader.New("foo ")
+		mut r2 := strings::Reader.New("")
+		mut r3 := strings::Reader.New("bar")
+		unsafe {
+			*_mr = io::MultiReader(r1, r2, r3)
+			*_buf = make([]byte, 20)
+		}
+		tests()
+	}
+	expectRead := fn(size: int, expected: str, eof: bool) {
+		unsafe {
+			*_nread++
+			n := (*_mr).Read((*_buf)[0:size])!
+			mut nwant := io::EOF
+			if !eof {
+				nwant = len(expected)
+			}
+			if n != nwant {
+				t.Errorf("#{}, expected {} bytes; got {}",
+					*_nread, nwant, n)
+			}
+			if n != io::EOF {
+				got := str((*_buf)[0:n])
+				if got != expected {
+					t.Errorf("#{}, expected {}; got {}",
+						*_nread, expected, got)
+				}
+				*_buf = (*_buf)[n:]
+			}
+		}
+	}
+	withFooBar(fn() {
+		expectRead(2, "fo", false)
+		expectRead(5, "o ", false)
+		expectRead(5, "bar", false)
+		expectRead(5, "", true)
+	})
+	withFooBar(fn() {
+		expectRead(4, "foo ", false)
+		expectRead(1, "b", false)
+		expectRead(3, "ar", false)
+		expectRead(1, "", true)
+	})
+	withFooBar(fn() {
+		expectRead(5, "foo ", false)
+	})
+}
+
+// Test that MultiReader copies the input slice and is insulated from future modification.
+#test
+fn testMultiReaderCopy(t: &testing::T) {
+	mut slice := []io::Reader([strings::Reader.New("hello world")])
+	mut r := io::MultiReader(slice...)
+	slice[0] = nil
+	data := io::ReadAll(r) else {
+		t.Errorf("unexpected error: {}", error)
+		ret
+	}
+	if str(data) != "hello world" {
+		t.Errorf("ReadAll() = {}, want {}", data, "hello world")
+	}
+}
+
+// A Reader which reads one byte (the underlying byte) and EOF at once in its Read call.
+type byteAndEOFReader: byte
+
+impl io::Reader for byteAndEOFReader {
+	fn Read(mut *self, mut p: []byte)!: int {
+		if len(p) == 0 {
+			// Read(0 bytes) is useless. We expect no such useless
+			// calls in this test.
+			panic("unexpected call")
+		}
+		if *self == 0 {
+			ret io::EOF
+		}
+		p[0] = byte(*self)
+		*self = 0
+		ret 1
+	}
+}
+
+// This used to yield bytes forever; Go's issue 16795.
+#test
+fn testMultiReaderSingleByteWithEOF(t: &testing::T) {
+	got := io::ReadAll(io::LimitReader(io::MultiReader(byteAndEOFReader('a'), byteAndEOFReader('b')), 10))!
+	const want = "ab"
+	if str(got) != want {
+		t.Errorf("got {}; want {}", got, want)
+	}
+}
+
+// Test that a reader returning (n, EOF) at the end of a MultiReader
+// chain continues to return EOF on its final read, rather than
+// yielding a (0, EOF).
+#test
+fn testMultiReaderFinalEOF(t: &testing::T) {
+	mut r := io::MultiReader(strings::Reader.New(""), byteAndEOFReader('a'))
+	mut buf := make([]byte, 2)
+	mut n := r.Read(buf) else {
+		t.Errorf("unexpected error: {}", error)
+		use 1
+	}
+	if n != 1 {
+		t.Errorf("got {}; want 1", n)
+	}
+	n = r.Read(buf) else {
+		t.Errorf("unexpected error: {}", error)
+		use io::EOF
+	}
+	if n != io::EOF {
+		t.Errorf("got {}; want EOF", n)
+	}
+}
+
+#test
+fn testInterleavedMultiReader(t: &testing::T) {
+	mut r1 := strings::Reader.New("123")
+	mut r2 := strings::Reader.New("45678")
+
+	mut mr1 := io::MultiReader(r1, r2)
+	mut mr2 := io::MultiReader(mr1)
+
+	mut buf := make([]byte, 4)
+
+	// Have mr2 use mr1's []Readers.
+	// Consume r1 (and clear it for GC to handle) and consume part of r2.
+	mut n := io::ReadFull(mr2, buf) else {
+		t.Errorf("unexpected error: {}", error)
+		use 0
+	}
+	mut got := str(buf[:n])
+	if got != "1234" {
+		t.Errorf(`ReadFull(mr2) = ({}), want ("1234")`, got)
+	}
+
+	// Consume the rest of r2 via mr1.
+	// This should not panic even though mr2 cleared r1.
+	n = io::ReadFull(mr1, buf) else {
+		t.Errorf("unexpected error: {}", error)
+		use 0
+	}
+	got = str(buf[:n])
+	if got != "5678" {
+		t.Errorf(`ReadFull(mr1) = ({}), want ("5678")`, got)
+	}
+}
