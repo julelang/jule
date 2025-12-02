@@ -83,6 +83,26 @@ fn closureForward2()! {
 	}
 }
 
+let mut deferWorks = false
+
+fn deferTestExeceptionalForwarding()!: (x: int) {
+	defer {
+		deferWorks = true
+	}
+	ret fn()!: int {
+		error("arbitrary error")
+	}() else {
+		error(error)
+	}
+}
+
+fn init() {
+	deferTestExeceptionalForwarding() else {}
+	if !deferWorks {
+		panic("deferred call did not executed")
+	}
+}
+
 fn main() {
 	successVoid() else {
 		panic("successVoid failed, should be success")
