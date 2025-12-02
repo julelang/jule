@@ -290,26 +290,32 @@ impl StrWriter for discard {
 	}
 }
 
-// Returns a Reader that reads from r
-// but stops like EOF after n bytes.
-fn LimitReader(mut r: Reader, n: i64): Reader { ret &limitedReader{r, n} }
-
-struct limitedReader {
-	r: Reader // underlying reader
-	n: i64    // max bytes remaining
+// Reads from R but limits the amount of
+// data returned to just N bytes. Each call to Read
+// updates N to reflect the new amount remaining.
+// Read returns EOF when N <= 0 or when the underlying R returns EOF.
+struct LimitedReader {
+	R: Reader // underlying reader
+	N: i64    // max bytes remaining
 }
 
-impl Reader for limitedReader {
+impl LimitedReader {
+	// Returns a LimitedReader that reads from r
+	// but stops like EOF after n bytes.
+	fn New(mut r: Reader, n: i64): Reader { ret &LimitedReader{r, n} }
+}
+
+impl Reader for LimitedReader {
 	fn Read(mut *self, mut p: []byte)!: (n: int) {
-		if self.n <= 0 {
+		if self.N <= 0 {
 			ret EOF
 		}
-		if i64(len(p)) > self.n {
-			p = p[0:self.n]
+		if i64(len(p)) > self.N {
+			p = p[0:self.N]
 		}
-		n = self.r.Read(p)?
+		n = self.R.Read(p)?
 		if n != EOF {
-			self.n -= i64(n)
+			self.N -= i64(n)
 		}
 		ret
 	}
@@ -323,7 +329,7 @@ let mut Discard = discard{}
 // error encountered while copying.
 // On return, written == n if and only if no error.
 fn CopyN(mut dst: Writer, mut src: Reader, n: i64)!: (written: i64) {
-	written = Copy(dst, LimitReader(src, n))?
+	written = Copy(dst, LimitedReader.New(src, n))?
 	if written == n {
 		ret n
 	}
