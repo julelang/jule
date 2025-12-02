@@ -1654,15 +1654,19 @@ impl exprCoder {
 		if m.Func.Decl.IsVoid() {
 			mut v, _ := m.Err.Model.(&sema::Var)
 			if v != nil && v.Name == "error" {
+				self.oc.write("return __jule_VoidExceptional{.error=")
 				if hasDefer {
-					self.oc.write(deferStackName + ".call();\n")
-					self.oc.indent()
+					self.oc.write("({ auto __result = ")
 				}
-				self.oc.write("return __jule_VoidExceptional{.error=std::move(")
+				self.oc.write("std::move(")
 				// Handle error variable like ordinary variable.
 				// Because it may be captured, use captured variable handler.
 				self.var(v)
-				self.oc.write(")}")
+				self.oc.write(")")
+				if hasDefer {
+					self.oc.write(";" + deferStackName + ".call(); __result; })")
+				}
+				self.oc.write("}")
 				ret
 			}
 			self.oc.write("return __jule_VoidExceptional{.error=")
@@ -1672,9 +1676,15 @@ impl exprCoder {
 			mut v, _ := m.Err.Model.(&sema::Var)
 			if v != nil && v.Name == "error" {
 				self.oc.write(">{.error=")
+				if hasDefer {
+					self.oc.write("({ auto __result = ")
+				}
 				// Handle error variable like ordinary variable.
 				// Because it may be captured, use captured variable handler.
 				self.var(v)
+				if hasDefer {
+					self.oc.write(";" + deferStackName + ".call(); __result; })")
+				}
 				self.oc.write("}")
 				ret
 			}
