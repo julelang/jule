@@ -566,7 +566,7 @@ fn testPeek(t: &testing::T) {
 	_ = p
 	// string is 16 (minReadBufferSize) long.
 	mut buf := Reader.NewSize(strings::Reader.New("abcdefghijklmnop"), minReadBufferSize)
-	mut s := buf.Peek(1) else {
+	mut s, _, _ := buf.Peek(1) else {
 		t.Errorf("unexpected error: {}", error)
 		ret
 	}
@@ -574,7 +574,7 @@ fn testPeek(t: &testing::T) {
 		t.Errorf("want {} got {}", "a", str(s))
 		ret
 	}
-	s = buf.Peek(4) else {
+	s, _, _ = buf.Peek(4) else {
 		t.Errorf("unexpected error: {}", error)
 		ret
 	}
@@ -594,16 +594,13 @@ fn testPeek(t: &testing::T) {
 		t.Errorf("expected error")
 		ret
 	}
-	err = false
-	buf.Peek(32) else {
-		if error != ErrBufferFull {
-			t.Errorf("unexpected error: {}", error)
-			ret
-		}
-		err = true
+
+	_, full, _ := buf.Peek(32) else {
+		t.Errorf("unexpected error: {}", error)
+		use nil, false, false
 	}
-	if !err {
-		t.Errorf("expected error")
+	if !full {
+		t.Errorf("expected full")
 		ret
 	}
 	buf.Read(p[0:3]) else {
@@ -614,7 +611,7 @@ fn testPeek(t: &testing::T) {
 		t.Errorf("want {} got {}", "abc", str(p[0:3]))
 		ret
 	}
-	s = buf.Peek(1) else {
+	s, _, _ = buf.Peek(1) else {
 		t.Errorf("unexpected error: {}", error)
 		ret
 	}
@@ -622,7 +619,7 @@ fn testPeek(t: &testing::T) {
 		t.Errorf("want {} got {}", "d", str(s))
 		ret
 	}
-	s = buf.Peek(2) else {
+	s, _, _ = buf.Peek(2) else {
 		t.Errorf("unexpected error: {}", error)
 		ret
 	}
@@ -638,7 +635,7 @@ fn testPeek(t: &testing::T) {
 		t.Errorf("want {} got {}", "def", str(p[0:3]))
 		ret
 	}
-	s = buf.Peek(4) else {
+	s, _, _ = buf.Peek(4) else {
 		t.Errorf("unexpected error: {}", error)
 		ret
 	}
@@ -654,7 +651,7 @@ fn testPeek(t: &testing::T) {
 		t.Errorf("want {} got {}", "ghijklmnop", str(p[0:3]))
 		ret
 	}
-	s = buf.Peek(0) else {
+	s, _, _ = buf.Peek(0) else {
 		t.Errorf("unexpected error: {}", error)
 		ret
 	}
@@ -662,7 +659,7 @@ fn testPeek(t: &testing::T) {
 		t.Errorf("want {} got {}", "", str(s))
 		ret
 	}
-	s = buf.Peek(1) else {
+	s, _, _ = buf.Peek(1) else {
 		t.Errorf("unexpected error: {}", error)
 		ret
 	}
@@ -1115,7 +1112,7 @@ fn testReaderDiscard(t: &testing::T) {
 	for (_, mut tt) in tests {
 		mut br := Reader.NewSize(tt.r, tt.bufSize)
 		if tt.peekSize > 0 {
-			peekBuf := br.Peek(tt.peekSize) else {
+			peekBuf, _, _ := br.Peek(tt.peekSize) else {
 				t.Errorf("{}: Peek({}): {}", tt.name, tt.peekSize, error)
 				continue
 			}

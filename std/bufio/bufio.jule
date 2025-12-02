@@ -173,12 +173,12 @@ impl Reader {
 	// being valid at the next read call. If necessary, it will read more bytes
 	// into the buffer in order to make n bytes available. If it reads fewer
 	// than n bytes, it throws an error explaining why the read is short.
-	// The error is [ErrBufferFull] if n is larger than self's buffer size.
-	// Returns `len(data)==0 && data!=nil` for EOF.
+	// If n is larger than Reader's buffer size, reports it with full and
+	// returns all the data in the buffer.
 	//
 	// Calling Peek prevents a [Reader.UnreadByte] or [Reader.UnreadRune] call from succeeding
 	// until the next read operation.
-	fn Peek(mut *self, n: int)!: (data: []byte) {
+	fn Peek(mut *self, mut n: int)!: (data: []byte, full: bool, eof: bool) {
 		if n < 0 {
 			error(ErrNegativeCount)
 		}
@@ -187,28 +187,33 @@ impl Reader {
 		self.lastRuneSize = -1
 
 		for self.w-self.r < n && self.w-self.r < len(self.buf) && self.err == nil {
-			eof := self.fill() // self.w-self.r < len(self.buf) => buffer is not full
+			eof = self.fill() // self.w-self.r < len(self.buf) => buffer is not full
 			if eof {
-				ret make([]byte, 0)
+				break
 			}
 		}
 
 		if n > len(self.buf) {
-			error(ErrBufferFull)
+			full = true
+			data = self.buf[self.r:self.w]
+			ret
 		}
 
 		// 0 <= n <= len(self.buf)
-		if self.w-self.r < n {
+		avail := self.w - self.r
+		if avail < n {
 			// not enough data in buffer
 			mut err := self.readErr()
 			if err == nil {
-				error(ErrBufferFull)
+				full = true
+				n = avail
 			} else {
 				// throw the error, probably buffer is not filled because of that
 				error(err)
 			}
 		}
-		ret self.buf[self.r : self.r+n]
+		data = self.buf[self.r : self.r+n]
+		ret
 	}
 
 	// Skips the next n bytes, returning the number of bytes discarded.
