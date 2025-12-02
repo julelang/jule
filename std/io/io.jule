@@ -290,6 +290,9 @@ impl StrWriter for discard {
 	}
 }
 
+// A [Writer] on which all Write calls succeed without doing anything.
+let mut Discard = discard{}
+
 // Reads from R but limits the amount of
 // data returned to just N bytes. Each call to Read
 // updates N to reflect the new amount remaining.
@@ -321,8 +324,23 @@ impl Reader for LimitedReader {
 	}
 }
 
-// A [Writer] on which all Write calls succeed without doing anything.
-let mut Discard = discard{}
+// Returns a [ReadCloser] with a no-op Close method wrapping
+// the provided [Reader] r.
+fn NopCloser(mut r: Reader): ReadCloser {
+	ret nopCloser{r}
+}
+
+struct nopCloser {
+	r: Reader
+}
+
+impl ReadCloser for nopCloser {
+	fn Read(mut *self, mut p: []byte)!: int {
+		ret self.r.Read(p)?
+	}
+
+	fn Close(mut *self)! {}
+}
 
 // Copies n bytes (or until an error) from src to dst.
 // It returns the number of bytes copied and throws the earliest
