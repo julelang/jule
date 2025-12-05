@@ -4,7 +4,7 @@
 </p>
 <h1>The Jule Programming Language</h1>
 
-An effective programming language to build efficient, fast, reliable and safe software while maintaining simplicity.
+Simple and safe programming language with first-class C/C++ interoperability and powerful compile-time capabilities.
 
 This repository is the main source tree of Jule. \
 It contains the reference compiler, API, and the standard library.
@@ -19,23 +19,23 @@ It contains the reference compiler, API, and the standard library.
 
 ### Key Features
 
-- Optimized for fast and safe programs
-- Empowered compile-time: reflection, evaluation, matching, and more
-- Deterministic memory management with reference-counting and smart pointers
-- Default immutability, boundary checking, no uninitialized memory, variable shadowing disabled
+- Optimized for building fast, safe, and reliable software
+- Powerful compile-time system: reflection, evaluation, iterations, and more
+- Deterministic memory management with reference counting and smart pointers
+- Safety by default: immutability, bounds checking, no uninitialized memory, no variable shadowing
 - Built-in testing framework
-- Easy low-level development
-- [Easy cross compilation](https://manual.jule.dev/compiler/cross-compilation): standard library support, target platform IR generation and architecture imitation
-- Easy error-handling with [exceptionals](https://manual.jule.dev/error-handling/exceptionals), much like optional types
-- [Concurrency support](https://manual.jule.dev/concurrency): managed threads, channels, mutexes, condition variables, and more
-- High [interoperability](https://manual.jule.dev/integrated-jule/interoperability) with C, C++, Objective-C and Objective-C++
-- C++ [API](https://manual.jule.dev/api) for extending Jule with interoperability
+- Easy and efficient low-level development
+- [Cross compilation](https://manual.jule.dev/compiler/cross-compilation) made simple: standard library support, target-specific IR generation, and architecture imitation
+- Lightweight error handling with [exceptionals](https://manual.jule.dev/error-handling/exceptionals), similar to optional types
+- Built-in [concurrency](https://manual.jule.dev/concurrency): managed threads, channels, mutexes, condition variables, and more
+- High [interoperability](https://manual.jule.dev/integrated-jule/interoperability) with C, C++, Objective-C, and Objective-C++
+- C++ [API](https://manual.jule.dev/api) for extending Jule or integrating with existing codebases
 
 > [!IMPORTANT]
-> Jule does not have a stable version yet and is still becoming more stable with each commit.
-> Some commits may not be fully honored due to some compiler/API errors.
-> Please report any issues you may encounter with the [Jule Issue Tracker](https://github.com/julelang/jule/issues).
-> You can also [join the Discord community](https://discord.gg/XNSUUDuGGQ) to discuss, help, and ask more questions about Jule.
+> Jule does not have a stable release yet and continues to improve with each commit.
+> Some changes may be unstable or affected by compiler or API issues.
+> If you encounter any problems, please report them through the [Jule Issue Tracker](https://github.com/julelang/jule/issues).
+> You can also join the Discord community](https://discord.gg/XNSUUDuGGQ) to discuss the language, get help, or contribute to its development.
 
 ## Community
 
