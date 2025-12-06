@@ -1783,8 +1783,22 @@ impl scopeCoder {
 	}
 
 	fn exceptionalForwarding(mut &self, mut m: &opt::ExceptionalForwardingExpr) {
-		self.oc.write("return ")
+		hasDefer := m.Func.Decl != nil && m.Func.Decl.HasDefer
+		if !hasDefer {
+			self.oc.write("return ")
+			self.oc.ec.pureFuncCall(m.Expr)
+			ret
+		}
+		if m.Func.Decl.IsVoid() {
+			self.oc.write("__jule_VoidExceptional")
+		} else {
+			self.oc.write("__jule_Exceptional<")
+			self.oc.tc.rc.codeMut1(&self.oc.Buf, m.Func.Result)
+			self.oc.write(">")
+		}
+		self.oc.write(" __result = ")
 		self.oc.ec.pureFuncCall(m.Expr)
+		self.oc.write("; " + deferStackName + ".call(); return __result;")
 	}
 
 	// Generates C++ code of statement.

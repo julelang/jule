@@ -809,12 +809,12 @@ impl exprOptimizer {
 	// Tries to optimize scope.
 	// If the |child| true and |self.scopeOpt| is not nil, calls the optimizeChildHard().
 	// Otherwise optimizes the scope with immutable copy of the data if exist.
-	fn scope(*self, mut s: &sema::Scope, child: bool) {
+	fn scope(*self, mut owner: &sema::FuncIns, mut s: &sema::Scope, child: bool) {
 		if child && self.scopeOpt != nil {
 			self.scopeOpt.optimizeChildHard(s)
 			ret
 		}
-		mut scopt := scopeOptimizer.new(s)
+		mut scopt := scopeOptimizer.new(owner, s)
 		if self.data != nil {
 			// If data exist, use it as immutable copy.
 			// Because this scope is not child.
@@ -932,7 +932,7 @@ impl exprOptimizer {
 			// Handle exceptional handler scope as child.
 			// Because it is actually a child scope.
 			const Child = true
-			self.scope(m.Except, Child)
+			self.scope(nil, m.Except, Child)
 		}
 		match {
 		| StdStrings && meta::Program.StrBuilder != nil:
@@ -994,7 +994,7 @@ impl exprOptimizer {
 		// It is possible with references, but it is unsafe operation.
 		// So optimizer is not have to thing such cases.
 		const Child = false
-		self.scope(m.Func.Scope, Child)
+		self.scope(m.Func, m.Func.Scope, Child)
 	}
 
 	fn inspectStep(*self, mut &m: *sema::Expr) {

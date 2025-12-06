@@ -15,6 +15,7 @@ use "std/strings"
 
 // Scope optimizer that applies target-independent optimizations.
 struct scopeOptimizer {
+	owner:  &sema::FuncIns
 	parent: &scopeOptimizer
 	i:      int
 	scope:  &sema::Scope
@@ -22,8 +23,9 @@ struct scopeOptimizer {
 }
 
 impl scopeOptimizer {
-	fn new(mut scope: &sema::Scope): &scopeOptimizer {
+	fn new(mut owner: &sema::FuncIns, mut scope: &sema::Scope): &scopeOptimizer {
 		mut sc := &scopeOptimizer{
+			owner: owner,
 			scope: scope,
 			data: &data{
 				boundary: new(boundary),
@@ -32,6 +34,16 @@ impl scopeOptimizer {
 			},
 		}
 		ret sc
+	}
+
+	fn getOwner(mut &self): &sema::FuncIns {
+		mut s := self
+		for s != nil; s = s.parent {
+			if s.owner != nil {
+				ret s.owner
+			}
+		}
+		ret nil
 	}
 
 	fn setCurrentStmt(mut &self, mut stmt: any) {
@@ -925,7 +937,11 @@ impl scopeOptimizer {
 			!obj::IsForwarded(fc.Except) {
 			ret
 		}
-		self.setCurrentStmt(&ExceptionalForwardingExpr{Expr: fc})
+		mut owner := self.getOwner()
+		if owner == nil {
+			panic("unreachable")
+		}
+		self.setCurrentStmt(&ExceptionalForwardingExpr{Func: owner, Expr: fc})
 	}
 
 	// Like optimizeStmt, but handles independent statement from the scope.
@@ -946,7 +962,7 @@ impl scopeOptimizer {
 		//	`x = 10; y = 20`, after optimization.
 		mut scope := new(sema::Scope)
 		scope.Stmts = append(scope.Stmts, *stmt)
-		mut opt := scopeOptimizer.new(scope)
+		mut opt := scopeOptimizer.new(nil, scope)
 		opt.optimize()
 		*stmt = scope
 	}
@@ -988,7 +1004,7 @@ impl scopeOptimizer {
 
 	// Optimizes child scope using mutable data.
 	fn optimizeChild(mut &self, mut child: &sema::Scope) {
-		mut so := scopeOptimizer.new(child)
+		mut so := scopeOptimizer.new(nil, child)
 		so.parent = self
 		so.data = self.data
 		so.optimize()
