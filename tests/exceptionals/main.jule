@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/math"
+
 fn successVoid()! {
 	println("success void")
 }
@@ -23,7 +25,7 @@ fn successRet1()!: (a: int) {
 	ret
 }
 
-fn failRet1()!: (a: int) {
+fn failRet1()!: (a: f64) {
 	error("not implemented")
 }
 
@@ -100,6 +102,27 @@ fn init() {
 	deferTestExceptionalForwarding() else {}
 	if !deferWorks {
 		panic("deferred call did not executed")
+	}
+
+	// Test dynamic-type handling.
+	let mut x: any
+	x = successRet()!
+	x = failRet() else {
+		use 20
+	}
+
+	// Test integer arithmetic assignment.
+	let mut z: int = 30
+	z += failRet() else { use 20 }
+	if z != 50 {
+		panic("expected 50")
+	}
+
+	// Test float arithmetic assignment.
+	let mut k: f64 = 30
+	k /= failRet1() else { use 0 }
+	if k != math::Inf(+1) {
+		panic("expected +Inf")
 	}
 }
 

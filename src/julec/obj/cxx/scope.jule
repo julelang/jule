@@ -659,33 +659,34 @@ impl scopeCoder {
 		}
 	}
 
-	fn shl(mut &self, mut a: &sema::Assign) {
-		self.assignLeft(a.Left.Model)
+	fn shl(mut &self, mut l: compExpr, mut lt: &sema::Type, mut r: compExpr, mut rt: &sema::Type) {
+		self.assignLeft(l)
 		self.oc.write(" = ")
-		self.oc.ec.shl(a.Left, a.Right)
+		self.oc.ec.shl(l, lt, r, rt)
 	}
 
-	fn shr(mut &self, mut a: &sema::Assign) {
-		self.assignLeft(a.Left.Model)
+	fn shr(mut &self, mut l: compExpr, mut lt: &sema::Type, mut r: compExpr, mut rt: &sema::Type) {
+		self.assignLeft(l)
 		self.oc.write(" = ")
-		self.oc.ec.shr(a.Left, a.Right)
+		self.oc.ec.shr(l, lt, r, rt)
 	}
 
-	fn divByZeroAssign(mut &self, mut a: &sema::Assign) {
-		self.assignLeft(a.Left.Model)
+	fn divByZeroAssign(mut &self, loc: &token::Token, opID: int, mut l: compExpr, mut lt: &sema::Type, mut r: compExpr, mut rt: &sema::Type) {
+		self.assignLeft(l)
 		self.oc.write(" = ")
-		self.oc.ec.divByZeroBinary(a.Op, a.Left, a.Right)
+		self.oc.ec.divByZeroBinary(loc, opID, l, lt, r, rt)
 	}
 
-	fn cmplxAssign(mut &self, mut a: &sema::Assign, kind: str) {
-		mut fc := isExceptionalResult(a.Right.Model)
-		if a.Op.ID == token::ASSIGN && fc != nil {
+	fn cmplxAssign(mut &self, opID: int, opKind: str, mut l: compExpr, mut lt: &sema::Type, mut r: compExpr, mut rt: &sema::Type, kind: str) {
+		mut fc := isExceptionalResult(r)
+		if opID == token::ASSIGN && fc != nil {
 			self.oc.ec.handleExceptionalCallWithData(fc, useExprMemory{
-				DestType: a.Left.Type,
-				Model: a.Left.Model,
+				Loc: nil,
+				DestType: lt,
+				Model: l,
 				Type: useExprAssignment,
-				OpId: a.Op.ID,
-				OpKind: a.Op.Kind,
+				OpID: opID,
+				OpKind: opKind,
 			})
 			ret
 		}
@@ -695,24 +696,25 @@ impl scopeCoder {
 			self.oc.addIndent()
 			self.oc.write("{\n")
 			self.oc.indent()
-			self.oc.tc.kind(&self.oc.Buf, a.Right.Type)
+			self.oc.tc.kind(&self.oc.Buf, rt)
 			self.oc.write(" __cmplx_temp;")
 			self.oc.ec.handleExceptionalCallWithData(fc, useExprMemory{
-				DestType: a.Left.Type,
+				Loc: nil,
+				DestType: lt,
 				Model: "__cmplx_temp",
 				Type: useExprAssignment,
-				OpId: token::ASSIGN,
+				OpID: token::ASSIGN,
 				OpKind: "=",
 			})
 			self.oc.write("\n")
 			self.oc.indent()
 		}
 
-		self.assignLeft(a.Left.Model)
+		self.assignLeft(l)
 		self.oc.write(" = ")
-		match a.Op.ID {
+		match opID {
 		| token::ASSIGN:
-			self.oc.ec.possibleRefExpr(a.Right.Model)
+			self.oc.ec.possibleRefExpr(r)
 			ret
 		| token::ADD_ASSIGN:
 			if kind == types::Cmplx128 {
@@ -742,10 +744,10 @@ impl scopeCoder {
 			panic("unreachable")
 		}
 		self.oc.write("(")
-		self.assignLeft(a.Left.Model)
+		self.assignLeft(l)
 		self.oc.write(", ")
 		if fc == nil {
-			self.oc.ec.possibleRefExpr(a.Right.Model)
+			self.oc.ec.possibleRefExpr(r)
 		} else {
 			self.oc.write("__cmplx_temp")
 		}
@@ -759,52 +761,96 @@ impl scopeCoder {
 	}
 
 	fn assign(mut &self, mut a: &sema::Assign) {
+		self.pureAssign(a.Op, a.Op.ID, a.Op.Kind, a.Left.Model, a.Left.Type, a.Right.Model, a.Right.Type)
+	}
+
+	// The loc needed only if operation is division.
+	fn pureAssign(mut &self, mut loc: &token::Token, mut opID: int, mut opKind: str, mut l: compExpr, mut lt: &sema::Type, mut r: compExpr, mut rt: &sema::Type) {
 		// optimize may optimize multi-assign statements
 		// it uses common tokens of normalized statement
 		// so it may be := assignment token, it is not a bug
 		// handle it like the equal operator
-		mut op := a.Op.ID
-		mut kind := a.Op.Kind
-		if a.Op.ID == token::DEFINE {
-			op = token::ASSIGN
-			kind = "="
+		if opID == token::DEFINE {
+			opID = token::ASSIGN
+			opKind = "="
 		}
 
-		lp := a.Left.Type.Prim()
+		lp := lt.Prim()
 		if lp != nil && types::IsCmplx(lp.Kind) {
-			self.cmplxAssign(a, lp.Kind)
+			self.cmplxAssign(opID, opKind, l, lt, r, rt, lp.Kind)
 			ret
 		}
 
-		mut fc := isExceptionalResult(a.Right.Model)
+		mut fc := isExceptionalResult(r)
 		if fc != nil {
 			self.oc.ec.handleExceptionalCallWithData(fc, useExprMemory{
-				DestType: a.Left.Type,
-				Model: a.Left.Model,
+				Loc: loc,
+				DestType: lt,
+				Model: l,
 				Type: useExprAssignment,
-				OpId: op,
-				OpKind: kind,
+				OpID: opID,
+				OpKind: opKind,
 			})
 			ret
 		}
 
-		match a.Op.ID {
+		match opID {
 		| token::QUO_ASSIGN | token::REM_ASSIGN:
 			if env::Safety {
-				self.divByZeroAssign(a)
+				self.divByZeroAssign(loc, opID, l, lt, r, rt)
 				ret
 			}
 		| token::SHL_ASSIGN:
-			self.shl(a)
+			self.shl(l, lt, r, rt)
 			ret
 		| token::SHR_ASSIGN:
-			self.shr(a)
+			self.shr(l, lt, r, rt)
 			ret
 		}
 
-		self.assignLeft(a.Left.Model)
-		self.oc.write(kind)
-		self.oc.ec.possibleRefExpr(a.Right.Model)
+		self.assignLeft(l)
+
+		if rt.IsNil() || rt.Equal(lt) {
+			self.oc.write(opKind)
+			self.oc.ec.possibleRefExpr(r)
+		} else {
+			match {
+			| obj::IsAny(lt):
+				self.oc.write(opKind)
+				self.oc.write(typeAny + "(")
+				self.oc.ec.possibleRefExpr(r)
+				self.oc.write(", &" + anyTypeIdent)
+				self.oc.write(conv::Itoa(self.oc.pushAnyType(rt)))
+				self.oc.write(")")
+			|:
+				// It should be trait.
+				if rt.Trait() != nil { // Different traits, cast.
+					self.oc.write(opKind)
+					mut t1 := lt.Trait()
+					mut t2 := rt.Trait()
+					self.oc.ec.possibleRefExpr(unsafe { *(*sema::Expr)(&r) })
+					self.oc.write(".map(")
+					self.oc.pushAndWriteMaskMapper(t1, t2)
+					self.oc.write(")")
+					break
+				}
+				t := lt.Trait()
+				if t == nil { // No cast needed.
+					self.oc.write(opKind)
+					self.oc.ec.possibleRefExpr(r)
+					break
+				}
+				self.oc.write(opKind)
+				self.oc.write(typeTrait + "(")
+				self.oc.ec.possibleRefExpr(r)
+				self.oc.write(", (__jule_TypeMeta*)&")
+				identCoder.traitDecl(&self.oc.Buf, t)
+				self.oc.write("_mptr_data")
+				self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(t, rt)))
+				self.oc.write(")")
+			}
+		}
+		self.oc.write(";")
 	}
 
 	fn mapLookupAssign(mut &self, mut a: &sema::MultiAssign) {
@@ -903,47 +949,6 @@ impl scopeCoder {
 		self.oc.write("}")
 	}
 
-	fn assignWithPossibleCast(mut &self, mut l: compExpr, mut lt: &sema::Type, mut r: compExpr, mut rt: &sema::Type) {
-		self.assignLeft(l)
-		match {
-		| rt.IsNil() || rt.Equal(lt):
-			self.oc.write(" = ")
-			self.oc.ec.possibleRefExpr(r)
-		| obj::IsAny(lt):
-			self.oc.write(" = " + typeAny + "(")
-			self.oc.ec.possibleRefExpr(r)
-			self.oc.write(", &" + anyTypeIdent)
-			self.oc.write(conv::Itoa(self.oc.pushAnyType(rt)))
-			self.oc.write(")")
-		|:
-			// It should be trait.
-			if rt.Trait() != nil { // Different traits, cast.
-				self.oc.write(" = ")
-				mut t1 := lt.Trait()
-				mut t2 := rt.Trait()
-				self.oc.ec.possibleRefExpr(r)
-				self.oc.write(".map(")
-				self.oc.pushAndWriteMaskMapper(t1, t2)
-				self.oc.write(")")
-				break
-			}
-			t := lt.Trait()
-			if t == nil { // No cast needed.
-				self.oc.write(" = ")
-				self.oc.ec.possibleRefExpr(r)
-				break
-			}
-			self.oc.write(" = " + typeTrait + "(")
-			self.oc.ec.possibleRefExpr(r)
-			self.oc.write(", (__jule_TypeMeta*)&")
-			identCoder.traitDecl(&self.oc.Buf, t)
-			self.oc.write("_mptr_data")
-			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(t, rt)))
-			self.oc.write(")")
-		}
-		self.oc.write(";")
-	}
-
 	fn multiAssignFunc(mut &self, mut a: &sema::MultiAssign) {
 		self.oc.write("{\n")
 		self.oc.addIndent()
@@ -953,10 +958,11 @@ impl scopeCoder {
 		self.oc.tc.rc.codeMut1(&self.oc.Buf, fc.Func.Result)
 		if fc.Func.Decl != nil && fc.Func.Decl.Exceptional {
 			let mut dest = useExprMemory{
+				Loc: nil,
 				DestType: nil, // Should not be required in this case.
 				Model: assignResultName,
 				Type: useExprPlain,
-				OpId: token::ASSIGN,
+				OpID: token::ASSIGN,
 				OpKind: "=",
 			}
 			self.oc.write(" " + assignResultName + ";\n")
@@ -979,7 +985,7 @@ impl scopeCoder {
 			}
 			r.Name = assignResultName + "." + resultArgName + conv::Itoa(i)
 			self.oc.indent()
-			self.assignWithPossibleCast(l.Model, l.Type, r, tup.Types[i])
+			self.pureAssign(nil, token::ASSIGN, "=", l.Model, l.Type, r, tup.Types[i])
 			self.oc.write("\n")
 		}
 
@@ -1551,10 +1557,11 @@ impl scopeCoder {
 				goto assignFC
 			}
 			let mut dest = useExprMemory{
+				Loc: nil,
 				DestType: nil, // Should not be required in this case.
 				Model: resultName,
 				Type: useExprPlain,
-				OpId: token::ASSIGN,
+				OpID: token::ASSIGN,
 				OpKind: "=",
 			}
 			self.oc.ec.handleExceptionalCallWithData(fc, dest)
@@ -1612,10 +1619,11 @@ impl scopeCoder {
 				Name: resultName,
 			}
 			mut dest := useExprMemory{
+				Loc: nil,
 				DestType: r.Func.Result,
 				Model: rv,
 				Type: useExprPlain,
-				OpId: token::ASSIGN,
+				OpID: token::ASSIGN,
 				OpKind: "=",
 			}
 			self.oc.ec.handleExceptionalCallWithData(fc, dest)

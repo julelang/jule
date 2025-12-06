@@ -188,32 +188,32 @@ impl exprCoder {
 		}
 	}
 
-	fn divByZeroBinary(mut &self, op: &token::Token, mut l: &sema::OperandExpr, mut r: &sema::OperandExpr) {
+	fn divByZeroBinary(mut &self, loc: &token::Token, opID: int, mut l: compExpr, mut lt: &sema::Type, mut r: compExpr, mut rt: &sema::Type) {
 		const (
 			xVar = "__jule_x"
 			yVar = "__jule_y"
 		)
 		self.oc.write("({ ")
-		self.oc.tc.kind(&self.oc.Buf, l.Type)
+		self.oc.tc.kind(&self.oc.Buf, lt)
 		self.oc.write(" ")
 		self.oc.write(xVar)
 		self.oc.write(" = ")
-		self.possibleRefExpr(l.Model)
+		self.possibleRefExpr(l)
 		self.oc.write("; ")
-		self.oc.tc.kind(&self.oc.Buf, r.Type)
+		self.oc.tc.kind(&self.oc.Buf, rt)
 		self.oc.write(" ")
 		self.oc.write(yVar)
 		self.oc.write(" = ")
-		self.possibleRefExpr(r.Model)
+		self.possibleRefExpr(r)
 		self.oc.write("; if (")
 		self.oc.write(yVar)
 		self.oc.write(` == 0) `)
-		lp, rp := l.Type.Prim(), r.Type.Prim()
+		lp, rp := lt.Prim(), rt.Prim()
 		if types::IsFloat(lp.Kind) || types::IsFloat(rp.Kind) {
 			if types::IsFloat(lp.Kind) {
-				self.oc.tc.kind(&self.oc.Buf, l.Type)
+				self.oc.tc.kind(&self.oc.Buf, lt)
 			} else {
-				self.oc.tc.kind(&self.oc.Buf, r.Type)
+				self.oc.tc.kind(&self.oc.Buf, rt)
 			}
 			self.oc.write("(__jule_Inf(")
 			self.oc.write(xVar)
@@ -228,7 +228,7 @@ impl exprCoder {
 				if !env::Production {
 					self.oc.write("\\nlocation: ")
 					len += 11 // \nlocation:
-					len += unsafe { self.oc.locInfo(op) }
+					len += unsafe { self.oc.locInfo(loc) }
 				}
 				self.oc.write("\"")
 				ret len
@@ -236,10 +236,10 @@ impl exprCoder {
 			self.oc.write("); ")
 		}
 		self.oc.write("((")
-		self.oc.tc.kind(&self.oc.Buf, l.Type)
+		self.oc.tc.kind(&self.oc.Buf, lt)
 		self.oc.write(")(")
 		self.oc.write(xVar)
-		match op.ID {
+		match opID {
 		| token::QUO
 		| token::QUO_ASSIGN:
 			self.oc.write(" / ")
@@ -431,29 +431,29 @@ impl exprCoder {
 		self._unsafeBinary(&self.oc.Buf, *m.Left, *m.Right, m.Op.ID, m.Op.Kind)
 	}
 
-	fn shl(mut &self, mut l: &sema::OperandExpr, mut r: &sema::OperandExpr) {
+	fn shl(mut &self, mut l: compExpr, mut lt: &sema::Type, mut r: compExpr, mut rt: &sema::Type) {
 		const (
 			xVar = "__jule_x"
 			yVar = "__jule_y"
 		)
 		self.oc.write("({ ")
-		self.oc.tc.kind(&self.oc.Buf, l.Type)
+		self.oc.tc.kind(&self.oc.Buf, lt)
 		self.oc.write(" ")
 		self.oc.write(xVar)
 		self.oc.write(" = ")
-		self.possibleRefExpr(l.Model)
+		self.possibleRefExpr(l)
 		self.oc.write("; ")
-		self.oc.tc.kind(&self.oc.Buf, r.Type)
+		self.oc.tc.kind(&self.oc.Buf, rt)
 		self.oc.write(" ")
 		self.oc.write(yVar)
 		self.oc.write(" = ")
-		self.possibleRefExpr(r.Model)
+		self.possibleRefExpr(r)
 		self.oc.write("; ((")
-		self.oc.tc.kind(&self.oc.Buf, l.Type)
+		self.oc.tc.kind(&self.oc.Buf, lt)
 		self.oc.write(")(")
 		self.oc.write(yVar)
 		self.oc.write(" >= ")
-		self.oc.write(conv::Itoa(types::BitSizeOf(l.Type.Prim().Kind)))
+		self.oc.write(conv::Itoa(types::BitSizeOf(lt.Prim().Kind)))
 		self.oc.write(" ? 0 : ")
 		self.oc.write(xVar)
 		self.oc.write(" << ")
@@ -461,29 +461,29 @@ impl exprCoder {
 		self.oc.write(")); })")
 	}
 
-	fn shr(mut &self, mut l: &sema::OperandExpr, mut r: &sema::OperandExpr) {
+	fn shr(mut &self, mut l: compExpr, mut lt: &sema::Type, mut r: compExpr, mut rt: &sema::Type) {
 		const (
 			xVar = "__jule_x"
 			yVar = "__jule_y"
 		)
 		self.oc.write("({ ")
-		self.oc.tc.kind(&self.oc.Buf, l.Type)
+		self.oc.tc.kind(&self.oc.Buf, lt)
 		self.oc.write(" ")
 		self.oc.write(xVar)
 		self.oc.write(" = ")
-		self.possibleRefExpr(l.Model)
+		self.possibleRefExpr(l)
 		self.oc.write("; ")
-		self.oc.tc.kind(&self.oc.Buf, r.Type)
+		self.oc.tc.kind(&self.oc.Buf, rt)
 		self.oc.write(" ")
 		self.oc.write(yVar)
 		self.oc.write(" = ")
-		self.possibleRefExpr(r.Model)
+		self.possibleRefExpr(r)
 		self.oc.write("; ((")
-		self.oc.tc.kind(&self.oc.Buf, l.Type)
+		self.oc.tc.kind(&self.oc.Buf, lt)
 		self.oc.write(")(")
 		self.oc.write(yVar)
 		self.oc.write(" >= ")
-		self.oc.write(conv::Itoa(types::BitSizeOf(l.Type.Prim().Kind)))
+		self.oc.write(conv::Itoa(types::BitSizeOf(lt.Prim().Kind)))
 		self.oc.write(" ? 0 : ")
 		self.oc.write(xVar)
 		self.oc.write(" >> ")
@@ -502,14 +502,14 @@ impl exprCoder {
 			fall
 		| token::REM:
 			if env::Safety {
-				self.divByZeroBinary(m.Op, m.Left, m.Right)
+				self.divByZeroBinary(m.Op, m.Op.ID, m.Left.Model, m.Left.Type, m.Right.Model, m.Right.Type)
 				ret
 			}
 		| token::SHL:
-			self.shl(m.Left, m.Right)
+			self.shl(m.Left.Model, m.Left.Type, m.Right.Model, m.Right.Type)
 			ret
 		| token::SHR:
-			self.shr(m.Left, m.Right)
+			self.shr(m.Left.Model, m.Left.Type, m.Right.Model, m.Right.Type)
 			ret
 		}
 		self.unsafeBinary(m)
@@ -2675,10 +2675,11 @@ const (
 )
 
 struct useExprMemory {
+	Loc:      &token::Token
 	DestType: &sema::Type
 	Model:    compExpr
 	Type:     int
-	OpId:     int
+	OpID:     int
 	OpKind:   str
 }
 
@@ -2687,7 +2688,7 @@ impl useExprMemory {
 		match self.Type {
 		| useExprPlain:
 			if src != nil && self.DestType != nil {
-				e.oc.sc.assignWithPossibleCast(self.Model, self.DestType, src, srcType)
+				e.oc.sc.pureAssign(self.Loc, self.OpID, self.OpKind, self.Model, self.DestType, src, srcType)
 			} else {
 				e.possibleRefExpr(self.Model)
 				if src != nil {
@@ -2698,31 +2699,14 @@ impl useExprMemory {
 				}
 			}
 		| useExprAssignment:
-			if src == nil {
-				e.oc.sc.assignLeft(self.Model)
-				ret
-			}
-			mut assign := new(sema::Assign)
-			assign.Op = &token::Token{
-				ID: self.OpId,
-				Kind: self.OpKind,
-			}
-			assign.Left = &sema::OperandExpr{
-				Type: self.DestType,
-				Model: unsafe { *(*sema::Expr)(&self.Model) },
-			}
-			assign.Right = &sema::OperandExpr{
-				Type: srcType,
-				Model: unsafe { *(*sema::Expr)(&src) },
-			}
-			e.oc.sc.assign(assign)
+			e.oc.sc.pureAssign(self.Loc, self.OpID, self.OpKind, self.Model, self.DestType, src, srcType)
 		|:
 			panic("unreachable")
 		}
 	}
 }
 
-fn isExceptionalResult(mut m: sema::Expr): (fc: &sema::FuncCallExpr) {
+fn isExceptionalResult(mut m: compExpr): (fc: &sema::FuncCallExpr) {
 	mut c, mut ok := m.(&sema::CastingExpr)
 	if ok {
 		m = c.Expr.Model
