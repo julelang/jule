@@ -87,12 +87,14 @@ fn compileIR(compiler: str, mut compilerArgs: []str) {
 	clearObjects()
 }
 
-fn isCppSourceFile(path: str): bool {
+fn isExternSourceFile(path: str): bool {
 	offset := strings::LastIndexByte(path, '.')
 	if offset == -1 {
 		ret false
 	}
-	ret build::IsValidCppExt(path[offset:])
+	ext := path[offset:]
+	ret build::IsValidCppExt(ext) ||
+		build::IsValidAssemblyExt(ext)
 }
 
 fn pushCompCmdClang(mut args: []str): []str {
@@ -317,7 +319,7 @@ fn genCompileCmd(sourcePath: str, mut ir: &obj::IR): (compiler: str, args: []str
 
 	// Push external source files.
 	for _, u in ir.Used {
-		if u.Extern && isCppSourceFile(u.Path) {
+		if u.Extern && isExternSourceFile(u.Path) {
 			args = append(args, u.Path)
 		}
 	}
