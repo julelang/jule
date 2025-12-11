@@ -50,7 +50,7 @@ impl mpmcQueue {
 
 		// Initialize per-slot sequence numbers to their indices
 		mut i := u64(0)
-		for i < cap; i++ {
+		for i < q.cap; i++ {
 			q.buf[i].seq = i
 		}
 		ret
@@ -73,7 +73,7 @@ impl mpmcQueue {
 			if dif == 0 {
 				// slot is EMPTY for this producer position: try to claim it
 				newPos := pos + 1
-				if atomic::CompareAndSwapWeak(&self.enqueuePos.v, pos, newPos, atomic::SeqCst, atomic::Relaxed) {
+				if atomic::CompareAndSwapWeak(&self.enqueuePos.v, pos, newPos, atomic::Release, atomic::Relaxed) {
 					// exclusive ownership of this slot
 					c.val = *val
 					// check if the buffer is full
@@ -109,7 +109,7 @@ impl mpmcQueue {
 
 			if dif == 0 {
 				// slot is FULL for this consumer position: try to claim it
-				if atomic::CompareAndSwapWeak(&self.dequeuePos.v, pos, pos+1, atomic::SeqCst, atomic::Relaxed) {
+				if atomic::CompareAndSwapWeak(&self.dequeuePos.v, pos, pos+1, atomic::Release, atomic::Relaxed) {
 					// exclusive access to this slot
 					*val = c.val
 					// help GC: clear the slot's value
