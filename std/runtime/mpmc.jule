@@ -61,14 +61,14 @@ impl mpmcQueue {
 	#disable boundary nilptr
 	fn enqueue(mut *self, mut &val: *T): (ok: bool, closed: bool, full: bool) {
 		for {
-			closed = atomic::Load(&self.closed, atomic::Acquire) != 0
+			closed = atomic::Load(&self.closed, atomic::Relaxed) != 0
 			if closed {
 				ret false, true, false
 			}
 			pos := atomic::Load(&self.enqueuePos.v, atomic::Relaxed)
 			mut &c := unsafe { &(*(&self.buf[pos%self.cap])) }
 			seq := atomic::Load(&c.seq, atomic::Acquire)
-			dif := i64(seq) - i64(pos)
+			dif := i64(seq - pos)
 
 			if dif == 0 {
 				// slot is EMPTY for this producer position: try to claim it
@@ -101,11 +101,11 @@ impl mpmcQueue {
 		for {
 			// do not immediately return even if isclosed is true
 			// we have to consume all queued data even if it is closed
-			closed = atomic::Load(&self.closed, atomic::Acquire) != 0
+			closed = atomic::Load(&self.closed, atomic::Relaxed) != 0
 			pos := atomic::Load(&self.dequeuePos.v, atomic::Relaxed)
 			mut &c := unsafe { &(*(&self.buf[pos%self.cap])) }
 			seq := atomic::Load(&c.seq, atomic::Acquire)
-			dif := i64(seq) - i64(pos+1)
+			dif := i64(seq - (pos + 1))
 
 			if dif == 0 {
 				// slot is FULL for this consumer position: try to claim it
