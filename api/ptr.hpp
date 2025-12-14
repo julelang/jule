@@ -87,7 +87,7 @@ struct __jule_Ptr
 
     __jule_Ptr(__jule_Ptr<T> &&src) noexcept
     {
-        this->__get_copy(src);
+        this->__get_copy(std::move(src));
     }
 
     __jule_Ptr(T *src) noexcept
@@ -235,7 +235,7 @@ struct __jule_Ptr
     __jule_Ptr<T> &operator=(__jule_Ptr<T> &&src) noexcept
     {
         this->dealloc();
-        this->__get_copy(src);
+        this->__get_copy(std::move(src));
         src.alloc = nullptr;
         src.ref = nullptr;
         return *this;
