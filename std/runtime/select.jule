@@ -252,7 +252,14 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 	// Do not assign thread yet, avoid making busy the mutex for a long time.
 	// Use round-robin iteration to achieve randomness.
 	mut parkers := make([]parkerList, nrecv+nsend)
-	mut state := parkerSelectWaiting
+	// Use heap allocated state for parkers.
+	// Because the select statement will not dequeue the parkers from all
+	// channels where they enqueued as waiter thread.
+	// If this select statement returns before all parkers dequeued,
+	// the stack must be valid and dequeue algorithm should read the
+	// state consistently.
+	mut state := new(int)
+	*state = parkerSelectWaiting
 	for i in parkers {
 		offset := ((k + i) % totalCases)
 		mut case := cases + offset
@@ -272,7 +279,7 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 
 		// Prepare and enqeueue parker.
 		parker.ticket = parkerSelect
-		parker.state = &state // Use shared state pointer for all parkers.
+		parker.state = state // Use shared state pointer for all parkers.
 		parker.stack = case.data
 		if i < nrecv {
 			(*ch).recvq.enqueue((&parkerList)(parker))
@@ -381,7 +388,7 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 		// Update state as waiting for all channels.
 		// Since the state variable only handled in lock and we have locked all channels,
 		// there is no consumption risk before we park.
-		atomic::Store(&state, parkerSelectWaiting, atomic::Release)
+		atomic::Store(&(*state), parkerSelectWaiting, atomic::Release)
 
 		// Enqueue parkers again, if needed.
 		// Some channels may drop our parkers while we try channels.

@@ -21,7 +21,7 @@ const (
 // Linked-list for coroutine parkers.
 struct parkerList {
 	coro:   &coro
-	state:  *int
+	state:  &int
 	ticket: u32
 	stack:  uintptr
 	next:   &parkerList
@@ -88,7 +88,7 @@ impl waitq {
 			// If the state is not zero, coroutine is consumed.
 			// Set state as consumed to prevent false dequeue.
 			if deq.ticket&parkerSelect == parkerSelect &&
-				!atomic::CompareAndSwap(deq.state, parkerSelectWaiting, parkerSelectConsumed, atomic::AcqRel, atomic::AcqRel) {
+				!atomic::CompareAndSwap(&(*deq.state), parkerSelectWaiting, parkerSelectConsumed, atomic::AcqRel, atomic::AcqRel) {
 				continue
 			}
 			ret deq
