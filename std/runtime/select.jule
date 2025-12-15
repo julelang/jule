@@ -32,14 +32,7 @@ struct scase {
 
 // Empty select statement implementation.
 #disable nilptr
-fn emptyselect() {
-	mut t := acquireThread()
-	t.state |= threadSuspended | reasonSelect | reasonSelectEmpty
-	// Add special case for empty select.
-	threadCases |= threadSC_EmptySelect
-	// Check deadlock before sleep and release mutex.
-	checkDeadlock(0, reasonSelect|reasonSelectEmpty)
-	threadMutex.unlock()
+async fn emptyselect() {
 	// Park thread indefinitely.
 	// We do not need to yield CPU with temporary parking,
 	// this thread will never continue to run.
@@ -48,7 +41,8 @@ fn emptyselect() {
 	// if any, after this stage. If this thread is the single thread,
 	// we already checked deadlocks. So put this thread into deep sleep
 	// indefinitely.
-	t.parker.park()
+	mut coro := gett().coro
+	park(coro, 0, reasonSelect|reasonSelectEmpty)
 	panic("unreachable")
 }
 
@@ -179,7 +173,7 @@ unsafe fn unlockchans(mut chans: *&uintptr, mut nchan: int) {
 // used since this kind of methods are type-dependent. To solve the problem,
 // each case includes function pointers of the underlying channel type.
 #disable nilptr boundary
-unsafe fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scase, mut nrecv: int, nsend: int, block: bool): int {
+unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scase, mut nrecv: int, nsend: int, block: bool): int {
 	totalCases := nrecv + nsend
 	k := absint(int(rand()))
 
@@ -287,12 +281,13 @@ unsafe fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scase, mut
 		}
 	}
 
+	mut coro := gett().coro
+
 	// We can acquire the current thread and assign it to parkers.
 	// All parkers will use the current thread.
 	// Any notification will unpark the select statement.
-	mut thread := acquireThread()
 	for i in parkers {
-		parkers[i].parker = thread.parker
+		parkers[i].coro = coro
 	}
 
 	// Park and try iteration.
@@ -302,7 +297,7 @@ unsafe fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scase, mut
 	for {
 		// Unlock channels and park the thread.
 		unlockchans(chans, nchan)
-		park2(&(*thread), 0, &(*thread.parker), reasonSelect)
+		park(coro, 0, reasonSelect).await
 
 		// Look for the selected channel.
 		for i in parkers {
@@ -415,8 +410,5 @@ unsafe fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scase, mut
 				(*ch).sendq.enqueueAvoidDuplicate((&parkerList)(parker))
 			}
 		}
-
-		// Acquire the thread mutex before park.
-		threadMutex.lock()
 	}
 }

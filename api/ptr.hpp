@@ -87,7 +87,7 @@ struct __jule_Ptr
 
     __jule_Ptr(__jule_Ptr<T> &&src) noexcept
     {
-        this->__get_copy(src);
+        this->__get_copy(std::move(src));
     }
 
     __jule_Ptr(T *src) noexcept
@@ -204,7 +204,7 @@ struct __jule_Ptr
             if (file != nullptr)
             {
                 auto n = strlen(file);
-                char *message = new (std::nothrow) char[84 + n];
+                char *message = new (std::nothrow) char[84 + n + 1];
                 if (!message)
                     __jule_panic((__jule_U8 *)"runtime: memory allocation failed for invalid memory dereferencing error of smart pointer", 89);
                 strncpy(message, __JULE_ERROR__INVALID_MEMORY, 47);
@@ -235,7 +235,7 @@ struct __jule_Ptr
     __jule_Ptr<T> &operator=(__jule_Ptr<T> &&src) noexcept
     {
         this->dealloc();
-        this->__get_copy(src);
+        this->__get_copy(std::move(src));
         src.alloc = nullptr;
         src.ref = nullptr;
         return *this;

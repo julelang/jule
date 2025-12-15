@@ -1,0 +1,105 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/runtime/atomic"
+
+// A bouded Chase-Lev deque for coroutines.
+struct deque {
+	top:    i64
+	bottom: i64
+	mask:   i64 // cap-1
+	buf:    []&coro
+}
+
+impl deque {
+	fn init(mut *self, cap: int) {
+		if cap < 2 || !isPowerOfTwo(cap) {
+			panic("runtime: deque needs at least 2 and power-of-two capacity")
+		}
+		self.buf = make([]&coro, cap)
+		self.mask = i64(cap - 1)
+	}
+
+	// Owner-only: pushes an item to the bottom.
+	fn push(mut *self, mut item: &coro): bool {
+		// Owner reads bottom/top.
+		b := atomic::Load(&self.bottom, atomic::Relaxed)
+		t := atomic::Load(&self.top, atomic::Acquire)
+
+		// Check if full.
+		if b-t >= i64(len(self.buf)) {
+			ret false
+		}
+
+		// Write element into ring buffer slot.
+		self.buf[b&self.mask] = item
+		// Release: ensure write to buffer visible before bottom increment.
+		atomic::Store(&self.bottom, b+1, atomic::Release)
+
+		ret true
+	}
+
+	// Owner-only: pops an item from the bottom.
+	fn pop(mut *self): (item: &coro, ok: bool) {
+		b := atomic::Load(&self.bottom, atomic::Relaxed) - 1
+
+		// Use SeqCst to ensure ordering with steal operations.
+		atomic::Store(&self.bottom, b, atomic::SeqCst)
+
+		t := atomic::Load(&self.top, atomic::Relaxed)
+
+		if t <= b {
+			// Non-empty queue.
+			item = self.buf[b&self.mask]
+			if t == b {
+				// Last item: race with thieves.
+				// Use SeqCst for the CAS to synchronize with steal.
+				if !atomic::CompareAndSwap(&self.top, t, t+1, atomic::SeqCst, atomic::Relaxed) {
+					// Lost race.
+					atomic::Store(&self.bottom, b+1, atomic::Relaxed)
+					ret nil, false
+				}
+				atomic::Store(&self.bottom, b+1, atomic::Relaxed)
+			}
+			ret item, true
+		} else {
+			// Empty queue.
+			atomic::Store(&self.bottom, b+1, atomic::Relaxed)
+			ret nil, false
+		}
+	}
+
+	// Multi-stealer.
+	fn steal(mut *self): (item: &coro, ok: bool) {
+		t := atomic::Load(&self.top, atomic::Acquire)
+
+		// Use SeqCst to order with owner's bottom store.
+		b := atomic::Load(&self.bottom, atomic::SeqCst)
+
+		if t < b {
+			// Non-empty queue.
+			item = self.buf[t&self.mask]
+			// CAS with SeqCst to synchronize with pop.
+			if !atomic::CompareAndSwap(&self.top, t, t+1, atomic::SeqCst, atomic::Relaxed) {
+				// Lost race.
+				ret nil, false
+			}
+			// Successfully stolen.
+			ret item, true
+		}
+
+		ret nil, false
+	}
+
+	// Returns an *approximate* number of elements in the deque.
+	fn len(*self): int {
+		t := atomic::Load(&self.top, atomic::Relaxed)
+		b := atomic::Load(&self.bottom, atomic::Relaxed)
+		n := int(b - t)
+		if n < 0 {
+			ret 0
+		}
+		ret n
+	}
+}

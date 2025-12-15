@@ -1,0 +1,69 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Polls a coroutine.
+#disable nilptr boundary
+fn coropoll(): (polled: &coro) {
+	gsched.enterspin()
+	{
+		mut t := gett()
+		if t.proc.runnext != nil {
+			polled = t.proc.runnext
+			t.proc.runnext = nil
+			goto ExitSpin
+		}
+
+		let mut ok: bool
+		polled, ok = t.proc.runq.pop()
+		if ok {
+			goto ExitSpin
+		}
+
+		// Local queue is empty, pop from the global queue.
+		gsched.mu.lock()
+		if gsched.runq.head == nil {
+			gsched.mu.unlock()
+			goto ExitSpin
+		}
+		let mut batch: [coroprocRunQueueSize]&coro
+		mut n := 0
+		for n < coroprocRunQueueSize; n++ {
+			if gsched.runq.head == nil {
+				break
+			}
+			batch[n] = gsched.runq.head.coro
+			gsched.runq.remove(gsched.runq.head)
+		}
+		gsched.mu.unlock()
+		if n > 0 {
+			polled = batch[0]
+			mut i := 1
+			for i < n; i++ {
+				ok = t.proc.runq.push(batch[i])
+				if !ok {
+					panic("runtime: coroutine scheduler queue corruption")
+				}
+			}
+			goto ExitSpin
+		}
+
+		// Try to steal from a coroutine process.
+		const StealTries = 4
+		n = 0
+		for n < StealTries; n++ {
+			idx := absint(int(rand() % u64(len(gsched.procs))))
+			mut proc := gsched.procs[idx]
+			if proc == t.proc {
+				continue
+			}
+			polled, ok = proc.runq.steal()
+			if ok {
+				goto ExitSpin
+			}
+		}
+	}
+ExitSpin:
+	gsched.exitspin()
+	ret
+}

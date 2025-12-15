@@ -856,6 +856,17 @@ impl parser {
 			f.Token = tokens[*i]
 		}
 
+		// Detect async keyword.
+		if f.Token.ID == token::ASYNC {
+			f.Async = true
+			*i++
+			if *i >= len(tokens) {
+				self.pushErr(f.Token, "invalid syntax")
+				ret nil
+			}
+			f.Token = tokens[*i]
+		}
+
 		// Skips fn token.
 		*i++
 		if *i >= len(tokens) {
@@ -1342,6 +1353,7 @@ impl parser {
 				continue
 			}
 			match tokens[0].ID {
+			| token::ASYNC
 			| token::FN:
 				mut i := 0
 				mut f := self.buildFunc(&i, tokens, true, true)
@@ -1502,7 +1514,7 @@ impl parser {
 			token = tokens[i]
 		}
 
-		if token.ID != token::FN {
+		if token.ID != token::FN && token.ID != token::ASYNC {
 			self.pushErr(token, "invalid syntax")
 			ret nil
 		}
@@ -1523,6 +1535,7 @@ impl parser {
 			}
 
 			match token.ID {
+			| token::ASYNC
 			| token::FN
 			| token::UNSAFE:
 				mut f := self.getMethod(tokens)
@@ -1608,6 +1621,7 @@ impl parser {
 	fn buildNodeData(mut &self, mut tokens: []&token::Token): ast::NodeData {
 		mut token := tokens[0]
 		match token.ID {
+		| token::ASYNC
 		| token::FN
 		| token::UNSAFE:
 			mut i := 0

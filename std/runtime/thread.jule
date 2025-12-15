@@ -2,64 +2,67 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use "std/internal/runtime"
-use "std/internal/runtime/atomic"
+extern let mut __jule_ct: &thread
 
 const (
 	// State flags of threads.
-	threadRunning   = 1 << iota // Header group specifier of running thread state.
-	threadSuspended             // Suspended running thread state. Use like threadRunning&threadSuspended.
-	threadClosed                // Thread execution completed, thread closed.
-
-	// State flags of threads for suspend reason.
-	reasonNA          = 0
-	reasonRecv        = 1 << iota // Channel-recv.
-	reasonSend                    // Channel-send.
-	reasonWaitGroup               // WaitGroup.
-	reasonMutex                   // Mutex.
-	reasonCond                    // Condition variable.
-	reasonSelect                  // Header group specifier of select statement.
-	reasonSelectEmpty             // Empty select statement state. Use like reasonSelect&reasonSelectEmpty.
+	threadRunning = 1 << iota // Header group specifier of running thread state.
+	threadClosed              // Thread execution completed, thread closed.
 )
+
+// Maximum count of cached scheduler threads.
+const maxCachedWorkers = 10
 
 // A thread instance is represents a spawned thread.
 // Used by the Jule runtime to manage threads.
+#export "__jule_thread"
 struct thread {
 	os: osthread
 
-	// Thread state and suspend reasons if thread is suspended.
-	// The reasons may be not zeroed after thread closed or woken.
+	// Thread state.
 	state: u32
-
-	// Unique identifier for various purposes, usually it is a pointer.
-	// It used to detect a specific primitive.
-	// It may be a mutex pointer for channel, of a sema pointer for mutex.
-	mu: uintptr
 
 	// Parker of the thread.
 	parker: &parker
 
+	// Pointer to the previous thread.
+	// Threads stored in the thread stack with a doubly linked-list.
+	prev: &thread
+
 	// Pointer to the next thread.
-	// Threads stored in the thread stack with a singly linked-list.
+	// Threads stored in the thread stack with a doubly linked-list.
 	next: &thread
+
+	// Coroutine process owned by the thread.
+	proc: &coroproc
+
+	// Current coroutine of the thread.
+	coro: &coro
 }
 
-// Special case flags for thread management.
-const (
-	threadSC_NA          = 0
-	threadSC_EmptySelect = 1 << iota
-)
+// Returns the current thread.
+// Uses the thread-local data.
+fn gett(): &thread {
+	ret extern.__jule_ct
+}
+
+// Sets the current thread as t.
+// Writes to the thread-local data.
+fn sett(mut t: &thread) {
+	extern.__jule_ct = t
+}
 
 // A thread stack and associated lock.
-// All spawned threads are stored in the threads.
-// When a thread completed, it will be marked as closed.
-// A closed thread instance will not be released, remains allocated and placed
-// in the threads. Subsequent thread generations may use the same allocation
+// All spawned threads are stored in the threadHead and threadTail (linked-list).
+// The threadHead variable will always point to the main program thread.
+// A closed thread instance will not be released if it is cachable,
+// remains allocated and placed in the threads.
+// Subsequent thread generations may use the same allocation
 // of closed threads for the new spawned threads.
-// threadCases stores special cases for thread management.
 let threadMutex = fmutex{}
-let mut threads = (&thread)(nil)
-let mut threadCases = threadSC_NA
+let mut threadHead = (&thread)(nil)
+let mut threadTail = (&thread)(nil)
+let mut cachedCount = 0 // Count of cached and parked coroutine scheduler threads.
 
 // Stores total number of logical threads.
 let mut numcpu = 0
@@ -72,33 +75,9 @@ let mut numcpu = 0
 fn NumCPU(): int { ret numcpu }
 
 // Allocates a new thread and sets state as running.
-//
-// Memory management and threads instances:
-//	Allocated threads are never will be deallocated. Closed threads
-//	will be marked as closed. Closed threads may be reused if a new thread spawned.
-//	It helps reduce the memory overhead of programs with high thread usage.
-//	Some tools like Valgrind may detect as memory leak, but this was done on purpose.
 #disable nilptr
 fn newThread(): &thread {
 	mut t := new(thread)
-	unsafe {
-		// Remove RC pointer and disable GC for thread allocations.
-		// Because allocated threads will never be deallocated.
-		// Avoid GC cost for threads.
-		//
-		// NOTE:
-		//	This is also prevents misuse of concurrent data.
-		//	End of the program, compiler will release the threads if they performs GC.
-		//	But other running threads may use the threads, and since threadMutex
-		//	will not be locked, it may cause SEGFAULT due to using released memory.
-		//
-		//	Of course a good implementation will wait for the running threads,
-		//	but we have to be safe as possible here. If the main thread will end
-		//	before other running threads, avoid possible SEGFAULT.
-		mut p := (*runtime::Smartptr[thread])(&t)
-		_RCFree(p.Ref)
-		p.Ref = nil
-	}
 	t.state |= threadRunning
 
 	// Initialized once and never deallocated if thread waiting for reuse.
@@ -110,30 +89,82 @@ fn newThread(): &thread {
 
 // Pushes a new thread to the main thread stack and sets state as running.
 // Returns the thread representing the created thread.
-// Locks the threadMutex and will not release before return,
-// should be released after pushNewThread.
+// Assumes the threadMutex is locked and will not release before return.
 //
-// This function assumes |threads| is not nil. So we must have a thread pointer
+// This function assumes |threadHead| is not nil. So we must have a thread pointer
 // associated with a thread in thread stack, it should be the main thread.
 // New created threads should be added to the main thread's tail.
 #disable nilptr
 fn pushNewThread(): &thread {
-	threadMutex.lock()
 	// Lookup for empty threads to caught ready to reuse thread if exist.
-	mut t := threads
+	mut t := threadHead
 	for t != nil; t = t.next {
 		if t.state&threadClosed == threadClosed {
 			t.state = threadRunning
-			t.mu = 0
+			t.coro = nil
 			ret t
-		}
-		if t.next == nil {
-			break
 		}
 	}
 	// We have not any reusable thread, so create a new one.
-	t.next = newThread()
-	ret t.next
+	mut newt := newThread()
+	newt.prev = threadTail
+	threadTail.next = newt
+	threadTail = newt
+	ret newt
+}
+
+// Closes the thread t, but it may be cached.
+// The thread t must be a scheduler thread.
+#disable nilptr
+fn closeThread(mut t: &thread): (schedAgain: bool) {
+	// Thread is have a coroutine process.
+	// We have to put back it to idle processes.
+	if t.proc != nil {
+		for {
+			ok, _, full := gsched.idleprocs.enqueue(&t.proc)
+			if !ok && full {
+				panic("malformed internal schedule queue")
+			}
+			if ok {
+				break
+			}
+		}
+	}
+
+	threadMutex.lock()
+	// We already cached a lot scheduler thread.
+	// Do not cache it, but keeps it if it is the main thread of the program.
+	if t != threadHead && cachedCount > maxCachedWorkers {
+		// Remove the instance from the queue.
+		if t.prev != nil {
+			t.prev.next = t.next
+		} else {
+			// Be safe, but this case must be unreachable.
+			threadHead = t.next
+		}
+		if t.next != nil {
+			t.next.prev = t.prev
+		} else {
+			threadTail = t.prev
+		}
+		t.prev = nil
+		t.next = nil
+		t.coro = nil
+		t.proc = nil
+		threadMutex.unlock()
+		t.parker.release()
+		t = nil
+		ret false
+	}
+	// There is space for caching, cache it.
+	// Park the thread and report true, it will be continue to run when notified.
+	cachedCount++
+	t.coro = nil
+	t.proc = nil
+	t.state = threadClosed
+	threadMutex.unlock()
+	t.parker.park()
+	ret true
 }
 
 // Locks the thread-mutex and returns the thread associated with current thread.
@@ -141,8 +172,14 @@ fn pushNewThread(): &thread {
 #disable nilptr
 fn acquireThread(): &thread {
 	threadMutex.lock()
+	ret getThread()
+}
+
+// Same as acquireThread, but assumes thread-mutex is already locked.
+#disable nilptr
+fn getThread(): &thread {
 	id := currentThreadID()
-	mut t := threads
+	mut t := threadHead
 	for t != nil; t = t.next {
 		if t.os.equal(id) {
 			ret t
@@ -151,251 +188,25 @@ fn acquireThread(): &thread {
 	ret nil
 }
 
-// Suspends the current thread and yields the CPU.
-// If the mu is not zero, assumes it already locked and releases before yield.
-// If reason is related with a sema, will not handle mu as a mutex.
-// If the parker is not nil, parks suspended thread.
-// The thread can be made runnable again by calling [parker.unpark].
+// Spawns a new scheduler thread with the coroutine process.
+// The thread-mutex must be acquired before the call, it will release before return.
 #disable nilptr
-fn park(mu: uintptr, mut &parker: *parker, mut reason: u32) {
-	mut t := acquireThread()
-	if t == nil {
-		panic("runtime: thread is not exist")
-	}
-	park2(&(*t), mu, parker, reason)
-}
-
-// Suspends the thread t and yields the CPU.
-// If the mu is not zero, assumes it already locked and releases before yield.
-// If reason is related with a sema, will not handle mu as a mutex.
-// If the parker is not nil, parks suspended thread.
-// The thread can be made runnable again by calling [parker.unpark].
-// The thread-mutex must be acquired, this function will release it.
-#disable nilptr
-fn park2(mut &t: *thread, mu: uintptr, mut &parker: *parker, mut reason: u32) {
-	t.state |= threadSuspended | reason
-	t.mu = mu
-	checkDeadlock(mu, reason)
-	// Unlock the mutex because other threads may need to lock.
-	// There is nothing to do for this thread for now, so release lock.
-	threadMutex.unlock()
-	// Release mutex if reason is not related with a sema.
-	if mu != 0 {
-		// Assume fmutex and qmutex have the same memory layout and
-		// implementation for unlock.
-		unsafe { (*fmutex)(mu).unlock() }
-	}
-	// Park the thread and yield the CPU until to be unparked by the another thread.
-	parker.park()
-	// CPU is back for this thread.
-	// Lock mutex again and wake up.
-	threadMutex.lock()
-	t.mu = 0
-	t.state &= ^(threadSuspended | reason)
-	threadMutex.unlock()
-}
-
-// Closes the thread associated with tptr, if exist.
-#disable nilptr
-fn closeThread(tptr: *unsafe) {
-	mut t := threads
-	for t != nil; t = t.next {
-		if &t.os.handle == tptr {
-			threadMutex.lock()
-			// We do not have to clear all state and reasons of the thread.
-			// If this will be reuse, the pushNewThread function will reset.
-			t.state = threadClosed
-			// We have empty select special case.
-			// We have to check deadlocks after any thread closed. Because at least
-			// one thread is in deep sleep and we do not know when this thread will wake up.
-			// So, if we have a deadlock, detection may be impossible because empty selects
-			// does not checks deadlocks. So check deadlock after closed a thread to
-			// caught special case deadlock; all threads are in the deep sleep.
-			if threadCases&threadSC_EmptySelect == threadSC_EmptySelect {
-				checkDeadlock(0, reasonNA)
-			}
-			threadMutex.unlock()
-			break
-		}
-	}
-}
-
-// Checks deadlock and panics if exist.
-// mut and reason is stores the current thread's parameters to yield CPU.
-#disable nilptr
-fn checkDeadlock(mu: uintptr, reason: u32) {
-	// Fast path: single thread.
-	if threads.next == nil {
-		panic("runtime: all threads are asleep - deadlock!")
-	}
-
-	// At this point, we should manage all threads under more diverse conditions.
-	//
-	//	WaitGroups:
-	//		If the reason is a WaitGroup, it indicates that the current thread
-	//		has been suspended for a WaitGroup. At this point, we must utilize the
-	//		`|wgRuns|` data. This data must satisfy the condition "`wgRuns >= 1`".
-	//		The rationale for this is that only a single thread might remain
-	//		at the moment, and this thread could potentially enter an infinite
-	//		parked state right now. Therefore, we must ensure that there is at
-	//		least one other running thread that the WaitGroup can depend on.
-	//		This guarantees that the suspended thread has a valid reason to wait
-	//		and avoids potential deadlocks.
-	//
-	//	Condition Variables:
-	//		Almost same as the WaitGroups, but condition is different.
-	//		For a WaitGroup, it is sufficient to check whether all threads are
-	//		in a waiting state for the same WaitGroup. However,
-	//		for a condition variable, at least one thread must not be waiting for
-	//		either a WaitGroup or a condition variable.
-	//
-	//		The reason for this difference lies in the possibility of two threads
-	//		existing simultaneously—one waiting for a WaitGroup and the other for
-	//		a condition variable. Even in such a scenario, the condition variable
-	//		thread might wake up because a thread could have already signaled it
-	//		before closed or suspended, and the thread waiting on the
-	//		condition variable has not yet processed the signal. Therefore,
-	//		the WaitGroup counter must also account for threads associated with
-	//		condition variables. This is necessary because after a condition variable
-	//		thread processes the signal, the WaitGroup wait may also conclude.
-	//		However, a condition variable should not include all waiting states
-	//		in its counter. A WaitGroup or another waiting condition variable
-	//		cannot signal a condition variable.
-	//
-	//	Mutexes:
-	//		Mutexes are similar to WaitGroups and condition variables but differ
-	//		in an important aspect: they do not add any lock states to their
-	//		counters. In other words, a thread suspended due to a WaitGroup,
-	//		condition variable, mutex, or select will not be included in any
-	//		counters. This is because none of these suspended states can unlock the
-	//		mutex being attempted.
-	//
-	//		It is unnecessary to exclude channel-induced suspended threads from
-	//		mutex-lock states. This is because a channel thread will trigger the
-	//		edge case and ensure the required conditions for the channel are met,
-	//		thus catching the potential deadlock.
-	//
-	//	Channels:
-	//		Channels are checked in the same way regardless of whether they are
-	//		buffered or unbuffered. Channels can enter a mutual locking state;
-	//		however, this is not considered a deadlock under appropriate conditions.
-	//		For example, a thread might be suspended while waiting to receive on
-	//		a mutex (and therefore a channel). If no threads are actively running,
-	//		all are in a suspended state, this might appear to be a deadlock.
-	//		However, if another thread is suspended while waiting to send on the
-	//		same channel, this situation does not constitute a deadlock.
-	//		In such cases, the thread waiting to send is expected to wake up first,
-	//		completing its operation and allowing the thread waiting to receive
-	//		to wake up subsequently. This sequential waking ensures that the
-	//		apparent deadlock resolves itself naturally without external intervention.
-	//
-	//		This scenario should be considered an edge case. Under normal circumstances,
-	//		channels do not require excessive attention because concurrency rarely
-	//		triggers such situations.
-	mut wgRuns := 0
-	mut condRuns := 0
-	mut nonlocked := 0
-	// Return immediately if exist any running and not suspended thread.
-	// Also count the |wgRuns|, |condRuns| and |nonlocked| data at same time.
-	mut t := threads
-	for t != nil; t = t.next {
-		if t.state&threadRunning == threadRunning {
-			// Thread is not suspended, so works.
-			// No requirement for heavy analysis, return immediately.
-			if t.state&threadSuspended != threadSuspended {
-				ret
-			}
-			// Reason of this thread is not WaitGroup.
-			// So all threads are not in the wait-state WaitGroups.
-			// We can count this thread |wgRuns|.
-			if t.state&reasonWaitGroup != reasonWaitGroup {
-				wgRuns++
-				// Reason of this thread is not WaitGroup and condition variable.
-				// So all threads are not in the mutual infinite wait.
-				// We can count this thread for |condRuns|.
-				if t.state&reasonCond != reasonCond {
-					condRuns++
-					// Reason of this thread is not WaitGroup, condition variable, mutex or select.
-					// So all threads are not in the mutual infinite wait or locked for a reason.
-					// We can count channels because we caught channel separately.
-					// So if counted channels are in the deadlock, we should caught that.
-					// So we can count this thread for |nonlocked|.
-					if t.state&reasonMutex != reasonMutex && t.state&reasonSelectEmpty != reasonSelectEmpty {
-						nonlocked++
-					}
-				}
-			}
-		}
-	}
-	// We must be count all possible |wgRuns| data here.
-	// So check and return immediately if reason is WaitGroup and |wgRuns| condition met.
-	// See the hard point for documentation.
-	if wgRuns > 0 && reason&reasonWaitGroup == reasonWaitGroup {
+fn spawnSchedThread(mut proc: &coroproc) {
+	// We have a cached scheduler thread.
+	// Notify it.
+	if cachedCount > 0 {
+		mut t := pushNewThread() // It will return a cached thread instance.
+		t.proc = proc
+		cachedCount--
+		threadMutex.unlock()
+		t.parker.unpark()
 		ret
 	}
-	// We must be count all possible |condRuns| data here.
-	// So check and return immediately if reason is condition variable and |condRuns| condition met.
-	// See the hard point for documentation.
-	if condRuns > 0 && reason&reasonCond == reasonCond {
-		ret
-	}
-	// We must be count all possible |nonlocked| data here.
-	// So check and return immediately if reason is Mutex and |nonlocked| condition met.
-	// See the hard point for documentation.
-	// Do not check whether the reason is mutex.
-	// If this condition is met, it is enough.
-	// Limiting this condition for mutex reasons, it may cause false deadlocks.
-	if nonlocked > 0 {
-		ret
-	}
-	// There is no running active thread for common cases, but we have non-zero mu.
-	// So this thread associated with a channel now, we have a chance as described
-	// in the channels section of the documentation. Check this edge case for a chance.
-	// We have to check mutual suspended threads for channels.
-	// All channels may be suspended for each other when using channels.
-	// For example, a thread may be suspended for a channel-send and
-	// now we may be suspend this thread for channel-recv on the same channel.
-	// So two threads are suspended for each other, caught this and wake
-	// suitable one. In such cases, there is no deadlock risk.
-	if mu != 0 && (reason&reasonSend == reasonSend || reason&reasonRecv == reasonRecv) {
-		t = threads
-		for t != nil; t = t.next {
-			// If the thread have a select statement (but not empty statement),
-			// this means thread waiting for the blocking select statement.
-			// We have to assume this select statement will send to/read from
-			// this channel.
-			//
-			// We should skip the empty select statements, because they have no
-			// effect in this case. If we return for the empty select statements
-			// here, the runtime continues even if there is a deadlock.
-			// For example, let's say there are two threads, one is doing
-			// blocking-send and the other is continuously yielding the CPU with
-			// the empty select statement. In this case, the channel continues
-			// to park to send the data when channel is suitable and if we return
-			// for the empty select statement here, the program falls into an
-			// infinite loop.
-			if t.state&reasonSelect == reasonSelect &&
-				t.state&reasonSelectEmpty != reasonSelectEmpty {
-				ret
-			}
-			if t.mu == mu {
-				mut lt := threads
-				for lt != nil; lt = lt.next {
-					if lt.mu == t.mu {
-						if lt.state&reasonRecv == reasonRecv &&
-							t.state&reasonSend == reasonSend {
-							ret
-						}
-						if lt.state&reasonSend == reasonSend &&
-							t.state&reasonRecv == reasonRecv {
-							ret
-						}
-					}
-				}
-			}
-		}
-	}
-	// We have not any running or ready to woken up thread, all of them suspended or closed.
-	// So all threads are locked, in other words; we have a deadlock.
-	panic("runtime: all threads are asleep - deadlock!")
+	// Spawn a new one.
+	unsafe { threadSpawn(proc, (*unsafe)(uintptr(schedthread)), nil) }
+}
+
+fn threadinit() {
+	// Platform specific initialization.
+	_threadinit()
 }

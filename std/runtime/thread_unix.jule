@@ -26,25 +26,21 @@ impl osthread {
 	}
 }
 
-// Common head fields for a thread data.
-struct threadData {
-	handle: *extern.pthread_t
-}
-
 // A low level API function for threads.
 // It doesn't provide much abstraction.
 // It just creates and detaches a thread using API.
 // Reports whether the thread created successfully.
 // The created thread is a native-thread.
+// Assumes the thread-mutex is already locked and will be released before return.
 // The |func| parameter should point to the valid function for operating system thread API.
-// The |args| parameter may be nil and should point to the thread data.
+// The |args| parameter may be nil, passed to the function when call.
 // The thread data, should be fit into the threadData struct.
 // So, the head fields of the thread data should be matched fields of the threadData.
-#export "__jule_coSpawn"
-unsafe fn coSpawn(func: *unsafe, mut args: *unsafe): bool {
+unsafe fn threadSpawn(mut proc: &coroproc, func: *unsafe, mut args: *unsafe): bool {
 	mut t := pushNewThread()
-	(*threadData)(args).handle = &t.os.handle
+	t.proc = proc
 	if sys::Addrcall[i32](uintptr(extern.pthread_create), &t.os.handle, (*unsafe)(nil), func, args) != 0 {
+		threadMutex.unlock()
 		ret false
 	}
 	threadMutex.unlock()
@@ -60,7 +56,7 @@ fn osyield() {
 	sys::SchedYield() else {}
 }
 
-fn threadinit() {
+fn _threadinit() {
 	setnumcpu()
 	// Push the main thread to threads.
 	// See the documentation of the pushNewThread function.
@@ -68,5 +64,6 @@ fn threadinit() {
 	// We do not have to lock the mutex for threads, no risk for concurrency.
 	mut t := newThread()
 	t.os.handle = currentThreadID()
-	threads = t
+	threadHead = t
+	threadTail = t
 }

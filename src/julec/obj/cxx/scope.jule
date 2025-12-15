@@ -506,6 +506,14 @@ impl scopeCoder {
 		self.oc.write("for (;;) {\n")
 		self.oc.addIndent() // Indent scope.
 		self.oc.indent()
+
+		// For async runtime, we need to add a compiler barrier here.
+		if self.oc.mode&_OBJ_ASYNC == _OBJ_ASYNC {
+			self.oc.write(compilerBarrier)
+			self.oc.write(";\n")
+			self.oc.indent()
+		}
+
 		self.scope(it.Scope)
 		self.oc.doneIndent()
 		self.oc.write("\n")
@@ -535,6 +543,13 @@ impl scopeCoder {
 		self.oc.write(begin)
 		self.oc.write(":;\n")
 		self.oc.indent()
+
+		// For async runtime, we need to add a compiler barrier here.
+		if self.oc.mode&_OBJ_ASYNC == _OBJ_ASYNC {
+			self.oc.write(compilerBarrier)
+			self.oc.write(";\n")
+			self.oc.indent()
+		}
 
 		if it.Expr != nil {
 			self.oc.write(typeBool)
@@ -609,6 +624,12 @@ impl scopeCoder {
 	fn label(mut &self, l: &sema::Label) {
 		identCoder.label(&self.oc.Buf, uintptr(l))
 		self.oc.write(":")
+
+		// For async runtime, we need to add a compiler barrier here.
+		if self.oc.mode&_OBJ_ASYNC == _OBJ_ASYNC {
+			self.oc.write("; ")
+			self.oc.write(compilerBarrier)
+		}
 	}
 
 	fn gotoStmt(mut &self, gt: &sema::Goto) {
@@ -1486,7 +1507,7 @@ impl scopeCoder {
 		self.oc.write("};\n")
 
 		self.oc.indent()
-		self.oc.write("__selectIndex = ")
+		self.oc.write("__selectIndex = co_await ")
 		identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Runselect)
 		self.oc.write("(__chanArr, ")
 		self.oc.write(conv::Itoa(nchan))
@@ -1666,10 +1687,12 @@ impl scopeCoder {
 				self.oc.indent()
 			}
 			if r.Func.Decl.Exceptional {
-				self.oc.write("return __jule_VoidExceptional{};")
+				self.oc.write(returnKw(r.Func))
+				self.oc.write(" __jule_VoidExceptional{};")
 				ret
 			}
-			self.oc.write("return;")
+			self.oc.write(returnKw(r.Func))
+			self.oc.write(";")
 			ret
 		} else if len(r.Func.Decl.Result.Names) == 0 && fc == nil {
 			if r.Func.Decl.Exceptional {
@@ -1689,7 +1712,8 @@ impl scopeCoder {
 					self.oc.write(deferStackName + ".call();\n")
 					self.oc.indent()
 				}
-				self.oc.write("return result;\n")
+				self.oc.write(returnKw(r.Func))
+				self.oc.write(" result;\n")
 				self.oc.doneIndent()
 				self.oc.indent()
 				self.oc.write("}")
@@ -1701,7 +1725,8 @@ impl scopeCoder {
 					self.oc.tc.kind(&self.oc.Buf, r.Func.Result)
 					self.oc.write(" __result = ")
 				} else {
-					self.oc.write("return ")
+					self.oc.write(returnKw(r.Func))
+					self.oc.write(" ")
 				}
 				self.oc.ec.possibleRefExpr(r.Expr)
 				if hasDefer {
@@ -1709,7 +1734,8 @@ impl scopeCoder {
 					self.oc.indent()
 					self.oc.write(deferStackName + ".call();\n")
 					self.oc.indent()
-					self.oc.write("return __result;\n")
+					self.oc.write(returnKw(r.Func))
+					self.oc.write(" __result;\n")
 				} else {
 					self.oc.write(";\n")
 				}
@@ -1749,11 +1775,13 @@ impl scopeCoder {
 			self.oc.indent()
 		}
 		if r.Func.Decl.Exceptional {
-			self.oc.write("return __jule_Exceptional<")
+			self.oc.write(returnKw(r.Func))
+			self.oc.write(" __jule_Exceptional<")
 			self.oc.tc.rc.codeMut1(&self.oc.Buf, r.Func.Result)
 			self.oc.write(">{.result=" + resultName + "};")
 		} else {
-			self.oc.write("return " + resultName + ";")
+			self.oc.write(returnKw(r.Func))
+			self.oc.write(" " + resultName + ";")
 		}
 
 		// Close the result variable scope.
@@ -1800,7 +1828,8 @@ impl scopeCoder {
 	fn exceptionalForwarding(mut &self, mut m: &opt::ExceptionalForwardingExpr) {
 		hasDefer := m.Func.Decl != nil && m.Func.Decl.HasDefer
 		if !hasDefer {
-			self.oc.write("return ")
+			self.oc.write(returnKw(m.Func))
+			self.oc.write(" ")
 			self.oc.ec.pureFuncCall(m.Expr)
 			ret
 		}
@@ -1813,7 +1842,9 @@ impl scopeCoder {
 		}
 		self.oc.write(" __result = ")
 		self.oc.ec.pureFuncCall(m.Expr)
-		self.oc.write("; " + deferStackName + ".call(); return __result;")
+		self.oc.write("; " + deferStackName + ".call(); ")
+		self.oc.write(returnKw(m.Func))
+		self.oc.write(" __result;")
 	}
 
 	// Generates C++ code of statement.
@@ -1902,7 +1933,7 @@ impl scopeCoder {
 		self.oc.write("}")
 	}
 
-	fn commonFuncScope(mut &self, mut f: &sema::FuncIns) {
+	fn commonFuncScope(mut &self, mut f: &sema::FuncIns, raw: bool) {
 		if !f.Decl.IsVoid() {
 			mut tup := f.Result.Tuple()
 			if tup != nil {
@@ -1963,12 +1994,19 @@ impl scopeCoder {
 			self.oc.indent()
 			self.oc.write(deferStackName + ".call();\n")
 		}
-		if f.Decl.Exceptional && f.Decl.IsVoid() {
-			// Just for void exceptionals.
-			// Other cases checked by semantic analsis and disallowed
-			// if they are not returns.
-			self.oc.indent()
-			self.oc.write("return __jule_VoidExceptional{};\n")
+		if !raw && f.Decl.IsVoid() {
+			if f.Decl.Exceptional {
+				// Just for void exceptionals.
+				// Other cases checked by semantic analsis and disallowed
+				// if they are not returns.
+				self.oc.indent()
+				self.oc.write(returnKw(f))
+				self.oc.write(" __jule_VoidExceptional{};\n")
+			} else {
+				self.oc.indent()
+				self.oc.write(returnKw(f))
+				self.oc.write(";\n")
+			}
 		}
 	}
 
@@ -1992,7 +2030,18 @@ impl scopeCoder {
 				" = (" + name + anonFuncCtxSuffix + "*)(" + ctxParamIdent + ");\n")
 		}
 
-		self.commonFuncScope(m.Func)
+		// Anonymous function may have different runtime model.
+		oldAsync := self.oc.mode & _OBJ_ASYNC
+		if m.Func.Decl.Async {
+			self.oc.mode |= _OBJ_ASYNC
+		} else {
+			self.oc.mode &= ^_OBJ_ASYNC
+		}
+
+		self.commonFuncScope(m.Func, false)
+
+		// Restore old runtime model.
+		self.oc.mode |= oldAsync
 
 		self.oc.doneIndent()
 		self.oc.indent()
@@ -2003,7 +2052,7 @@ impl scopeCoder {
 	}
 
 	// Generates C++ code of function's scope.
-	fn funcScope(mut &self, mut f: &sema::FuncIns) {
+	fn funcScope(mut &self, mut f: &sema::FuncIns, raw: bool) {
 		if f.Scope == nil {
 			ret
 		}
@@ -2020,10 +2069,15 @@ impl scopeCoder {
 			self.oc.mode = obj::HasDirectiveArg(disable, "boundary", self.oc.mode, _OBJC_DISABLE_BOUNDARY)
 			self.oc.mode = obj::HasDirectiveArg(disable, "nilptr", self.oc.mode, _OBJC_DISABLE_NILPTR)
 		}
+		if f.Decl.Async {
+			self.oc.mode |= _OBJ_ASYNC
+		} else {
+			self.oc.mode &= ^_OBJ_ASYNC
+		}
 
 		self.oc.write("{\n")
 		self.oc.addIndent()
-		self.commonFuncScope(f)
+		self.commonFuncScope(f, raw)
 		self.oc.doneIndent()
 		self.oc.indent()
 		self.oc.write("}")
@@ -2059,4 +2113,11 @@ fn captureVarHandling(mut oc: &ObjectCoder, mut m: &sema::AnonFuncExpr, mut v: &
 		}
 	}
 	ret false
+}
+
+fn returnKw(f: &sema::FuncIns): str {
+	if f.Decl == nil || !f.Decl.Async {
+		ret "return"
+	}
+	ret "co_return"
 }

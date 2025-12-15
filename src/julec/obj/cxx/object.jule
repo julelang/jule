@@ -43,8 +43,11 @@ const (
 	coSpawnArgDataSuffix = "_argdata"       // argdata suffix for coSpawn data prefix
 	coSpawnArgDataParam  = "__juleCoParam"
 	coSpawnArgDataFunc   = "__juleCoFunc"
-	coSpawnThreadData    = "__juleThread"
 )
+
+// Prevents the compiler from reordering or eliminating memory operations and
+// control-flow across this point.
+const compilerBarrier = "__jule_compilerBarrier()"
 
 const (
 	structDefaultEqMethodSuffix = "_eq"
@@ -91,7 +94,8 @@ struct metadata {
 const (
 	_OBJC_DEFAULT          = iota            // Default configuration.
 	_OBJC_DISABLE_BOUNDARY = 1 << (iota - 1) // Disable boundary checking.
-	_OBJC_DISABLE_NILPTR
+	_OBJC_DISABLE_NILPTR                     // Disable nil pointer checking.
+	_OBJ_ASYNC                               // Enable async runtime mode.
 
 	// All disable flags.
 	_OBJ_DISABLE = _OBJC_DISABLE_BOUNDARY | _OBJC_DISABLE_NILPTR
@@ -207,14 +211,6 @@ impl ObjectCoder {
 		self.coSpawnObj.WriteStr(is)!
 		self.coSpawnObj.WriteStr("{\n")!
 
-		// setup thread data
-		self.coSpawnObj.WriteByte(indentKind)!
-		writeThreadType(&self.coSpawnObj)
-		self.coSpawnObj.WriteStr(" *")!
-		self.coSpawnObj.WriteStr(coSpawnThreadData)!
-		self.coSpawnObj.WriteByte(';')!
-		self.coSpawnObj.WriteByte('\n')!
-
 		// setup func data
 		self.coSpawnObj.WriteByte(indentKind)!
 		self.tc.func(&self.coSpawnObj, f)
@@ -242,14 +238,8 @@ impl ObjectCoder {
 		self.coSpawnObj.WriteByte(';')!
 		self.coSpawnObj.WriteByte('\n')!
 
-		match {
-		| dist::IsWindows(build::OS):
-			self.coSpawnObj.WriteStr("unsigned long ")!
-		| dist::IsUnix(build::OS):
-			self.coSpawnObj.WriteStr("void *")!
-		|:
-			panic("cxx: pushCoSpawn: unimeplemented operating system for return type")
-		}
+		// Declare function.
+		self.coSpawnObj.WriteStr("__jule_DetachTask ")!
 		self.coSpawnObj.WriteStr(coSpawnPrefix + coSpawnMethodSuffix)!
 		self.coSpawnObj.WriteStr(is)!
 		const argData = "__jule_argdata"
@@ -267,7 +257,10 @@ impl ObjectCoder {
 		self.coSpawnObj.WriteStr("*)")!
 		self.coSpawnObj.WriteStr(argData)!
 		self.coSpawnObj.WriteStr("_param;\n")!
+
+		// call the function
 		self.coSpawnObj.WriteByte(indentKind)!
+		self.coSpawnObj.WriteStr("co_await ")!
 		self.coSpawnObj.WriteStr(argData)!
 		self.coSpawnObj.WriteStr("->")!
 		self.coSpawnObj.WriteStr(coSpawnArgDataFunc)!
@@ -285,26 +278,19 @@ impl ObjectCoder {
 		}
 		self.coSpawnObj.WriteStr(");\n")!
 
-		self.coSpawnObj.WriteByte(indentKind)!
-		identCoder.funcIns(&self.coSpawnObj, meta::Program.Runtime.CloseThread)
-		self.coSpawnObj.WriteStr("(")!
-		self.coSpawnObj.WriteStr(argData)!
-		self.coSpawnObj.WriteStr("->")!
-		self.coSpawnObj.WriteStr(coSpawnThreadData)!
-		self.coSpawnObj.WriteStr(");\n")!
+		// release coroutine data
 		self.coSpawnObj.WriteByte(indentKind)!
 		self.coSpawnObj.WriteStr("delete ")!
 		self.coSpawnObj.WriteStr(argData)!
 		self.coSpawnObj.WriteStr(";\n")!
-		match {
-		| build::OS == dist::Windows:
-			self.coSpawnObj.WriteByte(indentKind)!
-			self.coSpawnObj.WriteStr("return 0;\n")!
-		| dist::IsUnix(build::OS):
-			self.coSpawnObj.WriteByte(indentKind)!
-			self.coSpawnObj.WriteStr("return NULL;\n")!
-		|:
-			panic("cxx: pushCoSpawn: unimeplemented operating system for return type")
+		self.coSpawnObj.WriteByte(indentKind)!
+
+		// final return
+		self.coSpawnObj.WriteStr("co_return")!
+		if f.Decl.IsVoid() {
+			self.coSpawnObj.WriteStr(";\n")!
+		} else {
+			self.coSpawnObj.WriteStr(" {};\n")!
 		}
 		self.coSpawnObj.WriteStr("}\n")!
 
@@ -998,7 +984,17 @@ impl ObjectCoder {
 		if !ptr && opt::Inline && !f.Decl.IsEntryPoint() {
 			buf.WriteStr("inline ")!
 		}
-		self.tc.funcInsResult(buf, f)
+		if f.Decl.Async {
+			if f.Decl.IsVoid() {
+				buf.WriteStr("__jule_VoidTask")!
+			} else {
+				buf.WriteStr("__jule_Task<")!
+				self.tc.funcInsResult(buf, f)
+				buf.WriteByte('>')!
+			}
+		} else {
+			self.tc.funcInsResult(buf, f)
+		}
 		if ptr {
 			buf.WriteStr("(*")!
 			identCoder.funcIns(buf, f)
@@ -1198,7 +1194,7 @@ impl ObjectCoder {
 		self.funcHead(&self.Buf, f, false, name)
 		self.paramsIns(&self.Buf, f)
 		self.write(" ")
-		self.sc.funcScope(f)
+		self.sc.funcScope(f, false)
 		if f.Scope != nil {
 			self.write("\n\n")
 		}
@@ -1269,7 +1265,13 @@ impl ObjectCoder {
 				self.addIndent()
 				self.write("{\n")
 				self.indent()
-				if m.Exceptional || !m.IsVoid() {
+				if m.Async {
+					if m.IsVoid() {
+						self.write("co_await ")
+					} else {
+						self.write("co_return co_await ")
+					}
+				} else if m.Exceptional || !m.IsVoid() {
 					self.write("return ")
 				}
 				identCoder.func(&self.Buf, sm)
@@ -1567,12 +1569,14 @@ impl ObjectCoder {
 		for (_, mut v) in self.ir.Ordered.Globals {
 			// Skip special cases.
 			// This variables initialized by the initializer functions.
-			if v == meta::Program.Runtime.Threads ||
+			if v == meta::Program.Runtime.ThreadHead ||
+				v == meta::Program.Runtime.ThreadTail ||
 				v == meta::Program.Runtime.NumCPU ||
 				v == meta::Program.Runtime.Argc ||
 				v == meta::Program.Runtime.Argv ||
 				v == meta::Program.Runtime.Envp ||
-				v == meta::Program.Runtime.GlobalRand {
+				v == meta::Program.Runtime.GlobalRand ||
+				v == meta::Program.Runtime.Gsched {
 				continue
 			}
 			self.Buf.WriteByte(indentKind)!
@@ -1597,6 +1601,32 @@ impl ObjectCoder {
 
 	fn end(mut &self) {
 		self.addIndent()
+
+		// Write the fake main function.
+		if !env::Test {
+			asyncRuntime := meta::Program.EntryPoint.Async
+			if asyncRuntime {
+				self.write("__jule_DetachTask ")
+			} else {
+				self.write("void ")
+			}
+			self.write("__jule_fake_main(void) {\n")
+			self.indent()
+			if asyncRuntime {
+				self.write("co_await ")
+			}
+			identCoder.func(&self.Buf, meta::Program.EntryPoint)
+			self.write("(")
+			if meta::Program.EntryPoint.Instances[0].AsAnon {
+				// Pass nil pointer to anonymous context data.
+				self.write("nullptr")
+			}
+			self.write(");\n")
+			self.indent()
+			self.write("_Exit(0);\n}\n\n")
+		}
+
+		// Write the executable main function.
 		self.write(`int main(int argc, char *argv[], char *envp[]) {
 	__jule_argc = static_cast<__jule_Int>(argc);
 	__jule_argv = reinterpret_cast<__jule_U8**>(argv);
@@ -1611,16 +1641,22 @@ impl ObjectCoder {
 	`)
 
 		if env::Test {
-			self.write("test_point();")
+			self.write("test_point();\n")
 		} else {
-			identCoder.func(&self.Buf, meta::Program.EntryPoint)
-			self.write("(")
-			if meta::Program.EntryPoint.Instances[0].AsAnon {
-				// Pass nil pointer to anonymous context data.
-				self.write("nullptr")
+			asyncRuntime := meta::Program.EntryPoint.Async
+			if asyncRuntime {
+				identCoder.funcIns(&self.Buf, meta::Program.Runtime.Spawnmaincoro)
+				self.write("(")
 			}
-			self.write(");")
+			self.write("__jule_fake_main()")
+			if asyncRuntime {
+				self.write(".handle)")
+			}
+			self.write(";\n")
 		}
+		self.indent()
+		identCoder.funcIns(&self.Buf, meta::Program.Runtime.Sched)
+		self.write("();")
 
 		self.write(`
 
@@ -1702,7 +1738,7 @@ impl ObjectCoder {
 	// Checks concurrency state of program and updates function implementations
 	// to thread-safe variants if necessary.
 	fn implementRC(mut &self) {
-		if self.meta.concurrent {
+		if self.meta.concurrent || true {
 			// enable thread-safety for safe concurrency
 			self.funcIns(meta::Program.Runtime.RCAddAtomic, "__jule_RCAdd")
 			self.funcIns(meta::Program.Runtime.RCLoadAtomic, "__jule_RCLoad")
@@ -1749,17 +1785,4 @@ fn concatAllParts(parts: ...&token::Token): []byte {
 		s.WriteStr(p.Kind)!
 	}
 	ret unsafe { s.Buf() }
-}
-
-// Writes thread data type for Jule's runtime thread handling.
-// See runtime::coSpawn function for documentation.
-fn writeThreadType(mut &b: *strings::Builder) {
-	match {
-	| dist::IsWindows(build::OS):
-		b.WriteStr("HANDLE")!
-	| dist::IsUnix(build::OS):
-		b.WriteStr("pthread_t")!
-	|:
-		panic("unreachable")
-	}
 }

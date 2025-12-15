@@ -31,15 +31,19 @@ struct StrBuilder {
 
 // Metadata for the runtime package.
 struct Runtime {
-	Threads:    &sema::Var
+	ThreadHead: &sema::Var
+	ThreadTail: &sema::Var
 	NumCPU:     &sema::Var
 	Argc:       &sema::Var
 	Argv:       &sema::Var
 	Envp:       &sema::Var
 	GlobalRand: &sema::Var
+	Gsched:     &sema::Var
 
-	// Hard initializer function of runtime.
-	Init: &sema::FuncIns
+	Init:          &sema::FuncIns // Hard initializer function of runtime.
+	Sched:         &sema::FuncIns // Scheduler function.
+	Spawnmaincoro: &sema::FuncIns // Spawns main coroutine.
+	Park:          &sema::FuncIns // Compiler implemented `park` function.
 
 	Rand:            &sema::FuncIns
 	Osyield:         &sema::FuncIns
@@ -117,15 +121,20 @@ fn CollectRuntime(mut ir: &obj::IR): &Runtime {
 	mut meta := new(Runtime)
 
 	// Globals.
-	meta.Threads = obj::RuntimeFindGlobal(p, "threads")
+	meta.ThreadHead = obj::RuntimeFindGlobal(p, "threadHead")
+	meta.ThreadTail = obj::RuntimeFindGlobal(p, "threadTail")
 	meta.NumCPU = obj::RuntimeFindGlobal(p, "numcpu")
 	meta.Argc = obj::RuntimeFindGlobal(p, "argc")
 	meta.Argv = obj::RuntimeFindGlobal(p, "argv")
 	meta.Envp = obj::RuntimeFindGlobal(p, "envp")
 	meta.GlobalRand = obj::RuntimeFindGlobal(p, "__rand")
+	meta.Gsched = obj::RuntimeFindGlobal(p, "gsched")
 
 	// Functions.
 	meta.Init = obj::RuntimeFindFunc(p, "__init").Instances[0]
+	meta.Sched = obj::RuntimeFindFunc(p, "sched").Instances[0]
+	meta.Park = obj::RuntimeFindFunc(p, "park").Instances[0]
+	meta.Spawnmaincoro = obj::RuntimeFindFunc(p, "spawnmaincoro").Instances[0]
 	meta.Rand = obj::RuntimeFindFunc(p, "rand").Instances[0]
 	meta.Osyield = obj::RuntimeFindFunc(p, "osyield").Instances[0]
 	meta.ToStr = obj::RuntimeFindFunc(p, "toStr")

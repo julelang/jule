@@ -1,0 +1,225 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/runtime/atomic"
+
+// Returns the maximum number of CPUs that can be executing simultaneously.
+fn COMAXPROCS(): int { ret numcpu }
+
+const (
+	// The maximum count of the runnable coroutine queue of a coroutine process.
+	// Must be power of two.
+	coroprocRunQueueSize = 256
+)
+
+// A coroutine process.
+struct coroproc {
+	runnext: &coro
+	runq:    deque
+}
+
+// A scheduler envrionment.
+struct scheduler {
+	// All coroutine processes.
+	procs: []&coroproc
+
+	// Idle coroutine processes of the scheduler.
+	idleprocs: mpmcQueue[&coroproc]
+
+	mu:   fmutex
+	runq: &coroq // Global queue for runnable coroutines.
+
+	// Count of the worker threads actively polling for a coroutine.
+	// Atomic if used with relevant scheduler functions.
+	_nmspinning: int
+}
+
+impl scheduler {
+	// A worker thread should call this before polling for a corouitine.
+	fn enterspin(mut *self) {
+		atomic::Add(&self._nmspinning, 1, atomic::Relaxed)
+	}
+
+	// A worker thread should call this after polled a corouitine.
+	fn exitspin(mut *self) {
+		atomic::Add(&self._nmspinning, -1, atomic::Relaxed)
+	}
+
+	// Return count of the worker threads actively polling for a coroutine.
+	fn nmspinning(*self): int {
+		ret atomic::Load(&self._nmspinning, atomic::Relaxed)
+	}
+}
+
+// A global scheduler instance.
+// Just a declaration, compiler will not initialize it by default.
+let mut gsched = scheduler{}
+
+// Should be called when a corotuine enqueued to the global runnable queue.
+#disable nilptr
+fn onglobalrunqput() {
+	// There is not actively spinning worker thread.
+	// Try to wake or create worker thread, if an idle coroutine process avaiable.
+	if gsched.nmspinning() < 1 {
+		let mut rproc: &coroproc
+		ok, _ := gsched.idleprocs.dequeue(&rproc)
+		if ok {
+			// We found an idle coroutine process.
+			// Wake a thread or spawn a new one with the coroutine process.
+			threadMutex.lock()
+			spawnSchedThread(rproc)
+			ret
+		}
+	}
+}
+
+// Tries to put coroutine c to the runnable coroutine queue of the current thread.
+#disable nilptr boundary
+fn runqputl(mut &c: *&coro): (ok: bool) {
+	mut t := gett()
+	ok = t.proc.runq.push(*c)
+	if ok {
+		ret
+	}
+LoadBalance:
+	// Load balancing.
+	// Move half of the local queue to the global queue, if possible.
+	let mut batch: [coroprocRunQueueSize / 2]&coro
+	mut n := 0
+	for n < len(batch); n++ {
+		batch[n], ok = t.proc.runq.pop()
+		if !ok {
+			break
+		}
+	}
+	gsched.mu.lock()
+	mut i := 0
+	for i < n; i++ {
+		gsched.runq.push(batch[i])
+	}
+	gsched.mu.unlock()
+
+	// The queue is not full, now the enqueue must succeed.
+	ok = t.proc.runq.push(*c)
+	if !ok {
+		goto LoadBalance
+	}
+
+	onglobalrunqput()
+	ret
+}
+
+// Puts coroutine c to the runnable coroutine queue.
+// If next is true, runnext field of the current thread is prioritized.
+// Reports whether the coroutine c placesd to
+// the runnext of the current coroutine process.
+#disable nilptr
+fn runqput(mut &c: *&coro, next: bool) {
+	// We have a coroutine process on the current thread.
+	mut t := gett()
+	if t != nil && t.proc != nil {
+		if t.proc.runnext == nil {
+			// The runnext slot is empty, use it.
+			t.proc.runnext = *c
+			ret
+		} else if next && runqputl(&t.proc.runnext) {
+			// The runnext slot is not empty, but it is prioritized.
+			// So we tried moving it to local queue and done.
+			// Now we can use the runnext slot.
+			t.proc.runnext = *c
+			ret
+		}
+		// The runnext slot is full, try the local queue.
+		if runqputl(c) {
+			ret
+		}
+	}
+
+	// No other option, push it directly to the global queue.
+	gsched.mu.lock()
+	gsched.runq.push(*c)
+	gsched.mu.unlock()
+
+	onglobalrunqput()
+}
+
+// A coroutine scheduler routine.
+// Works like and event-loop, looks for a coroutine and execues it.
+#disable nilptr
+fn sched() {
+	sett(acquireThread())
+	threadMutex.unlock()
+	mut t := gett()
+Sched:
+	for {
+		// We lost our corotuine process.
+		// Try to get new one or break the loop and let thread eliminate itself.
+		if t.proc == nil {
+			deq, _ := gsched.idleprocs.dequeue(&t.proc)
+			if !deq {
+				break
+			}
+		}
+
+		// Poll a coroutine to run.
+		mut c := coropoll()
+		if c == nil {
+			break
+		}
+
+		// This coroutine is done, poll a new one.
+		if done(c) {
+			continue
+		}
+
+		t.coro = c
+		c.state |= coroRunning
+		resume(c)
+		setparkhandle(nil)
+		retiredrain() // Destroy the retire coroutines.
+		t.coro = nil
+	}
+	schedAgain := closeThread(t)
+	if schedAgain {
+		goto Sched
+	}
+}
+
+// Scheduler thread.
+//
+// This function handled like an anonymous function.
+// Therefore the compiler will add *unsafe argument to
+// the head of the argument list implicitly for anonymous function context.
+// The operating system thread API passes a pointer to the function when calling it.
+// In the final stage, this function's signature fits with the OS thread API.
+fn schedthread() {
+	sched()
+}
+
+#disable nilptr boundary
+fn schedinit() {
+	// Initialize the global scheduler instance.
+	gsched = scheduler{}
+	gsched.runq = new(coroq)
+
+	// We mutate gsched here but mutex is not need to be acquired.
+	// Becase we are in the program initialize state, no concurreny risk.
+
+	// Initialize corotuine processes.
+	maxprocs := u64(COMAXPROCS())
+	gsched.procs = make([]&coroproc, maxprocs)
+	gsched.idleprocs = mpmcQueue[&coroproc].new(maxprocs)
+	mut i := u64(0)
+	for i < maxprocs; i++ {
+		mut p := new(coroproc)
+		p.runq.init(coroprocRunQueueSize)
+		gsched.procs[i] = p
+		if i == 0 {
+			// Set proc of the main program thread.
+			threadHead.proc = p
+		} else {
+			gsched.idleprocs.enqueue(&p)
+		}
+	}
+}

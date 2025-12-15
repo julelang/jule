@@ -368,6 +368,7 @@ impl exprBuilder {
 			ret self.parseSmartPointerType()
 		| token::MUL:
 			ret self.parsePointerType()
+		| token::ASYNC
 		| token::FN:
 			ret self.parseFuncType()
 		| token::LBRACK:
@@ -681,7 +682,7 @@ impl exprBuilder {
 			self.err = false
 			fall
 		| token::LAND | token::AND | token::MUL | token::ARROW
-		| token::NAME | token::CHAN | token::MAP | token::FN | token::EXTERN | token::UNSAFE:
+		| token::NAME | token::CHAN | token::MAP | token::ASYNC | token::FN | token::EXTERN | token::UNSAFE:
 			isTyp = true
 			self.i--         // Back to ]
 			self.t = self.lt // Back to ]
@@ -898,6 +899,19 @@ impl exprBuilder {
 	fn parseFuncTypeOrLit(mut *self): &ast::Expr {
 		mut t := self.t
 		self.next()
+		mut isasync := false
+		if t.ID == token::ASYNC {
+			isasync = true
+			if self.eof() {
+				self.pushErr(t, "unexpected EOF; expected function type or literal")
+				ret nil
+			}
+			if self.t.ID != token::FN {
+				self.pushErr(t, "unexpected EOF; expected fn")
+				ret nil
+			}
+			self.next()
+		}
 		if self.eof() {
 			self.pushErr(t, "unexpected EOF; expected function type or literal")
 			ret nil
@@ -922,6 +936,7 @@ impl exprBuilder {
 		if f == nil {
 			ret nil
 		}
+		f.Async = isasync
 		if self.eof() || self.t.ID != token::LBRACE {
 			// Function type.
 			// No extra attention needed.
@@ -1027,6 +1042,7 @@ impl exprBuilder {
 			| token::SEP:
 				// Namespace.
 				ret self.parseNamespaceExpr(t)
+			| token::ASYNC
 			| token::FN:
 				// Function type.
 				mut f := self.parseFuncTypeOrLit()
@@ -1041,6 +1057,7 @@ impl exprBuilder {
 			|:
 				self.pushErr(t, "expected unsafe scope expression or unsafe function type/literal")
 			}
+		| token::ASYNC
 		| token::FN:
 			ret self.parseFuncTypeOrLit()
 		}
@@ -1143,6 +1160,20 @@ impl exprBuilder {
 					ret nil
 				}
 				match self.t.ID {
+				| token::AWAIT:
+					// Trailing await keyword.
+					// It should be call expression to an exceptional function.
+					mut f, isFunc := ast::Unparen(x).Data.(&ast::CallExpr)
+					if !isFunc {
+						self.pushErr(t, "await keyword expects a function call")
+						break
+					}
+					if f.Exception != nil {
+						self.pushErr(t, "exceptional must be handled after await")
+						break
+					}
+					f.Await = true
+					self.next()
 				| token::NAME:
 					x = self.parseSelector(x)
 				| token::LPAREN:

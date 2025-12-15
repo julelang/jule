@@ -140,8 +140,17 @@ impl identCoder {
 		identCoder.toOut(buf, s.Name, uintptr(s))
 	}
 
-	fn structureIns(mut &buf: *strings::Builder, s: &sema::StructIns) {
-		if s.Decl.Extern || len(s.Generics) == 0 {
+	fn structureIns(mut &buf: *strings::Builder, mut s: &sema::StructIns) {
+		if s.Decl.Extern {
+			identCoder.structure(buf, s.Decl)
+			ret
+		}
+		export := obj::FindDirective(s.Decl.Directives, directive::Export)
+		if export != nil {
+			buf.WriteStr(export.Args[0].Kind)!
+			ret
+		}
+		if len(s.Generics) == 0 {
 			identCoder.structure(buf, s.Decl)
 			ret
 		}

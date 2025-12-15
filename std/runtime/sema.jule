@@ -31,7 +31,6 @@ impl semaRoot {
 		// Reset them to default to avoid data misunderstanding.
 		p.next = nil
 		p.ticket = 0
-		p.parker.init()
 
 		mut t := self.tree
 		mut otru := (&semaNode)(nil)
@@ -141,7 +140,7 @@ fn cansemacquire(mut &sema: *u32): bool {
 // If lifo is true, queue waiter at the head of wait queue.
 // wg reports whether the semacqure called by a waitgroup.
 #disable nilptr
-fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
+async fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 	// Easy case.
 	if cansemacquire(sema) {
 		ret
@@ -155,8 +154,6 @@ fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 	//	(waiter descriptor is dequeued by signaler)
 	mut root := semtable_rootFor(sema)
 	mut p := new(parkerList)
-	p.parker = new(parker)
-	p.parker.init()
 	for {
 		root.lock.lock()
 		// Add ourselves to nwait to disable "easy case" in semrelease.
@@ -170,7 +167,8 @@ fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 		// Any semrelease after the cansemacquire knows we're waiting
 		// (we set nwait above), so go to sleep.
 		root.queue(sema, p, lifo)
-		park(uintptr(&root.lock), &(*p.parker), reason)
+		p.coro = gett().coro
+		park(p.coro, uintptr(&root.lock), reason).await
 		// Try to acquire semaphore before enqueue again.
 		if p.ticket != 0 || cansemacquire(sema) {
 			break
@@ -217,14 +215,7 @@ fn semrelease(mut &sema: *u32, handoff: bool) {
 		if handoff && cansemacquire(sema) {
 			p.ticket = 1
 		}
-		p.parker.unpark()
-		// If handoff is true, immediately yield the CPU with no analysis.
-		// This thread is not the expected owner of the next semacquire.
-		// So this thread doesn't matter for now, yield the CPU to increase
-		// the chances of semacquire of the dequeued thread.
-		if handoff && p.ticket == 1 {
-			osyield()
-		}
+		unpark(&p.coro)
 	}
 }
 
@@ -266,7 +257,7 @@ fn notifyListAdd(mut &l: *notifyList): u32 {
 // Waits for a notification. If one has been sent since
 // notifyListAdd was called, it returns immediately. Otherwise, it blocks.
 #disable nilptr
-fn notifyListWait(mut &l: *notifyList, t: u32) {
+async fn notifyListWait(mut &l: *notifyList, t: u32) {
 	// Return right away if this ticket has already been notified.
 	l.lock.lock()
 	if less(t, l.notify) {
@@ -275,9 +266,8 @@ fn notifyListWait(mut &l: *notifyList, t: u32) {
 	}
 
 	// Enqueue itself.
-	mut thread := acquireThread()
 	mut p := new(parkerList)
-	p.parker = thread.parker
+	p.coro = gett().coro
 	p.ticket = t
 	if l.tail == nil {
 		l.head = p
@@ -286,7 +276,7 @@ fn notifyListWait(mut &l: *notifyList, t: u32) {
 	}
 	l.tail = p
 
-	park2(&(*thread), uintptr(&l.lock), &(*p.parker), reasonCond)
+	park(p.coro, uintptr(&l.lock), reasonCond).await
 }
 
 // Notifies one entry in the list.
@@ -337,7 +327,7 @@ fn notifyListNotifyOne(mut &l: *notifyList) {
 			}
 			l.lock.unlock()
 			s.next = nil
-			s.parker.unpark()
+			unpark(&s.coro)
 			ret
 		}
 	}
@@ -373,7 +363,7 @@ fn notifyListNotifyAll(mut &l: *notifyList) {
 	for s != nil {
 		mut next := s.next
 		s.next = nil
-		s.parker.unpark()
+		unpark(&s.coro)
 		s = next
 	}
 }
