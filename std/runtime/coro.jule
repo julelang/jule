@@ -16,12 +16,6 @@ extern struct __jule_coroutineHandle {
 // Type alias for extern Jule coroutine.
 type coroutineHandle = extern.__jule_coroutineHandle
 
-// Coroutine handle pointer to capture park handles.
-extern let mut __jule_parkhandle: *coroutineHandle
-
-// Mutex address to release before yield for park.
-extern let mut __jule_parkmu: uintptr
-
 // Destroys all retired coroutine frames for the current worker thread.
 extern fn __jule_retireDrain()
 
@@ -112,12 +106,14 @@ fn close(mut c: &coro) {
 // This function will compile inlinely by the compiler.
 // The function must implement additional behavior before the park.
 // Compiler will park the coroutine at the placeholder comment.
+//
+// The first parameters must be the resume-coroutine,
+// where park handle will be written, and mutex address.
+// Following parameters may be change.
 #disable nilptr
 async fn park(mut rc: &coro, mu: uintptr, mut reason: u32) {
 	mut c := gett().coro
 	c.state |= coroSuspended | reason
-	setparkhandle(rc)
-	setparkmutex(mu)
 	// park(c)
 }
 
@@ -137,21 +133,6 @@ fn mutexunlock(mu: uintptr) {
 fn unpark(mut &c: *&coro) {
 	(*c).state &= ^reasonMask
 	runqput(c, true)
-}
-
-// Sets handle receiver for the park.
-#disable nilptr
-fn setparkhandle(mut c: &coro) {
-	if c != nil {
-		extern.__jule_parkhandle = &c.handle
-	} else {
-		extern.__jule_parkhandle = nil
-	}
-}
-
-// Sets mutex for the park.
-fn setparkmutex(mu: uintptr) {
-	extern.__jule_parkmu = mu
 }
 
 // Destroys all retired coroutine frames for the current worker thread.

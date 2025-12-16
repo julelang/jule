@@ -26,10 +26,10 @@
 #include <utility>
 
 #if defined(_MSC_VER)
-    // Required for _ReadWriteBarrier intrinsic.
-    #include <intrin.h>
+// Required for _ReadWriteBarrier intrinsic.
+#include <intrin.h>
 #else
-    #include <atomic>
+#include <atomic>
 #endif
 
 // Represents a scheduler worker thread in the Jule runtime.
@@ -140,14 +140,6 @@ static inline void __jule_compilerBarrier(void) noexcept
 // which have a compatible memory layout what this function expects.
 void __jule_mutexUnlock(__jule_Uintptr mu);
 
-// Pointer to a location where a parked coroutine handle should be written.
-// This is set by the scheduler immediately before awaiting __jule_Park.
-inline thread_local __jule_coroutineHandle *__jule_parkhandle = nullptr;
-// Pointer to a location where a acquired mutex should be released.
-// This will be released by the scheduler immediately before awaiting __jule_Park.
-// The mutex must be compatible with the `__jule_mutexUnlock`.
-inline thread_local __jule_Uintptr __jule_parkmu = 0;
-
 // Awaitable used to *park* the current coroutine.
 //
 // Semantics:
@@ -157,25 +149,15 @@ inline thread_local __jule_Uintptr __jule_parkmu = 0;
 // - Transfers control back to the scheduler
 struct __jule_Park
 {
+    __jule_coroutineHandle *out;
+    __jule_Uintptr mu;
+
     bool await_ready(void) const noexcept { return false; }
 
     __jule_coroutineHandle await_suspend(__jule_coroutineHandle h) const noexcept
     {
-        // Hand the coroutine handle to the scheduler.
-#ifndef NDEBUG
-        if (!__jule_parkhandle)
-        {
-            std::terminate();
-        }
-#endif
-
-        *__jule_parkhandle = h;
-        // Release the mutex.
-        if (__jule_parkmu != 0)
-        {
-            __jule_mutexUnlock(__jule_parkmu);
-        }
-        // Do not resume anything automatically.
+        *out = h;
+        __jule_mutexUnlock(mu);
         return std::noop_coroutine();
     }
 
