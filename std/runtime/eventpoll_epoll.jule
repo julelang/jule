@@ -1,0 +1,72 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+#build linux
+
+use "std/sys"
+
+extern use "<sys/epoll.h>"
+
+let mut epfd: i32 = -1
+
+fn eventpollinit() {
+	(epfd), mut errno := syscall_EpollCreate1(sys::EPOLL_CLOEXEC)
+	if errno != _NO_ERROR {
+		panic("runtime: epoll init failed")
+	}
+}
+
+// delay < 0: blocks indefinitely
+// delay == 0: does not block, just polls
+// delay > 0: block for up to that many nanoseconds
+fn eventpoll(delay: i64): coroq {
+	if epfd == -1 {
+		ret coroq{}
+	}
+	let mut wait: i32
+	if delay < 0 {
+		wait = -1
+	} else if delay == 0 {
+		wait = 0
+	} else if delay < 1e6 {
+		wait = 1
+	} else if delay < 1e15 {
+		// Convert delay to milliseconds, rounding *up* instead of truncating.
+		//
+		// This computation implements a ceiling division without using floating-point:
+		//	wait = ceil(delay / 1ms)
+		// which is equivalent to:
+		//	(delay + 1ms - 1) / 1ms
+		//
+		// Rounding up is critical:
+		//	- It guarantees that the timer never fires *earlier* than requested.
+		//	- Early wakeups break scheduler semantics and can cause subtle race bugs.
+		//
+		// Any delay smaller than 1ms is clamped to 1ms intentionally.
+		// This is NOT a loss of precision but a correctness requirement.
+		//
+		// Therefore, enforcing a minimum wait of 1ms preserves correctness,
+		// avoids spin loops, and aligns with real OS timer granularity.
+		wait = i32((delay + _Millisecond - 1) / _Millisecond)
+	} else {
+		// An arbitrary cap on how long to wait for a timer.
+		// 1e9 ms == ~11.5 days.
+		wait = 1e9
+	}
+	let mut events: [128]epollEvent
+retry:
+	_, errno := syscall_EpollWait(epfd, &events[0], i32(len(events)), wait)
+	if errno != _NO_ERROR {
+		if errno != sys::EINTR {
+			panic("runtime: eventpoll: epoll failed")
+		}
+		// If a timed sleep was interrupted, just return to
+		// recalculate how long we should sleep now.
+		if wait >= 0 {
+			ret coroq{}
+		}
+		goto retry
+	}
+	ret coroq{}
+}

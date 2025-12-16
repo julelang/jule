@@ -1,0 +1,80 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+#build darwin
+
+use "std/sys"
+
+extern use "<sys/event.h>"
+
+extern let kqueue: *unsafe
+extern let kevent: *unsafe
+
+struct keventt {
+	ident:  u64
+	filter: i16
+	flags:  u16
+	fflags: u32
+	data:   i64
+	udata:  *byte
+}
+
+let mut kq: i32 = -1
+
+fn eventpollinit() {
+	kq = sys::Addrcall[i32](uintptr(extern.kqueue))
+	if kq < 0 {
+		panic("runtime: kqueue init failed")
+	}
+	// close-on-exec
+	sys::Fcntl(int(kq), sys::F_SETFD, sys::FD_CLOEXEC) else {}
+}
+
+// delay < 0: blocks indefinitely
+// delay == 0: does not block, just polls
+// delay > 0: block for up to that many nanoseconds
+fn eventpoll(delay: i64): coroq {
+	if kq == -1 {
+		ret coroq{}
+	}
+	let mut tp: *sys::Timespec
+	let mut ts: sys::Timespec
+	if delay < 0 {
+		tp = nil
+	} else if delay == 0 {
+		tp = &ts
+	} else {
+		setNsec(&ts, delay)
+		if ts.Sec > 1e6 {
+			// Darwin returns EINVAL if the sleep time is too long.
+			ts.Sec = 1e6
+		}
+		tp = &ts
+	}
+	let mut events: [64]keventt
+retry:
+	kn := sys::Addrcall[i32](uintptr(extern.kevent), kq, (*unsafe)(nil), i32(0), &events[0], i32(len(events)), tp)
+	n := int(kn)
+	if n < 0 {
+		// Ignore the ETIMEDOUT error for now, but try to dive deep and
+		// figure out what really happened with n == ETIMEOUT,
+		// see Go's iissue https://go.dev/issue/59679 for details.
+		err := sys::GetLastErrno()
+		if err != sys::EINTR && err != sys::ETIMEDOUT {
+			panic("runtime: eventpoll: kevent failed")
+		}
+		// If a timed sleep was interrupted, just return to
+		// recalculate how long we should sleep now.
+		if delay > 0 {
+			ret coroq{}
+		}
+		goto retry
+	}
+	ret coroq{}
+}
+
+fn setNsec(mut &ts: *sys::Timespec, ns: i64) {
+	ts.Sec = ns / 1e9
+	ts.Nsec = ns % 1e9
+}

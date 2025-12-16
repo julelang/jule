@@ -22,35 +22,35 @@ fn coropoll(): (polled: &coro) {
 
 		// Local queue is empty, pop from the global queue.
 		gsched.mu.lock()
-		if gsched.runq.head == nil {
-			gsched.mu.unlock()
-			goto ExitSpin
-		}
-		let mut batch: [coroprocRunQueueSize]&coro
-		mut n := 0
-		for n < coroprocRunQueueSize; n++ {
-			if gsched.runq.head == nil {
-				break
-			}
-			batch[n] = gsched.runq.head.coro
-			gsched.runq.remove(gsched.runq.head)
-		}
-		gsched.mu.unlock()
-		if n > 0 {
-			polled = batch[0]
-			mut i := 1
-			for i < n; i++ {
-				ok = t.proc.runq.push(batch[i])
-				if !ok {
-					panic("runtime: coroutine scheduler queue corruption")
+		if gsched.runq.head != nil {
+			let mut batch: [coroprocRunQueueSize]&coro
+			mut n := 0
+			for n < coroprocRunQueueSize; n++ {
+				if gsched.runq.head == nil {
+					break
 				}
+				batch[n] = gsched.runq.head.coro
+				gsched.runq.remove(gsched.runq.head)
 			}
-			goto ExitSpin
+			gsched.mu.unlock()
+			if n > 0 {
+				polled = batch[0]
+				mut i := 1
+				for i < n; i++ {
+					ok = t.proc.runq.push(batch[i])
+					if !ok {
+						panic("runtime: coroutine scheduler queue corruption")
+					}
+				}
+				goto ExitSpin
+			}
+		} else {
+			gsched.mu.unlock()
 		}
 
 		// Try to steal from a coroutine process.
 		const StealTries = 4
-		n = 0
+		mut n := 0
 		for n < StealTries; n++ {
 			idx := absint(int(rand() % u64(len(gsched.procs))))
 			mut proc := gsched.procs[idx]
@@ -60,6 +60,61 @@ fn coropoll(): (polled: &coro) {
 			polled, ok = proc.runq.steal()
 			if ok {
 				goto ExitSpin
+			}
+		}
+
+		// Timer exist try eventpoll.
+		if t.proc.timers.peek() != nil {
+			mut delay := i64(0)
+			mut now := nanotime()
+			// Check for already expired timers.
+			n = 0
+			for n < coroprocRunQueueSize; n++ {
+				mut timer := t.proc.timers.peek()
+				if timer == nil || timer.when > now {
+					break
+				}
+				mut coro := t.proc.timers.pop().coro
+				if polled == nil {
+					polled = coro
+				} else {
+					ok = t.proc.runq.push(coro)
+					if !ok {
+						panic("runtime: coroutine scheduler queue corruption")
+					}
+				}
+			}
+			// If there is already a polled expired timer, do not eventpoll.
+			// Return immediately.
+			if polled != nil {
+				goto ExitSpin
+			}
+			soonest := t.proc.timers.peek()
+			delay = soonest.when - now
+			if delay <= 0 {
+				panic("runtime: inconsistent timer state")
+			}
+			toRun := eventpoll(delay)
+			if toRun.len > 0 {
+				panic("runtime: unexpected eventpoll result")
+			}
+			// After eventpoll, look for expired timers.
+			now = nanotime()
+			n = 0
+			for n < coroprocRunQueueSize; n++ {
+				mut timer := t.proc.timers.peek()
+				if timer == nil || timer.when > now {
+					break
+				}
+				mut coro := t.proc.timers.pop().coro
+				if polled == nil {
+					polled = coro
+				} else {
+					ok = t.proc.runq.push(coro)
+					if !ok {
+						panic("runtime: coroutine scheduler queue corruption")
+					}
+				}
 			}
 		}
 	}

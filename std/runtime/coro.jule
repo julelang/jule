@@ -35,9 +35,10 @@ const (
 	reasonCond                    // Condition variable.
 	reasonSelect                  // Header group specifier of select statement.
 	reasonSelectEmpty             // Empty select statement state. Use like reasonSelect&reasonSelectEmpty.
+	reasonSleep                   // Sleep.
 
 	reasonMask = reasonRecv | reasonSend | reasonWaitGroup | reasonMutex |
-		reasonCond | reasonSelect | reasonSelectEmpty
+		reasonCond | reasonSelect | reasonSelectEmpty | reasonSleep
 )
 
 // A Jule coroutine.
@@ -133,6 +134,17 @@ fn mutexunlock(mu: uintptr) {
 fn unpark(mut &c: *&coro) {
 	(*c).state &= ^reasonMask
 	runqput(c, true)
+}
+
+// Puts the current coroutine sleep for duration dur.
+#disable nilptr
+async fn sleep(dur: sleepDuration) {
+	mut t := gett()
+	mut timer := new(timer)
+	timer.coro = t.coro
+	timer.when = nanotime() + dur
+	t.proc.timers.push(timer)
+	park(t.coro, 0, reasonSleep).await
 }
 
 // Destroys all retired coroutine frames for the current worker thread.

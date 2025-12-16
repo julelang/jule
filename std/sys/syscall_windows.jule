@@ -77,6 +77,7 @@ extern unsafe fn GetFileAttributesW(name: *c::Wchar): extern.DWORD
 extern unsafe fn SetHandleInformation(hObject: extern.HANDLE, dwMask: extern.DWORD, dwFlags: extern.DWORD): bool
 extern fn GetCurrentProcess(): extern.HANDLE
 extern unsafe fn DuplicateHandle(hSourceProcessHandle: extern.HANDLE, hSourceHandle: extern.HANDLE, hTargetProcessHandle: extern.HANDLE, lpTargetHandle: *extern.HANDLE, dwDesiredAccess: extern.DWORD, bInheritHandle: bool, dwOptions: extern.DWORD): bool
+extern unsafe fn QueryPerformanceFrequency(mut counter: *extern.LARGE_INTEGER): bool
 extern unsafe fn QueryPerformanceCounter(mut counter: *extern.LARGE_INTEGER): bool
 extern unsafe fn GetSystemTimeAsFileTime(mut ft: *extern.FILETIME)
 
@@ -475,6 +476,14 @@ fn ExitProcess(exitcode: u32) {
 
 fn Exit(code: int) {
 	ExitProcess(u32(code))
+}
+
+fn QueryPerformanceFrequency()!: i64 {
+	mut counter := i64(0)
+	if unsafe { !extern.QueryPerformanceFrequency((*extern.LARGE_INTEGER)(&counter)) } {
+		panic("runtime: nanotime failed")
+	}
+	ret counter
 }
 
 fn QueryPerformanceCounter()!: i64 {

@@ -15,8 +15,17 @@ const (
 
 // A coroutine process.
 struct coroproc {
+	// Prioritized coroutine, should run at next scheduler loop.
 	runnext: &coro
-	runq:    deque
+
+	// List of the runnable coroutines.
+	runq: deque
+
+	// Local timers of the coroutine process.
+	timers: timerheap
+
+	//Ttime of last eventpoll.
+	lastpoll: i64
 }
 
 // A scheduler envrionment.
@@ -165,6 +174,15 @@ Sched:
 		// Poll a coroutine to run.
 		mut c := coropoll()
 		if c == nil {
+			// There are timers in this worker, clean them.
+			// Normally, eventpoll returns a timer if exist.
+			// Somehow, a spurious wakeup occured.
+			if t.proc.timers.len() > 0 {
+				continue
+			}
+			// No coroutine to run, no timer.
+			// Nothing to do, break the loop.
+			// Park or destroy the worker thread.
 			break
 		}
 
