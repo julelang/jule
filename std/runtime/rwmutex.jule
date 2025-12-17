@@ -1,0 +1,149 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Copyright 2023 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/runtime/atomic"
+
+const rwmutexMaxReaders = 1 << 30
+
+// A rwmutex is a reader/writer mutual exclusion lock.
+// The lock can be held by an arbitrary number of readers or a single writer.
+// The zero value for a rwmutex is an unlocked mutex.
+//
+// A rwmutex must not be copied after first use.
+//
+// If any thread calls [rwmutex.lock] while the lock is already held by
+// one or more readers, concurrent calls to [rwmutex.rLock] will block until
+// the writer has acquired (and released) the lock, to ensure that
+// the lock eventually becomes available to the writer.
+// Note that this prohibits recursive read-locking.
+// A [rwmutex.rLock] cannot be upgraded into a [rwmutex.lock],
+// nor can a [rwmutex.lock] be downgraded into a [rwmutex.rLock].
+//
+// The n'th call to [rwmutex.unlock] “synchronizes before” the m'th call to lock
+// for any n < m, just as for [mutex]. For any call to rLock,
+// there exists an n such that the n'th call to Unlock “synchronizes before” that
+// call to rlock, and the corresponding call to [rwmutex.rUnlock] “synchronizes before”
+// the n+1'th call to lock.
+//
+// It is designed for use where asynchronous code is not available or needs to
+// remain an internal detail. It is runtime-specific.
+//
+// Derived from the [sync::RWMutex] implementation.
+// Stay up-to-date.
+struct rwmutex {
+	w:               mutex // held if there are pending writers
+	mut writerSem:   u32   // semaphore for writers to wait for completing readers
+	mut readerSem:   u32   // semaphore for readers to wait for completing writers
+	mut readerCount: i32   // number of pending readers
+	mut readerWait:  i32   // number of departing readers
+}
+
+impl rwmutex {
+	// Locks for reading.
+	//
+	// It should not be used for recursive read locking; a blocked Lock
+	// call excludes new readers from acquiring the lock. See the
+	// documentation on the [rwmutex] type.
+	fn rLock(*self) {
+		if atomic::Add(&self.readerCount, 1, atomic::AcqRel) < 0 {
+			// A writer is pending, wait for it.
+			tsemacquire(&self.readerSem, false, reasonMutex)
+		}
+	}
+
+	// Tries to lock for reading and reports whether it succeeded.
+	//
+	// Note that while correct uses of tryRLock do exist, they are rare,
+	// and use of tryRLock is often a sign of a deeper problem
+	// in a particular use of mutexes.
+	fn tryRLock(*self): bool {
+		for {
+			c := atomic::Load(&self.readerCount, atomic::Acquire)
+			if c < 0 {
+				ret false
+			}
+			if atomic::CompareAndSwap(&self.readerCount, c, c+1, atomic::AcqRel, atomic::Acquire) {
+				ret true
+			}
+		}
+	}
+
+	// rUnlock undoes a single [rwmutex.rLock] call;
+	// it does not affect other simultaneous readers.
+	// It is a run-time error if it is not locked for reading
+	// on entry to rUnlock.
+	fn rUnlock(*self) {
+		r := atomic::Add(&self.readerCount, -1, atomic::AcqRel)
+		if r < 0 {
+			// Outlined slow-path to allow the fast-path to be inlined
+			self.rUnlockSlow(r)
+		}
+	}
+
+	fn rUnlockSlow(*self, r: i32) {
+		if r+1 == 0 || r+1 == -rwmutexMaxReaders {
+			panic("std/sync: RUnlock of unlocked RWMutex")
+		}
+		// A writer is pending.
+		if atomic::Add(&self.readerWait, -1, atomic::AcqRel) == 0 {
+			// The last reader unblocks the writer.
+			tsemrelease(&self.writerSem, false)
+		}
+	}
+
+	// Locks for writing.
+	// If the lock is already locked for reading or writing,
+	// Lock blocks until the lock is available.
+	fn lock(*self) {
+		// First, resolve competition with other writers.
+		self.w.lock()
+		// Announce to readers there is a pending writer.
+		r := atomic::Add(&self.readerCount, -rwmutexMaxReaders, atomic::AcqRel) + rwmutexMaxReaders
+		// Wait for active readers.
+		if r != 0 && atomic::Add(&self.readerWait, r, atomic::AcqRel) != 0 {
+			tsemacquire(&self.writerSem, false, reasonMutex)
+		}
+	}
+
+	// Tries to lock for writing and reports whether it succeeded.
+	//
+	// Note that while correct uses of tryLock do exist, they are rare,
+	// and use of tryLock is often a sign of a deeper problem
+	// in a particular use of mutexes.
+	fn tryLock(*self): bool {
+		if !self.w.tryLock() {
+			ret false
+		}
+		if !atomic::CompareAndSwap(&self.readerCount, 0, -rwmutexMaxReaders, atomic::AcqRel, atomic::Acquire) {
+			self.w.unlock()
+			ret false
+		}
+		ret true
+	}
+
+	// Unlocks for writing. It is a run-time error if it is
+	// not locked for writing on entry to unlock.
+	//
+	// As with mutexes, a locked [rwmutex] is not associated with a particular
+	// thread. One thread may [rwmutex.rLock] ([rwmutex.lock]) a rwmutex and then
+	// arrange for another thread to [rwmutex.rUnlock] ([rwmutex.unlock]) it.
+	fn unlock(*self) {
+		// Announce to readers there is no active writer.
+		r := atomic::Add(&self.readerCount, rwmutexMaxReaders, atomic::AcqRel)
+		if r >= rwmutexMaxReaders {
+			panic("std/sync: unlock of unlocked rwmutex")
+		}
+		// Unblock blocked readers, if any.
+		mut i := 0
+		for i < int(r); i++ {
+			tsemrelease(&self.readerSem, false)
+		}
+		// Allow other writers to proceed.
+		self.w.unlock()
+	}
+}

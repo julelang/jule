@@ -14,7 +14,7 @@ use "std/sys"
 let envOnce = sync::Once{}
 
 // Guards env and envs.
-let envLock = sync::RWMutex{}
+let envLock = runtime::rwmutex{}
 
 // Maps from an environment variable to its first occurrence in envs.
 let mut env: map[str]int = nil
@@ -53,8 +53,8 @@ fn lookupenv(key: str): (value: str, found: bool) {
 		ret "", false
 	}
 
-	envLock.RLock()
-	defer { envLock.RUnlock() }
+	envLock.rLock()
+	defer { envLock.rUnlock() }
 
 	mut i, ok := env[key]
 	if !ok {
@@ -82,8 +82,8 @@ fn setenv(key: str, value: str)! {
 		}
 	}
 
-	envLock.Lock()
-	unsafe defer { envLock.Unlock() }
+	envLock.lock()
+	unsafe defer { envLock.unlock() }
 
 	i, ok := env[key]
 	kv := key + "=" + value
@@ -98,13 +98,13 @@ fn setenv(key: str, value: str)! {
 
 fn environ(): []str {
 	envOnce.Do(copyenv)
-	envLock.RLock()
+	envLock.rLock()
 	mut a := make([]str, 0, len(envs))
 	for _, env in envs {
 		if env != "" {
 			a = append(a, env)
 		}
 	}
-	envLock.RUnlock()
+	envLock.rUnlock()
 	ret a
 }

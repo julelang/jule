@@ -565,24 +565,24 @@ struct field {
 
 // Field cache data for structure types and associated RWMutex.
 let mut fieldMap = map[uintptr][]&field{}
-let mut fieldMapLock = sync::RWMutex{}
+let mut fieldMapLock = runtime::rwmutex{}
 
 // Returns field cache data for the structure type T.
 // If the structure is not cached yet, it will cache it.
 fn cachedFields[T](): []&field {
 	const t = comptime::TypeOf(T)
-	fieldMapLock.RLock()
+	fieldMapLock.rLock()
 	mut cache, mut exist := fieldMap[t.Hash()]
-	fieldMapLock.RUnlock()
+	fieldMapLock.rUnlock()
 	if exist {
 		ret cache
 	}
 	// There is no cache for type type T, cache it.
-	fieldMapLock.Lock()
+	fieldMapLock.lock()
 	// Last check with write lock before cache.
 	cache, exist := fieldMap[t.Hash()]
 	if exist {
-		fieldMapLock.Unlock()
+		fieldMapLock.unlock()
 		ret cache
 	}
 	p := unsafe { (*T)(0) }
@@ -623,7 +623,7 @@ fn cachedFields[T](): []&field {
 		}
 	}
 	fieldMap[t.Hash()] = cache
-	fieldMapLock.Unlock()
+	fieldMapLock.unlock()
 	ret cache
 }
 
