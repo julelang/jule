@@ -221,7 +221,7 @@ fn semrelease(mut &sema: *u32, handoff: bool) {
 
 // Same as semacquire, but based-on thread parking instead of coroutine parking.
 #disable nilptr
-fn tsemacquire(mut &root: *semaRoot, mut &sema: *u32, lifo: bool, reason: u32) {
+fn tsemacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 	// Easy case.
 	if cansemacquire(sema) {
 		ret
@@ -233,6 +233,7 @@ fn tsemacquire(mut &root: *semaRoot, mut &sema: *u32, lifo: bool, reason: u32) {
 	//	enqueue itself as a waiter
 	//	sleep
 	//	(waiter descriptor is dequeued by signaler)
+	mut root := semtable_rootFor(sema)
 	mut p := new(parkerList)
 	p.parker = new(parker)
 	p.parker.init()
@@ -262,7 +263,8 @@ fn tsemacquire(mut &root: *semaRoot, mut &sema: *u32, lifo: bool, reason: u32) {
 
 // Same as semrelease, but based-on thread parking instead of coroutine parking.
 #disable nilptr
-fn tsemrelease(mut &root: *semaRoot, mut &sema: *u32, handoff: bool) {
+fn tsemrelease(mut &sema: *u32, handoff: bool) {
+	mut root := semtable_rootFor(sema)
 	atomic::Add(sema, 1, atomic::AcqRel)
 
 	// Easy case: no waiters?

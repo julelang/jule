@@ -38,7 +38,7 @@ const (
 	mutexWaiterShift
 )
 
-const mutexSize = 4 + 4 + semaRootSize // i32 + u32 + uintptr
+const mutexSize = 4 + 4 // i32 + u32
 
 // muxtex is a primitive used to protect memory in
 // multi-threading situations such as concurrent access.
@@ -57,7 +57,6 @@ const mutexSize = 4 + 4 + semaRootSize // i32 + u32 + uintptr
 struct mutex {
 	mut state: i32
 	mut sema:  u32
-	mut root:  semaRoot
 }
 
 impl mutex {
@@ -125,7 +124,7 @@ impl mutex {
 				if waitStartTime == 0 {
 					waitStartTime = nanotime()
 				}
-				tsemacquire(&self.root, &self.sema, queueLifo, reasonMutex)
+				tsemacquire(&self.sema, queueLifo, reasonMutex)
 				starving = starving || nanotime()-waitStartTime > starvationThresholdNs
 				old = self.state
 				if old&mutexStarving != 0 {
@@ -204,7 +203,7 @@ impl mutex {
 				new = (old - 1<<mutexWaiterShift) | mutexWoken
 				{
 					if atomic::CompareAndSwap(&self.state, old, new, atomic::AcqRel, atomic::Relaxed) {
-						tsemrelease(&self.root, &self.sema, false)
+						tsemrelease(&self.sema, false)
 						ret
 					}
 				}
@@ -216,7 +215,7 @@ impl mutex {
 			// Note: mutexLocked is not set, the waiter will set it after wakeup.
 			// But mutex is still considered locked if mutexStarving is set,
 			// so new coming thread will not acquire it.
-			tsemrelease(&self.root, &self.sema, true)
+			tsemrelease(&self.sema, true)
 		}
 	}
 }
