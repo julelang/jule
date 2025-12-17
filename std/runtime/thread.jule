@@ -63,6 +63,7 @@ let threadMutex = mutex{}
 let mut threadHead = (&thread)(nil)
 let mut threadTail = (&thread)(nil)
 let mut cachedCount = 0 // Count of cached and parked coroutine scheduler threads.
+let mut workerCount = 0 // Count of worker threads at least runs or able to run a coroutine.
 
 // Stores total number of logical threads.
 let mut numcpu = 0
@@ -132,6 +133,10 @@ fn closeThread(mut t: &thread): (schedAgain: bool) {
 	}
 
 	threadMutex.lock()
+	workerCount--
+	if workerCount <= 0 {
+		panic("runtime: all coroutines are asleep - deadlock!")
+	}
 	// We already cached a lot scheduler thread.
 	// Do not cache it, but keeps it if it is the main thread of the program.
 	if t != threadHead && cachedCount > maxCachedWorkers {
@@ -192,6 +197,7 @@ fn getThread(): &thread {
 // The thread-mutex must be acquired before the call, it will release before return.
 #disable nilptr
 fn spawnSchedThread(mut proc: &coroproc) {
+	workerCount++
 	// We have a cached scheduler thread.
 	// Notify it.
 	if cachedCount > 0 {
@@ -209,4 +215,6 @@ fn spawnSchedThread(mut proc: &coroproc) {
 fn threadinit() {
 	// Platform specific initialization.
 	_threadinit()
+
+	workerCount = 1 // The main program thread.
 }
