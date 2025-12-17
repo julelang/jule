@@ -5,7 +5,7 @@
 use "std/internal/conv"
 use "std/math"
 use "std/math/bits"
-use "std/sync"
+use "std/runtime"
 
 const digits = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -245,7 +245,7 @@ struct divisor {
 }
 
 struct cacheBase10 {
-	mtx:   sync::Mutex
+	mtx:   runtime::mutex
 	table: [64]divisor // cached divisors for base 10
 }
 
@@ -278,7 +278,7 @@ fn divisors(m: int, b: Word, ndigits: int, bb: Word): []divisor {
 	// reuse and extend existing table of divisors or create new table as appropriate
 	mut table := []divisor(nil) // for b == 10, table overlaps with cache10.table
 	if b == 10 {
-		cache10.mtx.Lock()
+		cache10.mtx.lock()
 		table = cache10.table[0:k] // reuse old table for this conversion
 	} else {
 		table = make([]divisor, k) // create new table for this conversion
@@ -317,7 +317,7 @@ fn divisors(m: int, b: Word, ndigits: int, bb: Word): []divisor {
 	}
 
 	if b == 10 {
-		cache10.mtx.Unlock()
+		cache10.mtx.unlock()
 	}
 
 	ret table
