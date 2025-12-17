@@ -35,6 +35,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ====================================================
 
+use "std/runtime"
 use "std/sync/atomic"
 
 // Once is an object that will perform exactly one action.
@@ -46,7 +47,7 @@ struct Once {
 	// Placing done first allows more compact instructions on some architectures (amd64/i386),
 	// and fewer instructions (to calculate offset) on other architectures.
 	mut done: atomic::U8
-	mut m:    Mutex
+	mut m:    runtime::fmutex
 }
 
 impl Once {
@@ -75,7 +76,7 @@ impl Once {
 	//
 	// If f panics, Do considers it to have returned; future calls of Do return
 	// without calling f.
-	async fn Do(*self, f: async fn()) {
+	fn Do(*self, f: fn()) {
 		// Note: Here is an incorrect implementation of Do:
 		//
 		//	if self.done.CompareAndSwap(0, 1, atomic::SeqCst, atomic::SeqCst) {
@@ -92,16 +93,16 @@ impl Once {
 
 		if self.done.Load(atomic::Acquire) == 0 {
 			// Outlined slow-path to allow inlining of the fast-path.
-			self.doSlow(f).await
+			self.doSlow(f)
 		}
 	}
 
-	async fn doSlow(*self, f: async fn()) {
-		self.m.Lock().await
+	fn doSlow(*self, f: fn()) {
+		self.m.lock()
 		if self.done.Load(atomic::Acquire) == 0 {
-			f().await
+			f()
 			self.done.Store(1, atomic::Release)
 		}
-		self.m.Unlock()
+		self.m.unlock()
 	}
 }
