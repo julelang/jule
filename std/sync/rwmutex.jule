@@ -42,10 +42,10 @@ impl RWMutex {
 	// It should not be used for recursive read locking; a blocked Lock
 	// call excludes new readers from acquiring the lock. See the
 	// documentation on the [RWMutex] type.
-	fn RLock(*self) {
+	async fn RLock(*self) {
 		if self.readerCount.Add(1, atomic::AcqRel) < 0 {
 			// A writer is pending, wait for it.
-			runtime::semacquire(&self.readerSem, false, runtime::reasonMutex)
+			runtime::semacquire(&self.readerSem, false, runtime::reasonMutex).await
 		}
 	}
 
@@ -92,14 +92,14 @@ impl RWMutex {
 	// Locks for writing.
 	// If the lock is already locked for reading or writing,
 	// Lock blocks until the lock is available.
-	fn Lock(*self) {
+	async fn Lock(*self) {
 		// First, resolve competition with other writers.
-		self.w.Lock()
+		self.w.Lock().await
 		// Announce to readers there is a pending writer.
 		r := self.readerCount.Add(-rwmutexMaxReaders, atomic::AcqRel) + rwmutexMaxReaders
 		// Wait for active readers.
 		if r != 0 && self.readerWait.Add(r, atomic::AcqRel) != 0 {
-			runtime::semacquire(&self.writerSem, false, runtime::reasonMutex)
+			runtime::semacquire(&self.writerSem, false, runtime::reasonMutex).await
 		}
 	}
 
@@ -150,6 +150,6 @@ impl RWMutex {
 type rlocker: &RWMutex
 
 impl Locker for rlocker {
-	fn Lock(*self) { (&RWMutex)(*self).RLock() }
+	async fn Lock(*self) { (&RWMutex)(*self).RLock().await }
 	fn Unlock(*self) { (&RWMutex)(*self).RUnlock() }
 }

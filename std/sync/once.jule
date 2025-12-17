@@ -75,7 +75,7 @@ impl Once {
 	//
 	// If f panics, Do considers it to have returned; future calls of Do return
 	// without calling f.
-	fn Do(*self, f: fn()) {
+	async fn Do(*self, f: async fn()) {
 		// Note: Here is an incorrect implementation of Do:
 		//
 		//	if self.done.CompareAndSwap(0, 1, atomic::SeqCst, atomic::SeqCst) {
@@ -88,18 +88,18 @@ impl Once {
 		// call f, and the second would return immediately, without
 		// waiting for the first's call to f to complete.
 		// This is why the slow path falls back to a mutex, and why
-		// the self.done.store must be delayed until after f returns.
+		// the self.done.Store must be delayed until after f returns.
 
 		if self.done.Load(atomic::Acquire) == 0 {
 			// Outlined slow-path to allow inlining of the fast-path.
-			self.doSlow(f)
+			self.doSlow(f).await
 		}
 	}
 
-	fn doSlow(*self, f: fn()) {
-		self.m.Lock()
+	async fn doSlow(*self, f: async fn()) {
+		self.m.Lock().await
 		if self.done.Load(atomic::Acquire) == 0 {
-			f()
+			f().await
 			self.done.Store(1, atomic::Release)
 		}
 		self.m.Unlock()

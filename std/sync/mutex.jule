@@ -7,7 +7,7 @@ use "std/sync/atomic"
 
 // Represents an object that can be locked and unlocked.
 trait Locker {
-	fn Lock(*self)
+	async fn Lock(*self)
 	fn Unlock(*self)
 }
 
@@ -70,16 +70,16 @@ impl Mutex {
 	// Locks mutex.
 	// If the lock is already in use, the calling thread
 	// blocks until the mutex is available.
-	fn Lock(*self) {
+	async fn Lock(*self) {
 		// Fast path: grab unlocked mutex.
 		if atomic::CompareAndSwap(&self.state, 0, mutexLocked, atomic::Acquire, atomic::Relaxed) {
 			ret
 		}
 		// Slow path (outlined so that the fast path may be inlined).
-		self.lockSlow()
+		self.lockSlow().await
 	}
 
-	fn lockSlow(*self) {
+	async fn lockSlow(*self) {
 		let mut waitStartTime: i64
 		mut starving := false
 		mut awoke := false
@@ -131,7 +131,7 @@ impl Mutex {
 				if waitStartTime == 0 {
 					waitStartTime = runtime::nanotime()
 				}
-				runtime::semacquire(&self.sema, queueLifo, runtime::reasonMutex)
+				runtime::semacquire(&self.sema, queueLifo, runtime::reasonMutex).await
 				starving = starving || runtime::nanotime()-waitStartTime > starvationThresholdNs
 				old = self.state
 				if old&mutexStarving != 0 {

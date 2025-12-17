@@ -27,8 +27,8 @@ impl Cond {
 	}
 
 	// Locks the locker.
-	fn Lock(*self) {
-		self.l.Lock()
+	async fn Lock(*self) {
+		self.l.Lock().await
 	}
 
 	// Unlocks the locker.
@@ -51,11 +51,11 @@ impl Cond {
 	//	}
 	//	... make use of condition ...
 	//	self.Unlock()
-	fn Wait(*self) {
+	async fn Wait(*self) {
 		t := runtime::notifyListAdd(&self.notify)
 		self.l.Unlock()
-		runtime::notifyListWait(&self.notify, t)
-		self.l.Lock()
+		runtime::notifyListWait(&self.notify, t).await
+		self.l.Lock().await
 	}
 
 	// Wakes one thread waiting on the condition, if there is any.
