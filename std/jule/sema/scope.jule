@@ -430,6 +430,12 @@ impl scopeChecker {
 		ret false
 	}
 
+	// Reports whether scope is unsafe.
+	fn isAsync(mut &self): bool {
+		r := self.getRoot()
+		ret r.owner != nil && r.owner.Decl != nil && r.owner.Decl.Async
+	}
+
 	// Reports scope is root.
 	// Accepts anonymous functions as root.
 	fn isRoot(*self): bool {
@@ -2115,6 +2121,9 @@ impl scopeChecker {
 	}
 
 	fn checkSelect(mut &self, mut sc: &ast::Select) {
+		if !self.isAsync() {
+			self.s.pushErr(sc.Token, "`select` statements can only be used within an `async` scope")
+		}
 		mut slct := &Select{
 			Scope: self.scope,
 		}
