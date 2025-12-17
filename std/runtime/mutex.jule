@@ -4,67 +4,229 @@
 
 use "std/internal/runtime/atomic"
 
-// Ideal threshold for the wait/sleep time. Supports every possible platform.
-// For sleep functions, on most UNIX-like systems we can sleep less than 1ms,
-// but Windows supports minimum 1ms sleep. So, the threshold is 1ms to be portable.
-// It also may be used as threshold for spinlocks before sleeping or fall in starvation mode.
-const pauseThreshold = 1e6
+// Mutex fairness.
+//
+// Mutex can be in 2 modes of operations: normal and starvation.
+// In normal mode waiters are queued in FIFO order, but a woken up waiter
+// does not own the mutex and competes with new arriving threads over
+// the ownership. New arriving threads have an advantage - they are
+// already running on CPU and there can be lots of them, so a woken up
+// waiter has good chances of losing. In such case it is queued at front
+// of the wait queue. If a waiter fails to acquire the mutex for more than 1ms,
+// it switches mutex to the starvation mode.
+//
+// In starvation mode ownership of the mutex is directly handed off from
+// the unlocking thread to the waiter at the front of the queue.
+// New arriving threads don't try to acquire the mutex even if it appears
+// to be unlocked, and don't try to spin. Instead they queue themselves at
+// the tail of the wait queue.
+//
+// If a waiter receives ownership of the mutex and sees that either
+// (1) it is the last waiter in the queue, or (2) it waited for less than 1ms,
+// it switches mutex back to normal operation mode.
+//
+// Normal mode has considerably better performance as a thread can acquire
+// a mutex several times in a row even if there are blocked waiters.
+// Starvation mode is important to prevent pathological cases of tail latency.
+const starvationThresholdNs = 1e6
 
-const fmutexSize = 4 // i32
+// Mutex state flags.
+const (
+	mutexLocked = 1 << iota
+	mutexWoken
+	mutexStarving
+	mutexWaiterShift
+)
 
-// Simple mutex implementation for elementary purposes.
-// Suitable for quick Lock/Unlock arenas.
-// It may be insufficient in long-term locks due to lack of thread parking integration.
-struct fmutex {
+const mutexSize = 4 + 4 + semaRootSize // i32 + u32 + uintptr
+
+// muxtex is a primitive used to protect memory in
+// multi-threading situations such as concurrent access.
+//
+// Mutextes are uses internal mutability and internal states.
+// Locking, unlocking and etc is not mutable operations.
+// But there is no internal mutable memory, so mutexes are not use shared memory.
+// Therefore, for correct use, a mutex instance should not be copied after first use.
+// Otherwise internal state will be copied and not mutated by other instances.
+//
+// It is designed for use where asynchronous code is not available or needs to
+// remain an internal detail. It is runtime-specific.
+//
+// Derived from the [sync::Mutex] implementation.
+// Stay up-to-date.
+struct mutex {
 	mut state: i32
+	mut sema:  u32
+	mut root:  semaRoot
 }
 
-impl fmutex {
-	#disable nilptr
+impl mutex {
+	// Locks mutex.
+	// If the lock is already in use, the calling thread
+	// blocks until the mutex is available.
 	fn lock(*self) {
-		mut waitstart := i64(0)
+		// Fast path: grab unlocked mutex.
+		if atomic::CompareAndSwap(&self.state, 0, mutexLocked, atomic::Acquire, atomic::Relaxed) {
+			ret
+		}
+		// Slow path (outlined so that the fast path may be inlined).
+		self.lockSlow()
+	}
+
+	fn lockSlow(*self) {
+		let mut waitStartTime: i64
+		mut starving := false
+		mut awoke := false
+		mut iter := 1
+		mut old := self.state
 		for {
-			if self.tryLock() {
-				ret
-			}
-			if waitstart == 0 {
-				waitstart = nanotime()
+			// Don't spin in starvation mode, ownership is handed off to waiters
+			// so we won't be able to acquire the mutex anyway.
+			if old&(mutexLocked|mutexStarving) == mutexLocked && iter < 1<<9 {
+				// Active spinning makes sense.
+				// Try to set mutexWoken flag to inform Unlock
+				// to not wake other blocked threads.
+				if !awoke && old&mutexWoken == 0 && old>>mutexWaiterShift != 0 {
+					awoke = atomic::CompareAndSwap(&self.state, old, old|mutexWoken, atomic::AcqRel, atomic::Relaxed)
+				}
+				iter <<= 1
+				old = self.state
 				continue
 			}
-			// If mutex tries more than pauseThreshold, try to yield CPU.
-			if nanotime()-waitstart > pauseThreshold {
-				// Yield the CPU if possible, it may return immediately for the same thread.
-				// However, this part of thread management belongs to the operating system.
-				osyield()
-				waitstart = nanotime()
+			mut new := old
+			// Don't try to acquire starving mutex, new arriving threads must queue.
+			if old&mutexStarving == 0 {
+				new |= mutexLocked
+			}
+			if old&(mutexLocked|mutexStarving) != 0 {
+				new += 1 << mutexWaiterShift
+			}
+			// The current thread switches mutex to starvation mode.
+			// But if the mutex is currently unlocked, don't do the switch.
+			// Unlock expects that starving mutex has waiters, which will not
+			// be true in this case.
+			if starving && old&mutexLocked != 0 {
+				new |= mutexStarving
+			}
+			if awoke {
+				// The thread has been woken from sleep,
+				// so we need to reset the flag in either case.
+				if new&mutexWoken == 0 {
+					panic("runtime: inconsistent mutex state")
+				}
+				new &= ^mutexWoken
+			}
+			if atomic::CompareAndSwap(&self.state, old, new, atomic::AcqRel, atomic::Relaxed) {
+				if old&(mutexLocked|mutexStarving) == 0 {
+					break // locked the mutex with CAS
+				}
+				// If we were already waiting before, queue at the front of the queue.
+				queueLifo := waitStartTime != 0
+				if waitStartTime == 0 {
+					waitStartTime = nanotime()
+				}
+				tsemacquire(&self.root, &self.sema, queueLifo, reasonMutex)
+				starving = starving || nanotime()-waitStartTime > starvationThresholdNs
+				old = self.state
+				if old&mutexStarving != 0 {
+					// If this thread was woken and mutex is in starvation mode,
+					// ownership was handed off to us but mutex is in somewhat
+					// inconsistent state: mutexLocked is not set and we are still
+					// accounted as waiter. Fix that.
+					if old&(mutexLocked|mutexWoken) != 0 || old>>mutexWaiterShift == 0 {
+						panic("runtime: inconsistent mutex state")
+					}
+					mut delta := i32(mutexLocked - 1<<mutexWaiterShift)
+					if !starving || old>>mutexWaiterShift == 1 {
+						// Exit starvation mode.
+						// Critical to do it here and consider wait time.
+						// Starvation mode is so inefficient, that two threads
+						// can go lock-step infinitely once they switch mutex
+						// to starvation mode.
+						delta -= mutexStarving
+					}
+					atomic::Add(&self.state, delta, atomic::AcqRel)
+					break
+				}
+				awoke = true
+				iter = 1
+			} else {
+				old = self.state
 			}
 		}
 	}
 
-	#disable nilptr
+	// Tries to lock mutwx and reports whether it succeeded.
+	//
+	// Note that while correct uses of TryLock do exist, they are rare,
+	// and use of TryLock is often a sign of a deeper problem
+	// in a particular use of mutexes.
+	fn tryLock(*self): bool {
+		old := self.state
+		if old&(mutexLocked|mutexStarving) != 0 {
+			ret false
+		}
+
+		// There may be a thread waiting for the mutex, but we are
+		// running now and can try to grab the mutex before that
+		// thread wakes up.
+		ret atomic::CompareAndSwap(&self.state, old, old|mutexLocked, atomic::Acquire, atomic::Relaxed)
+	}
+
+	// Unlocks mutex.
+	// It is a runtime error if mutex is not locked on entry to Unlock.
 	fn unlock(*self) {
-		old := atomic::Swap(&self.state, 0, atomic::Release)
-		if old == 0 {
-			panic("runtime: mutex: unlock of unlocked mutex")
+		// Fast path: drop lock bit.
+		new := atomic::Add(&self.state, -mutexLocked, atomic::Release)
+		if new != 0 {
+			// Outlined slow path to may allow inlining the fast path.
+			self.unlockSlow(new)
 		}
 	}
 
-	#disable nilptr
-	fn tryLock(*self): bool {
-		ret atomic::CompareAndSwap(&self.state, 0, 1, atomic::Acquire, atomic::Relaxed)
+	fn unlockSlow(*self, mut new: i32) {
+		if (new+mutexLocked)&mutexLocked == 0 {
+			panic("runtime: unlock of unlocked mutex")
+		}
+		if new&mutexStarving == 0 {
+			mut old := new
+			for {
+				// If there are no waiters or a thread has already
+				// been woken or grabbed the lock, no need to wake anyone.
+				// In starvation mode ownership is directly handed off from unlocking
+				// thread to the next waiter. We are not part of this chain,
+				// since we did not observe mutexStarving when we unlocked the mutex above.
+				// So get off the way.
+				if old>>mutexWaiterShift == 0 || old&(mutexLocked|mutexWoken|mutexStarving) != 0 {
+					ret
+				}
+				// Grab the right to wake someone.
+				new = (old - 1<<mutexWaiterShift) | mutexWoken
+				{
+					if atomic::CompareAndSwap(&self.state, old, new, atomic::AcqRel, atomic::Relaxed) {
+						tsemrelease(&self.root, &self.sema, false)
+						ret
+					}
+				}
+				old = self.state
+			}
+		} else {
+			// Starving mode: handoff mutex ownership to the next waiter,
+			// so that the next waiter can start to run without wasting time.
+			// Note: mutexLocked is not set, the waiter will set it after wakeup.
+			// But mutex is still considered locked if mutexStarving is set,
+			// so new coming thread will not acquire it.
+			tsemrelease(&self.root, &self.sema, true)
+		}
 	}
 }
 
 const qmutexSize = 4 // i32
 
-// Simpler mutex implementation for elementary purposes.
+// Simpler mutex implementation for elementary purposes and short-critical sections.
 // Suitable for quick Lock/Unlock arenas.
 // It may be insufficient in long-term locks due to lack of thread parking integration.
-// Unlike the fmutex, it uses pure spin-lock.
-//
-// Be careful when updating memory layout of the type.
-// Because unsafe pointer conversions assumes
-// fmutex and qmutex have the same memory layout.
+// Unlike the mutex, it uses pure spin-lock.
 struct qmutex {
 	mut state: i32
 }

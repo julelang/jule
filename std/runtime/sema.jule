@@ -13,11 +13,11 @@ struct semaNode {
 	next: &semaNode
 }
 
-const semaRootSize = fmutexSize + runtime::SmartptrSize + 4 // +4 for u32
+const semaRootSize = qmutexSize + runtime::SmartptrSize + 4 // +4 for u32
 
 // Stores all space collections of sema.
 struct semaRoot {
-	lock:  fmutex
+	lock:  qmutex
 	tree:  &semaNode // Root of tree of unique sema spaces.
 	nwait: u32       // Number of waiters. Read w/o the lock, should be atomic.
 }
@@ -219,6 +219,92 @@ fn semrelease(mut &sema: *u32, handoff: bool) {
 	}
 }
 
+// Same as semacquire, but based-on thread parking instead of coroutine parking.
+#disable nilptr
+fn tsemacquire(mut &root: *semaRoot, mut &sema: *u32, lifo: bool, reason: u32) {
+	// Easy case.
+	if cansemacquire(sema) {
+		ret
+	}
+
+	// Harder case:
+	//	increment waiter count
+	//	try cansemacquire one more time, return if succeeded
+	//	enqueue itself as a waiter
+	//	sleep
+	//	(waiter descriptor is dequeued by signaler)
+	mut p := new(parkerList)
+	p.parker = new(parker)
+	p.parker.init()
+	for {
+		root.lock.lock()
+		// Add ourselves to nwait to disable "easy case" in semrelease.
+		atomic::Add(&root.nwait, 1, atomic::AcqRel)
+		// Check cansemacquire to avoid missed wakeup.
+		if cansemacquire(sema) {
+			atomic::Add(&root.nwait, ^u32(0), atomic::AcqRel)
+			root.lock.unlock()
+			p.parker.release() // Release memory.
+			break
+		}
+		// Any semrelease after the cansemacquire knows we're waiting
+		// (we set nwait above), so go to sleep.
+		root.queue(sema, p, lifo)
+		root.lock.unlock()
+		p.parker.park()
+		// Try to acquire semaphore before enqueue again.
+		if p.ticket != 0 || cansemacquire(sema) {
+			p.parker.release() // Release memory.
+			break
+		}
+	}
+}
+
+// Same as semrelease, but based-on thread parking instead of coroutine parking.
+#disable nilptr
+fn tsemrelease(mut &root: *semaRoot, mut &sema: *u32, handoff: bool) {
+	atomic::Add(sema, 1, atomic::AcqRel)
+
+	// Easy case: no waiters?
+	// This check must happen after the atomicAdd, to avoid a missed wakeup
+	// (see loop in semacquire).
+	if atomic::Load(&root.nwait, atomic::Acquire) == 0 {
+		ret
+	}
+
+	// Harder case: search for a waiter and wake it.
+	root.lock.lock()
+	if atomic::Load(&root.nwait, atomic::Acquire) == 0 {
+		// The count is already consumed by another thread,
+		// so no need to wake up another thread.
+		root.lock.unlock()
+		ret
+	}
+
+	mut p := root.dequeue(sema)
+	if p != nil {
+		atomic::Add(&root.nwait, ^u32(0), atomic::AcqRel)
+	}
+	root.lock.unlock()
+	// May be slow or even yield, so unlock first.
+	if p != nil {
+		if p.ticket != 0 {
+			panic("runtime: invalid semaphore ticket")
+		}
+		if handoff && cansemacquire(sema) {
+			p.ticket = 1
+		}
+		p.parker.unpark()
+		// If handoff is true, immediately yield the CPU with no analysis.
+		// This thread is not the expected owner of the next semacquire.
+		// So this thread doesn't matter for now, yield the CPU to increase
+		// the chances of semacquire of the dequeued thread.
+		if handoff && p.ticket == 1 {
+			osyield()
+		}
+	}
+}
+
 // Checks if a < b, considering a & b running counts that may overflow the
 // 32-bit range, and that their "unwrapped" difference is always less than 2^31.
 fn less(a: u32, b: u32): bool {
@@ -245,7 +331,7 @@ struct notifyList {
 	head: &parkerList
 	tail: &parkerList
 
-	lock: qmutex
+	lock: mutex
 }
 
 // Adds new notify ticked to list l and returns the ticket number.
