@@ -214,6 +214,16 @@ fn schedthread() {
 	sched()
 }
 
+// Yields the processor, allowing other coroutines to run. It does not
+// suspend the current coroutine, so execution resumes automatically.
+async fn Yield() {
+	mut coro := gett().coro
+	coro.state &= ^coroRunning
+	coro.state |= coroSuspended
+	runqput(&coro, false)
+	park(coro, 0, reasonNA).await
+}
+
 #disable nilptr boundary
 fn schedinit() {
 	// Initialize the global scheduler instance.
