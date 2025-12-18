@@ -8,8 +8,9 @@ use "std/jule/sema"
 
 // Linkpath of common packages.
 const (
-	linkpathRuntime = "std/runtime"
-	linkpathStrings = "std/strings"
+	linkpathRuntime                = "std/runtime"
+	linkpathInternalRuntimeBuiltin = "std/internal/runtime/builtin"
+	linkpathStrings                = "std/strings"
 )
 
 // Program metadata for the main IR.
@@ -61,8 +62,8 @@ struct Runtime {
 	FastmemcopyImpl: &sema::FuncIns
 	Prememappend:    &sema::Func
 	Memappend:       &sema::Func
-	Zprint:          &sema::FuncIns
-	Zprintln:        &sema::FuncIns
+	Zprint:          &sema::FuncIns // from "std/internal/runtime/builtin"
+	Zprintln:        &sema::FuncIns // from "std/internal/runtime/builtin"
 	Emptyselect:     &sema::FuncIns
 	Runselect:       &sema::FuncIns
 	RCAdd:           &sema::FuncIns
@@ -157,8 +158,6 @@ fn CollectRuntime(mut ir: &obj::IR): &Runtime {
 	meta.FastmemcopyImpl = obj::RuntimeFindFunc(p, "fastmemcopy_impl").Instances[0]
 	meta.Prememappend = obj::RuntimeFindFunc(p, "prememappend")
 	meta.Memappend = obj::RuntimeFindFunc(p, "memappend")
-	meta.Zprint = obj::RuntimeFindFunc(p, "zprint").Instances[0]
-	meta.Zprintln = obj::RuntimeFindFunc(p, "zprintln").Instances[0]
 	meta.Emptyselect = obj::RuntimeFindFunc(p, "emptyselect").Instances[0]
 	meta.Runselect = obj::RuntimeFindFunc(p, "runselect").Instances[0]
 	meta.RCAdd = obj::RuntimeFindFunc(p, "_RCAdd").Instances[0]
@@ -197,6 +196,14 @@ fn CollectRuntime(mut ir: &obj::IR): &Runtime {
 	meta.Cmplx128 = obj::RuntimeFindStruct(p, "_cmplx128").Instances[0]
 	meta.Scase = obj::RuntimeFindStruct(p, "scase").Instances[0]
 	meta.Coro = obj::RuntimeFindStruct(p, "coro").Instances[0]
+
+	p = obj::SelectImport(ir.Used, linkpathInternalRuntimeBuiltin)
+	if p == nil {
+		ret nil
+	}
+
+	meta.Zprint = obj::RuntimeFindFunc(p, "zprint").Instances[0]
+	meta.Zprintln = obj::RuntimeFindFunc(p, "zprintln").Instances[0]
 
 	ret meta
 }

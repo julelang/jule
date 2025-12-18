@@ -559,7 +559,9 @@ impl symBuilder {
 
 			mut oldMod := self.importer.GetMod()
 			self.importer.SetMod(self.importer.ModById(port.ModID))
-			self.checkPackageAccessibility(decl, oldMod, port.Path)
+			if !isImplicitImport(imp) && !isRuntimeInternal(imp) {
+				self.checkPackageAccessibility(decl, oldMod, port.Path)
+			}
 			self.importer.SetMod(oldMod)
 		} else {
 			if !self.checkImportCycles(imp, decl) {
@@ -577,7 +579,9 @@ impl symBuilder {
 				ret false
 			}
 
-			self.checkPackageAccessibility(decl, oldMod, imp.Path)
+			if !isImplicitImport(imp) && !isRuntimeInternal(imp) {
+				self.checkPackageAccessibility(decl, oldMod, imp.Path)
+			}
 
 			for (_, mut ast) in asts {
 				mut table := (&SymTab)(nil)
@@ -732,6 +736,11 @@ impl symBuilder {
 // See developer reference (6).
 fn isImplicitImport(imp: &ImportInfo): bool {
 	ret imp.Decl.Token == nil
+}
+
+// Reports whether imp is runtime internal package.
+fn isRuntimeInternal(imp: &ImportInfo): bool {
+	ret strings::HasPrefix(imp.LinkPath, "std/internal/runtime")
 }
 
 // Takes filepath and returns module name from the path and submodule path if exist.
