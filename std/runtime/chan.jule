@@ -74,12 +74,12 @@ impl pchan {
 	}
 
 	// Final implementation of the [pchan.send] function.
-	// Focuses on parked threads.
+	// Focuses on parked coroutines.
 	// Mutex must be locked. It will be released before return.
 	// Reports whether the stack pointer is used (data handled).
 	#disable nilptr
 	async fn sendFinal(mut *self, mut &data: *T): (spurious: bool) {
-		// Before park the thread, check for a waiting receiver, if any.
+		// Before park the coroutine, check for a waiting receiver, if any.
 		// If we lucky, write data to the stack of the receiver and return.
 		mut recvp := self.recvq.dequeueChan()
 		if recvp != nil {
@@ -93,7 +93,7 @@ impl pchan {
 			ret false
 		}
 
-		// We have to park the thread.
+		// We have to park the coroutine.
 		mut stackp := parkerList{}
 		mut p := unsafe { (&parkerList)(&stackp) }
 		p.coro = gett().coro
@@ -131,8 +131,8 @@ impl pchan {
 				panic("runtime: send on closed channel")
 			}
 
-			// Slow-path: enqueue thread to waiters and park.
-			// A thread must notify (might be spurious) this thread.
+			// Slow-path: enqueue the coroutine to waiters and park.
+			// A coroutine must notify (might be spurious) this coroutine.
 			self.lock.lock()
 			if self.closed != 0 {
 				panic("runtime: send on closed channel")
@@ -146,7 +146,7 @@ impl pchan {
 				ret
 			}
 			// Send data (hand-off) to a waiting receiver, if any.
-			// Otherwise, park the thread until a thread notify (might be spurious) us.
+			// Otherwise, park the coroutine until a coroutine notify (might be spurious) us.
 			if !self.sendFinal(&data).await {
 				// Not a spurious wakeup, return.
 				ret
@@ -269,12 +269,12 @@ impl pchan {
 	}
 
 	// Final implementation of the [pchan.recv] function.
-	// Focuses on parked threads.
+	// Focuses on parked coroutines.
 	// Mutex must be locked. It will be released before return.
 	// Reports whether the stack pointer is used (data handled).
 	#disable nilptr
 	async fn recvFinal(mut *self, mut &ok: *bool, mut &data: *T): (spurious: bool) {
-		// Before park the thread, check for a waiting sender, if any.
+		// Before park the coroutine, check for a waiting sender, if any.
 		// If we lucky, read data from the stack of the sender and return.
 		mut sendp := self.sendq.dequeueChan()
 		if sendp != nil {
@@ -289,7 +289,7 @@ impl pchan {
 			ret false
 		}
 
-		// We have to park the thread.
+		// We have to park the coroutine.
 		mut stackp := parkerList{}
 		mut p := unsafe { (&parkerList)(&stackp) }
 		p.coro = gett().coro
@@ -325,8 +325,8 @@ impl pchan {
 				ret
 			}
 
-			// Slow-path: enqueue thread to waiters and park.
-			// A thread must notify (might be spurious) this thread.
+			// Slow-path: enqueue the coroutine to waiters and park.
+			// A coroutine must notify (might be spurious) this coroutine.
 			self.lock.lock()
 			if self.closed != 0 {
 				self.lock.unlock()
@@ -347,7 +347,7 @@ impl pchan {
 				ret
 			}
 			// Receive (hand-off) data from a waiting sender, if any.
-			// Otherwise, park the thread until a thread notify (might be spurious) us.
+			// Otherwise, park the coroutine until a coroutine notify (might be spurious) us.
 			if !self.recvFinal(ok, &data).await {
 				// Not a spurious wakeup, return.
 				ret

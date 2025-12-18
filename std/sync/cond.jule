@@ -5,7 +5,7 @@
 use "std/runtime"
 
 // Implements a condition variable, a rendezvous point
-// for threads waiting for or announcing the occurrence
+// for coroutines waiting for or announcing the occurrence
 // of an event.
 //
 // Each Cond has an associated Locker L (often a [&Mutex]),
@@ -37,7 +37,7 @@ impl Cond {
 	}
 
 	// Atomically unlocks the locker and suspends execution
-	// of the calling thread. After later resuming execution,
+	// of the calling coroutine. After later resuming execution,
 	// Wait locks the locker before returning. Unlike in other systems,
 	// Wait cannot return unless awoken by [Cond.Broadcast] or [Cond.Signal].
 	//
@@ -58,18 +58,18 @@ impl Cond {
 		self.l.Lock().await
 	}
 
-	// Wakes one thread waiting on the condition, if there is any.
+	// Wakes one coroutine waiting on the condition, if there is any.
 	//
 	// It is allowed but not required for the caller to hold the locker
 	// during the call.
 	//
-	// Signal() does not affect thread scheduling priority; if other threads
-	// are attempting to lock the locker, they may be awoken before a "waiting" thread.
+	// Signal() does not affect coroutine scheduling priority; if other coroutines
+	// are attempting to lock the locker, they may be awoken before a "waiting" coroutine.
 	fn Signal(*self) {
 		runtime::notifyListNotifyOne(&self.notify)
 	}
 
-	// Broadcast wakes all threads waiting on the condition.
+	// Broadcast wakes all coroutines waiting on the condition.
 	//
 	// It is allowed but not required for the caller to hold the locker
 	// during the call.

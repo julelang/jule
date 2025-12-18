@@ -33,14 +33,11 @@ struct scase {
 // Empty select statement implementation.
 #disable nilptr
 async fn emptyselect() {
-	// Park thread indefinitely.
+	// Park the coroutine indefinitely.
 	// We do not need to yield CPU with temporary parking,
-	// this thread will never continue to run.
+	// this coroutine will never continue to run.
 	// It always yields CPU due to empty select statement,
-	// so put it into deep sleep. Other threads can caught deadlocks,
-	// if any, after this stage. If this thread is the single thread,
-	// we already checked deadlocks. So put this thread into deep sleep
-	// indefinitely.
+	// so put it into deep sleep.
 	mut coro := gett().coro
 	park(coro, 0, reasonSelect|reasonSelectEmpty).await
 	panic("unreachable")
@@ -209,7 +206,7 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 	if !block {
 		ret totalCases
 	}
-	// Slow-path: we have to park the thread until one of the channels notify us.
+	// Slow-path: we have to park the coroutine until one of the channels notify us.
 
 	// Sort channels. Thus, we can manage them easily.
 	sortchans(chans, nchan)
@@ -246,15 +243,14 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 		}
 	}
 	// There is no waiter in the queue.
-	// We have to park this thread, eventually.
-
+	// We have to park this coroutine, eventually.
+	mut coro := gett().coro
 	// Allocate and prepare a parker per operation.
-	// Do not assign thread yet, avoid making busy the mutex for a long time.
 	// Use round-robin iteration to achieve randomness.
 	mut parkers := make([]parkerList, nrecv+nsend)
 	// Use heap allocated state for parkers.
 	// Because the select statement will not dequeue the parkers from all
-	// channels where they enqueued as waiter thread.
+	// channels where they enqueued as waiter coroutine.
 	// If this select statement returns before all parkers dequeued,
 	// the stack must be valid and dequeue algorithm should read the
 	// state consistently.
@@ -278,6 +274,7 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 		}
 
 		// Prepare and enqeueue parker.
+		parker.coro = coro
 		parker.ticket = parkerSelect
 		parker.state = state // Use shared state pointer for all parkers.
 		parker.stack = case.data
@@ -288,21 +285,12 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 		}
 	}
 
-	mut coro := gett().coro
-
-	// We can acquire the current thread and assign it to parkers.
-	// All parkers will use the current thread.
-	// Any notification will unpark the select statement.
-	for i in parkers {
-		parkers[i].coro = coro
-	}
-
 	// Park and try iteration.
-	// First, parks the thread.
+	// First, parks the coroutine.
 	// When notified, returns immediately if channel notified after hand-off.
 	// If a channel notified spuriously, try again and park it, if it fails.
 	for {
-		// Unlock channels and park the thread.
+		// Unlock channels and park the coroutine.
 		unlockchans(chans, nchan)
 		park(coro, 0, reasonSelect).await
 
@@ -383,7 +371,7 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 				ret offset
 			}
 		}
-		// Failure. We have to park thread again, unfortunately.
+		// Failure. We have to park coroutine again, unfortunately.
 
 		// Update state as waiting for all channels.
 		// Since the state variable only handled in lock and we have locked all channels,

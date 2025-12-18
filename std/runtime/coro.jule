@@ -16,9 +16,6 @@ extern struct __jule_coroutineHandle {
 // Type alias for extern Jule coroutine.
 type coroutineHandle = extern.__jule_coroutineHandle
 
-// Destroys all retired coroutine frames for the current worker thread.
-extern fn __jule_retireDrain()
-
 const (
 	// State flags of coroutines.
 	coroRunning = 1 << iota
@@ -47,7 +44,7 @@ struct coro {
 	handle: coroutineHandle
 
 	// Coroutine state and suspend reasons if it is suspended.
-	// The reasons may be not zeroed after thread closed or woken.
+	// The reasons may be not zeroed after coroutine closed or woken.
 	state: u32
 }
 
@@ -75,6 +72,7 @@ fn spawnmaincoro(h: coroutineHandle) {
 // It just creates a coroutine using API.
 // The coroutine handle h is the handle of the coroutine.
 #export "__jule_cospawn"
+#disable nilptr
 fn cospawn(h: coroutineHandle) {
 	mut c := newcoro(h)
 	runqput(&c, true)
@@ -87,69 +85,16 @@ fn resume(mut c: &coro) {
 }
 
 // Reports whether the coroutine done.
+#disable nilptr
 fn done(c: &coro): bool {
 	ret c.handle.done()
 }
 
 // Closes coroutine, releases memory.
+#disable nilptr
 fn close(mut c: &coro) {
 	c.handle.destroy()
 	c = nil
-}
-
-// Suspends the current coroutine and yields the CPU.
-// If the mu is not zero, assumes it already locked and releases before yield.
-// The coroutine can be made runnable again by calling [unpark].
-//
-// The coroutine rc is the resume coroutine.
-// Compiler will write the handle to it, resume(rc) must be used to resume.
-//
-// This function will compile inlinely by the compiler.
-// The function must implement additional behavior before the park.
-// Compiler will park the coroutine at the placeholder comment.
-//
-// The first parameters must be the resume-coroutine,
-// where park handle will be written, and mutex address.
-// Following parameters may be change.
-#disable nilptr
-async fn park(mut rc: &coro, mu: uintptr, mut reason: u32) {
-	mut c := gett().coro
-	c.state |= coroSuspended | reason
-	// park(c)
-}
-
-// Unlocks mutex mu, if it is not zero.
-// The mu must point to the `mutex` memory layout.
-#export "__jule_mutexUnlock"
-fn mutexunlock(mu: uintptr) {
-	if mu != 0 {
-		// Assume mutex and qmutex have the same memory layout and
-		// implementation for unlock.
-		unsafe { (*mutex)(mu).unlock() }
-	}
-}
-
-// Makes coroutine c runnable.
-#disable nilptr
-fn unpark(mut &c: *&coro) {
-	(*c).state &= ^reasonMask
-	runqput(c, true)
-}
-
-// Puts the current coroutine sleep for duration dur.
-#disable nilptr
-async fn sleep(dur: sleepDuration) {
-	mut t := gett()
-	mut timer := new(timer)
-	timer.coro = t.coro
-	timer.when = nanotime() + dur
-	t.proc.timers.push(timer)
-	park(t.coro, 0, reasonSleep).await
-}
-
-// Destroys all retired coroutine frames for the current worker thread.
-fn retiredrain() {
-	extern.__jule_retireDrain()
 }
 
 // A coroq coroutine.

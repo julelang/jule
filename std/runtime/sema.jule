@@ -176,7 +176,7 @@ async fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 	}
 }
 
-// Atomically increments sema and notifies a waiting thread
+// Atomically increments sema and notifies a waiting coroutine
 // if one is blocked in semacquire.
 // It is intended as a simple wakeup primitive for use by the synchronization
 // library and should not be used directly.
@@ -196,8 +196,8 @@ fn semrelease(mut &sema: *u32, handoff: bool) {
 	// Harder case: search for a waiter and wake it.
 	root.lock.lock()
 	if atomic::Load(&root.nwait, atomic::Acquire) == 0 {
-		// The count is already consumed by another thread,
-		// so no need to wake up another thread.
+		// The count is already consumed by another coroutine,
+		// so no need to wake up another coroutine.
 		root.lock.unlock()
 		ret
 	}
@@ -325,7 +325,7 @@ struct notifyList {
 	//
 	// Both wait & notify can wrap around, and such cases will be correctly
 	// handled as long as their "unwrapped" difference is bounded by 2^31.
-	// For this not to be the case, we'd need to have 2^31+ threads
+	// For this not to be the case, we'd need to have 2^31+ coroutines
 	// blocked on the same condvar, which is currently not possible.
 	notify: u32
 

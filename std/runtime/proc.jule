@@ -4,6 +4,9 @@
 
 use "std/internal/runtime/atomic"
 
+// Destroys all retired coroutine frames for the current worker thread.
+extern fn __jule_retireDrain()
+
 // Returns the maximum number of CPUs that can be executing simultaneously.
 fn COMAXPROCS(): int { ret numcpu }
 
@@ -28,7 +31,7 @@ struct coroproc {
 	lastpoll: i64
 }
 
-// A scheduler envrionment.
+// A scheduler envrionment for the whole Jule program.
 struct scheduler {
 	// All coroutine processes.
 	procs: []&coroproc
@@ -61,8 +64,9 @@ impl scheduler {
 	}
 }
 
-// A global scheduler instance.
+// A global scheduler instance of the program.
 // Just a declaration, compiler will not initialize it by default.
+// It will be initalized by the runtime.
 let mut gsched = scheduler{}
 
 // Should be called when a corotuine enqueued to the global runnable queue.
@@ -83,7 +87,8 @@ fn onglobalrunqput() {
 	}
 }
 
-// Tries to put coroutine c to the runnable coroutine queue of the current thread.
+// Tries to put coroutine c to the
+// runnable coroutine queue of the current process.
 #disable nilptr boundary
 fn runqputl(mut &c: *&coro): (ok: bool) {
 	mut t := gett()
@@ -120,10 +125,10 @@ LoadBalance:
 }
 
 // Puts coroutine c to the runnable coroutine queue.
-// If next is true, runnext field of the current thread is prioritized.
+// If next is true, runnext field of the current process is prioritized.
 #disable nilptr
 fn runqput(mut &c: *&coro, next: bool) {
-	// We have a coroutine process on the current thread.
+	// We have a coroutine process on the current worker thread.
 	mut t := gett()
 	if t != nil && t.proc != nil {
 		if t.proc.runnext == nil {
@@ -201,7 +206,7 @@ Sched:
 	}
 }
 
-// Scheduler thread.
+// Start point of a scheduler thread.
 //
 // This function handled like an anonymous function.
 // Therefore the compiler will add *unsafe argument to
@@ -210,6 +215,50 @@ Sched:
 // In the final stage, this function's signature fits with the OS thread API.
 fn schedthread() {
 	sched()
+}
+
+// Suspends the current coroutine and yields the CPU.
+// If the mu is not zero, assumes it already locked and releases before yield.
+// The coroutine can be made runnable again by calling [unpark].
+//
+// The coroutine rc is the resume coroutine.
+// Compiler will write the handle to it, resume(rc) must be used to resume.
+//
+// This function will compile inlinely by the compiler.
+// The function must implement additional behavior before the park.
+// Compiler will park the coroutine at the placeholder comment.
+//
+// The first parameters must be the resume-coroutine,
+// where park handle will be written, and mutex address.
+// Following parameters may be change.
+#disable nilptr
+async fn park(mut rc: &coro, mu: uintptr, mut reason: u32) {
+	mut c := gett().coro
+	c.state |= coroSuspended | reason
+	// park(c)
+}
+
+// Makes coroutine c runnable.
+#disable nilptr
+fn unpark(mut &c: *&coro) {
+	(*c).state &= ^reasonMask
+	runqput(c, true)
+}
+
+// Puts the current coroutine sleep for duration dur.
+#disable nilptr
+async fn sleep(dur: sleepDuration) {
+	mut t := gett()
+	mut timer := new(timer)
+	timer.coro = t.coro
+	timer.when = nanotime() + dur
+	t.proc.timers.push(timer)
+	park(t.coro, 0, reasonSleep).await
+}
+
+// Destroys all retired coroutine frames for the current worker thread.
+fn retiredrain() {
+	extern.__jule_retireDrain()
 }
 
 // Yields the processor, allowing other coroutines to run. It does not

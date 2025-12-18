@@ -13,7 +13,7 @@ const rwmutexMaxReaders = 1 << 30
 //
 // A RWMutex must not be copied after first use.
 //
-// If any thread calls [RWMutex.Lock] while the lock is already held by
+// If any coroutine calls [RWMutex.Lock] while the lock is already held by
 // one or more readers, concurrent calls to [RWMutex.RLock] will block until
 // the writer has acquired (and released) the lock, to ensure that
 // the lock eventually becomes available to the writer.
@@ -123,8 +123,8 @@ impl RWMutex {
 	// not locked for writing on entry to Unlock.
 	//
 	// As with Mutexes, a locked [RWMutex] is not associated with a particular
-	// thread. One thread may [RWMutex.RLock] ([RWMutex.Lock]) a RWMutex and then
-	// arrange for another thread to [RWMutex.RUnlock] ([RWMutex.Unlock]) it.
+	// coroutine. One coroutine may [RWMutex.RLock] ([RWMutex.Lock]) a RWMutex and then
+	// arrange for another coroutine to [RWMutex.RUnlock] ([RWMutex.Unlock]) it.
 	fn Unlock(*self) {
 		// Announce to readers there is no active writer.
 		r := self.readerCount.Add(rwmutexMaxReaders, atomic::AcqRel)

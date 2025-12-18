@@ -15,16 +15,16 @@ trait Locker {
 //
 // Mutex can be in 2 modes of operations: normal and starvation.
 // In normal mode waiters are queued in FIFO order, but a woken up waiter
-// does not own the mutex and competes with new arriving threads over
-// the ownership. New arriving threads have an advantage -- they are
+// does not own the mutex and competes with new arriving coroutines over
+// the ownership. New arriving coroutines have an advantage -- they are
 // already running on CPU and there can be lots of them, so a woken up
-// waiter has good chances of losing.  In such case it is queued at front
+// waiter has good chances of losing. In such case it is queued at front
 // of the wait queue. If a waiter fails to acquire the mutex for more than 1ms,
 // it switches mutex to the starvation mode.
 //
 // In starvation mode ownership of the mutex is directly handed off from
-// the unlocking thread to the waiter at the front of the queue.
-// New arriving threads don't try to acquire the mutex even if it appears
+// the unlocking coroutine to the waiter at the front of the queue.
+// New arriving coroutines don't try to acquire the mutex even if it appears
 // to be unlocked, and don't try to spin. Instead they queue themselves at
 // the tail of the wait queue.
 //
@@ -32,7 +32,7 @@ trait Locker {
 // (1) it is the last waiter in the queue, or (2) it waited for less than 1ms,
 // it switches mutex back to normal operation mode.
 //
-// Normal mode has considerably better performance as a thread can acquire
+// Normal mode has considerably better performance as a coroutine can acquire
 // a mutex several times in a row even if there are blocked waiters.
 // Starvation mode is important to prevent pathological cases of tail latency.
 const starvationThresholdNs = 1e6
@@ -45,8 +45,8 @@ const (
 	mutexWaiterShift
 )
 
-// Muxtex is a primitive used to protect memory in
-// multi-threading situations such as concurrent access.
+// A Mutex is a mutual exclusion lock.
+// The zero value for a Mutex is an unlocked mutex.
 //
 // Mutextes are uses internal mutability and internal states.
 // Locking, unlocking and etc is not mutable operations.
@@ -54,11 +54,10 @@ const (
 // Therefore, for correct use, a mutex instance should not be copied after first use.
 // Otherwise internal state will be copied and not mutated by other instances.
 //
-// Mutexes are not implemented using API of operating system. Implemented in pure Jule.
 // This mutex implementation will not check ownership of the mutex.
-// So, a locked Mutex is not associated with a particular thread.
-// It is allowed for one thread to lock a Mutex and then
-// arrange for another thread to unlock it.
+// So, a locked Mutex is not associated with a particular coroutine.
+// It is allowed for one coroutine to lock a Mutex and then
+// arrange for another coroutine to unlock it.
 struct Mutex {
 	mut state: i32
 	mut sema:  u32
@@ -68,7 +67,7 @@ impl Locker for Mutex {}
 
 impl Mutex {
 	// Locks mutex.
-	// If the lock is already in use, the calling thread
+	// If the lock is already in use, the calling coroutine
 	// blocks until the mutex is available.
 	async fn Lock(*self) {
 		// Fast path: grab unlocked mutex.
@@ -91,7 +90,7 @@ impl Mutex {
 			if old&(mutexLocked|mutexStarving) == mutexLocked && iter < 1<<9 {
 				// Active spinning makes sense.
 				// Try to set mutexWoken flag to inform Unlock
-				// to not wake other blocked threads.
+				// to not wake other blocked coroutines.
 				if !awoke && old&mutexWoken == 0 && old>>mutexWaiterShift != 0 {
 					awoke = atomic::CompareAndSwap(&self.state, old, old|mutexWoken, atomic::AcqRel, atomic::Relaxed)
 				}
@@ -100,14 +99,14 @@ impl Mutex {
 				continue
 			}
 			mut new := old
-			// Don't try to acquire starving mutex, new arriving threads must queue.
+			// Don't try to acquire starving mutex, new arriving coroutines must queue.
 			if old&mutexStarving == 0 {
 				new |= mutexLocked
 			}
 			if old&(mutexLocked|mutexStarving) != 0 {
 				new += 1 << mutexWaiterShift
 			}
-			// The current thread switches mutex to starvation mode.
+			// The current coroutine switches mutex to starvation mode.
 			// But if the mutex is currently unlocked, don't do the switch.
 			// Unlock expects that starving mutex has waiters, which will not
 			// be true in this case.
@@ -115,7 +114,7 @@ impl Mutex {
 				new |= mutexStarving
 			}
 			if awoke {
-				// The thread has been woken from sleep,
+				// The coroutine has been woken from sleep,
 				// so we need to reset the flag in either case.
 				if new&mutexWoken == 0 {
 					panic("runtime: inconsistent mutex state")
@@ -135,7 +134,7 @@ impl Mutex {
 				starving = starving || runtime::nanotime()-waitStartTime > starvationThresholdNs
 				old = self.state
 				if old&mutexStarving != 0 {
-					// If this thread was woken and mutex is in starvation mode,
+					// If this coroutine was woken and mutex is in starvation mode,
 					// ownership was handed off to us but mutex is in somewhat
 					// inconsistent state: mutexLocked is not set and we are still
 					// accounted as waiter. Fix that.
@@ -146,7 +145,7 @@ impl Mutex {
 					if !starving || old>>mutexWaiterShift == 1 {
 						// Exit starvation mode.
 						// Critical to do it here and consider wait time.
-						// Starvation mode is so inefficient, that two threads
+						// Starvation mode is so inefficient, that two coroutines
 						// can go lock-step infinitely once they switch mutex
 						// to starvation mode.
 						delta -= mutexStarving
@@ -173,9 +172,9 @@ impl Mutex {
 			ret false
 		}
 
-		// There may be a thread waiting for the mutex, but we are
+		// There may be a coroutine waiting for the mutex, but we are
 		// running now and can try to grab the mutex before that
-		// thread wakes up.
+		// coroutine wakes up.
 		ret atomic::CompareAndSwap(&self.state, old, old|mutexLocked, atomic::Acquire, atomic::Relaxed)
 	}
 
@@ -197,10 +196,10 @@ impl Mutex {
 		if new&mutexStarving == 0 {
 			mut old := new
 			for {
-				// If there are no waiters or a thread has already
+				// If there are no waiters or a coroutine has already
 				// been woken or grabbed the lock, no need to wake anyone.
 				// In starvation mode ownership is directly handed off from unlocking
-				// thread to the next waiter. We are not part of this chain,
+				// coroutine to the next waiter. We are not part of this chain,
 				// since we did not observe mutexStarving when we unlocked the mutex above.
 				// So get off the way.
 				if old>>mutexWaiterShift == 0 || old&(mutexLocked|mutexWoken|mutexStarving) != 0 {
@@ -221,7 +220,7 @@ impl Mutex {
 			// so that the next waiter can start to run without wasting time.
 			// Note: mutexLocked is not set, the waiter will set it after wakeup.
 			// But mutex is still considered locked if mutexStarving is set,
-			// so new coming thread will not acquire it.
+			// so new coming coroutine will not acquire it.
 			runtime::semrelease(&self.sema, true)
 		}
 	}
