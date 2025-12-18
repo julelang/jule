@@ -1606,8 +1606,8 @@ impl ObjectCoder {
 	fn end(mut &self) {
 		self.addIndent()
 
-		// Write the fake main function.
 		if !env::Test {
+			// Write the fake main function.
 			asyncRuntime := meta::Program.EntryPoint.Async
 			if asyncRuntime {
 				self.write("__jule_DetachTask ")
@@ -1644,10 +1644,13 @@ impl ObjectCoder {
 	__jule_call_initializers();
 	`)
 
+		asyncRuntime := env::Test || meta::Program.EntryPoint.Async
+		self.meta.concurrent = self.meta.concurrent || asyncRuntime
+
 		if env::Test {
-			self.write("test_point();\n")
+			identCoder.funcIns(&self.Buf, meta::Program.Runtime.Spawnmaincoro)
+			self.write("(test_point().handle);\n")
 		} else {
-			asyncRuntime := meta::Program.EntryPoint.Async
 			if asyncRuntime {
 				identCoder.funcIns(&self.Buf, meta::Program.Runtime.Spawnmaincoro)
 				self.write("(")
@@ -1658,9 +1661,11 @@ impl ObjectCoder {
 			}
 			self.write(";\n")
 		}
-		self.indent()
-		identCoder.funcIns(&self.Buf, meta::Program.Runtime.Sched)
-		self.write("();")
+		if asyncRuntime {
+			self.indent()
+			identCoder.funcIns(&self.Buf, meta::Program.Runtime.Sched)
+			self.write("();")
+		}
 
 		self.write(`
 
@@ -1742,7 +1747,7 @@ impl ObjectCoder {
 	// Checks concurrency state of program and updates function implementations
 	// to thread-safe variants if necessary.
 	fn implementRC(mut &self) {
-		if self.meta.concurrent || true {
+		if self.meta.concurrent {
 			// enable thread-safety for safe concurrency
 			self.funcIns(meta::Program.Runtime.RCAddAtomic, "__jule_RCAdd")
 			self.funcIns(meta::Program.Runtime.RCLoadAtomic, "__jule_RCLoad")
