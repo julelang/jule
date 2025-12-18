@@ -121,8 +121,6 @@ LoadBalance:
 
 // Puts coroutine c to the runnable coroutine queue.
 // If next is true, runnext field of the current thread is prioritized.
-// Reports whether the coroutine c placesd to
-// the runnext of the current coroutine process.
 #disable nilptr
 fn runqput(mut &c: *&coro, next: bool) {
 	// We have a coroutine process on the current thread.
@@ -220,8 +218,12 @@ async fn Yield() {
 	mut coro := gett().coro
 	coro.state &= ^coroRunning
 	coro.state |= coroSuspended
-	runqput(&coro, false)
-	park(coro, 0, reasonNA).await
+	// Push the coroutine to the global queue, otherwise the next
+	// scheduler iteration after park may run it from the local queue.
+	gsched.mu.lock()
+	gsched.runq.push(coro)
+	onglobalrunqput()
+	park(coro, uintptr(&gsched.mu), reasonNA).await
 }
 
 #disable nilptr boundary
