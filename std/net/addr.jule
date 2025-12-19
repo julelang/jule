@@ -247,14 +247,14 @@ fn filterAddrList(filter: fn(mut IPAddr): bool, net: Network, mut ips: []IPAddr,
 // returns internal protocol family address.
 //
 // Forwards any exceptional from used methods.
-fn resolveInternetAddrList(net: Network, addr: str)!: addrList {
+async fn resolveInternetAddrList(net: Network, addr: str)!: addrList {
 	mut host, mut port := "", ""
 	mut portnum := 0
 	match net {
 	| TCP | TCP4 | TCP6
 	| UDP | UDP4 | UDP6:
 		host, port = SplitHostPort(addr)?
-		portnum = lookupPort(net, port)?
+		portnum = lookupPort(net, port).await?
 	| IP | IP4 | IP6:
 		if addr != "" {
 			host = addr
@@ -267,7 +267,7 @@ fn resolveInternetAddrList(net: Network, addr: str)!: addrList {
 	}
 
 	// Try as a literal IP address, then as a DNS name.
-	mut ips := lookupIPAddr(net, host)?
+	mut ips := lookupIPAddr(net, host).await?
 	// If the machine has halfway configured
 	// IPv6 such that it can bind on "::" (IPv6Unspecified)
 	// but not connect back to that same address, fall

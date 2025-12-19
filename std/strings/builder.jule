@@ -14,11 +14,6 @@ struct Builder {
 	buf: []byte
 }
 
-impl io::Writer for Builder {}
-impl io::ByteWriter for Builder {}
-impl io::RuneWriter for Builder {}
-impl io::StrWriter for Builder {}
-
 impl Builder {
 	// Writes bytes to buffer.
 	// Never throws an exceptional.
@@ -103,5 +98,43 @@ impl Builder {
 	// Sets mutable internal buffer for low-level interactions.
 	unsafe fn SetBuf(mut *self, mut buf: []byte) {
 		self.buf = buf
+	}
+
+	// Returns async wrapper for the Builder.
+	// Useful to satisfy behavior implemented `io` traits.
+	fn Async(mut &self): asyncBuilder {
+		ret asyncBuilder(self)
+	}
+}
+
+// A Builder is CPU-bound and sync, normally.
+// But this type wraps the sync functions with async functions.
+// Useful to satisfy `io` traits.
+type asyncBuilder: &Builder
+
+impl io::Writer for asyncBuilder {}
+impl io::ByteWriter for asyncBuilder {}
+impl io::RuneWriter for asyncBuilder {}
+impl io::StrWriter for asyncBuilder {}
+
+impl asyncBuilder {
+	// Implements the io::Writer trait.
+	async fn Write(mut *self, b: []byte)!: (n: int) {
+		ret (&Builder)(*self).Write(b)?
+	}
+
+	// Implements the io::StrWriter trait.
+	async fn WriteStr(mut *self, s: str)!: (n: int) {
+		ret (&Builder)(*self).WriteStr(s)?
+	}
+
+	// Implements the io::ByteWriter trait.
+	async fn WriteByte(mut *self, b: byte)! {
+		(&Builder)(*self).WriteByte(b)?
+	}
+
+	// Implements the io::RuneWriter trait.
+	async fn WriteRune(mut *self, r: rune)!: (n: int) {
+		ret (&Builder)(*self).WriteRune(r)?
 	}
 }

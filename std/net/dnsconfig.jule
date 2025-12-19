@@ -74,7 +74,7 @@ let mut conf = dnsConfig{}
 let mut configInitializer = sync::Once{}
 
 // Resolves config to conf.
-fn resolveConfig() {
+async fn resolveConfig() {
 	// Ensure only one update at a time checks config.
 	conf.mu.lock()
 	defer { conf.mu.unlock() }
@@ -82,7 +82,7 @@ fn resolveConfig() {
 	// Fast path: zero mtime, not initialized yet.
 	zero := time::Time{}
 	if conf.mtime == zero {
-		osResolveConfig()
+		osResolveConfig().await
 		conf.lastChecked = time::Now()
 		ret
 	}
@@ -109,5 +109,5 @@ fn resolveConfig() {
 		}
 	}
 
-	osResolveConfig()
+	osResolveConfig().await
 }

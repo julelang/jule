@@ -9,6 +9,9 @@ impl FD {
 	// on OS X, SYS_FSYNC doesn't fully flush contents to disk.
 	// See the man page for fsync on OS X.
 	fn Fsync(mut *self)! {
+		self.incref()?
+		defer { self.decref() else {} }
+
 		fd := int(self.File)
 		ignoringEINTR(fn|| {
 			sys::Fcntl(fd, sys::F_FULLFSYNC, 0) else {

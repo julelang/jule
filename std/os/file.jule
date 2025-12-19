@@ -83,7 +83,7 @@ fn Create(path: str)!: &File {
 // Reads bytes of file.
 // First, learns byte-size of file.
 // Then reads bytes and returns buffer.
-fn ReadFile(path: str)!: []byte {
+async fn ReadFile(path: str)!: []byte {
 	mut f := Open(path)?
 	info := Stat(path)?
 
@@ -106,9 +106,48 @@ fn ReadFile(path: str)!: []byte {
 
 	mut data := make([]byte, 0, size)
 	for {
-		n := f.Read(data[len(data):cap(data)])?
+		n := f.Read(data[len(data):cap(data)]).await?
 		if n == io::EOF {
-			f.Close()?
+			f.Close().await?
+			ret data
+		}
+		data = data[:len(data)+n]
+		if len(data) >= cap(data) {
+			mut d := append(data[:cap(data)], 0)
+			data = d[:len(data)]
+		}
+	}
+}
+
+// Sync variant of [ReadFile].
+// It is provided for blocking operations and must be used carefully
+// in an async runtime; it blocks the thread, not the coroutine.
+fn ReadFileSync(path: str)!: []byte {
+	mut f := Open(path)?
+	info := Stat(path)?
+
+	let mut size: int
+	size64 := info.Size()
+	if i64(int(size64)) == size64 {
+		size = int(size64)
+	}
+	size++ // one byte for final read at EOF
+
+	// Following information adopted from Go:
+	//
+	// If a file claims a small size, read at least 512 bytes.
+	// In particular, files in Linux's /proc claim size 0 but
+	// then do not work right if read in small pieces,
+	// so an initial read of 1 byte would not work correctly.
+	if size < 512 {
+		size = 512
+	}
+
+	mut data := make([]byte, 0, size)
+	for {
+		n := f.ReadSync(data[len(data):cap(data)])?
+		if n == io::EOF {
+			f.CloseSync()?
 			ret data
 		}
 		data = data[:len(data)+n]
@@ -125,22 +164,38 @@ fn ReadFile(path: str)!: []byte {
 // Since requires multiple system calls to complete, a failure mid-operation
 // can leave the file in a partially written state.
 // Calls internally `File.Open`, `File.Write`, `File.Close` and forwards any exceptional.
-fn WriteFile(path: str, data: []byte, perm: FileMode)! {
+async fn WriteFile(path: str, data: []byte, perm: FileMode)! {
 	mut f := OpenFile(path, O_WRONLY|O_CREATE|O_TRUNC, perm)?
-	f.Write(data)?
-	f.Close()?
+	f.Write(data).await?
+	f.Close().await?
+}
+
+// Sync variant of [WriteFile].
+// It is provided for blocking operations and must be used carefully
+// in an async runtime; it blocks the thread, not the coroutine.
+fn WriteFileSync(path: str, data: []byte, perm: FileMode)! {
+	mut f := OpenFile(path, O_WRONLY|O_CREATE|O_TRUNC, perm)?
+	f.WriteSync(data)?
+	f.CloseSync()?
 }
 
 impl File {
 	// Writes bytes to handle and returns written byte count.
 	// The number of bytes written can never exceed the length of the buf.
-	fn Write(mut *self, buf: []byte)!: (n: int) {
-		ret self.fd.Write(buf)?
+	async fn Write(mut *self, buf: []byte)!: (n: int) {
+		ret self.fd.Write(buf).await?
+	}
+
+	// Sync variant of [Write].
+	// It is provided for blocking operations and must be used carefully
+	// in an async runtime; it blocks the thread, not the coroutine.
+	fn WriteSync(mut *self, buf: []byte)!: (n: int) {
+		ret self.fd.WriteSync(buf)?
 	}
 
 	// Like Write, but writes the contents of string s rather than a slice of bytes.
-	fn WriteStr(mut *self, s: str)!: (n: int) {
-		ret self.Write(unsafe::StrBytes(s))?
+	async fn WriteStr(mut *self, s: str)!: (n: int) {
+		ret self.Write(unsafe::StrBytes(s)).await?
 	}
 
 	// Read bytes to buffer from handle and returns read byte count.
@@ -148,15 +203,22 @@ impl File {
 	// If the buf is larger than the number of bytes that can be read,
 	// the buffer will not cause an overflow. Offset will be shifted
 	// by the number of bytes read.
-	fn Read(mut *self, mut buf: []byte)!: (n: int) {
-		ret self.fd.Read(buf)?
+	async fn Read(mut *self, mut buf: []byte)!: (n: int) {
+		ret self.fd.Read(buf).await?
+	}
+
+	// Sync variant of [Write].
+	// It is provided for blocking operations and must be used carefully
+	// in an async runtime; it blocks the thread, not the coroutine.
+	fn ReadSync(mut *self, mut buf: []byte)!: (n: int) {
+		ret self.fd.ReadSync(buf)?
 	}
 
 	// Sets offset to next Read/Write operation and returns the new offset.
 	// whence: 0 (io::SeekStart) means, relative to the whence of the file, 1 (io::SeekCurrent)
 	// means relative to the current offset, and 2 (io::SeekEnd) means relative to end.
-	fn Seek(mut *self, offset: i64, whence: int)!: i64 {
-		ret self.fd.Seek(offset, whence)?
+	async fn Seek(mut *self, offset: i64, whence: int)!: i64 {
+		ret self.fd.Seek(offset, whence).await?
 	}
 
 	// Commits the current contents of the file to stable storage.
@@ -173,7 +235,14 @@ impl File {
 	}
 
 	// Closes file handle.
-	fn Close(mut *self)! {
-		self.fd.Close()?
+	async fn Close(mut *self)! {
+		self.fd.Close().await?
+	}
+
+	// Sync variant of [Close].
+	// It is provided for blocking operations and must be used carefully
+	// in an async runtime; it blocks the thread, not the coroutine.
+	fn CloseSync(mut *self)! {
+		self.fd.CloseSync()?
 	}
 }

@@ -132,16 +132,16 @@ impl Replacer {
 	}
 
 	// Writes s to w with all replacements performed.
-	fn WriteStr(&self, mut w: io::Writer, s: str)!: (n: int) {
+	async fn WriteStr(&self, mut w: io::Writer, s: str)!: (n: int) {
 		self.once.Do(fn|| self.buildOnce())
-		ret self.r.WriteStr(w, s)?
+		ret self.r.WriteStr(w, s).await?
 	}
 }
 
 // Trait that a replacement algorithm needs to implement.
 trait replacer {
 	fn Replace(mut *self, s: str): str
-	fn WriteStr(mut *self, mut w: io::Writer, s: str)!: (n: int)
+	async fn WriteStr(mut *self, mut w: io::Writer, s: str)!: (n: int)
 }
 
 // Node in a lookup trie for prioritized key/value pairs. Keys
@@ -392,7 +392,7 @@ impl replacer for genericReplacer {
 	}
 
 	#disable boundary
-	fn WriteStr(mut *self, mut w: io::Writer, s: str)!: (n: int) {
+	async fn WriteStr(mut *self, mut w: io::Writer, s: str)!: (n: int) {
 		let mut last: int
 		let mut prevMatchEmpty: bool
 		mut i := 0
@@ -410,8 +410,8 @@ impl replacer for genericReplacer {
 			val, keylen, _match := self.lookup(s[i:], prevMatchEmpty)
 			prevMatchEmpty = _match && keylen == 0
 			if _match {
-				n += io::WriteStr(w, s[last:i])?
-				n += io::WriteStr(w, val)?
+				n += io::WriteStr(w, s[last:i]).await?
+				n += io::WriteStr(w, val).await?
 				i += keylen
 				last = i
 				continue
@@ -419,7 +419,7 @@ impl replacer for genericReplacer {
 			i++
 		}
 		if last != len(s) {
-			n += io::WriteStr(w, s[last:])?
+			n += io::WriteStr(w, s[last:]).await?
 		}
 		ret
 	}
@@ -474,18 +474,18 @@ impl replacer for singleStrReplacer {
 	}
 
 	#disable boundary
-	fn WriteStr(mut *self, mut w: io::Writer, s: str)!: (n: int) {
+	async fn WriteStr(mut *self, mut w: io::Writer, s: str)!: (n: int) {
 		let mut i: int
 		for {
 			_match := self.finder.next(s[i:])
 			if _match == -1 {
 				break
 			}
-			n += io::WriteStr(w, s[i:i+_match])?
-			n += io::WriteStr(w, self.value)?
+			n += io::WriteStr(w, s[i:i+_match]).await?
+			n += io::WriteStr(w, self.value).await?
 			i += _match + len(self.finder.pattern)
 		}
-		n += io::WriteStr(w, s[i:])?
+		n += io::WriteStr(w, s[i:]).await?
 		ret
 	}
 }
@@ -515,7 +515,7 @@ impl replacer for byteReplacer {
 	}
 
 	#disable boundary
-	fn WriteStr(mut *self, mut w: io::Writer, s: str)!: (n: int) {
+	async fn WriteStr(mut *self, mut w: io::Writer, s: str)!: (n: int) {
 		mut last := 0
 		mut i := 0
 		for i < len(s); i++ {
@@ -524,13 +524,13 @@ impl replacer for byteReplacer {
 				continue
 			}
 			if last != i {
-				n += io::WriteStr(w, s[last:i])?
+				n += io::WriteStr(w, s[last:i]).await?
 			}
 			last = i + 1
-			n += w.Write((*self)[b : int(b)+1])?
+			n += w.Write((*self)[b : int(b)+1]).await?
 		}
 		if last != len(s) {
-			n += io::WriteStr(w, s[last:])?
+			n += io::WriteStr(w, s[last:]).await?
 		}
 		ret n
 	}
@@ -599,7 +599,7 @@ impl replacer for byteStrReplacer {
 		ret unsafe::StrFromBytes(buf)
 	}
 
-	fn WriteStr(mut *self, mut w: io::Writer, s: str)!: (n: int) {
+	async fn WriteStr(mut *self, mut w: io::Writer, s: str)!: (n: int) {
 		mut i, mut last := 0, 0
 		for i < len(s); i++ {
 			b := s[i]
@@ -607,13 +607,13 @@ impl replacer for byteStrReplacer {
 				continue
 			}
 			if last != i {
-				n += io::WriteStr(w, s[last:i])?
+				n += io::WriteStr(w, s[last:i]).await?
 			}
 			last = i + 1
-			n += w.Write(self.replacements[b])?
+			n += w.Write(self.replacements[b]).await?
 		}
 		if last != len(s) {
-			n += io::WriteStr(w, s[last:])?
+			n += io::WriteStr(w, s[last:]).await?
 		}
 		ret
 	}

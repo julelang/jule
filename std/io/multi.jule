@@ -5,7 +5,7 @@
 struct eofReader{}
 
 impl Reader for eofReader {
-	fn Read(*self, []byte)!: int {
+	async fn Read(*self, []byte)!: int {
 		ret EOF
 	}
 }
@@ -15,7 +15,7 @@ struct multiReader {
 }
 
 impl Reader for multiReader {
-	fn Read(mut *self, mut p: []byte)!: (n: int) {
+	async fn Read(mut *self, mut p: []byte)!: (n: int) {
 		for len(self.readers) > 0 {
 			// Optimization to flatten nested multiReaders (Go's issue 13558).
 			if len(self.readers) == 1 {
@@ -25,7 +25,7 @@ impl Reader for multiReader {
 					continue
 				}
 			}
-			n = self.readers[0].Read(p)?
+			n = self.readers[0].Read(p).await?
 			if n == EOF {
 				// Use eofReader instead of nil to avoid nil panic
 				// after performing flatten (Go's issue 18232).

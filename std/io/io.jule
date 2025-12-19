@@ -34,7 +34,7 @@ const EOF = -1
 // Implementations must not retain buf.
 // Exceptionals are not standardized. Should be documented by implementations.
 trait Reader {
-	fn Read(mut *self, mut buf: []byte)!: (n: int)
+	async fn Read(mut *self, mut buf: []byte)!: (n: int)
 }
 
 // Implements the basic Write method.
@@ -47,7 +47,7 @@ trait Reader {
 // Implementations must not retain buf.
 // Exceptionals are not standardized. Should be documented by implementations.
 trait Writer {
-	fn Write(mut *self, buf: []byte)!: (n: int)
+	async fn Write(mut *self, buf: []byte)!: (n: int)
 }
 
 // Implements the basic WriteStr method.
@@ -58,7 +58,7 @@ trait Writer {
 // Implementations must not retain s.
 // Exceptionals are not standardized. Should be documented by implementations.
 trait StrWriter {
-	fn WriteStr(mut *self, s: str)!: (n: int)
+	async fn WriteStr(mut *self, s: str)!: (n: int)
 }
 
 // Implements the basic ReadByte method.
@@ -71,7 +71,7 @@ trait StrWriter {
 //
 // Exceptionals are not standardized. Should be documented by implementations.
 trait ByteReader {
-	fn ReadByte(mut *self)!: (byte, n: int)
+	async fn ReadByte(mut *self)!: (byte, n: int)
 }
 
 // Implements the UnreadByte method to the basic ReadByte method of ByteReader.
@@ -83,7 +83,7 @@ trait ByteReader {
 // seek to one byte before the current offset.
 trait ByteScanner {
 	ByteReader
-	fn UnreadByte(mut *self)!
+	async fn UnreadByte(mut *self)!
 }
 
 // Implements the basic WriteByte method.
@@ -93,7 +93,7 @@ trait ByteScanner {
 //
 // Exceptionals are not standardized. Should be documented by implementations.
 trait ByteWriter {
-	fn WriteByte(mut *self, b: byte)!
+	async fn WriteByte(mut *self, b: byte)!
 }
 
 // Implements the basic ReadRune method.
@@ -106,7 +106,7 @@ trait ByteWriter {
 //
 // Exceptionals are not standardized. Should be documented by implementations.
 trait RuneReader {
-	fn ReadRune(mut *self)!: (r: rune, size: int)
+	async fn ReadRune(mut *self)!: (r: rune, size: int)
 }
 
 // Implements the UnreadRune method to the basic ReadRune method of RuneReader.
@@ -118,7 +118,7 @@ trait RuneReader {
 // seek to the start of the rune before the current offset.
 trait RuneScanner {
 	RuneReader
-	fn UnreadRune(mut *self)!
+	async fn UnreadRune(mut *self)!
 }
 
 // Implements the basic WriteRune method.
@@ -132,7 +132,7 @@ trait RuneScanner {
 //
 // Exceptionals are not standardized. Should be documented by implementations.
 trait RuneWriter {
-	fn WriteRune(mut *self, r: rune)!: (n: int)
+	async fn WriteRune(mut *self, r: rune)!: (n: int)
 }
 
 // Implements the basic Close method.
@@ -146,7 +146,7 @@ trait RuneWriter {
 //
 // Exceptionals are not standardized. Should be documented by implementations.
 trait Closer {
-	fn Close(mut *self)!
+	async fn Close(mut *self)!
 }
 
 // The trait that wraps the basic ReadAt method.
@@ -177,7 +177,7 @@ trait Closer {
 // Implementations must not retain p.
 // Exceptionals are not standardized. Should be documented by implementations.
 trait ReaderAt {
-	fn ReadAt(mut *self, mut p: []byte, off: i64)!: (n: int)
+	async fn ReadAt(mut *self, mut p: []byte, off: i64)!: (n: int)
 }
 
 // The trait that wraps the basic ReadFrom method.
@@ -188,7 +188,7 @@ trait ReaderAt {
 //
 // It should return io::EOF for EOF.
 trait ReaderFrom {
-	fn ReadFrom(mut *self, mut r: Reader)!: (n: i64)
+	async fn ReadFrom(mut *self, mut r: Reader)!: (n: i64)
 }
 
 // The trait that wraps the WriteTo method.
@@ -201,7 +201,7 @@ trait ReaderFrom {
 //
 // Exceptionals are not standardized. Should be documented by implementations.
 trait WriterTo {
-	fn WriteTo(mut *self, mut w: Writer)!: (n: i64)
+	async fn WriteTo(mut *self, mut w: Writer)!: (n: i64)
 }
 
 // The trait that wraps the basic Seek method.
@@ -224,7 +224,7 @@ trait WriterTo {
 //
 // Exceptionals are not standardized. Should be documented by implementations.
 trait Seeker {
-	fn Seek(mut *self, offset: i64, whence: int)!: i64
+	async fn Seek(mut *self, offset: i64, whence: int)!: i64
 }
 
 // Inheritance group for the Reader and Closer traits.
@@ -279,13 +279,13 @@ trait ReadWriteSeeker {
 struct discard{}
 
 impl Writer for discard {
-	fn Write(mut *self, buf: []byte)!: (n: int) {
+	async fn Write(mut *self, buf: []byte)!: (n: int) {
 		ret len(buf)
 	}
 }
 
 impl StrWriter for discard {
-	fn WriteStr(mut *self, s: str)!: (n: int) {
+	async fn WriteStr(mut *self, s: str)!: (n: int) {
 		ret len(s)
 	}
 }
@@ -309,14 +309,14 @@ impl LimitedReader {
 }
 
 impl Reader for LimitedReader {
-	fn Read(mut *self, mut p: []byte)!: (n: int) {
+	async fn Read(mut *self, mut p: []byte)!: (n: int) {
 		if self.N <= 0 {
 			ret EOF
 		}
 		if i64(len(p)) > self.N {
 			p = p[0:self.N]
 		}
-		n = self.R.Read(p)?
+		n = self.R.Read(p).await?
 		if n != EOF {
 			self.N -= i64(n)
 		}
@@ -326,7 +326,7 @@ impl Reader for LimitedReader {
 
 // Returns a [ReadCloser] with a no-op Close method wrapping
 // the provided [Reader] r.
-fn NopCloser(mut r: Reader): ReadCloser {
+async fn NopCloser(mut r: Reader): ReadCloser {
 	ret nopCloser{r}
 }
 
@@ -335,19 +335,19 @@ struct nopCloser {
 }
 
 impl ReadCloser for nopCloser {
-	fn Read(mut *self, mut p: []byte)!: int {
-		ret self.r.Read(p)?
+	async fn Read(mut *self, mut p: []byte)!: int {
+		ret self.r.Read(p).await?
 	}
 
-	fn Close(mut *self)! {}
+	async fn Close(mut *self)! {}
 }
 
 // Copies n bytes (or until an error) from src to dst.
 // It returns the number of bytes copied and throws the earliest
 // error encountered while copying.
 // On return, written == n if and only if no error.
-fn CopyN(mut dst: Writer, mut src: Reader, n: i64)!: (written: i64) {
-	written = Copy(dst, LimitedReader.New(src, n))?
+async fn CopyN(mut dst: Writer, mut src: Reader, n: i64)!: (written: i64) {
+	written = Copy(dst, LimitedReader.New(src, n)).await?
 	if written == n {
 		ret n
 	}
@@ -359,34 +359,34 @@ fn CopyN(mut dst: Writer, mut src: Reader, n: i64)!: (written: i64) {
 // copied and the first error encountered while copying, if any.
 //
 // Forwards any exceptional and may be throw InvalidWrite or ShortWrite.
-fn Copy(mut dst: Writer, mut src: Reader)!: (written: i64) {
-	ret copyBuffer(dst, src, nil)?
+async fn Copy(mut dst: Writer, mut src: Reader)!: (written: i64) {
+	ret copyBuffer(dst, src, nil).await?
 }
 
 // Identical to Copy except that it stages through the
 // provided buffer (if one is required) rather than allocating a
 // temporary one. If buf is nil, one is allocated; otherwise if it has
 // zero length, it panics.
-fn CopyBuffer(mut dst: Writer, mut src: Reader, mut buf: []byte)!: (written: i64) {
+async fn CopyBuffer(mut dst: Writer, mut src: Reader, mut buf: []byte)!: (written: i64) {
 	if buf != nil && len(buf) == 0 {
 		panic("std/io: empty buffer in CopyBuffer")
 	}
-	ret copyBuffer(dst, src, buf)?
+	ret copyBuffer(dst, src, buf).await?
 }
 
 // Actual implementation of Copy and CopyBuffer.
 // if buf is nil, one is allocated.
-fn copyBuffer(mut dst: Writer, mut src: Reader, mut buf: []byte)!: (written: i64) {
+async fn copyBuffer(mut dst: Writer, mut src: Reader, mut buf: []byte)!: (written: i64) {
 	if buf == nil {
 		buf = make([]byte, 32*1024)
 	}
 	for {
-		nr := src.Read(buf)?
+		nr := src.Read(buf).await?
 		if nr == EOF {
 			break
 		}
 		if nr > 0 {
-			nw := dst.Write(buf[0:nr])?
+			nw := dst.Write(buf[0:nr]).await?
 			if nw < 0 || nr < nw {
 				error(errInvalidWrite)
 			}
@@ -401,22 +401,22 @@ fn copyBuffer(mut dst: Writer, mut src: Reader, mut buf: []byte)!: (written: i64
 
 // Writes the contents of the string s to w efficiently.
 // Guarantees a slice will not be allocated.
-fn WriteStr(mut w: Writer, s: str)!: (n: int) {
-	ret w.Write(unsafe::StrBytes(s))?
+async fn WriteStr(mut w: Writer, s: str)!: (n: int) {
+	ret w.Write(unsafe::StrBytes(s)).await?
 }
 
 // Writes a single byte to w efficiently.
 // Guarantees a slice will not be allocated.
-fn WriteByte(mut w: Writer, b: byte)!: (n: int) {
-	ret w.Write(unsafe::Slice(&b, 1, 1))?
+async fn WriteByte(mut w: Writer, b: byte)!: (n: int) {
+	ret w.Write(unsafe::Slice(&b, 1, 1)).await?
 }
 
 // Reads from r until an error or EOF and returns the data it read.
 // A successful call throws no exception.
-fn ReadAll(mut r: Reader)!: []byte {
+async fn ReadAll(mut r: Reader)!: []byte {
 	mut b := make([]byte, 0, 512)
 	for {
-		n := r.Read(b[len(b):cap(b)])?
+		n := r.Read(b[len(b):cap(b)]).await?
 		if n == EOF {
 			ret b
 		}
@@ -436,12 +436,12 @@ fn ReadAll(mut r: Reader)!: []byte {
 // If min is greater than the length of buf, exception is ErrShortBuffer.
 // On return, n >= min if and only if err == nil.
 // If r returns an error having read at least min bytes, the error is dropped.
-fn ReadAtLeast(mut r: Reader, mut buf: []byte, min: int)!: (n: int) {
+async fn ReadAtLeast(mut r: Reader, mut buf: []byte, min: int)!: (n: int) {
 	if len(buf) < min {
 		error(ErrShortBuffer)
 	}
 	for n < min {
-		rn := r.Read(buf[n:]) else {
+		rn := r.Read(buf[n:]).await else {
 			if n >= min {
 				ret n
 			}
@@ -465,6 +465,6 @@ fn ReadAtLeast(mut r: Reader, mut buf: []byte, min: int)!: (n: int) {
 // If an EOF happens after reading some but not all the bytes, exception is ErrUnexpectedEOF.
 // On return, n == len(buf) if and only if err == nil.
 // If r returns an error having read at least len(buf) bytes, the error is dropped.
-fn ReadFull(mut r: Reader, mut buf: []byte)!: (n: int) {
-	ret ReadAtLeast(r, buf, len(buf))?
+async fn ReadFull(mut r: Reader, mut buf: []byte)!: (n: int) {
+	ret ReadAtLeast(r, buf, len(buf)).await?
 }

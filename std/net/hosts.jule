@@ -42,7 +42,7 @@ struct hostsdata {
 // hosts contains known host entries.
 let mut hosts = hostsdata{}
 
-fn readHosts() {
+async fn readHosts() {
 	now := time::Now()
 	hp := hostsFilePath
 
@@ -61,9 +61,8 @@ fn readHosts() {
 	mut file, ok := open(hp)
 
 	if ok {
-		defer { file.close() }
-		mut line, (ok) := file.readLine()
-		for ok; line, ok = file.readLine() {
+		mut line, (ok) := file.readLine().await
+		for ok; line, ok = file.readLine().await {
 			mut i := byteslite::IndexByteStr(line, '#')
 			if i >= 0 {
 				// Discard comments.
@@ -107,6 +106,7 @@ fn readHosts() {
 				}
 			}
 		}
+		file.close().await
 	}
 	// Update the data cache.
 	hosts.expire = now.Add(cacheMaxAge)

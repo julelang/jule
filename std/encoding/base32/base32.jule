@@ -383,7 +383,7 @@ struct encoder {
 }
 
 impl io::WriteCloser for encoder {
-	fn Write(mut *self, p: []byte)!: (n: int) {
+	async fn Write(mut *self, p: []byte)!: (n: int) {
 		mut out := unsafe::Slice(&self.out[0], len(self.out), len(self.out))
 		mut buf := unsafe::Slice(&self.buf[0], len(self.buf), len(self.buf))
 
@@ -400,7 +400,7 @@ impl io::WriteCloser for encoder {
 				ret
 			}
 			self.enc.Encode(out[0:], buf[0:])
-			self.w.Write(out[0:8])?
+			self.w.Write(out[0:8]).await?
 			self.nbuf = 0
 		}
 
@@ -412,7 +412,7 @@ impl io::WriteCloser for encoder {
 				nn -= nn % 5
 			}
 			self.enc.Encode(out[0:], p[0:nn])
-			self.w.Write(out[0 : nn/5*8])?
+			self.w.Write(out[0 : nn/5*8]).await?
 			n += nn
 			unsafe { *(&p) = (*(&p))[nn:] }
 		}
@@ -427,7 +427,7 @@ impl io::WriteCloser for encoder {
 	// Flushes any pending output from the encoder.
 	// It is an error to call Write after calling Close.
 	#disable boundary
-	fn Close(mut *self)! {
+	async fn Close(mut *self)! {
 		// If there's anything left in the buffer, flush it out
 		if self.nbuf > 0 {
 			mut out := unsafe::Slice(&self.out[0], len(self.out), len(self.out))
@@ -436,7 +436,7 @@ impl io::WriteCloser for encoder {
 			self.enc.Encode(out[0:], buf[0:self.nbuf])
 			encodedLen := self.enc.EncodedLen(self.nbuf)
 			self.nbuf = 0
-			self.w.Write(out[0:encodedLen])?
+			self.w.Write(out[0:encodedLen]).await?
 		}
 	}
 }
@@ -460,9 +460,9 @@ struct decoder {
 	outbuf: [1024 / 8 * 5]byte
 }
 
-fn readEncodedData(mut r: io::Reader, mut buf: []byte, min: int, expectsPadding: bool)!: (n: int) {
+async fn readEncodedData(mut r: io::Reader, mut buf: []byte, min: int, expectsPadding: bool)!: (n: int) {
 	for n < min {
-		nn := r.Read(buf[n:])?
+		nn := r.Read(buf[n:]).await?
 		if nn == io::EOF {
 			// Data was read, less than min bytes could be read.
 			if n < min && n > 0 {
@@ -482,7 +482,7 @@ fn readEncodedData(mut r: io::Reader, mut buf: []byte, min: int, expectsPadding:
 }
 
 impl io::Reader for decoder {
-	fn Read(mut *self, mut p: []byte)!: (n: int) {
+	async fn Read(mut *self, mut p: []byte)!: (n: int) {
 		// Use leftover decoded output from last read.
 		if len(self.out) > 0 {
 			n = copy(p, self.out)
@@ -515,7 +515,7 @@ impl io::Reader for decoder {
 
 		mut buf := unsafe::Slice(&self.buf[0], len(self.buf), len(self.buf))
 
-		nn = readEncodedData(self.r, buf[self.nbuf:nn], min, expectsPadding)?
+		nn = readEncodedData(self.r, buf[self.nbuf:nn], min, expectsPadding).await?
 		if nn != io::EOF {
 			self.nbuf += nn
 		}

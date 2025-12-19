@@ -219,12 +219,12 @@ impl Reader {
 	// If there is no data left to be read, read returns nil.
 	// If [self.ReuseRecord] is true, the returned slice may be shared
 	// between multiple calls to read.
-	fn Read(mut *self)!: (record: []str) {
+	async fn Read(mut *self)!: (record: []str) {
 		if self.ReuseRecord {
-			record = self.readRecord(self.lastRecord)?
+			record = self.readRecord(self.lastRecord).await?
 			self.lastRecord = record
 		} else {
-			record = self.readRecord(nil)?
+			record = self.readRecord(nil).await?
 		}
 		ret
 	}
@@ -247,9 +247,9 @@ impl Reader {
 
 	// Reads all the remaining records from r.
 	// Each record is a slice of fields.
-	fn ReadAll(mut *self)!: (records: [][]str) {
+	async fn ReadAll(mut *self)!: (records: [][]str) {
 		for {
-			mut record := self.readRecord(nil)?
+			mut record := self.readRecord(nil).await?
 			if len(record) == 0 {
 				break
 			}
@@ -261,8 +261,8 @@ impl Reader {
 	// Reads the next line (with the trailing endline).
 	// If EOF is hit without a trailing endline, it will be omitted.
 	// The result is only valid until the next call to readLine.
-	fn readLine(mut *self)!: []byte {
-		mut line := self.r.readSlice('\n')?
+	async fn readLine(mut *self)!: []byte {
+		mut line := self.r.readSlice('\n').await?
 		mut readSize := len(line)
 		if readSize > 0 {
 			// For backwards compatibility, drop trailing \r before EOF.
@@ -281,7 +281,7 @@ impl Reader {
 		ret line
 	}
 
-	fn readRecord(mut *self, mut dst: []str)!: []str {
+	async fn readRecord(mut *self, mut dst: []str)!: []str {
 		if self.Comma == self.Comment ||
 			!validDelim(self.Comma) ||
 			(self.Comment != 0 && !validDelim(self.Comment)) {
@@ -291,7 +291,7 @@ impl Reader {
 		// Read line (automatically skipping past empty lines and any comments).
 		let mut line: []byte
 		for {
-			line = self.readLine()?
+			line = self.readLine().await?
 			if len(line) == 0 {
 				ret nil
 			}
@@ -404,7 +404,7 @@ impl Reader {
 						// Hit end of line (copy all data so far).
 						self.recordBuffer = append(self.recordBuffer, line...)
 						pos.col += len(line)
-						line = self.readLine()?
+						line = self.readLine().await?
 						if len(line) > 0 {
 							pos.line++
 							pos.col = 1
@@ -498,7 +498,7 @@ impl bufreader {
 		ret br
 	}
 
-	fn readSlice(mut *self, delim: byte)!: (line: []byte) {
+	async fn readSlice(mut *self, delim: byte)!: (line: []byte) {
 		mut n := 0
 		for {
 			i := bytes::IndexByte(self.buf[self.r:], delim)
@@ -512,7 +512,7 @@ impl bufreader {
 				copy(buf, self.buf)
 				self.buf = buf
 			}
-			w := self.rd.Read(self.buf[self.r+n:])?
+			w := self.rd.Read(self.buf[self.r+n:]).await?
 			if w == io::EOF {
 				line = self.buf[self.r:self.w]
 				self.r = self.w

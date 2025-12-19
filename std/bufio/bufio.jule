@@ -129,7 +129,7 @@ impl Reader {
 	}
 
 	// Reads a new chunk into the buffer.
-	fn fill(mut *self): (eof: bool) {
+	async fn fill(mut *self): (eof: bool) {
 		// Slide existing data to beginning.
 		if self.r > 0 {
 			copy(self.buf, self.buf[self.r:self.w])
@@ -144,7 +144,7 @@ impl Reader {
 		// Read new data: try a limited number of times.
 		mut i := maxConsecutiveEmptyReads
 		for i > 0; i-- {
-			n := self.rd.Read(self.buf[self.w:]) else {
+			n := self.rd.Read(self.buf[self.w:]).await else {
 				self.err = error
 				ret false
 			}
@@ -178,7 +178,7 @@ impl Reader {
 	//
 	// Calling Peek prevents a [Reader.UnreadByte] or [Reader.UnreadRune] call from succeeding
 	// until the next read operation.
-	fn Peek(mut *self, mut n: int)!: (data: []byte, full: bool, eof: bool) {
+	async fn Peek(mut *self, mut n: int)!: (data: []byte, full: bool, eof: bool) {
 		if n < 0 {
 			error(ErrNegativeCount)
 		}
@@ -187,7 +187,7 @@ impl Reader {
 		self.lastRuneSize = -1
 
 		for self.w-self.r < n && self.w-self.r < len(self.buf) && self.err == nil {
-			eof = self.fill() // self.w-self.r < len(self.buf) => buffer is not full
+			eof = self.fill().await // self.w-self.r < len(self.buf) => buffer is not full
 			if eof {
 				break
 			}
@@ -221,7 +221,7 @@ impl Reader {
 	// If Discard skips fewer than n bytes, it throws an error.
 	// If 0 <= n <= self.Buffered(), Discard is guaranteed to succeed without
 	// reading from the underlying io::Reader.
-	fn Discard(mut *self, n: int)!: (discarded: int) {
+	async fn Discard(mut *self, n: int)!: (discarded: int) {
 		if n < 0 {
 			error(ErrNegativeCount)
 		}
@@ -237,7 +237,7 @@ impl Reader {
 			mut eof := false
 			mut skip := self.Buffered()
 			if skip == 0 {
-				eof = self.fill()
+				eof = self.fill().await
 				skip = self.Buffered()
 			}
 			if skip > remain {
@@ -264,7 +264,7 @@ impl Reader {
 	// To read exactly len(p) bytes, use io::ReadFull(self, p).
 	// If the underlying [Reader] can return a non-zero count,
 	// then this Read method can do so as well; see the [io::Reader] docs.
-	fn Read(mut *self, mut p: []byte)!: (n: int) {
+	async fn Read(mut *self, mut p: []byte)!: (n: int) {
 		n = len(p)
 		if n == 0 {
 			if self.Buffered() > 0 {
@@ -282,7 +282,7 @@ impl Reader {
 			if len(p) >= len(self.buf) {
 				// Large read, empty buffer.
 				// Read directly into p to avoid copy.
-				n = self.rd.Read(p)?
+				n = self.rd.Read(p).await?
 				if n == io::EOF {
 					ret n
 				}
@@ -299,7 +299,7 @@ impl Reader {
 			// Do not use self.fill, which will loop.
 			self.r = 0
 			self.w = 0
-			n = self.rd.Read(self.buf)?
+			n = self.rd.Read(self.buf).await?
 			if n == io::EOF {
 				ret io::EOF
 			}
@@ -321,7 +321,7 @@ impl Reader {
 
 	// Reads and returns a single byte.
 	// If no byte is available, returns an error.
-	fn ReadByte(mut *self)!: (byte, int) {
+	async fn ReadByte(mut *self)!: (byte, int) {
 		self.lastRuneSize = -1
 		mut eof := false
 		for self.r == self.w {
@@ -331,7 +331,7 @@ impl Reader {
 			if self.err != nil {
 				error(self.readErr())
 			}
-			eof = self.fill() // buffer is empty
+			eof = self.fill().await // buffer is empty
 		}
 		c := self.buf[self.r]
 		self.r++
@@ -344,7 +344,7 @@ impl Reader {
 	// Returns an error if the most recent method called on the
 	// [Reader] was not a read operation. Notably, [Reader.Peek], [Reader.Discard], and [Reader.WriteTo] are not
 	// considered read operations.
-	fn UnreadByte(mut *self)! {
+	async fn UnreadByte(mut *self)! {
 		if self.lastByte < 0 || self.r == 0 && self.w > 0 {
 			error(ErrInvalidUnreadByte)
 		}
@@ -363,9 +363,9 @@ impl Reader {
 	// Reads a single UTF-8 encoded Unicode character and returns the
 	// rune and its size in bytes. If the encoded rune is invalid, it consumes one byte
 	// and returns unicode.ReplacementChar (U+FFFD) with a size of 1.
-	fn ReadRune(mut *self)!: (r: rune, size: int) {
+	async fn ReadRune(mut *self)!: (r: rune, size: int) {
 		for self.r+utf8::UTFMax > self.w && !utf8::FullRune(self.buf[self.r:self.w]) && self.err == nil && self.w-self.r < len(self.buf) {
-			eof := self.fill() // self.w-self.r < len(buf) => buffer is not full
+			eof := self.fill().await // self.w-self.r < len(buf) => buffer is not full
 			if eof {
 				break
 			}
@@ -391,7 +391,7 @@ impl Reader {
 	// the [Reader] was not a [Reader.ReadRune], [Reader.UnreadRune] returns an error. (In this
 	// regard it is stricter than [Reader.UnreadByte], which will unread the last byte
 	// from any read operation.)
-	fn UnreadRune(mut *self)! {
+	async fn UnreadRune(mut *self)! {
 		if self.lastRuneSize < 0 || self.r < self.lastRuneSize {
 			error(ErrInvalidUnreadRune)
 		}
@@ -415,7 +415,7 @@ impl Reader {
 	// Throws error if and only if line does not end in delim because of an error.
 	// If it encounters EOF before finding a delimiter,
 	// it returns all the data in the buffer.
-	fn ReadSlice(mut *self, delim: byte)!: (line: []byte, full: bool, eof: bool) {
+	async fn ReadSlice(mut *self, delim: byte)!: (line: []byte, full: bool, eof: bool) {
 		mut s := 0 // search start index
 		for {
 			// Search buffer.
@@ -450,7 +450,7 @@ impl Reader {
 
 			s = self.w - self.r // do not rescan area we scanned before
 
-			eof = self.fill() // buffer is not full
+			eof = self.fill().await // buffer is not full
 		}
 
 		// Handle last byte, if any.
@@ -478,8 +478,8 @@ impl Reader {
 	// Calling [Reader.UnreadByte] after ReadLine will always unread the last byte read
 	// (possibly a character belonging to the line end) even if that byte is not
 	// part of the line returned by ReadLine.
-	fn ReadLine(mut *self)!: (line: []byte, isPrefix: bool, eof: bool) {
-		line, full, eof := self.ReadSlice('\n')?
+	async fn ReadLine(mut *self)!: (line: []byte, isPrefix: bool, eof: bool) {
+		line, full, eof := self.ReadSlice('\n').await?
 		if full {
 			// Handle the case where "\r\n" straddles the buffer.
 			if len(line) > 0 && line[len(line)-1] == '\r' {
@@ -516,11 +516,11 @@ impl Reader {
 	// `bytes::Join(append(fullBuffers, finalFragment), nil)`, which has a
 	// length of `totalLen`. The result is structured in this way to allow callers
 	// to minimize allocations and copies.
-	fn collectFragments(mut *self, delim: byte)!: (fullBuffers: [][]byte, finalFragment: []byte, totalLen: int, eof: bool) {
+	async fn collectFragments(mut *self, delim: byte)!: (fullBuffers: [][]byte, finalFragment: []byte, totalLen: int, eof: bool) {
 		let mut frag: []byte
 		// Use ReadSlice to look for delim, accumulating full buffers.
 		for {
-			(frag), full, (eof) := self.ReadSlice(delim)? // unexpected error, if any
+			(frag), full, (eof) := self.ReadSlice(delim).await? // unexpected error, if any
 			if !full || eof { // got final fragment
 				break
 			}
@@ -541,8 +541,8 @@ impl Reader {
 	// Returns zero-length slice for EOF. If it encounters EOF before finding a delimiter,
 	// it returns all the data in the buffer.
 	// For simple uses, a Scanner may be more convenient.
-	fn ReadBytes(mut *self, delim: byte)!: (buf: []byte, eof: bool) {
-		full, frag, mut n, eof := self.collectFragments(delim)?
+	async fn ReadBytes(mut *self, delim: byte)!: (buf: []byte, eof: bool) {
+		full, frag, mut n, eof := self.collectFragments(delim).await?
 		if n == 0 && eof {
 			ret
 		}
@@ -564,8 +564,8 @@ impl Reader {
 	// Returns empty string for EOF. If it encounters EOF before finding a delimiter,
 	// it returns all the data in the buffer.
 	// For simple uses, a Scanner may be more convenient.
-	fn ReadStr(mut *self, delim: byte)!: (str, eof: bool) {
-		full, frag, n, eof := self.collectFragments(delim)?
+	async fn ReadStr(mut *self, delim: byte)!: (str, eof: bool) {
+		full, frag, n, eof := self.collectFragments(delim).await?
 		if n == 0 && eof {
 			ret
 		}
@@ -582,27 +582,27 @@ impl Reader {
 
 	// Implements io::WriterTo.
 	// This may make multiple calls to the [Reader.Read] method of the underlying [Reader].
-	fn WriteTo(mut *self, mut w: io::Writer)!: (n: i64) {
+	async fn WriteTo(mut *self, mut w: io::Writer)!: (n: i64) {
 		self.lastByte = -1
 		self.lastRuneSize = -1
 
 		if self.r < self.w {
-			n = self.writeBuf(w)?
+			n = self.writeBuf(w).await?
 		}
 
 		if self.w-self.r < len(self.buf) {
-			self.fill() // buffer not full
+			self.fill().await // buffer not full
 		}
 
 		mut eof := false
 		for self.r < self.w {
 			// self.r < self.w => buffer is not empty
-			m := self.writeBuf(w)?
+			m := self.writeBuf(w).await?
 			n += m
 			if eof {
 				break
 			}
-			eof = self.fill() // buffer is empty
+			eof = self.fill().await // buffer is empty
 		}
 
 		if self.err != nil {
@@ -613,8 +613,8 @@ impl Reader {
 	}
 
 	// Writes the [Reader]'s buffer to the writer.
-	fn writeBuf(mut *self, mut w: io::Writer)!: i64 {
-		n := w.Write(self.buf[self.r:self.w])?
+	async fn writeBuf(mut *self, mut w: io::Writer)!: i64 {
+		n := w.Write(self.buf[self.r:self.w]).await?
 		if n < 0 {
 			panic("bufio: reader returned negative count from Read")
 		}
@@ -695,14 +695,14 @@ impl Writer {
 	}
 
 	// Writes any buffered data to the underlying [io::Writer].
-	fn Flush(mut *self)! {
+	async fn Flush(mut *self)! {
 		if self.err != nil {
 			error(self.err)
 		}
 		if self.n == 0 {
 			ret
 		}
-		n := self.wr.Write(self.buf[0:self.n]) else {
+		n := self.wr.Write(self.buf[0:self.n]).await else {
 			self.err = error
 			error(self.err)
 		}
@@ -730,20 +730,20 @@ impl Writer {
 	// Writes the contents of p into the buffer.
 	// It returns the number of bytes written.
 	// If nn < len(p), it throws for short-write reason.
-	fn Write(mut *self, p: []byte)!: (nn: int) {
+	async fn Write(mut *self, p: []byte)!: (nn: int) {
 		for len(p) > self.Available() && self.err == nil {
 			let mut n: int
 			if self.Buffered() == 0 {
 				// Large write, empty buffer.
 				// Write directly from p to avoid copy.
-				n = self.wr.Write(p) else {
+				n = self.wr.Write(p).await else {
 					self.err = error
 					use 0
 				}
 			} else {
 				n = copy(self.buf[self.n:], p)
 				self.n += n
-				self.Flush() else {}
+				self.Flush().await else {}
 			}
 			nn += n
 			unsafe { *(&p) = (*(&p))[n:] }
@@ -758,12 +758,12 @@ impl Writer {
 	}
 
 	// Writes a single byte.
-	fn WriteByte(mut *self, c: byte)! {
+	async fn WriteByte(mut *self, c: byte)! {
 		if self.err != nil {
 			error(self.err)
 		}
 		if self.Available() <= 0 {
-			self.Flush()?
+			self.Flush().await?
 		}
 		self.buf[self.n] = c
 		self.n++
@@ -771,10 +771,10 @@ impl Writer {
 
 	// Writes a single Unicode code point, returning
 	// the number of bytes written and throws any error.
-	fn WriteRune(mut *self, r: rune)!: (size: int) {
+	async fn WriteRune(mut *self, r: rune)!: (size: int) {
 		// Compare as u32 to correctly handle negative runes.
 		if u32(r) < utf8::RuneSelf {
-			self.WriteByte(byte(r))?
+			self.WriteByte(byte(r)).await?
 			ret 1
 		}
 		if self.err != nil {
@@ -782,11 +782,11 @@ impl Writer {
 		}
 		mut n := self.Available()
 		if n < utf8::UTFMax {
-			self.Flush()?
+			self.Flush().await?
 			n = self.Available()
 			if n < utf8::UTFMax {
 				// Can only happen if buffer is silly small.
-				ret self.WriteStr(str(r))?
+				ret self.WriteStr(str(r)).await?
 			}
 		}
 		size = utf8::EncodeRune(self.buf[self.n:], r)
@@ -798,13 +798,13 @@ impl Writer {
 	// It returns the number of bytes written.
 	// If the count is less than len(s), it throws an error explaining
 	// why the write is short.
-	fn WriteStr(mut *self, mut s: str)!: int {
+	async fn WriteStr(mut *self, mut s: str)!: int {
 		mut nn := 0
 		for len(s) > self.Available() && self.err == nil {
 			let mut n: int
 			n = copy(self.buf[self.n:], s)
 			self.n += n
-			self.Flush() else {}
+			self.Flush().await else {}
 			nn += n
 			s = s[n:]
 		}
@@ -818,7 +818,7 @@ impl Writer {
 	}
 
 	// Implements [io::ReaderFrom].
-	fn ReadFrom(mut *self, mut r: io::Reader)!: (n: i64) {
+	async fn ReadFrom(mut *self, mut r: io::Reader)!: (n: i64) {
 		if self.err != nil {
 			error(self.err)
 		}
@@ -826,11 +826,11 @@ impl Writer {
 	Loop:
 		for {
 			if self.Available() == 0 {
-				self.Flush()?
+				self.Flush().await?
 			}
 			mut nr := 0
 			for nr < maxConsecutiveEmptyReads {
-				m = r.Read(self.buf[self.n:])?
+				m = r.Read(self.buf[self.n:]).await?
 				if m == io::EOF {
 					break Loop
 				} else if m != 0 {
@@ -847,7 +847,7 @@ impl Writer {
 		if m == io::EOF {
 			// If we filled the buffer exactly, flush preemptively.
 			if self.Available() == 0 {
-				self.Flush()?
+				self.Flush().await?
 			}
 		}
 		ret n

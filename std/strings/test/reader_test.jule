@@ -135,9 +135,9 @@ fn testReaderAt(t: &testing::T) {
 
 // tests that Len is affected by reads, but Size is not.
 #test
-fn testReaderLenSize(t: &testing::T) {
+async fn testReaderLenSize(t: &testing::T) {
 	mut r := strings::Reader.New("abc")
-	io::CopyN(io::Discard, r, 1)!
+	io::CopyN(io::Discard, r.Async(), 1).await!
 	if r.Len() != 2 {
 		t.Errorf("Len = {}; want 2", r.Len())
 	}
@@ -147,7 +147,7 @@ fn testReaderLenSize(t: &testing::T) {
 }
 
 #test
-fn testReaderReset(t: &testing::T) {
+async fn testReaderReset(t: &testing::T) {
 	mut r := strings::Reader.New("世界")
 	let mut err: any
 	r.ReadRune() else {
@@ -167,7 +167,7 @@ fn testReaderReset(t: &testing::T) {
 		t.Errorf("UnreadRune: expected error, got nil")
 	}
 	err = nil
-	buf := io::ReadAll(r) else {
+	buf := io::ReadAll(r.Async()).await else {
 		err = error
 		use nil
 	}

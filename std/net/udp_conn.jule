@@ -32,8 +32,8 @@ impl UDPConn {
 	// In addition, any bind and listening error will be return as exceptional.
 	//
 	// See the [Dial] function for a description of the addr parameter.
-	fn Bind(addr: str)!: &UDPConn {
-		ret udpBind(Network.UDP, addr)?
+	async fn Bind(addr: str)!: &UDPConn {
+		ret udpBind(Network.UDP, addr).await?
 	}
 
 	// Connects to UDP listener by given address.
@@ -42,8 +42,8 @@ impl UDPConn {
 	// In addition, any bind and listening error will be return as exceptional.
 	//
 	// See the [Dial] function for a description of the addr parameter.
-	fn Dial(addr: str)!: &UDPConn {
-		ret udpDial(Network.UDP, addr)?
+	async fn Dial(addr: str)!: &UDPConn {
+		ret udpDial(Network.UDP, addr).await?
 	}
 
 	// Read bytes to buffer from connection and returns read byte count.
@@ -51,33 +51,33 @@ impl UDPConn {
 	// If the buffer is larger than the number of bytes that can be read,
 	// the buffer will not cause an overflow.
 	// It will panic if connection is closed.
-	fn Read(mut *self, mut buf: []byte)!: (n: int) {
+	async fn Read(mut *self, mut buf: []byte)!: (n: int) {
 		if self.fd == nil {
 			panic("net: UDPConn.Read: connection is closed")
 		}
 		if self.connect {
-			ret self.fd.Read(buf)?
+			ret self.fd.Read(buf).await?
 		}
 		if self.v6 {
-			ret self.fd.ReadV6(buf, self.sockaddr6)?
+			ret self.fd.ReadV6(buf, self.sockaddr6).await?
 		} else {
-			ret self.fd.ReadV4(buf, self.sockaddr4)?
+			ret self.fd.ReadV4(buf, self.sockaddr4).await?
 		}
 	}
 
 	// Writes bytes to connection and returns written byte count.
 	// The number of bytes written can never exceed the length of the buffer.
-	fn Write(mut *self, buf: []byte)!: (n: int) {
+	async fn Write(mut *self, buf: []byte)!: (n: int) {
 		if self.fd == nil {
 			panic("net: UDPConn.Write: connection is closed")
 		}
 		if self.connect {
-			ret self.fd.Write(buf)?
+			ret self.fd.Write(buf).await?
 		}
 		if self.v6 {
-			ret self.fd.WriteV6(buf, self.sockaddr6)?
+			ret self.fd.WriteV6(buf, self.sockaddr6).await?
 		} else {
-			ret self.fd.WriteV4(buf, self.sockaddr4)?
+			ret self.fd.WriteV4(buf, self.sockaddr4).await?
 		}
 	}
 
@@ -125,18 +125,18 @@ impl UDPConn {
 	}
 
 	// Closes connection.
-	fn Close(mut *self)! {
+	async fn Close(mut *self)! {
 		if self.fd == nil {
 			ret
 		}
-		self.fd.Close()?
+		self.fd.Close().await?
 		self.fd = nil
 		self.v6 = false
 	}
 }
 
-fn udpBind(network: Network, addr: str)!: &UDPConn {
-	mut connAddr := UDPAddr.Resolve(network, addr)?
+async fn udpBind(network: Network, addr: str)!: &UDPConn {
+	mut connAddr := UDPAddr.Resolve(network, addr).await?
 	mut conn := UDPConn{
 		Addr: connAddr,
 	}
@@ -149,7 +149,7 @@ fn udpBind(network: Network, addr: str)!: &UDPConn {
 			conn.sockaddr4.Family = sys::AF_INET
 			conn.sockaddr4.Port = htons(conn.Addr.Port)
 			sys::Bind(handle, uintptr(&conn.sockaddr4), sys::Socklen(mem::SizeOf(conn.sockaddr4))) else {
-				conn.fd.Close()?
+				conn.fd.Close().await?
 				error(error)
 			}
 		| UDP6:
@@ -160,7 +160,7 @@ fn udpBind(network: Network, addr: str)!: &UDPConn {
 			sockAddr.Family = sys::AF_INET6
 			sockAddr.Port = htons(conn.Addr.Port)
 			sys::Bind(handle, uintptr(&sockAddr), sys::Socklen(mem::SizeOf(sockAddr))) else {
-				conn.fd.Close()?
+				conn.fd.Close().await?
 				error(error)
 			}
 		|:
@@ -181,7 +181,7 @@ fn udpBind(network: Network, addr: str)!: &UDPConn {
 			ipv6 := conn.Addr.IP.To16()
 			copy(conn.sockaddr6.Addr[:], ipv6)
 			sys::Bind(handle, uintptr(&conn.sockaddr6), sys::Socklen(mem::SizeOf(conn.sockaddr6))) else {
-				conn.fd.Close()?
+				conn.fd.Close().await?
 				error(error)
 			}
 		} else {
@@ -196,7 +196,7 @@ fn udpBind(network: Network, addr: str)!: &UDPConn {
 			conn.sockaddr4.Port = htons(conn.Addr.Port)
 			copy(conn.sockaddr4.Addr[:], ipv4)
 			sys::Bind(handle, uintptr(&conn.sockaddr4), sys::Socklen(mem::SizeOf(conn.sockaddr4))) else {
-				conn.fd.Close()?
+				conn.fd.Close().await?
 				error(error)
 			}
 		}
@@ -204,8 +204,8 @@ fn udpBind(network: Network, addr: str)!: &UDPConn {
 	ret new(UDPConn, conn)
 }
 
-fn udpDial(network: Network, addr: str)!: &UDPConn {
-	mut connAddr := UDPAddr.Resolve(network, addr)?
+async fn udpDial(network: Network, addr: str)!: &UDPConn {
+	mut connAddr := UDPAddr.Resolve(network, addr).await?
 	mut conn := UDPConn{
 		Addr: connAddr,
 		connect: true,
@@ -220,7 +220,7 @@ fn udpDial(network: Network, addr: str)!: &UDPConn {
 			conn.sockaddr4.Family = sys::AF_INET
 			conn.sockaddr4.Port = htons(conn.Addr.Port)
 			connectSocket(handle, uintptr(&conn.sockaddr4), sys::Socklen(mem::SizeOf(conn.sockaddr4)), 0) else {
-				conn.Close()?
+				conn.Close().await?
 				error(error)
 			}
 		| UDP6:
@@ -230,7 +230,7 @@ fn udpDial(network: Network, addr: str)!: &UDPConn {
 			conn.sockaddr6.Family = sys::AF_INET6
 			conn.sockaddr6.Port = htons(conn.Addr.Port)
 			connectSocket(handle, uintptr(&conn.sockaddr6), sys::Socklen(mem::SizeOf(conn.sockaddr6)), 0) else {
-				conn.Close()?
+				conn.Close().await?
 				error(error)
 			}
 		|:
@@ -251,7 +251,7 @@ fn udpDial(network: Network, addr: str)!: &UDPConn {
 			ipv6 := conn.Addr.IP.To16()
 			copy(conn.sockaddr6.Addr[:], ipv6)
 			connectSocket(handle, uintptr(&conn.sockaddr6), sys::Socklen(mem::SizeOf(conn.sockaddr6)), 0) else {
-				conn.Close()?
+				conn.Close().await?
 				error(error)
 			}
 		} else {
@@ -266,7 +266,7 @@ fn udpDial(network: Network, addr: str)!: &UDPConn {
 			conn.sockaddr4.Port = htons(conn.Addr.Port)
 			copy(conn.sockaddr4.Addr[:], ipv4)
 			connectSocket(handle, uintptr(&conn.sockaddr4), sys::Socklen(mem::SizeOf(conn.sockaddr4)), 0) else {
-				conn.Close()?
+				conn.Close().await?
 				error(error)
 			}
 		}

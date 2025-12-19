@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+// TODO: add async I/O support with overlapped file handles.
+
 use "std/internal/sys/windows"
 use "std/mem"
 use "std/sys"
@@ -19,6 +21,12 @@ const maxRW = 1 << 30 // 1GB is large enough and keeps subsequent reads aligned
 // Provides internal, common implementation for
 // file descriptors, console handles, and sockets.
 struct FD {
+	// Lock File and serialize access to Read and Write methods.
+	fdmu: fdMutex
+
+	// Semaphore signaled when file is closed.
+	csema: u32
+
 	// The file descriptor should be compatible
 	// with pointers and other integer kinds such as UNIX file descriptors.
 	File:  u64
@@ -56,7 +64,54 @@ impl FD {
 
 	// Writes bytes to the file descriptor and returns written byte count.
 	// The number of bytes written can never exceed the length of the buf.
-	fn Write(mut *self, buf: []byte)!: (n: int) {
+	async fn Write(mut *self, buf: []byte)!: (n: int) {
+		if len(buf) == 0 {
+			// If the caller wanted a zero byte write, return immediately
+			// without trying to write.
+			ret 0
+		}
+
+		if self.Flags&File == File {
+			self.readWriteLock().await?
+			defer { self.readWriteUnlock() }
+		} else {
+			self.writeLock().await?
+			defer { self.writeUnlock() }
+		}
+
+		mut buf2 := unsafe { *(&buf) } // break immutability, do not mutable the content
+		for len(buf2) > 0 {
+			mut b := buf2
+			if len(b) > maxRW {
+				b = b[:maxRW]
+			}
+			mut nn := 0
+			match {
+			| self.Flags&Console == Console:
+				nn = self.writeConsole(b)?
+			| self.Flags&File == File | self.Flags&Pipe == Pipe:
+				nn = self.writeFile(b)?
+			| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
+				handle := NetHandle(self.File)
+				nn = execIO(operation{
+					bufSize: len(b),
+					op: fn|| {
+						sys::Send(handle, b, 0)?
+						ret len(b)
+					},
+				})?
+			|:
+				panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Write")
+			}
+			n += nn
+			buf2 = buf2[n:]
+		}
+		ret n
+	}
+
+	// Writes bytes to the file descriptor and returns written byte count.
+	// The number of bytes written can never exceed the length of the buf.
+	fn WriteSync(mut *self, buf: []byte)!: (n: int) {
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte write, return immediately
 			// without trying to write.
@@ -95,7 +150,41 @@ impl FD {
 
 	// Like Write, but wraps sendto syscall.
 	// General for V4 and V6. Unsafe variant.
-	fn WriteV(mut *self, buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
+	async fn WriteV(mut *self, buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
+		if self.Flags&SocketNoConn != SocketNoConn {
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for WriteV")
+		}
+		if len(buf) == 0 {
+			// If the caller wanted a zero byte read, return immediately
+			// without trying to read.
+			ret 0
+		}
+		self.writeLock().await?
+		defer { self.writeUnlock() }
+		for {
+			mut max := len(buf)
+			if max-n > maxRW {
+				max = n + maxRW
+			}
+			part := buf[n:max]
+			handle := NetHandle(self.File)
+			execIO(operation{
+				bufSize: len(part),
+				op: fn|| {
+					sys::Sendto(handle, part, 0, addr, addrLen)?
+					ret 0
+				},
+			})?
+			n += len(part)
+			if n == len(buf) {
+				ret
+			}
+		}
+	}
+
+	// Like Write, but wraps sendto syscall.
+	// General for V4 and V6. Unsafe variant.
+	fn WriteVSync(mut *self, buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
 		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for WriteV")
 		}
@@ -177,7 +266,49 @@ impl FD {
 	// If the buf is larger than the number of bytes that can be read,
 	// the buffer will not cause an overflow. Offset will be shifted
 	// by the number of bytes read.
-	fn Read(mut *self, mut buf: []byte)!: (n: int) {
+	async fn Read(mut *self, mut buf: []byte)!: (n: int) {
+		if len(buf) == 0 {
+			// If the caller wanted a zero byte read, return immediately
+			// without trying to read.
+			ret 0
+		}
+
+		if self.Flags&File == File {
+			self.readWriteLock().await?
+			defer { self.readWriteUnlock() }
+		} else {
+			self.readLock().await?
+			defer { self.readUnlock() }
+		}
+
+		if len(buf) > maxRW {
+			buf = buf[:maxRW]
+		}
+
+		match {
+		| self.Flags&Console == Console:
+			n = self.readConsole(buf)?
+		| self.Flags&File == File | self.Flags&Pipe == Pipe:
+			n = self.readFile(buf)?
+		| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
+			handle := NetHandle(self.File)
+			n = execIO(operation{
+				bufSize: len(buf),
+				op: fn|| sys::Recv(handle, buf, 0)?,
+			})?
+		|:
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Read")
+		}
+		n = self.statEOF(n)
+		ret
+	}
+
+	// Read bytes to buffer from the file descriptor and returns read byte count.
+	// The number of bytes read can never exceed the length of the buf.
+	// If the buf is larger than the number of bytes that can be read,
+	// the buffer will not cause an overflow. Offset will be shifted
+	// by the number of bytes read.
+	fn ReadSync(mut *self, mut buf: []byte)!: (n: int) {
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte read, return immediately
 			// without trying to read.
@@ -208,7 +339,32 @@ impl FD {
 
 	// Like Read, but wraps recvfrom syscall.
 	// General for V4 and V6. Unsafe variant.
-	fn ReadV(mut *self, mut buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
+	async fn ReadV(mut *self, mut buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
+		if self.Flags&SocketNoConn != SocketNoConn {
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
+		}
+		if len(buf) == 0 {
+			// If the caller wanted a zero byte read, return immediately
+			// without trying to read.
+			ret 0
+		}
+		if len(buf) > maxRW {
+			buf = buf[:maxRW]
+		}
+		handle := NetHandle(self.File)
+		self.readLock().await?
+		defer { self.readUnlock() }
+		n = execIO(operation{
+			bufSize: len(buf),
+			op: fn|| sys::Recvfrom(handle, buf, 0, addr, addrLen)?,
+		})?
+		n = self.statEOF(n)
+		ret n
+	}
+
+	// Like Read, but wraps recvfrom syscall.
+	// General for V4 and V6. Unsafe variant.
+	fn ReadVSync(mut *self, mut buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
 		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
 		}
@@ -315,22 +471,28 @@ impl FD {
 	// Sets offset to next Read/Write operation and returns the new offset.
 	// whence: 0 (Seek.Set) means, relative to the whence of the file, 1 (Seek.Cur)
 	// means relative to the current offset, and 2 (Seek.End) means relative to end.
-	fn Seek(mut *self, offset: i64, whence: int)!: (newoffset: i64) {
+	async fn Seek(mut *self, offset: i64, whence: int)!: (newoffset: i64) {
+		self.readWriteLock().await?
+		defer { self.readWriteUnlock() }
 		ret sys::Seek(sys::Handle(self.File), offset, whence)?
 	}
 
 	// Imitates the POSIX ftruncate function.
 	fn Ftruncate(mut *self, size: i64)! {
+		self.incref()?
+		defer { self.decref() else {} }
 		sys::Ftruncate(sys::Handle(self.File), size)?
 	}
 
 	// Wraps sys::FlushFileBuffers.
 	fn Fsync(mut *self)! {
+		self.incref()?
+		defer { self.decref() else {} }
 		sys::FlushFileBuffers(sys::Handle(self.File))?
 	}
 
 	// Closes file descriptor.
-	fn Close(mut *self)! {
+	fn destroy(mut *self)! {
 		match {
 		| self.Flags&File == File | self.Flags&Pipe == Pipe | self.Flags&Pipe == Pipe | self.Flags&Console == Console:
 			sys::CloseHandle(sys::Handle(self.File))?
@@ -338,6 +500,39 @@ impl FD {
 			sys::CloseSocket(NetHandle(self.File))?
 		|:
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Close")
+		}
+		semrelease(&self.csema)
+	}
+
+	// Closes file descriptor.
+	fn CloseSync(mut *self)! {
+		match {
+		| self.Flags&File == File | self.Flags&Pipe == Pipe | self.Flags&Pipe == Pipe | self.Flags&Console == Console:
+			sys::CloseHandle(sys::Handle(self.File))?
+		| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
+			sys::CloseSocket(NetHandle(self.File))?
+		|:
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Close")
+		}
+	}
+
+	// Closes file descriptor.
+	async fn Close(mut *self)! {
+		if !self.fdmu.increfAndClose() {
+			errClosing(self.isFile())?
+		}
+
+		// The call to decref will call destroy if there are no other
+		// references.
+		let mut err: any
+		self.decref() else { err = error }
+
+		// Wait until the descriptor is closed. If this was the only
+		// reference, it is already closed.
+		semacquire(&self.csema).await
+
+		if err != nil {
+			error(err)
 		}
 	}
 }
