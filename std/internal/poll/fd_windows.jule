@@ -6,6 +6,7 @@
 
 use "std/internal/sys/windows"
 use "std/mem"
+use "std/runtime"
 use "std/sys"
 use "std/unicode/utf16"
 use "std/unicode/utf8"
@@ -79,6 +80,8 @@ impl FD {
 			defer { self.writeUnlock() }
 		}
 
+		runtime::entersyscall()
+		defer { runtime::exitsyscall() }
 		mut buf2 := unsafe { *(&buf) } // break immutability, do not mutable the content
 		for len(buf2) > 0 {
 			mut b := buf2
@@ -161,6 +164,8 @@ impl FD {
 		}
 		self.writeLock().await?
 		defer { self.writeUnlock() }
+		runtime::entersyscall()
+		defer { runtime::exitsyscall() }
 		for {
 			mut max := len(buf)
 			if max-n > maxRW {
@@ -285,6 +290,9 @@ impl FD {
 			buf = buf[:maxRW]
 		}
 
+		runtime::entersyscall()
+		defer { runtime::exitsyscall() }
+
 		match {
 		| self.Flags&Console == Console:
 			n = self.readConsole(buf)?
@@ -354,6 +362,8 @@ impl FD {
 		handle := NetHandle(self.File)
 		self.readLock().await?
 		defer { self.readUnlock() }
+		runtime::entersyscall()
+		defer { runtime::exitsyscall() }
 		n = execIO(operation{
 			bufSize: len(buf),
 			op: fn|| sys::Recvfrom(handle, buf, 0, addr, addrLen)?,

@@ -4,6 +4,7 @@
 
 use "std/internal/conv"
 use "std/io"
+use "std/runtime"
 use "std/sys"
 
 // This information adopted from the Go programming language:
@@ -58,6 +59,8 @@ impl FD {
 		}
 		self.writeLock().await?
 		defer { self.writeUnlock() }
+		runtime::entersyscall()
+		defer { runtime::exitsyscall() }
 		for {
 			mut max := len(buf)
 			if self.IsStream && max-n > maxRW {
@@ -129,6 +132,8 @@ impl FD {
 		}
 		self.writeLock().await?
 		defer { self.writeUnlock() }
+		runtime::entersyscall()
+		defer { runtime::exitsyscall() }
 		for {
 			sys::Sendto(int(self.File), buf, 0, addr, addrLen) else {
 				if error == sys::EINTR {
@@ -184,11 +189,12 @@ impl FD {
 		}
 		self.readLock().await?
 		defer { self.readUnlock() }
-		for {
-			n = ignoringEINTRIO(sys::Read, int(self.File), buf)?
-			n = self.statEOF(n)
-			ret n
-		}
+
+		runtime::entersyscall()
+		defer { runtime::exitsyscall() }
+		n = ignoringEINTRIO(sys::Read, int(self.File), buf)?
+		n = self.statEOF(n)
+		ret n
 	}
 
 	// Read bytes to buffer from the file descriptor and returns read byte count.
@@ -211,11 +217,10 @@ impl FD {
 		if self.IsStream && len(buf) > maxRW {
 			buf = buf[:maxRW]
 		}
-		for {
-			n = ignoringEINTRIO(sys::Read, int(self.File), buf)?
-			n = self.statEOF(n)
-			ret n
-		}
+
+		n = ignoringEINTRIO(sys::Read, int(self.File), buf)?
+		n = self.statEOF(n)
+		ret n
 	}
 
 	// Like Read, but wraps recvfrom syscall.
@@ -231,6 +236,8 @@ impl FD {
 		}
 		self.readLock().await?
 		defer { self.readUnlock() }
+		runtime::entersyscall()
+		defer { runtime::exitsyscall() }
 		for {
 			n = sys::Recvfrom(int(self.File), buf, 0, addr, addrLen) else {
 				if error == sys::EINTR {
