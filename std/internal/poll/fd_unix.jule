@@ -347,9 +347,11 @@ impl FD {
 
 	// Closes file descriptor.
 	fn destroy(mut *self)! {
-		// Poller may want to unregister fd in notification mechanism,
-		// so this must be executed before Close.
-		self.pd.close()
+		if self.pollable {
+			// Poller may want to unregister fd in notification mechanism,
+			// so this must be executed before Close.
+			self.pd.close()
+		}
 
 		// All kinds are supports the Close function.
 		sys::Close(int(self.File))?
@@ -365,11 +367,6 @@ impl FD {
 
 	// Closes file descriptor.
 	async fn Close(mut *self)! {
-		if !self.pollable {
-			self.CloseSync()?
-			ret
-		}
-
 		if !self.fdmu.increfAndClose() {
 			errClosing(self.isFile())?
 		}
