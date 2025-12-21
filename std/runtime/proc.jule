@@ -11,12 +11,12 @@ extern fn __jule_retireDrain()
 fn COMAXPROCS(): int { ret numcpu }
 
 const (
-	// The maximum count of the runnable coroutine queue of a coroutine process.
+	// The maximum count of the runnable coroutine queue of a coroutine processor.
 	// Must be power of two.
 	coroprocRunQueueSize = 256
 )
 
-// A coroutine process.
+// A coroutine processor.
 struct coroproc {
 	// Prioritized coroutine, should run at next scheduler loop.
 	runnext: &coro
@@ -27,37 +27,16 @@ struct coroproc {
 	// Waiting poll descriptors.
 	pds: polldescq
 
-	// Local timers of the coroutine process.
+	// Local timers of the coroutine processor.
 	timers: timerheap
-
-	//Ttime of last eventpoll.
-	lastpoll: i64
-
-	// This coroutine processor is in use.
-	owned: i32
-}
-
-impl coroproc {
-	// Tries to take ownership.
-	fn tryown(mut *self): bool {
-		for {
-			owned := atomic::Load(&self.owned, atomic::Acquire)
-			if owned != 0 {
-				ret false
-			}
-			if atomic::CompareAndSwap(&self.owned, owned, 1, atomic::AcqRel, atomic::Relaxed) {
-				ret true
-			}
-		}
-	}
 }
 
 // A scheduler envrionment for the whole Jule program.
 struct scheduler {
-	// All coroutine processes.
+	// All coroutine processors.
 	procs: []&coroproc
 
-	// Idle coroutine processes of the scheduler.
+	// Idle coroutine processors of the scheduler.
 	idleprocs: mpmcQueue[&coroproc]
 
 	// Global queue for runnable coroutines with guard.
@@ -103,26 +82,6 @@ impl scheduler {
 	fn nmspinning(*self): int {
 		ret atomic::Load(&self._nmspinning, atomic::Relaxed)
 	}
-
-	// Returns a coroutine processor with ownership, if possible.
-	fn getproc(mut *self): (rproc: &coroproc) {
-		for {
-			ok, empty := gsched.idleprocs.dequeue(&rproc)
-			if !ok {
-				if !empty {
-					// Queue is not empty, try again.
-					continue
-				}
-				ret nil
-			}
-			// We found an idle coroutine process.
-			// Try to take ownership.
-			if rproc.tryown() {
-				ret
-			}
-			// Lost race, try again.
-		}
-	}
 }
 
 // A global scheduler instance of the program.
@@ -134,13 +93,13 @@ let mut gsched = scheduler{}
 #disable nilptr
 fn onglobalrunqput() {
 	// There is not actively spinning worker thread.
-	// Try to wake or create worker thread, if an idle coroutine process avaiable.
+	// Try to wake or create worker thread, if an idle coroutine processor available.
 	if gsched.nmspinning() < 1 {
 		let mut rproc: &coroproc
 		ok, _ := gsched.idleprocs.dequeue(&rproc)
 		if ok {
-			// We found an idle coroutine process.
-			// Wake a thread or spawn a new one with the coroutine process.
+			// We found an idle coroutine processor.
+			// Wake a thread or spawn a new one with the coroutine processor.
 			threadMutex.lock()
 			spawnSchedThread(rproc)
 			ret
@@ -149,7 +108,7 @@ fn onglobalrunqput() {
 }
 
 // Tries to put coroutine c to the
-// runnable coroutine queue of the current process.
+// runnable coroutine queue of the current processor.
 #disable nilptr boundary
 fn runqputl(mut &c: *&coro): (ok: bool) {
 	mut t := gett()
@@ -186,10 +145,10 @@ LoadBalance:
 }
 
 // Puts coroutine c to the runnable coroutine queue.
-// If next is true, runnext field of the current process is prioritized.
+// If next is true, runnext field of the current processor is prioritized.
 #disable nilptr
 fn runqput(mut &c: *&coro, next: bool) {
-	// We have a coroutine process on the current worker thread.
+	// We have a coroutine processor on the current worker thread.
 	mut t := gett()
 	if t != nil && t.proc != nil {
 		if t.proc.runnext == nil {
@@ -225,9 +184,12 @@ fn sched() {
 	threadMutex.unlock()
 	mut t := gett()
 Sched:
+	// If poll is set, attempt a non-blocking eventpoll first.
+	mut poll := false
 	for {
 		// Poll a coroutine to run.
-		mut c := coropoll()
+		mut c := coropoll(&poll)
+		// coropoll failed to find a runnable coroutine.
 		if c == nil {
 			// There are timers in this worker, clean them.
 			// Normally, eventpoll returns a timer if exist.
@@ -251,10 +213,16 @@ Sched:
 		}
 
 		t.coro = c
+		c.state &= ^reasonSched // Remove sched-reason flag, if exist.
 		c.state |= coroRunning
 		resume(c)
 		retiredrain() // Destroy the retire coroutines.
 		t.coro = nil
+
+		// If coropoll return true for poll, save it.
+		// Otherwise make it true if coroutine is yield
+		// because of scheduler starvation risk.
+		poll = poll || c.state&reasonSched == reasonSched
 	}
 	schedAgain := closeThread(t)
 	if schedAgain {
@@ -321,15 +289,17 @@ fn retiredrain() {
 // Yields the processor, allowing other coroutines to run. It does not
 // suspend the current coroutine, so execution resumes automatically.
 async fn Yield() {
-	mut coro := gett().coro
-	coro.state &= ^coroRunning
-	coro.state |= coroSuspended
 	// Push the coroutine to the global queue, otherwise the next
 	// scheduler iteration after park may run it from the local queue.
+	mut coro := gett().coro
 	gsched.runqmu.lock()
 	gsched.runq.push(coro)
-	onglobalrunqput()
-	park(coro, uintptr(&gsched.runqmu), reasonNA).await
+	// Do not call onglobalrunqput here.
+	// We are doing this out of necessity because
+	// when it gets stuck in the local queue,
+	// it can be immediately retrieved and resumed.
+	// We need to prevent that. This is not an actual overflow.
+	park(coro, uintptr(&gsched.runqmu), reasonSched).await
 }
 
 #disable nilptr boundary
@@ -341,7 +311,7 @@ fn schedinit() {
 	// We mutate gsched here but mutex is not need to be acquired.
 	// Becase we are in the program initialize state, no concurreny risk.
 
-	// Initialize corotuine processes.
+	// Initialize corotuine processors.
 	maxprocs := u64(COMAXPROCS())
 	gsched.procs = make([]&coroproc, maxprocs)
 	gsched.idleprocs = mpmcQueue[&coroproc].new(maxprocs)

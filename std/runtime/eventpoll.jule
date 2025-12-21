@@ -149,17 +149,19 @@ async fn netpollwait(mut pd: &polldesc, mode: i32)! {
 	if mode != 'r' && mode != 'w' {
 		panic("runtime: invalid poll mode")
 	}
+	mut t := gett()
+	pd.mu.lock()
 	// Check for completion signals first.
 	if mode == 'r' && pd.rcoro == pollrace {
 		pd.rcoro = nil
+		pd.mu.unlock()
 		ret
 	}
 	if mode == 'w' && pd.wcoro == pollrace {
 		pd.wcoro = nil
+		pd.mu.unlock()
 		ret
 	}
-	mut t := gett()
-	pd.mu.lock()
 	if pd.closing {
 		error(netpollClosing)
 	}
@@ -198,17 +200,19 @@ async fn netpollwaitcanceled(mut pd: &polldesc, mode: i32) {
 	if mode != 'r' && mode != 'w' {
 		panic("runtime: invalid poll mode")
 	}
+	mut t := gett()
+	pd.mu.lock()
 	// Check for completion signals first.
 	if mode == 'r' && pd.rcoro == pollrace {
 		pd.rcoro = nil
+		pd.mu.unlock()
 		ret
 	}
 	if mode == 'w' && pd.wcoro == pollrace {
 		pd.wcoro = nil
+		pd.mu.unlock()
 		ret
 	}
-	mut t := gett()
-	pd.mu.lock()
 	match mode {
 	| 'r':
 		pd.rcoro = t.coro
@@ -236,11 +240,11 @@ async fn netpollwaitcanceled(mut pd: &polldesc, mode: i32) {
 // Throws error if needed after polling for an event.
 #disable nilptr
 fn netpollgeterr(mut pd: &polldesc, mode: i32)! {
-	if mode == 'r' && pd.rcoro != nil {
+	if mode == 'r' && pd.rcoro != nil && pd.rcoro != pollrace {
 		pd.rcoro = nil
 		error(netpollDeadline)
 	}
-	if mode == 'w' && pd.wcoro != nil {
+	if mode == 'w' && pd.wcoro != nil && pd.rcoro != pollrace {
 		pd.wcoro = nil
 		error(netpollDeadline)
 	}
@@ -251,27 +255,27 @@ fn netpollgeterr(mut pd: &polldesc, mode: i32)! {
 fn pollnotified(mut &pd: *polldesc, mode: i32, mut &toRun: *coroq) {
 	match mode {
 	| 'r':
-		if pd.rcoro != nil {
+		if pd.rcoro != nil && pd.rcoro != pollrace {
 			toRun.push(pd.rcoro)
 			pd.rcoro = nil
 		} else {
 			pd.rcoro = pollrace
 		}
 	| 'w':
-		if pd.wcoro != nil {
+		if pd.wcoro != nil && pd.wcoro != pollrace {
 			toRun.push(pd.wcoro)
 			pd.wcoro = nil
 		} else {
 			pd.wcoro = pollrace
 		}
 	| 'r' + 'w':
-		if pd.rcoro != nil {
+		if pd.rcoro != nil && pd.rcoro != pollrace {
 			toRun.push(pd.rcoro)
 			pd.rcoro = nil
 		} else {
 			pd.rcoro = pollrace
 		}
-		if pd.wcoro != nil {
+		if pd.wcoro != nil && pd.wcoro != pollrace {
 			toRun.push(pd.wcoro)
 			pd.wcoro = nil
 		} else {

@@ -2,177 +2,253 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-// Polls a coroutine.
+// Selects a runnable coroutine for execution.
+//
+// This function is one of the core components of the coroutine scheduler.
+// It attempts to find exactly one coroutine to run,
+// following a strict priority order:
+//
+// The function guarantees that at most one coroutine is returned via
+// `polled`; any additional runnable coroutines are enqueued back into
+// appropriate run queues.
+//
+// Invariants:
+//	- eventpoll() never returns more entries than a local run queue can hold.
+//	- Queue corruption is considered a fatal runtime error.
+//
+// The `poll` flag is a scheduler hint used to amortize eventpoll costs
+// under high I/O traffic.
 #disable nilptr boundary
-fn coropoll(): (polled: &coro) {
-	gsched.enterspin()
-	{
-		mut t := gett()
-		if t.proc.runnext != nil {
-			polled = t.proc.runnext
-			t.proc.runnext = nil
-			goto ExitSpin
-		}
+fn coropoll(mut &poll: *bool): (polled: &coro) {
+	// Fast-path: if poll is set, attempt a non-blocking eventpoll first.
+	//
+	// This is used to avoid starvation under high I/O load by allowing
+	// the scheduler to re-check pending events on the next iteration.
+	if *poll {
+		// Clear the flag immediately; this attempt is sufficient.
+		*poll = false
 
-		let mut ok: bool
-		polled, ok = t.proc.runq.pop()
-		if ok {
-			goto ExitSpin
-		}
+		// Use 0-delay to perform a non-blocking poll.
+		mut toRun := eventpoll(0)
 
-		// Local queue is empty, pop from the global queue.
-		gsched.runqmu.lock()
-		if gsched.runq.head != nil {
-			let mut batch: [coroprocRunQueueSize]&coro
-			mut n := 0
-			for n < coroprocRunQueueSize; n++ {
-				if gsched.runq.head == nil {
-					break
-				}
-				batch[n] = gsched.runq.head.coro
-				gsched.runq.remove(gsched.runq.head)
+		// If any coroutines are ready, return the first and enqueue the rest.
+		// Timers possibly expired here will be handled in a later iteration.
+		if toRun.len > 0 {
+			polled = toRun.head.coro
+			toRun.remove(toRun.head)
+			for toRun.head != nil {
+				runqput(&toRun.head.coro, false)
+				toRun.remove(toRun.head)
 			}
-			gsched.runqmu.unlock()
-			if n > 0 {
-				polled = batch[0]
-				mut i := 1
-				for i < n; i++ {
-					ok = t.proc.runq.push(batch[i])
+			ret
+		}
+	}
+
+	mut t := gett()
+	gsched.enterspin()
+
+	// Highest priority: runnext slot.
+	//
+	// This is used for coroutine handoff and latency-sensitive scheduling.
+	if t.proc.runnext != nil {
+		polled = t.proc.runnext
+		t.proc.runnext = nil
+		gsched.exitspin()
+		ret
+	}
+
+	// Second priority: local run queue.
+	let mut ok: bool
+	polled, ok = t.proc.runq.pop()
+	if ok {
+		gsched.exitspin()
+		ret
+	}
+
+	// Local queue empty: attempt to fetch a batch from the global run queue.
+	//
+	// The batch size is capped to coroprocRunQueueSize to preserve
+	// locality and reduce contention on the global lock.
+	gsched.runqmu.lock()
+	if gsched.runq.head != nil {
+		let mut batch: [coroprocRunQueueSize]&coro
+		mut n := 0
+
+		for n < len(batch); n++ {
+			if gsched.runq.head == nil {
+				break
+			}
+			batch[n] = gsched.runq.head.coro
+			gsched.runq.remove(gsched.runq.head)
+		}
+		gsched.runqmu.unlock()
+
+		if n > 0 {
+			gsched.exitspin()
+			polled = batch[0]
+
+			// Push remaining coroutines into the local run queue.
+			mut i := 1
+			for i < n; i++ {
+				ok = t.proc.runq.push(batch[i])
+				if !ok {
+					panic("runtime: coroutine scheduler queue corruption")
+				}
+			}
+			ret
+		}
+	} else {
+		gsched.runqmu.unlock()
+	}
+
+	// No work found locally or globally: attempt work stealing.
+	//
+	// Stealing is limited to a small fixed number of attempts to
+	// avoid excessive contention and cache thrashing.
+	const StealTries = 4
+	mut n := 0
+	for n < StealTries; n++ {
+		idx := absint(int(rand() % u64(len(gsched.procs))))
+		mut proc := gsched.procs[idx]
+
+		// Do not steal from ourselves.
+		if proc == t.proc {
+			continue
+		}
+
+		polled, ok = proc.runq.steal()
+		if ok {
+			gsched.exitspin()
+			ret
+		}
+	}
+	gsched.exitspin()
+
+	// No runnable coroutine found yet.
+	// Determine how long we can block based on timers and deadlines.
+	// The default is -1, which is blocks indefinetely.
+	mut delay := i64(-1)
+
+	mut now := nanotime()
+	mut iodeadline := false // Indicates presence of expired I/O deadlines.
+
+	// Processor local timers.
+	//
+	// Expired timers immediately make their coroutines runnable.
+	// The first such coroutine is returned; others are enqueued.
+	if t.proc.timers.peek() != nil {
+		n = 0
+		for n < coroprocRunQueueSize {
+			mut timer := t.proc.timers.peek()
+			if timer == nil || timer.when > now {
+				break
+			}
+			mut coro := t.proc.timers.pop().coro
+			if coro != nil {
+				if polled == nil {
+					polled = coro
+				} else {
+					ok = t.proc.runq.push(coro)
 					if !ok {
 						panic("runtime: coroutine scheduler queue corruption")
 					}
 				}
-				goto ExitSpin
+			} else {
+				// Timer corresponds to an I/O deadline.
+				iodeadline = true
 			}
-		} else {
-			gsched.runqmu.unlock()
+			n++
 		}
 
-		// Try to steal from a coroutine process.
-		const StealTries = 4
-		mut n := 0
-		for n < StealTries; n++ {
-			idx := absint(int(rand() % u64(len(gsched.procs))))
-			mut proc := gsched.procs[idx]
-			if proc == t.proc {
-				continue
-			}
-			polled, ok = proc.runq.steal()
-			if ok {
-				goto ExitSpin
-			}
+		// If we already found a runnable coroutine, return immediately
+		// without entering event polling.
+		if polled != nil {
+			ret
 		}
 
-		mut delay := i64(-1)
-
-		// Timer exist try eventpoll.
-		mut now := nanotime()
-		mut iodeadline := false // IO deadline found.
-		if t.proc.timers.peek() != nil {
-			// Check for already expired timers.
-			n = 0
-			for n < coroprocRunQueueSize; n++ {
-				mut timer := t.proc.timers.peek()
-				if timer == nil || timer.when > now {
-					break
-				}
-				mut coro := t.proc.timers.pop().coro
-				if coro != nil {
-					if polled == nil {
-						polled = coro
-					} else {
-						ok = t.proc.runq.push(coro)
-						if !ok {
-							panic("runtime: coroutine scheduler queue corruption")
-						}
-					}
-				} else {
-					iodeadline = true
-				}
-			}
-			// If there is already a polled expired timer, do not eventpoll.
-			// Return immediately.
-			if polled != nil {
-				goto ExitSpin
-			}
-			soonest := t.proc.timers.peek()
-			if soonest != nil {
-				delay = soonest.when - now
-				if delay <= 0 {
-					panic("runtime: inconsistent timer state")
-				}
+		// Compute delay until the next timer fires.
+		soonest := t.proc.timers.peek()
+		if soonest != nil {
+			delay = soonest.when - now
+			if delay <= 0 {
+				panic("runtime: inconsistent timer state")
 			}
 		}
-		// No timer found but IO deadline.
-		// Check for waiting coroutines with deadline and make them runnable.
-		if iodeadline && t.proc.pds.head != nil {
-			mut q := t.proc.pds.head
-			for {
-				if n >= coroprocRunQueueSize || q == nil {
-					break
+	}
+
+	// Handle expired I/O deadlines.
+	//
+	// Waiting coroutines with read/write deadlines are made runnable
+	// when their deadlines expire.
+	if iodeadline && t.proc.pds.head != nil {
+		mut q := t.proc.pds.head
+		for {
+			if n >= coroprocRunQueueSize || q == nil {
+				break
+			}
+			q.mu.lock()
+
+			if q.rdeadline <= now && q.rcoro != nil {
+				ok = t.proc.runq.push(q.rcoro)
+				if !ok {
+					panic("runtime: coroutine scheduler queue corruption")
 				}
-				q.mu.lock()
-				if q.rdeadline <= now && q.rcoro != nil {
+				n++
+			}
+			if q.wdeadline <= now && q.wcoro != nil {
+				ok = t.proc.runq.push(q.wcoro)
+				if !ok {
+					panic("runtime: coroutine scheduler queue corruption")
+				}
+				n++
+			}
+			if q.deadline <= now {
+				if q.rcoro != nil {
 					ok = t.proc.runq.push(q.rcoro)
 					if !ok {
 						panic("runtime: coroutine scheduler queue corruption")
 					}
 					n++
 				}
-				if q.wdeadline <= now && q.wcoro != nil {
+				if q.wcoro != nil {
 					ok = t.proc.runq.push(q.wcoro)
 					if !ok {
 						panic("runtime: coroutine scheduler queue corruption")
 					}
 					n++
 				}
-				if q.deadline <= now {
-					if q.rcoro != nil {
-						ok = t.proc.runq.push(q.rcoro)
-						if !ok {
-							panic("runtime: coroutine scheduler queue corruption")
-						}
-						n++
-					}
-					if q.wcoro != nil {
-						ok = t.proc.runq.push(q.wcoro)
-						if !ok {
-							panic("runtime: coroutine scheduler queue corruption")
-						}
-						n++
-					}
-				}
-				q.mu.unlock()
-				q = q.next
 			}
-			polled, ok = t.proc.runq.pop()
+			q.mu.unlock()
+			q = q.next
+		}
+
+		polled, ok = t.proc.runq.pop()
+		if !ok {
+			panic("runtime: coroutine scheduler queue corruption")
+		}
+		ret
+	}
+
+	// Final step: perform eventpoll.
+	mut toRun := eventpoll(delay)
+
+	if toRun.len > 0 {
+		// Set poll flag so the next scheduler iteration performs
+		// a fast non-blocking eventpoll. This is critical under
+		// sustained high I/O load.
+		*poll = true
+
+		// eventpoll guarantees len(toRun) <= local run queue capacity.
+		polled = toRun.head.coro
+		toRun.remove(toRun.head)
+		for toRun.head != nil {
+			ok = t.proc.runq.push(toRun.head.coro)
 			if !ok {
 				panic("runtime: coroutine scheduler queue corruption")
 			}
-			goto ExitSpin
-		}
-
-		mut toRun := eventpoll(delay)
-		// If we have toRun list, use these coroutines.
-		// Some timer might be expired, they will be handled at next iteration.
-		if toRun.len > 0 {
-			// eventpoll always returns: len(toRun)<=cap(t.proc.runq)
-			// So we can push all coroutine to the local queue of the process,
-			// since it is empty and we are looking for coroutine from eventpoll.
-			// Reserve the first coroutine for return and enqueue what remains.
-			polled = toRun.head.coro
 			toRun.remove(toRun.head)
-			for toRun.head != nil {
-				ok = t.proc.runq.push(toRun.head.coro)
-				if !ok {
-					panic("runtime: coroutine scheduler queue corruption")
-				}
-				toRun.remove(toRun.head)
-			}
-			goto ExitSpin
 		}
 	}
-ExitSpin:
-	gsched.exitspin()
+
 	ret
 }
