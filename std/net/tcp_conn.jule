@@ -4,6 +4,7 @@
 
 use "std/internal/poll"
 use "std/io"
+use "std/mem"
 use "std/runtime"
 use "std/sys"
 use "std/time"
@@ -23,6 +24,21 @@ impl io::ReadWriteCloser for TCPConn {}
 impl io::WriteCloser for TCPConn {}
 
 impl TCPConn {
+	// Connects to TCP listener by given address.
+	// Returns relevant created &TCPConn if success.
+	// If addr is not a valid address, it will forward relevant parse exceptionals.
+	// In addition, any bind and listening error will be return as exceptional.
+	//
+	// See the [Dial] function for a description of the addr parameter.
+	async fn Dial(addr: str)!: &TCPConn {
+		ret tcpDial(Network.TCP, addr, 0).await?
+	}
+
+	// Same as TCPListener.Dial, but uses timeout.
+	async fn DialTimeout(addr: str, timeout: time::Duration)!: &TCPConn {
+		ret tcpDial(Network.TCP, addr, timeout).await?
+	}
+
 	// Read bytes to buffer from connection and returns read byte count.
 	// The number of bytes read can never exceed the length of the buffer.
 	// If the buffer is larger than the number of bytes that can be read,
@@ -54,28 +70,41 @@ impl TCPConn {
 		ret self.fd.Write(buf).await?
 	}
 
-	// Sets read timeout for connection.
-	// Timeout precision is milliseconds.
-	// If the timeout is below one millisecond it will be accepted as zero.
-	// The maximum timeout is 40 days, if timeout is greater than 40 fays, it panics.
-	// The zero timeout, clears current timeout if exist.
-	fn SetReadTimeout(mut *self, timeout: time::Duration)! {
+	// Sets or updates a deadline for the future read operations.
+	// If the deadline is given as 0, the deadline is cleared.
+	// The deadline is evaluated against an absolute point in time.
+	// In practice, the given deadline is equivalent to `time::Now().Add(deadline)`.
+	// It does not apply per operation, but remains valid until this absolute time.
+	// Any operation initiated after this deadline has passed will fail.
+	fn SetReadDeadline(mut *self, deadline: time::Duration)! {
 		if self.fd == nil {
-			panic("net: TCPConn.SetReadTimeout: connection is closed")
+			panic("net: TCPConn.SetReadDeadline: connection is closed")
 		}
-		self.fd.SetReadTimeout(timeout)?
+		self.fd.SetReadDeadline(deadline)
 	}
 
-	// Sets write timeout for connection.
-	// Timeout precision is milliseconds.
-	// If the timeout is below one millisecond it will be accepted as zero.
-	// The maximum timeout is 40 days, if timeout is greater than 40 fays, it panics.
-	// The zero timeout, clears current timeout if exist.
-	fn SetWriteTimeout(mut *self, timeout: time::Duration)! {
+	// Sets or updates a deadline for the future write operations.
+	// If the deadline is given as 0, the deadline is cleared.
+	// The deadline is evaluated against an absolute point in time.
+	// In practice, the given deadline is equivalent to `time::Now().Add(deadline)`.
+	// It does not apply per operation, but remains valid until this absolute time.
+	// Any operation initiated after this deadline has passed will fail.
+	fn SetWriteDeadline(mut *self, deadline: time::Duration)! {
 		if self.fd == nil {
-			panic("net: TCPConn.SetWriteTimeout: connection is closed")
+			panic("net: TCPConn.SetWriteDeadline: connection is closed")
 		}
-		self.fd.SetWriteTimeout(timeout)?
+		self.fd.SetWriteDeadline(deadline)
+	}
+
+	// Controls whether the operating system should delay
+	// packet transmission in hopes of sending fewer packets (Nagle's
+	// algorithm). The default is true (no delay), meaning that data is
+	// sent as soon as possible after a Write.
+	fn SetNoDelay(mut *self, noDelay: bool)! {
+		if self.fd == nil {
+			error(sys::EINVAL)
+		}
+		setNoDelay(self.fd, noDelay)?
 	}
 
 	// Returns network name which is connected.
@@ -106,4 +135,92 @@ impl TCPConn {
 		self.fd = nil
 		self.v6 = false
 	}
+}
+
+async fn tcpDial(network: Network, addr: str, timeout: time::Duration)!: &TCPConn {
+	mut tcpAddr := TCPAddr.Resolve(network, addr).await?
+	mut fd := (&netFD)(nil)
+	mut v6 := false
+	let mut handle: poll::NetHandle
+	if tcpAddr.IP.Empty() {
+		match network {
+		| TCP | TCP4:
+			handle = tcpsocketipv4()?
+			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
+			mut sockAddr := sys::RawSockaddrInet4{}
+			sockAddr.Family = sys::AF_INET
+			sockAddr.Port = htons(tcpAddr.Port)
+			handleprepare(handle) else {
+				fd.Close().await?
+				error(error)
+			}
+			fd.connect(4, uintptr(&sockAddr), sys::Socklen(mem::SizeOf(sockAddr)), timeout).await else {
+				fd.Close().await?
+				error(error)
+			}
+		| TCP6:
+			handle = tcpsocketipv6()?
+			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
+			mut sockAddr := sys::RawSockaddrInet6{}
+			sockAddr.Family = sys::AF_INET6
+			sockAddr.Port = htons(tcpAddr.Port)
+			handleprepare(handle) else {
+				fd.Close().await?
+				error(error)
+			}
+			fd.connect(6, uintptr(&sockAddr), sys::Socklen(mem::SizeOf(sockAddr)), timeout).await else {
+				fd.Close().await?
+				error(error)
+			}
+		|:
+			error(&AddrError{Err: "invalid network: " + str(network)})
+		}
+	} else {
+		mut ipv4 := tcpAddr.IP.To4()
+		if ipv4.Empty() {
+			if network == Network.TCP4 {
+				error(&AddrError{Err: "expected IPv4 address but found IPv6", Addr: addr})
+			}
+			v6 = true
+			handle = tcpsocketipv6()?
+			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
+			mut sockAddr := sys::RawSockaddrInet6{}
+			sockAddr.Family = sys::AF_INET6
+			sockAddr.Port = htons(tcpAddr.Port)
+			ipv6 := tcpAddr.IP.To16()
+			copy(sockAddr.Addr[:], ipv6)
+			handleprepare(handle) else {
+				fd.Close().await?
+				error(error)
+			}
+			fd.connect(6, uintptr(&sockAddr), sys::Socklen(mem::SizeOf(sockAddr)), timeout).await else {
+				fd.Close().await?
+				error(error)
+			}
+		} else {
+			if network == Network.TCP6 {
+				error(&AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr})
+			}
+			tcpAddr.IP = ipv4
+			handle = tcpsocketipv4()?
+			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
+			mut sockAddr := sys::RawSockaddrInet4{}
+			sockAddr.Family = sys::AF_INET
+			sockAddr.Port = htons(tcpAddr.Port)
+			copy(sockAddr.Addr[:], ipv4)
+			handleprepare(handle) else {
+				fd.Close().await?
+				error(error)
+			}
+			fd.connect(4, uintptr(&sockAddr), sys::Socklen(mem::SizeOf(sockAddr)), timeout).await else {
+				fd.Close().await?
+				error(error)
+			}
+		}
+	}
+	ret newTCPConn(&TCPConn{
+		Addr: tcpAddr,
+		fd: fd,
+		v6: v6,
+	})
 }

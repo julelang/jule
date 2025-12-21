@@ -5,33 +5,3 @@
 // System specific syscall emit.
 // On macOS, supports only up to 6 arguments.
 // fn syscall(num: uintptr, args: ...uintptr): int
-
-// This function must be called before entering a blocking syscall in a coroutine.
-// Before exit the syscall, the [exitsyscall] must be called.
-// This function helps to scheduler, otherwise thread will may be blocked.
-fn entersyscall() {
-	// This thread going to be a syscall worker.
-	// We have to spawn a new scheduler thread to execute coroutines.
-	// Handoff the coroutine process to the new thread.
-	mut t := gett()
-	if t == nil {
-		// gett returns nil, the program is runs in sync runtime.
-		panic("runtime: entersyscall function invoked in sync runtime")
-	}
-	if t.proc == nil {
-		// This thread is already detached from it's coroutine processor.
-		panic("runtime: entersyscall function invoked in detached worker thread")
-	}
-	mut proc := t.proc
-	t.proc = nil
-	threadMutex.lock()
-	spawnSchedThread(proc)
-}
-
-// This function must be called before exit a blocking syscall,
-// where [entersyscall] called.
-fn exitsyscall() {
-	// This thread will continue to it's work if possible.
-	// Scheduler will try to add it as a
-	// corotuine worker thread or close/park it if needed.
-}

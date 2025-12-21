@@ -4,101 +4,25 @@
 
 use "std/integ/c"
 use "std/internal/poll"
+use "std/internal/sys/windows"
 use "std/mem"
 use "std/sys"
-use "std/time"
 
 fn lastErrorCode(): sys::Errno {
 	ret sys::Errno(sys::WSAGetLastError())
 }
 
-fn setSocketBlockingMode(handle: poll::NetHandle, mode: c::UnsignedLong)! {
-	FIONBIO := 0x80000000 | (unsafe { (c::Long)(mem::SizeOf(c::UnsignedLong) & 0x7F) } << 16) | ('f' << 8) | 126
-	size := u32(mem::SizeOf(u32))
-	r := u32(0)
-	unsafe {
-		if sys::WSAIoctl(u64(handle), u32(FIONBIO), (*byte)(&mode), size, nil, 0, &r) == sys::SOCKET_ERROR {
-			error(lastErrorCode())
-		}
-	}
+fn socket(domain: int, typ: int, proto: int)!: poll::NetHandle {
+	ret sys::WSASocket(domain, typ, proto, nil, 0, windows::WSA_FLAG_OVERLAPPED|windows::WSA_FLAG_NO_HANDLE_INHERIT)?
 }
 
-fn closeSocketBlockingMode(handle: poll::NetHandle)! {
-	setSocketBlockingMode(handle, 1)?
-}
-
-fn openSocketBlockingMode(handle: poll::NetHandle)! {
-	setSocketBlockingMode(handle, 0)?
-}
-
-fn connectSocket(handle: poll::NetHandle, sockAddr: uintptr, sockLen: sys::Socklen, timeout: time::Duration)! {
-	if timeout == 0 {
-		connectSocketNoTimeout(handle, sockAddr, sockLen)?
-		ret
-	}
-	mut tv, ok := timevalFromDuration(timeout)
-	if !ok {
-		error(ErrInvalidTimeout)
-	}
-	if tv.Sec == 0 && tv.Usec == 0 {
-		connectSocketNoTimeout(handle, sockAddr, sockLen)?
-		ret
-	}
-	closeSocketBlockingMode(handle)?
-	sys::Connect(handle, sockAddr, sockLen) else {
-		if error != sys::WSAEWOULDBLOCK {
-			error(error)
-		}
-		goto Select
-	}
-	ret
-Select:
-	mut fdW := sys::FdSet{}
-	mut fdE := sys::FdSet{}
-	fdW.Zero()
-	fdW.Set(handle)
-	fdE.Zero()
-	fdE.Set(handle)
-	res := sys::Select(0, nil, &fdW, &fdE, &tv)?
-	if res == 0 {
-		// Timeout.
-		error(ErrTimeout)
-	}
-	if fdE.IsSet(handle) {
-		mut opt := 0
-		mut optLen := sys::Socklen(mem::SizeOf(opt))
-		sys::Getsockopt(handle, sys::SOL_SOCKET, sys::SO_ERROR, uintptr(&opt), optLen)!
-		error(int(opt))
-	}
-	openSocketBlockingMode(handle)?
-}
-
-fn setSocketTimeout(handle: poll::NetHandle, scope: int, timeout: time::Duration)! {
-	mut dwordTimeout := u32(timeout / time::Millisecond)
-	sys::Setsockopt(handle, sys::SOL_SOCKET, scope, uintptr(&dwordTimeout), 4)?
-}
-
-fn accept(h: poll::NetHandle, addr: uintptr, addrlen: sys::Socklen)!: poll::NetHandle {
-	for {
-		ret sys::Accept(h, addr, addrlen) else {
-			// Sometimes we see WSAECONNRESET and ERROR_NETNAME_DELETED is
-			// returned here. These happen if connection reset is received
-			// before Accept could complete. These errors relate to new
-			// connection, not to Accept, so ignore broken connection and
-			// try Accept again for more connections.
-			if error == sys::ERROR_NETNAME_DELETED || error == sys::WSAECONNRESET {
-				// ignore these and try again
-				continue
-			}
-			error(error)
-		}
-	}
+fn handleprepare(handle: poll::NetHandle)! {
+	// On Windows, overlapped mode is non-blocking and async.
+	// Created sockets use WSA_FLAG_NO_HANDLE_INHERIT,
+	// which is equals to CloseOnExec on UNIX.
+	// Nothing to do.
 }
 
 fn init() {
-	mut wsaData := sys::WsaData{}
-	verReq := sys::MakeWord(2, 2)
-	sys::WSAStartup(verReq, &wsaData) else {
-		panic("net: WSAStartup failed (Windows specific)")
-	}
+	poll::InitWSA()
 }

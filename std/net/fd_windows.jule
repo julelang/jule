@@ -1,0 +1,55 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/poll"
+use "std/mem"
+use "std/sys"
+use "std/time"
+
+impl netFD {
+	#disable nilptr
+	async fn connect(mut *self, ipv: int, sockaddr: uintptr, socksize: sys::Socklen, deadline: time::Duration)! {
+		h := self.Handle()
+		// ConnectEx supports only connection-oriented sockets (e.g. TCP).
+		// UDP (SOCK_DGRAM) is not supported.
+		// For UDP, use connect(), which only sets the default peer address.
+		// Since UDP has no connection handshake, connect timeouts are not applicable.
+		if self.pfd.Flags&poll::SocketNoConn == poll::SocketNoConn {
+			sys::Connect(h, sockaddr, socksize)?
+			ret
+		}
+		// Use ConnectEx API for overlapped connection-oriented sockets.
+		// ConnectEx does NOT implicitly bind the socket.
+		// The socket MUST be explicitly bound before calling ConnectEx,
+		// unlike connect(), which performs an implicit bind if needed.
+		if ipv == 4 {
+			mut addr := sys::RawSockaddrInet4{}
+			addr.Family = sys::AF_INET
+			sys::Bind(h, uintptr(&addr), socksize) else {
+				self.Close().await?
+				error(error)
+			}
+		} else {
+			mut addr := sys::RawSockaddrInet6{}
+			addr.Family = sys::AF_INET6
+			sys::Bind(h, uintptr(&addr), socksize) else {
+				self.Close().await?
+				error(error)
+			}
+		}
+		self.pfd.ConnectEx(sockaddr, socksize).await?
+		// Refresh socket properties.
+		sys::Setsockopt(h, sys::SOL_SOCKET, sys::SO_UPDATE_CONNECT_CONTEXT, uintptr(h), sys::Socklen(mem::SizeOf(h)))?
+	}
+
+	#disable nilptr
+	async fn accept(mut *self, ipv: int, addr: uintptr, mut &addrlen: *sys::Socklen)!: poll::NetHandle {
+		ret self.pfd.Accept(fn|| {
+			if ipv == 4 {
+				ret tcpsocketipv4()?
+			}
+			ret tcpsocketipv6()?
+		}, addr, addrlen).await?
+	}
+}

@@ -36,6 +36,7 @@ extern struct FILETIME{}
 // It is a C enum in the Windows API.
 extern type GET_FILEEX_INFO_LEVELS: int
 
+extern let CancelIoEx: *unsafe
 extern let LoadLibraryW: *unsafe
 extern let LoadLibraryExW: *unsafe
 extern let GetProcAddress: *unsafe
@@ -281,8 +282,8 @@ unsafe fn ReadConsole(handle: Handle, mut buffer: *u16, toRead: u32, mut &read: 
 }
 
 // Calls Windows's WSAGetLastError function.
-fn WSAGetLastError(): int {
-	ret extern.WSAGetLastError()
+fn WSAGetLastError(): Errno {
+	ret Errno(extern.WSAGetLastError())
 }
 
 // Call's Windows FindFirstFileW function.
@@ -527,6 +528,13 @@ fn GetProcAddress(module: Handle, procname: str)!: (proc: uintptr) {
 
 fn FreeLibrary(handle: Handle)! {
 	r := Addrcall[i32](uintptr(extern.FreeLibrary), unsafe { (*unsafe)(handle) })
+	if r == 0 {
+		error(GetLastErrno())
+	}
+}
+
+fn CancelIoEx(s: Handle, &o: *Overlapped)! {
+	r := Addrcall[i32](uintptr(extern.CancelIoEx), s, o)
 	if r == 0 {
 		error(GetLastErrno())
 	}

@@ -81,28 +81,30 @@ impl UDPConn {
 		}
 	}
 
-	// Sets read timeout for connection.
-	// Timeout precision is milliseconds.
-	// If the timeout is below one millisecond it will be accepted as zero.
-	// The maximum timeout is 40 days, if timeout is greater than 40 fays, it panics.
-	// The zero timeout, clears current timeout if exist.
-	fn SetReadTimeout(mut *self, timeout: time::Duration)! {
+	// Sets or updates a deadline for the future read operations.
+	// If the deadline is given as 0, the deadline is cleared.
+	// The deadline is evaluated against an absolute point in time.
+	// In practice, the given deadline is equivalent to `time::Now().Add(deadline)`.
+	// It does not apply per operation, but remains valid until this absolute time.
+	// Any operation initiated after this deadline has passed will fail.
+	fn SetReadDeadline(mut *self, deadline: time::Duration)! {
 		if self.fd == nil {
-			panic("net: TCPConn.SetReadTimeout: connection is closed")
+			panic("net: TCPConn.SetReadDeadline: connection is closed")
 		}
-		self.fd.SetReadTimeout(timeout)?
+		self.fd.SetReadDeadline(deadline)
 	}
 
-	// Sets write timeout for connection.
-	// Timeout precision is milliseconds.
-	// If the timeout is below one millisecond it will be accepted as zero.
-	// The maximum timeout is 40 days, if timeout is greater than 40 fays, it panics.
-	// The zero timeout, clears current timeout if exist.
-	fn SetWriteTimeout(mut *self, timeout: time::Duration)! {
+	// Sets or updates a deadline for the future write operations.
+	// If the deadline is given as 0, the deadline is cleared.
+	// The deadline is evaluated against an absolute point in time.
+	// In practice, the given deadline is equivalent to `time::Now().Add(deadline)`.
+	// It does not apply per operation, but remains valid until this absolute time.
+	// Any operation initiated after this deadline has passed will fail.
+	fn SetWriteDeadline(mut *self, deadline: time::Duration)! {
 		if self.fd == nil {
-			panic("net: TCPConn.SetWriteTimeout: connection is closed")
+			panic("net: TCPConn.SetWriteDeadline: connection is closed")
 		}
-		self.fd.SetWriteTimeout(timeout)?
+		self.fd.SetWriteDeadline(deadline)
 	}
 
 	// Returns network name which is connected or listening.
@@ -143,7 +145,7 @@ async fn udpBind(network: Network, addr: str)!: &UDPConn {
 	if conn.Addr.IP.Empty() {
 		match network {
 		| UDP | UDP4:
-			handle := sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
+			handle := socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
 			conn.sockaddr4 = sys::RawSockaddrInet4{}
 			conn.sockaddr4.Family = sys::AF_INET
@@ -154,7 +156,7 @@ async fn udpBind(network: Network, addr: str)!: &UDPConn {
 			}
 		| UDP6:
 			conn.v6 = true
-			handle := sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
+			handle := socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
 			mut sockAddr := sys::RawSockaddrInet6{}
 			sockAddr.Family = sys::AF_INET6
@@ -173,7 +175,7 @@ async fn udpBind(network: Network, addr: str)!: &UDPConn {
 				error(&AddrError{Err: "expected IPv4 address but found IPv6", Addr: addr})
 			}
 			conn.v6 = true
-			handle := sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
+			handle := socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
 			conn.sockaddr6 = sys::RawSockaddrInet6{}
 			conn.sockaddr6.Family = sys::AF_INET6
@@ -189,7 +191,7 @@ async fn udpBind(network: Network, addr: str)!: &UDPConn {
 				error(&AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr})
 			}
 			conn.Addr.IP = ipv4
-			handle := sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
+			handle := socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
 			conn.sockaddr4 = sys::RawSockaddrInet4{}
 			conn.sockaddr4.Family = sys::AF_INET
@@ -211,25 +213,34 @@ async fn udpDial(network: Network, addr: str)!: &UDPConn {
 		connect: true,
 	}
 
+	let mut handle: poll::NetHandle
 	if conn.Addr.IP.Empty() {
 		match network {
 		| UDP | UDP4:
-			handle := sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
+			handle = socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
 			conn.sockaddr4 = sys::RawSockaddrInet4{}
 			conn.sockaddr4.Family = sys::AF_INET
 			conn.sockaddr4.Port = htons(conn.Addr.Port)
-			connectSocket(handle, uintptr(&conn.sockaddr4), sys::Socklen(mem::SizeOf(conn.sockaddr4)), 0) else {
+			handleprepare(handle) else {
+				conn.Close().await?
+				error(error)
+			}
+			conn.fd.connect(4, uintptr(&conn.sockaddr4), sys::Socklen(mem::SizeOf(conn.sockaddr4)), 0).await else {
 				conn.Close().await?
 				error(error)
 			}
 		| UDP6:
-			handle := sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
+			handle = socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
 			conn.sockaddr6 = sys::RawSockaddrInet6{}
 			conn.sockaddr6.Family = sys::AF_INET6
 			conn.sockaddr6.Port = htons(conn.Addr.Port)
-			connectSocket(handle, uintptr(&conn.sockaddr6), sys::Socklen(mem::SizeOf(conn.sockaddr6)), 0) else {
+			handleprepare(handle) else {
+				conn.Close().await?
+				error(error)
+			}
+			conn.fd.connect(6, uintptr(&conn.sockaddr6), sys::Socklen(mem::SizeOf(conn.sockaddr6)), 0).await else {
 				conn.Close().await?
 				error(error)
 			}
@@ -243,14 +254,18 @@ async fn udpDial(network: Network, addr: str)!: &UDPConn {
 				error(&AddrError{Err: "expected IPv4 address but found IPv6", Addr: addr})
 			}
 			conn.v6 = true
-			handle := sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
+			handle = socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
 			conn.sockaddr6 = sys::RawSockaddrInet6{}
 			conn.sockaddr6.Family = sys::AF_INET6
 			conn.sockaddr6.Port = htons(conn.Addr.Port)
 			ipv6 := conn.Addr.IP.To16()
 			copy(conn.sockaddr6.Addr[:], ipv6)
-			connectSocket(handle, uintptr(&conn.sockaddr6), sys::Socklen(mem::SizeOf(conn.sockaddr6)), 0) else {
+			handleprepare(handle) else {
+				conn.Close().await?
+				error(error)
+			}
+			conn.fd.connect(6, uintptr(&conn.sockaddr6), sys::Socklen(mem::SizeOf(conn.sockaddr6)), 0).await else {
 				conn.Close().await?
 				error(error)
 			}
@@ -259,13 +274,17 @@ async fn udpDial(network: Network, addr: str)!: &UDPConn {
 				error(&AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr})
 			}
 			conn.Addr.IP = ipv4
-			handle := sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
+			handle = socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)?
 			conn.fd = newFD(handle, poll::SocketNoConn, sys::SOCK_DGRAM)
 			conn.sockaddr4 = sys::RawSockaddrInet4{}
 			conn.sockaddr4.Family = sys::AF_INET
 			conn.sockaddr4.Port = htons(conn.Addr.Port)
 			copy(conn.sockaddr4.Addr[:], ipv4)
-			connectSocket(handle, uintptr(&conn.sockaddr4), sys::Socklen(mem::SizeOf(conn.sockaddr4)), 0) else {
+			handleprepare(handle) else {
+				conn.Close().await?
+				error(error)
+			}
+			conn.fd.connect(4, uintptr(&conn.sockaddr4), sys::Socklen(mem::SizeOf(conn.sockaddr4)), 0).await else {
 				conn.Close().await?
 				error(error)
 			}

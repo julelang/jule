@@ -20,9 +20,26 @@ fn eventpollinit() {
 	}
 }
 
+#disable nilptr boundary
+fn eventpollopen(fd: u64, mut &pd: *polldesc) {
+	let mut ev: epollEvent
+	ev.Events = sys::EPOLLIN | sys::EPOLLOUT | sys::EPOLLRDHUP | sys::EPOLLET
+	unsafe { *(*uintptr)(&ev.Data) = uintptr(pd) }
+	e := syscall_EpollCtl(epfd, sys::EPOLL_CTL_ADD, i32(fd), &ev)
+	if e != _NO_ERROR {
+		panic("runtime: eventpollopen: epoll failed")
+	}
+}
+
+fn eventpollclose(fd: u64): sys::Errno {
+	let mut ev: epollEvent
+	ret syscall_EpollCtl(epfd, sys::EPOLL_CTL_DEL, i32(fd), &ev)
+}
+
 // delay < 0: blocks indefinitely
 // delay == 0: does not block, just polls
 // delay > 0: block for up to that many nanoseconds
+#disable nilptr boundary
 fn eventpoll(delay: i64): coroq {
 	if epfd == -1 {
 		ret coroq{}
@@ -59,7 +76,7 @@ fn eventpoll(delay: i64): coroq {
 	}
 	let mut events: [128]epollEvent
 retry:
-	_, errno := syscall_EpollWait(epfd, &events[0], i32(len(events)), wait)
+	n, errno := syscall_EpollWait(epfd, &events[0], i32(len(events)), wait)
 	if errno != _NO_ERROR {
 		if errno != sys::EINTR {
 			panic("runtime: eventpoll: epoll failed")
@@ -70,6 +87,30 @@ retry:
 			ret coroq{}
 		}
 		goto retry
+	}
+	let mut toRun: coroq
+	mut i := i32(0)
+	for i < n; i++ {
+		&ev := &events[i]
+		if ev.Events == 0 {
+			continue
+		}
+
+		let mut mode: i32
+		if ev.Events&(sys::EPOLLIN|sys::EPOLLRDHUP|sys::EPOLLHUP|sys::EPOLLERR) != 0 {
+			mode += 'r'
+		}
+		if ev.Events&(sys::EPOLLOUT|sys::EPOLLHUP|sys::EPOLLERR) != 0 {
+			mode += 'w'
+		}
+		if mode == 0 {
+			continue
+		}
+		mut &pd := unsafe { &(*(*polldesc)(&ev.Data)) }
+		pd.mu.lock()
+		pd.eventerr = pd.eventerr || ev.Events == sys::EPOLLERR
+		pollnotified(pd, mode, &toRun)
+		pd.mu.unlock()
 	}
 	ret coroq{}
 }

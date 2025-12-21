@@ -16,20 +16,35 @@ const (
 	_WAIT_TIMEOUT = 0x102
 )
 
-struct overlapped {
-	internal:     uintptr
-	internalhigh: uintptr
-	anon0:        [8]byte
-	hevent:       *byte
-}
-
 // Contains the information returned by a call to GetQueuedCompletionStatusEx.
 // https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-overlapped_entry
 struct overlappedEntry {
 	key:      uintptr
-	ov:       *overlapped
+	ov:       *sys::Overlapped
 	internal: uintptr
 	qty:      u32
+}
+
+// Must be the same as beginning of internal/poll.operation.
+// Keep these in sync.
+struct polloperation {
+	// used by windows
+	_: sys::Overlapped
+
+	// used by eventpoll
+	pd:   &polldesc
+	mode: i32
+}
+
+// Returns the polloperation contained in e.
+// It can return nil if the entry is not from internal/poll.
+fn polloperationFromOverlappedEntry(mut &e: *overlappedEntry): &polloperation {
+	if e.ov == nil {
+		ret nil
+	}
+	mut opptr := unsafe { (*polloperation)(e.ov) }
+	mut op := unsafe { (&polloperation)(opptr) }
+	ret op
 }
 
 let mut iocphandle = sys::InvalidHandle
@@ -45,9 +60,26 @@ fn eventpollinit() {
 	iocphandle = sys::Handle(h)
 }
 
+#disable nilptr boundary
+fn eventpollopen(fd: u64, mut &pd: *polldesc) {
+	r := unsafe {
+		sys::Addrcall[*unsafe](uintptr(extern.CreateIoCompletionPort),
+			(*unsafe)(fd), (*unsafe)(iocphandle), (*unsafe)(pd), u32(0))
+	}
+	if r == nil {
+		panic("runtime: IOCP open failed")
+	}
+}
+
+fn eventpollclose(fd: u64): sys::Errno {
+	// nothing to do
+	ret 0
+}
+
 // delay < 0: blocks indefinitely
 // delay == 0: does not block, just polls
 // delay > 0: block for up to that many nanoseconds
+#disable nilptr boundary
 fn eventpoll(mut delay: i64): coroq {
 	if iocphandle == sys::InvalidHandle {
 		ret coroq{}
@@ -101,5 +133,21 @@ fn eventpoll(mut delay: i64): coroq {
 		}
 		panic("runtime: eventpoll: IOCP failed")
 	}
-	ret coroq{}
+	let mut toRun: coroq
+	mut i := u32(0)
+	for i < n; i++ {
+		mut &e := &entries[i]
+		mut op := polloperationFromOverlappedEntry(e)
+		if op == nil {
+			continue
+		}
+		mode := op.mode
+		if mode != 'r' && mode != 'w' {
+			panic("runtime: invalid mode on eventpoll")
+		}
+		op.pd.mu.lock()
+		pollnotified(&(*op.pd), mode, &toRun)
+		op.pd.mu.unlock()
+	}
+	ret toRun
 }

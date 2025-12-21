@@ -26,6 +26,10 @@ struct FD {
 	// Semaphore signaled when file is closed.
 	csema: u32
 
+	// Poll descriptor for the FD.
+	pd:       &runtime::polldesc
+	pollable: bool
+
 	// The file descriptor should be compatible
 	// with pointers and other integer kinds such as UNIX file descriptors.
 	File:  u64
@@ -41,7 +45,13 @@ struct FD {
 }
 
 impl FD {
-	fn Init(mut *self)! {}
+	fn Init(mut *self, pollable: bool)! {
+		if pollable {
+			self.pd = new(runtime::polldesc)
+			self.pd.init(self.File)
+			self.pollable = true
+		}
+	}
 
 	// Writes bytes to the file descriptor and returns written byte count.
 	// The number of bytes written can never exceed the length of the buf.
@@ -59,15 +69,19 @@ impl FD {
 		}
 		self.writeLock().await?
 		defer { self.writeUnlock() }
-		runtime::entersyscall()
-		defer { runtime::exitsyscall() }
 		for {
 			mut max := len(buf)
 			if self.IsStream && max-n > maxRW {
 				max = n + maxRW
 			}
 			part := buf[n:max]
-			nn := ignoringEINTRIO2(sys::Write, int(self.File), part)?
+			nn := ignoringEINTRIO2(sys::Write, int(self.File), part) else {
+				if error == sys::EAGAIN && self.pollable {
+					self.WaitWrite().await?
+					continue
+				}
+				error(error)
+			}
 			if n > max-nn {
 				// This can reportedly happen when using
 				// some VPN software. Go's issue #61060.
@@ -132,11 +146,13 @@ impl FD {
 		}
 		self.writeLock().await?
 		defer { self.writeUnlock() }
-		runtime::entersyscall()
-		defer { runtime::exitsyscall() }
 		for {
 			sys::Sendto(int(self.File), buf, 0, addr, addrLen) else {
 				if error == sys::EINTR {
+					continue
+				}
+				if error == sys::EAGAIN && self.pollable {
+					self.WaitWrite().await?
 					continue
 				}
 				error(error)
@@ -190,11 +206,17 @@ impl FD {
 		self.readLock().await?
 		defer { self.readUnlock() }
 
-		runtime::entersyscall()
-		defer { runtime::exitsyscall() }
-		n = ignoringEINTRIO(sys::Read, int(self.File), buf)?
-		n = self.statEOF(n)
-		ret n
+		for {
+			n = ignoringEINTRIO(sys::Read, int(self.File), buf) else {
+				if error == sys::EAGAIN && self.pollable {
+					self.WaitRead().await?
+					continue
+				}
+				error(error)
+			}
+			n = self.statEOF(n)
+			ret n
+		}
 	}
 
 	// Read bytes to buffer from the file descriptor and returns read byte count.
@@ -236,11 +258,13 @@ impl FD {
 		}
 		self.readLock().await?
 		defer { self.readUnlock() }
-		runtime::entersyscall()
-		defer { runtime::exitsyscall() }
 		for {
 			n = sys::Recvfrom(int(self.File), buf, 0, addr, addrLen) else {
 				if error == sys::EINTR {
+					continue
+				}
+				if error == sys::EAGAIN && self.pollable {
+					self.WaitRead().await?
 					continue
 				}
 				error(error)
@@ -289,8 +313,44 @@ impl FD {
 		sys::Ftruncate(int(self.File), size)?
 	}
 
+	// Wraps the accept network call.
+	async fn Accept(mut *self, addr: uintptr, mut &addrlen: *sys::Socklen)!: NetHandle {
+		self.readLock().await?
+		defer { self.readUnlock() }
+
+		for {
+			h := sys::Accept(NetHandle(self.File), addr, addrlen) else {
+				match error {
+				| sys::EINTR:
+					continue
+				| sys::ECONNABORTED:
+					// This means that a socket on the listen
+					// queue was closed before we Accept()ed it;
+					// it's a silly error, so try again.
+					continue
+				| sys::EAGAIN:
+					if self.pollable {
+						self.WaitRead().await?
+						continue
+					}
+				}
+				error(error)
+			}
+			sys::CloseOnExec(h)
+			sys::SetNonblock(h, true) else {
+				sys::Close(h) else {}
+				error(error)
+			}
+			ret h
+		}
+	}
+
 	// Closes file descriptor.
 	fn destroy(mut *self)! {
+		// Poller may want to unregister fd in notification mechanism,
+		// so this must be executed before Close.
+		self.pd.close()
+
 		// All kinds are supports the Close function.
 		sys::Close(int(self.File))?
 
@@ -305,6 +365,11 @@ impl FD {
 
 	// Closes file descriptor.
 	async fn Close(mut *self)! {
+		if !self.pollable {
+			self.CloseSync()?
+			ret
+		}
+
 		if !self.fdmu.increfAndClose() {
 			errClosing(self.isFile())?
 		}

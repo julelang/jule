@@ -4,7 +4,9 @@
 
 use "std/io"
 use "std/mem"
+use "std/runtime"
 use "std/sys"
+use "std/time"
 
 // FD flags. Kind flags should not be combined like File|Console|Socket.
 const (
@@ -17,12 +19,12 @@ const (
 
 impl FD {
 	// Returns new FD by file and kind.
-	fn New(file: u64, flags: int)!: &FD {
+	fn New(file: u64, flags: int, pollable: bool)!: &FD {
 		mut f := &FD{
 			File: file,
 			Flags: flags,
 		}
-		f.Init()?
+		f.Init(pollable)?
 		ret f
 	}
 
@@ -87,5 +89,41 @@ impl FD {
 	fn WriteV6Sync(mut *self, buf: []byte, addr: sys::RawSockaddrInet6)!: (n: int) {
 		addrLen := mem::SizeOf(addr)
 		ret self.WriteVSync(buf, uintptr(&addr), sys::Socklen(addrLen))?
+	}
+
+	// Sets a general deadline for pd.
+	fn SetDeadline(mut *self, mut deadline: time::Duration) {
+		self.pd.setDeadline(i64(deadline))
+	}
+
+	// Sets a read deadline for pd.
+	fn SetReadDeadline(mut *self, mut deadline: time::Duration) {
+		self.pd.setReadDeadline(i64(deadline))
+	}
+
+	// Sets a write deadline for pd.
+	fn SetWriteDeadline(mut *self, mut deadline: time::Duration) {
+		self.pd.setWriteDeadline(i64(deadline))
+	}
+
+	// Waits until an event is triggered by netpoll according to the mode.
+	// After returning, either the coroutine is ready to be executed
+	// according to the mode, or an error has occurred (e.g., deadline exceeded).
+	async fn Wait(mut *self, mode: i32)! {
+		runtime::netpollwait(self.pd, mode).await?
+	}
+
+	// Waits until an event is triggered by netpoll for read operation.
+	// After returning, either the coroutine is ready to be executed
+	// according to the mode, or an error has occurred (e.g., deadline exceeded).
+	async fn WaitRead(mut *self)! {
+		self.Wait('r').await?
+	}
+
+	// Waits until an event is triggered by netpoll for write operation.
+	// After returning, either the coroutine is ready to be executed
+	// according to the mode, or an error has occurred (e.g., deadline exceeded).
+	async fn WaitWrite(mut *self)! {
+		self.Wait('w').await?
 	}
 }

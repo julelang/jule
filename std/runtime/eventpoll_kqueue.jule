@@ -4,6 +4,7 @@
 
 #build darwin
 
+use "std/internal/runtime/atomic"
 use "std/sys"
 
 extern use "<sys/event.h>"
@@ -17,7 +18,7 @@ struct keventt {
 	flags:  u16
 	fflags: u32
 	data:   i64
-	udata:  *byte
+	udata:  *unsafe
 }
 
 let mut kq: i32 = -1
@@ -31,9 +32,38 @@ fn eventpollinit() {
 	sys::Fcntl(int(kq), sys::F_SETFD, sys::FD_CLOEXEC) else {}
 }
 
+#disable nilptr boundary
+fn eventpollopen(fd: u64, mut &pd: *polldesc) {
+	let mut ev: [2]keventt
+
+	// READ
+	ev[0].ident = fd
+	ev[0].filter = sys::EVFILT_READ
+	ev[0].flags = sys::EV_ADD | sys::EV_CLEAR
+	ev[0].fflags = 0
+	ev[0].data = 0
+	ev[0].udata = pd
+
+	// WRITE
+	ev[1] = ev[0]
+	ev[1].filter = sys::EVFILT_WRITE
+
+	r := sys::Addrcall[i32](uintptr(extern.kevent), kq, &ev[0], i32(2), (*unsafe)(nil), i32(0), (*unsafe)(nil))
+	if r < 0 {
+		panic("runtime: eventpollopen: kevent failed")
+	}
+}
+
+fn eventpollclose(fd: u64): sys::Errno {
+	// Don't need to unregister because calling close()
+	// on fd will remove any kevents that reference the descriptor.
+	ret 0
+}
+
 // delay < 0: blocks indefinitely
 // delay == 0: does not block, just polls
 // delay > 0: block for up to that many nanoseconds
+#disable nilptr boundary
 fn eventpoll(delay: i64): coroq {
 	if kq == -1 {
 		ret coroq{}
@@ -54,14 +84,13 @@ fn eventpoll(delay: i64): coroq {
 	}
 	let mut events: [64]keventt
 retry:
-	kn := sys::Addrcall[i32](uintptr(extern.kevent), kq, (*unsafe)(nil), i32(0), &events[0], i32(len(events)), tp)
+	kn, e := kevent(kq, nil, 0, &events[0], i32(len(events)), tp)
 	n := int(kn)
 	if n < 0 {
 		// Ignore the ETIMEDOUT error for now, but try to dive deep and
 		// figure out what really happened with n == ETIMEOUT,
 		// see Go's iissue https://go.dev/issue/59679 for details.
-		err := sys::GetLastErrno()
-		if err != sys::EINTR && err != sys::ETIMEDOUT {
+		if e != sys::EINTR && e != sys::ETIMEDOUT {
 			panic("runtime: eventpoll: kevent failed")
 		}
 		// If a timed sleep was interrupted, just return to
@@ -71,10 +100,52 @@ retry:
 		}
 		goto retry
 	}
-	ret coroq{}
+	let mut toRun: coroq
+	mut i := 0
+	for i < n; i++ {
+		&ev := &events[i]
+
+		let mut mode: i32
+		match ev.filter {
+		| sys::EVFILT_READ:
+			mode += 'r'
+
+			// On some systems when the read end of a pipe
+			// is closed the write end will not get a
+			// EVFILT_WRITE event, but will get a
+			// EVFILT_READ event with EV_EOF set.
+			// Note that setting 'w' here just means that we
+			// will wake up a coroutine waiting to write;
+			// that coroutine will try the write again,
+			// and the appropriate thing will happen based
+			// on what that write returns (success, EPIPE, EAGAIN).
+			if ev.flags&sys::EV_EOF != 0 {
+				mode += 'w'
+			}
+		| sys::EVFILT_WRITE:
+			mode += 'w'
+		}
+		if mode == 0 {
+			continue
+		}
+		mut &pd := unsafe { &(*(*polldesc)(ev.udata)) }
+		pd.mu.lock()
+		pd.eventerr = pd.eventerr || ev.flags == sys::EV_ERROR
+		pollnotified(pd, mode, &toRun)
+		pd.mu.unlock()
+	}
+	ret toRun
 }
 
 fn setNsec(mut &ts: *sys::Timespec, ns: i64) {
 	ts.Sec = ns / 1e9
 	ts.Nsec = ns % 1e9
+}
+
+fn kevent(kq: i32, &ev: *keventt, evn: i32, &ev2: *keventt, ev2n: i32, tm: *sys::Timespec): (n: i32, e: sys::Errno) {
+	n = sys::Addrcall[i32](uintptr(extern.kevent), kq, ev, evn, ev2, ev2n, tm)
+	if n < 0 {
+		e = sys::GetLastErrno()
+	}
+	ret n, e
 }
