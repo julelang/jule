@@ -24,7 +24,7 @@ fn eventpollinit() {
 fn eventpollopen(fd: u64, mut &pd: *polldesc) {
 	let mut ev: epollEvent
 	ev.Events = sys::EPOLLIN | sys::EPOLLOUT | sys::EPOLLRDHUP | sys::EPOLLET
-	unsafe { *(*uintptr)(&ev.Data) = uintptr(pd) }
+	ev.Data = pd
 	e := syscall_EpollCtl(epfd, sys::EPOLL_CTL_ADD, i32(fd), &ev)
 	if e != _NO_ERROR {
 		panic("runtime: eventpollopen: epoll failed")
@@ -106,11 +106,11 @@ retry:
 		if mode == 0 {
 			continue
 		}
-		mut &pd := unsafe { &(*(*polldesc)(&ev.Data)) }
+		mut &pd := unsafe { &(*(*polldesc)(ev.Data)) }
 		pd.mu.lock()
 		pd.eventerr = pd.eventerr || ev.Events == sys::EPOLLERR
 		pollnotified(pd, mode, &toRun)
 		pd.mu.unlock()
 	}
-	ret coroq{}
+	ret toRun
 }
