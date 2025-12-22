@@ -139,7 +139,10 @@ impl polldesc {
 
 	#disable nilptr
 	fn close(mut &self) {
+		self.mu.lock()
+		self.closing = true
 		self.proc.pds.remove(self)
+		self.mu.unlock()
 		eventpollclose(self.fd)
 	}
 }
@@ -163,12 +166,14 @@ async fn netpollwait(mut pd: &polldesc, mode: i32)! {
 		ret
 	}
 	if pd.closing {
+		pd.mu.unlock()
 		error(netpollClosing)
 	}
 	// Report an event scanning error only on a read event.
 	// An error on a write event will be captured in a subsequent
 	// write call that is able to report a more specific error.
 	if mode == 'r' && pd.eventerr {
+		pd.mu.unlock()
 		error(netpollNotPollable)
 	}
 	// Check for deadline because scheduler will remove it
@@ -176,10 +181,13 @@ async fn netpollwait(mut pd: &polldesc, mode: i32)! {
 	now := nanotime()
 	match {
 	| pd.deadline != 0 && pd.deadline <= now:
+		pd.mu.unlock()
 		error(netpollDeadline)
 	| mode == 'r' && pd.rdeadline != 0 && pd.rdeadline <= now:
+		pd.mu.unlock()
 		error(netpollDeadline)
 	| mode == 'w' && pd.wdeadline != 0 && pd.wdeadline <= now:
+		pd.mu.unlock()
 		error(netpollDeadline)
 	}
 	match mode {
@@ -194,6 +202,7 @@ async fn netpollwait(mut pd: &polldesc, mode: i32)! {
 	netpollgeterr(pd, mode)?
 }
 
+#disable nilptr
 async fn netpollwaitcanceled(mut pd: &polldesc, mode: i32) {
 	// This function is used only on windows after a failed attempt to cancel
 	// a pending async IO operation. Wait for ioready, ignore closing or timeouts.
@@ -244,7 +253,7 @@ fn netpollgeterr(mut pd: &polldesc, mode: i32)! {
 		pd.rcoro = nil
 		error(netpollDeadline)
 	}
-	if mode == 'w' && pd.wcoro != nil && pd.rcoro != pollrace {
+	if mode == 'w' && pd.wcoro != nil && pd.wcoro != pollrace {
 		pd.wcoro = nil
 		error(netpollDeadline)
 	}
@@ -252,6 +261,7 @@ fn netpollgeterr(mut pd: &polldesc, mode: i32)! {
 
 // Adds notified coroutines of pd to toRun according to mode.
 // It assumes pd mutex is locked.
+#disable nilptr
 fn pollnotified(mut &pd: *polldesc, mode: i32, mut &toRun: *coroq) {
 	match mode {
 	| 'r':
