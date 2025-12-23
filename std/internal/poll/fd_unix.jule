@@ -47,8 +47,7 @@ struct FD {
 impl FD {
 	fn Init(mut *self, pollable: bool)! {
 		if pollable {
-			self.pd = new(runtime::polldesc)
-			self.pd.init(self.File)
+			self.pd = runtime::eventpollnew(self.File)
 			self.pollable = true
 		}
 	}
@@ -349,7 +348,7 @@ impl FD {
 		if self.pollable {
 			// Poller may want to unregister fd in notification mechanism,
 			// so this must be executed before Close.
-			self.pd.close()
+			runtime::eventpollfree(self.pd)
 		}
 
 		// All kinds are supports the Close function.

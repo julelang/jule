@@ -181,46 +181,49 @@ fn coropoll(mut &poll: *bool): (polled: &coro) {
 	// Waiting coroutines with read/write deadlines are made runnable
 	// when their deadlines expire.
 	if iodeadline && t.proc.pds.head != nil {
+		t.proc.pdsmu.lock()
 		mut q := t.proc.pds.head
 		for {
 			if n >= coroprocRunQueueSize || q == nil {
 				break
 			}
-			q.mu.lock()
+			mut pd := q.pd
+			pd.mu.lock()
 
-			if q.rdeadline <= now && q.rcoro != nil {
-				ok = t.proc.runq.push(q.rcoro)
+			if pd.rdeadline > 0 && pd.rdeadline <= now && pd.rcoro != nil {
+				ok = t.proc.runq.push(pd.rcoro)
 				if !ok {
 					panic("runtime: coroutine scheduler queue corruption")
 				}
 				n++
 			}
-			if q.wdeadline <= now && q.wcoro != nil {
-				ok = t.proc.runq.push(q.wcoro)
+			if pd.wdeadline > 0 && pd.wdeadline <= now && pd.wcoro != nil {
+				ok = t.proc.runq.push(pd.wcoro)
 				if !ok {
 					panic("runtime: coroutine scheduler queue corruption")
 				}
 				n++
 			}
-			if q.deadline <= now {
-				if q.rcoro != nil {
-					ok = t.proc.runq.push(q.rcoro)
+			if pd.deadline > 0 && pd.deadline <= now {
+				if pd.rcoro != nil {
+					ok = t.proc.runq.push(pd.rcoro)
 					if !ok {
 						panic("runtime: coroutine scheduler queue corruption")
 					}
 					n++
 				}
-				if q.wcoro != nil {
-					ok = t.proc.runq.push(q.wcoro)
+				if pd.wcoro != nil {
+					ok = t.proc.runq.push(pd.wcoro)
 					if !ok {
 						panic("runtime: coroutine scheduler queue corruption")
 					}
 					n++
 				}
 			}
-			q.mu.unlock()
+			pd.mu.unlock()
 			q = q.next
 		}
+		t.proc.pdsmu.unlock()
 
 		polled, ok = t.proc.runq.pop()
 		if !ok {

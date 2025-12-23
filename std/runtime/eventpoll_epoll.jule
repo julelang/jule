@@ -7,6 +7,7 @@
 
 #build linux
 
+use "std/internal/runtime/atomic"
 use "std/sys"
 
 extern use "<sys/epoll.h>"
@@ -24,7 +25,9 @@ fn eventpollinit() {
 fn eventpollopen(fd: u64, mut &pd: *polldesc) {
 	let mut ev: epollEvent
 	ev.Events = sys::EPOLLIN | sys::EPOLLOUT | sys::EPOLLRDHUP | sys::EPOLLET
-	ev.Data = pd
+	fdseq := atomic::Load(&pd.fdseq, atomic::Acquire)
+	tp := taggedPointerPack(pd, fdseq)
+	ev.Data = u64(tp)
 	e := syscall_EpollCtl(epfd, sys::EPOLL_CTL_ADD, i32(fd), &ev)
 	if e != _NO_ERROR {
 		panic("runtime: eventpollopen: epoll failed")
@@ -106,7 +109,12 @@ retry:
 		if mode == 0 {
 			continue
 		}
-		mut &pd := unsafe { &(*(*polldesc)(ev.Data)) }
+		tp := taggedPointer(ev.Data)
+		mut &pd := unsafe { &(*(*polldesc)(tp.pointer())) }
+		tag := tp.tag()
+		if atomic::Load(&pd.fdseq, atomic::Acquire) != tag {
+			continue // stale
+		}
 		pd.mu.lock()
 		pd.eventerr = pd.eventerr || ev.Events == sys::EPOLLERR
 		pollnotified(pd, mode, &toRun)

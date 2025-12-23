@@ -74,8 +74,7 @@ impl FD {
 		}
 
 		if pollable {
-			self.pd = new(runtime::polldesc)
-			self.pd.init(self.File)
+			self.pd = runtime::eventpollnew(self.File)
 			self.pollable = true
 		}
 
@@ -526,7 +525,7 @@ impl FD {
 		if self.pollable {
 			// Poller may want to unregister fd in notification mechanism,
 			// so this must be executed before Close.
-			self.pd.close()
+			runtime::eventpollfree(self.pd)
 		}
 
 		match {
@@ -573,9 +572,9 @@ impl FD {
 	}
 
 	// Waits for cancellation.
-	// See documentation of the [netpollwaitcanceled].
+	// See documentation of the [eventpollwaitcanceled].
 	async fn waitCanceled(mut *self, mode: i32) {
-		runtime::netpollwaitcanceled(self.pd, mode).await
+		runtime::eventpollwaitcanceled(self.pd, mode).await
 	}
 }
 

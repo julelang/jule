@@ -1,0 +1,49 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+#build amd64 || arm64
+
+const (
+	// Number of bits needed to represent a virtual address.
+	//
+	// See heapAddrBits for a table of address space sizes on
+	// various architectures. 48 bits is enough for all supported
+	// architectures.
+	//
+	// On AMD64, virtual addresses are 48-bit (or 57-bit) numbers sign extended to 64.
+	// We shift the address left 16 to eliminate the sign extended part and make
+	// room in the bottom for the count.
+	addrBits = 48
+
+	// In addition to the 16 bits taken from the top, we can take 3 from the
+	// bottom, because node must be pointer-aligned, giving a total of 19 bits
+	// of count.
+	tagBits = 64 - addrBits + 3
+)
+
+// The number of bits stored in the numeric tag of a taggedPointer.
+const taggedPointerBits = tagBits
+
+// Created a taggedPointer from a pointer and a tag.
+// Tag bits that don't fit in the result are discarded.
+fn taggedPointerPack(ptr: *unsafe, tag: uintptr): taggedPointer {
+	ret taggedPointer(u64(uintptr(ptr))<<(64-addrBits) | u64(tag&(1<<tagBits-1)))
+}
+
+impl taggedPointer {
+	// Pointer returns the pointer from a taggedPointer.
+	fn pointer(*self): *unsafe {
+		if Arch == "amd64" {
+			// amd64 systems can place the stack above the VA hole, so we need to sign extend
+			// val before unpacking.
+			ret unsafe { (*unsafe)(uintptr(i64(*self) >> tagBits << 3)) }
+		}
+		ret unsafe { (*unsafe)(uintptr(*self >> tagBits << 3)) }
+	}
+
+	// Tag returns the tag from a taggedPointer.
+	fn tag(*self): uintptr {
+		ret uintptr(*self & (1<<taggedPointerBits - 1))
+	}
+}
