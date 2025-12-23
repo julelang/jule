@@ -9,7 +9,7 @@ use "std/time"
 
 impl netFD {
 	#disable nilptr
-	async fn connect(mut *self, ipv: int, sockaddr: uintptr, socksize: sys::Socklen, deadline: time::Duration)! {
+	async fn connect(mut *self, ipv: int, sockaddr: uintptr, socksize: sys::Socklen, timeout: time::Duration)! {
 		h := self.Handle()
 		// ConnectEx supports only connection-oriented sockets (e.g. TCP).
 		// UDP (SOCK_DGRAM) is not supported.
@@ -18,6 +18,10 @@ impl netFD {
 		if self.pfd.Flags&poll::SocketNoConn == poll::SocketNoConn {
 			sys::Connect(h, sockaddr, socksize)?
 			ret
+		}
+		if timeout > 0 {
+			self.SetDeadline(timeout)
+			defer { self.SetDeadline(0) }
 		}
 		// Use ConnectEx API for overlapped connection-oriented sockets.
 		// ConnectEx does NOT implicitly bind the socket.

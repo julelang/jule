@@ -8,8 +8,12 @@ use "std/time"
 
 impl netFD {
 	#disable nilptr
-	async fn connect(mut *self, ipv: int, sockaddr: uintptr, socksize: sys::Socklen, deadline: time::Duration)! {
+	async fn connect(mut *self, ipv: int, sockaddr: uintptr, socksize: sys::Socklen, timeout: time::Duration)! {
 		fd := self.Handle()
+		if timeout > 0 {
+			self.SetDeadline(timeout)
+			defer { self.SetDeadline(0) }
+		}
 		sys::Connect(fd, sockaddr, socksize) else {
 			if error == sys::EISCONN {
 				ret
