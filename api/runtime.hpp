@@ -41,7 +41,6 @@ __jule_Slice<__jule_U8> __jule_strToBytes(__jule_Str s);
 __jule_Str __jule_strFromByte(__jule_U8 b);
 __jule_Str __jule_strFromRune(__jule_I32 r);
 void __jule_runeStep(__jule_U8 *s, __jule_Int len, __jule_I32 *r, __jule_Int *outLen);
-__jule_Bool __jule_coSpawn(void *func, void *args);
 __jule_Int __jule_runeCount(__jule_Str s);
 void __jule_pseudoMalloc(__jule_Int n, __jule_Uint size);
 __jule_Str __jule_strBytePtr(__jule_U8 *b, __jule_Int n);
