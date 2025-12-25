@@ -47,6 +47,7 @@
 use "std/internal/runtime/atomic"
 
 extern fn __jule_retireDrain()
+extern fn __jule_trampolineRun()
 
 // Returns the maximum number of CPUs that can be executing simultaneously.
 fn COMAXPROCS(): int { ret numcpu }
@@ -258,6 +259,7 @@ Sched:
 		c.state &= ^reasonSched // Remove sched-reason flag, if exist.
 		c.state |= coroRunning
 		resume(c)
+		trampolinerun()
 		retiredrain() // Destroy the retire coroutines.
 		t.coro = nil
 
@@ -326,6 +328,12 @@ async fn sleep(dur: sleepDuration) {
 // Destroys all retired coroutine frames for the current worker thread.
 fn retiredrain() {
 	extern.__jule_retireDrain()
+}
+
+// Run all queued coroutines until the queue is empty.
+// This must be called by the scheduler to make progress after resume.
+fn trampolinerun() {
+	extern.__jule_trampolineRun()
 }
 
 // Yields the processor, allowing other coroutines to run. It does not
