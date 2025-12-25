@@ -343,7 +343,7 @@ public:
     __jule_Bool operator==(const __jule_Str &str) const noexcept
     {
         return this->_len == str._len &&
-               std::memcmp(this->begin(), str.begin(), this->_len) == 0;
+               (this->_len == 0 || std::memcmp(this->begin(), str.begin(), this->_len) == 0);
     }
 
     inline __jule_Bool operator!=(const __jule_Str &str) const noexcept
