@@ -24,10 +24,10 @@ fn eventpollinit() {
 #disable nilptr boundary
 fn eventpollopen(fd: u64, mut &pd: *polldesc) {
 	let mut ev: epollEvent
-	ev.Events = sys::EPOLLIN | sys::EPOLLOUT | sys::EPOLLRDHUP | sys::EPOLLET
+	ev.events = sys::EPOLLIN | sys::EPOLLOUT | sys::EPOLLRDHUP | sys::EPOLLET
 	fdseq := atomic::Load(&pd.fdseq, atomic::Acquire)
 	tp := taggedPointerPack(pd, fdseq)
-	ev.Data = u64(tp)
+	ev.data._u64 = u64(tp)
 	e := syscall_EpollCtl(epfd, sys::EPOLL_CTL_ADD, i32(fd), &ev)
 	if e != _NO_ERROR {
 		panic("runtime: eventpollopen: epoll failed")
@@ -95,28 +95,28 @@ retry:
 	mut i := i32(0)
 	for i < n; i++ {
 		&ev := &events[i]
-		if ev.Events == 0 {
+		if ev.events == 0 {
 			continue
 		}
 
 		let mut mode: i32
-		if ev.Events&(sys::EPOLLIN|sys::EPOLLRDHUP|sys::EPOLLHUP|sys::EPOLLERR) != 0 {
+		if ev.events&(sys::EPOLLIN|sys::EPOLLRDHUP|sys::EPOLLHUP|sys::EPOLLERR) != 0 {
 			mode += 'r'
 		}
-		if ev.Events&(sys::EPOLLOUT|sys::EPOLLHUP|sys::EPOLLERR) != 0 {
+		if ev.events&(sys::EPOLLOUT|sys::EPOLLHUP|sys::EPOLLERR) != 0 {
 			mode += 'w'
 		}
 		if mode == 0 {
 			continue
 		}
-		tp := taggedPointer(ev.Data)
+		tp := taggedPointer(ev.data._u64)
 		mut &pd := unsafe { &(*(*polldesc)(tp.pointer())) }
 		tag := tp.tag()
 		if atomic::Load(&pd.fdseq, atomic::Acquire) != tag {
 			continue // stale
 		}
 		pd.mu.lock()
-		pd.eventerr = pd.eventerr || ev.Events == sys::EPOLLERR
+		pd.eventerr = pd.eventerr || ev.events == sys::EPOLLERR
 		pollnotified(pd, mode, &toRun)
 		pd.mu.unlock()
 	}
