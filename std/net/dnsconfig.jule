@@ -26,7 +26,7 @@ struct Resolver {
 }
 
 // Default DNS resolver of the package.
-// Mutating this variable is not thread-safe by default.
+// Mutating this variable is not concurrency-safe by default.
 // Most programs only need to configure it once, so performing
 // configuration before introducing concurrency is the most common approach.
 // Otherwise, atomic access is required for Read/Write operations.
@@ -36,7 +36,7 @@ let mut DefaultResolver = Resolver{}
 let mut defaultNS = ["127.0.0.1:53", "[::1]:53"]
 
 struct dnsConfig {
-	mu:            sync::Mutex
+	mu:            runtime::mutex
 	servers:       []str          // server addresses (in host:port form) to use
 	search:        []str          // rooted suffixes to append to local name
 	ndots:         int            // number of dots in name to trigger absolute lookup
@@ -68,21 +68,21 @@ impl dnsConfig {
 // Global DNS config.
 // Fields of this variable will be updated if needed,
 // but never will be assigned data to it directly.
-// Otherwise, the sync::RWMutex field might be compromised.
+// Otherwise, the mutex field might be compromised.
 let mut conf = dnsConfig{}
 
 let mut configInitializer = sync::Once{}
 
 // Resolves config to conf.
-fn resolveConfig() {
+async fn resolveConfig() {
 	// Ensure only one update at a time checks config.
-	conf.mu.Lock()
-	defer { conf.mu.Unlock() }
+	conf.mu.lock()
+	defer { conf.mu.unlock() }
 
 	// Fast path: zero mtime, not initialized yet.
 	zero := time::Time{}
 	if conf.mtime == zero {
-		osResolveConfig()
+		osResolveConfig().await
 		conf.lastChecked = time::Now()
 		ret
 	}
@@ -109,5 +109,5 @@ fn resolveConfig() {
 		}
 	}
 
-	osResolveConfig()
+	osResolveConfig().await
 }

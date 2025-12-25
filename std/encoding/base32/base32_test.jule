@@ -63,12 +63,12 @@ fn testAppendEncode(t: &testing::T) {
 }
 
 #test
-fn testEncoder(t: &testing::T) {
+async fn testEncoder(t: &testing::T) {
 	for _, case in encodeDecodeMap {
 		mut sb := new(strings::Builder)
-		mut enc := NewEncoder(StdEncoding, sb)
-		enc.Write([]byte(case[0]))!
-		enc.Close()!
+		mut enc := NewEncoder(StdEncoding, sb.Async())
+		enc.Write([]byte(case[0])).await!
+		enc.Close().await!
 		r := sb.Str()
 		d := case[1]
 		if len(r) != len(d) {
@@ -161,11 +161,11 @@ fn testDecodeStr(t: &testing::T) {
 }
 
 #test
-fn testDecoder(t: &testing::T) {
+async fn testDecoder(t: &testing::T) {
 	for _, case in encodeDecodeMap {
 		mut r := make([]byte, StdEncoding.DecodedLen(len(case[1])))
-		mut dec := NewDecoder(StdEncoding, strings::Reader.New(str(case[1])))
-		n := dec.Read(r)!
+		mut dec := NewDecoder(StdEncoding, strings::Reader.New(str(case[1])).Async())
+		n := dec.Read(r).await!
 		r = r[:n]
 		d := case[0]
 		if len(r) != len(d) {

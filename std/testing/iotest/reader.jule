@@ -46,11 +46,11 @@ struct oneByteReader {
 }
 
 impl io::Reader for oneByteReader {
-	fn Read(mut *self, mut p: []byte)!: int {
+	async fn Read(mut *self, mut p: []byte)!: int {
 		if len(p) == 0 {
 			ret 0
 		}
-		ret self.r.Read(p[0:1])?
+		ret self.r.Read(p[0:1]).await?
 	}
 }
 
@@ -63,8 +63,8 @@ struct halfReader {
 }
 
 impl io::Reader for halfReader {
-	fn Read(mut *self, mut p: []byte)!: int {
-		ret self.r.Read(p[0 : (len(p)+1)/2])?
+	async fn Read(mut *self, mut p: []byte)!: int {
+		ret self.r.Read(p[0 : (len(p)+1)/2]).await?
 	}
 }
 
@@ -82,13 +82,13 @@ struct dataErrReader {
 }
 
 impl io::Reader for dataErrReader {
-	fn Read(mut *self, mut p: []byte)!: (n: int) {
+	async fn Read(mut *self, mut p: []byte)!: (n: int) {
 		// loop because first call needs two reads:
 		// one to get data and a second to look for an error.
 		n = io::EOF
 		for {
 			if len(self.unread) == 0 {
-				mut n1 := self.r.Read(self.data)?
+				mut n1 := self.r.Read(self.data).await?
 				if n1 == io::EOF {
 					self.unread = self.data[0:0]
 					ret

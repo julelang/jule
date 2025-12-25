@@ -249,7 +249,17 @@ impl typeCoder {
 		if f.Result != nil && f.Result.Tuple() != nil {
 			self.oc.pushResultIns(f)
 		}
-		self.funcInsResult(buf, f)
+		if f.Decl.Async {
+			if f.Decl.IsVoid() && !f.Decl.Exceptional {
+				buf.WriteStr("__jule_VoidTask")!
+			} else {
+				buf.WriteStr("__jule_Task<")!
+				self.funcInsResult(buf, f)
+				buf.WriteByte('>')!
+			}
+		} else {
+			self.funcInsResult(buf, f)
+		}
 		if len(f.Params) == 0 {
 			ret
 		}

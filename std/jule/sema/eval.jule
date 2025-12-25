@@ -145,6 +145,12 @@ impl eval {
 		ret ok
 	}
 
+	// Reports whether evaluated expression is in async scope.
+	fn isAsync(mut *self): bool {
+		mut sc, ok := self.lookup.(&scopeChecker)
+		ret ok && sc.isAsync()
+	}
+
 	fn applyNumericPrefix(mut *self, mut v: &Value): bool {
 		if v == nil ||
 			!v.IsConst() ||
@@ -2305,9 +2311,28 @@ impl eval {
 			Expr: callModel,
 			Args: fcac.argModels,
 			IsCo: fc.IsCo,
+			Await: fc.Await,
 		}
 		(*v).Model = model
 		(*v).Mutable = true
+
+		// Check for async runtime measurements.
+		if f.Decl.Async {
+			if !fc.IsCo && !fc.Await {
+				self.s.pushErr(fc.Token, "`async` function call must be either concurrent or awaited")
+				self.s.pushSuggestion("use `co myFunc()` for concurrent execution or `myFunc().await` to wait for the result")
+			} else if fc.IsCo && fc.Await {
+				self.s.pushErr(fc.Token, "concurrent calls cannot be awaited")
+			} else if self.isGlobal() {
+				self.s.pushErr(fc.Token, "`async` function calls are not allowed at global scope")
+			} else if !self.isAsync() {
+				self.s.pushErr(fc.Token, "`async` functions can only be called from within an `async` scope")
+			}
+		} else if fc.IsCo {
+			self.s.pushErr(fc.Token, "only `async` functions can be called with `co`")
+		} else if fc.Await {
+			self.s.pushErr(fc.Token, "only `async` functions can be awaited")
+		}
 
 		if f.Decl.Exceptional {
 			if fc.IsCo {
@@ -3243,6 +3268,9 @@ impl eval {
 	}
 
 	fn evalChanSend(mut &self, mut chs: &ast::ChanSend): &Value {
+		if !self.isAsync() {
+			self.s.pushErr(chs.Chan.Token, "channels can only be used within an `async` scope")
+		}
 		mut l := self.evalExpr(chs.Chan, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if l == nil {
 			ret nil
@@ -3915,6 +3943,9 @@ impl unaryEval {
 	}
 
 	fn chanRecv(mut *self): &Value {
+		if !self.e.isAsync() {
+			self.e.pushErr(self.u.X.Token, "channels can only be used within an `async` scope")
+		}
 		mut v := self.e.evalExpr(self.u.X, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if v == nil {
 			ret nil

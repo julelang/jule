@@ -8,8 +8,9 @@ use "std/jule/sema"
 
 // Linkpath of common packages.
 const (
-	linkpathRuntime = "std/runtime"
-	linkpathStrings = "std/strings"
+	linkpathRuntime                = "std/runtime"
+	linkpathInternalRuntimeBuiltin = "std/internal/runtime/builtin"
+	linkpathStrings                = "std/strings"
 )
 
 // Program metadata for the main IR.
@@ -31,15 +32,24 @@ struct StrBuilder {
 
 // Metadata for the runtime package.
 struct Runtime {
-	Threads:    &sema::Var
-	NumCPU:     &sema::Var
-	Argc:       &sema::Var
-	Argv:       &sema::Var
-	Envp:       &sema::Var
-	GlobalRand: &sema::Var
+	ThreadHead:  &sema::Var
+	ThreadTail:  &sema::Var
+	NumCPU:      &sema::Var
+	Argc:        &sema::Var
+	Argv:        &sema::Var
+	Envp:        &sema::Var
+	GlobalRand:  &sema::Var
+	Gsched:      &sema::Var
+	Kq:          &sema::Var
+	Epfd:        &sema::Var
+	Iocphandle:  &sema::Var
+	Qpcfreq:     &sema::Var
+	WorkerCount: &sema::Var
 
-	// Hard initializer function of runtime.
-	Init: &sema::FuncIns
+	Init:          &sema::FuncIns // Hard initializer function of runtime.
+	Sched:         &sema::FuncIns // Scheduler function.
+	Spawnmaincoro: &sema::FuncIns // Spawns main coroutine.
+	Park:          &sema::FuncIns // Compiler implemented `park` function.
 
 	Rand:            &sema::FuncIns
 	Osyield:         &sema::FuncIns
@@ -52,8 +62,8 @@ struct Runtime {
 	FastmemcopyImpl: &sema::FuncIns
 	Prememappend:    &sema::Func
 	Memappend:       &sema::Func
-	Zprint:          &sema::FuncIns
-	Zprintln:        &sema::FuncIns
+	Zprint:          &sema::FuncIns // from "std/internal/runtime/builtin"
+	Zprintln:        &sema::FuncIns // from "std/internal/runtime/builtin"
 	Emptyselect:     &sema::FuncIns
 	Runselect:       &sema::FuncIns
 	RCAdd:           &sema::FuncIns
@@ -90,6 +100,7 @@ struct Runtime {
 	Cmplx64:     &sema::StructIns
 	Cmplx128:    &sema::StructIns
 	Scase:       &sema::StructIns
+	Coro:        &sema::StructIns
 }
 
 // Metadata for common objects.
@@ -117,15 +128,25 @@ fn CollectRuntime(mut ir: &obj::IR): &Runtime {
 	mut meta := new(Runtime)
 
 	// Globals.
-	meta.Threads = obj::RuntimeFindGlobal(p, "threads")
+	meta.ThreadHead = obj::RuntimeFindGlobal(p, "threadHead")
+	meta.ThreadTail = obj::RuntimeFindGlobal(p, "threadTail")
 	meta.NumCPU = obj::RuntimeFindGlobal(p, "numcpu")
 	meta.Argc = obj::RuntimeFindGlobal(p, "argc")
 	meta.Argv = obj::RuntimeFindGlobal(p, "argv")
 	meta.Envp = obj::RuntimeFindGlobal(p, "envp")
 	meta.GlobalRand = obj::RuntimeFindGlobal(p, "__rand")
+	meta.Gsched = obj::RuntimeFindGlobal(p, "gsched")
+	meta.WorkerCount = obj::RuntimeFindGlobal(p, "workerCount")
+	meta.Kq = p.FindVar("kq", false)                 // Darwin
+	meta.Epfd = p.FindVar("epfd", false)             // Linux
+	meta.Iocphandle = p.FindVar("iocphandle", false) // Windows
+	meta.Qpcfreq = p.FindVar("qpcfreq", false)       // Windows
 
 	// Functions.
 	meta.Init = obj::RuntimeFindFunc(p, "__init").Instances[0]
+	meta.Sched = obj::RuntimeFindFunc(p, "sched").Instances[0]
+	meta.Park = obj::RuntimeFindFunc(p, "park").Instances[0]
+	meta.Spawnmaincoro = obj::RuntimeFindFunc(p, "spawnmaincoro").Instances[0]
 	meta.Rand = obj::RuntimeFindFunc(p, "rand").Instances[0]
 	meta.Osyield = obj::RuntimeFindFunc(p, "osyield").Instances[0]
 	meta.ToStr = obj::RuntimeFindFunc(p, "toStr")
@@ -137,8 +158,6 @@ fn CollectRuntime(mut ir: &obj::IR): &Runtime {
 	meta.FastmemcopyImpl = obj::RuntimeFindFunc(p, "fastmemcopy_impl").Instances[0]
 	meta.Prememappend = obj::RuntimeFindFunc(p, "prememappend")
 	meta.Memappend = obj::RuntimeFindFunc(p, "memappend")
-	meta.Zprint = obj::RuntimeFindFunc(p, "zprint").Instances[0]
-	meta.Zprintln = obj::RuntimeFindFunc(p, "zprintln").Instances[0]
 	meta.Emptyselect = obj::RuntimeFindFunc(p, "emptyselect").Instances[0]
 	meta.Runselect = obj::RuntimeFindFunc(p, "runselect").Instances[0]
 	meta.RCAdd = obj::RuntimeFindFunc(p, "_RCAdd").Instances[0]
@@ -176,6 +195,15 @@ fn CollectRuntime(mut ir: &obj::IR): &Runtime {
 	meta.Cmplx64 = obj::RuntimeFindStruct(p, "_cmplx64").Instances[0]
 	meta.Cmplx128 = obj::RuntimeFindStruct(p, "_cmplx128").Instances[0]
 	meta.Scase = obj::RuntimeFindStruct(p, "scase").Instances[0]
+	meta.Coro = obj::RuntimeFindStruct(p, "coro").Instances[0]
+
+	p = obj::SelectImport(ir.Used, linkpathInternalRuntimeBuiltin)
+	if p == nil {
+		ret nil
+	}
+
+	meta.Zprint = obj::RuntimeFindFunc(p, "zprint").Instances[0]
+	meta.Zprintln = obj::RuntimeFindFunc(p, "zprintln").Instances[0]
 
 	ret meta
 }

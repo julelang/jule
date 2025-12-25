@@ -1,0 +1,177 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+extern use "std/runtime/coroutine.hpp"
+
+// Jule coroutine handle type.
+#typedef
+extern struct __jule_coroutineHandle {
+	address: fn(): *unsafe
+	resume:  fn()       // Resume execution.
+	done:    fn(): bool // Reports whether the coroutine is done.
+	destroy: fn()       // Destroys coroutine.
+}
+
+// Type alias for extern Jule coroutine.
+type coroutineHandle = extern.__jule_coroutineHandle
+
+const (
+	// State flags of coroutines.
+	coroRunning = 1 << iota
+	coroSuspended
+	coroClosed
+	coroMain // Coroutine is the main coroutine.
+
+	// State flags of coroutines for suspend reason.
+	reasonNA          = 0
+	reasonRecv        = 1 << iota // Channel-recv.
+	reasonSend                    // Channel-send.
+	reasonWaitGroup               // WaitGroup.
+	reasonMutex                   // Mutex.
+	reasonCond                    // Condition variable.
+	reasonSelect                  // Header group specifier of select statement.
+	reasonSelectEmpty             // Empty select statement state. Use like reasonSelect&reasonSelectEmpty.
+	reasonSleep                   // Sleep.
+	reasonSched                   // Scheduler trigger reason, not an actual suspend reason.
+
+	reasonMask = reasonRecv | reasonSend | reasonWaitGroup | reasonMutex |
+		reasonCond | reasonSelect | reasonSelectEmpty | reasonSleep
+)
+
+// A Jule coroutine.
+struct coro {
+	// Handle of the coroutine.
+	handle: coroutineHandle
+
+	// Coroutine state and suspend reasons if it is suspended.
+	// The reasons may be not zeroed after coroutine closed or woken.
+	state: u32
+}
+
+// Creates new coroutine with the handle.
+// Ready for the resume call.
+#disable nilptr boundary
+fn newcoro(h: coroutineHandle): &coro {
+	mut c := new(coro)
+	c.state |= coroSuspended
+	c.handle = h
+	ret c
+}
+
+// Appends the main coroutine of the program.
+// Implicitly called by the compiler to add the main coroutine.
+#disable nilptr
+fn spawnmaincoro(h: coroutineHandle) {
+	mut c := newcoro(h)
+	c.state |= coroMain
+	threadHead.proc.runnext = c
+}
+
+// A low level API function for Jule coroutines.
+// It doesn't provide much abstraction.
+// It just creates a coroutine using API.
+// The coroutine handle h is the handle of the coroutine.
+#export "__jule_cospawn"
+#disable nilptr
+fn cospawn(h: coroutineHandle) {
+	mut c := newcoro(h)
+	runqput(&c, true)
+}
+
+// Basic resume primitive for the coroutine c.
+#disable nilptr
+fn resume(mut c: &coro) {
+	c.handle.resume()
+}
+
+// Reports whether the coroutine done.
+#disable nilptr
+fn done(c: &coro): bool {
+	ret c.handle.done()
+}
+
+// Closes coroutine, releases memory.
+#disable nilptr
+fn close(mut c: &coro) {
+	c.handle.destroy()
+	c = nil
+}
+
+// A coroq coroutine.
+struct coroqc {
+	// The coroutine.
+	coro: &coro
+
+	// Pointer to the previous corotuine.
+	prev: &coroqc
+
+	// Pointer to the next coroutine.
+	next: &coroqc
+}
+
+// A coroutine doubly linked-list queue.
+// Not safe for concurrent use.
+struct coroq {
+	len:  int
+	head: &coroqc
+	tail: &coroqc
+}
+
+impl coroq {
+	// Appends coroutine c to the queue.
+	#disable nilptr
+	fn push(mut *self, mut c: &coro) {
+		mut qc := new(coroqc)
+		qc.coro = c
+		self.pushq(qc)
+	}
+
+	// Appends coroutine c to front of the queue.
+	#disable nilptr
+	fn pushFront(mut *self, mut c: &coro) {
+		mut qc := new(coroqc)
+		qc.coro = c
+		if self.tail == nil {
+			self.head = qc
+			self.tail = qc
+		} else {
+			qc.next = self.head
+			self.head.prev = qc
+			self.head = qc
+		}
+		self.len++
+	}
+
+	// Same as push, but takes a coroq.
+	#disable nilptr
+	fn pushq(mut *self, mut qc: &coroqc) {
+		if self.tail == nil {
+			self.head = qc
+			self.tail = qc
+		} else {
+			qc.prev = self.tail
+			self.tail.next = qc
+			self.tail = qc
+		}
+		self.len++
+	}
+
+	// Removes coroutine c from the queue.
+	#disable nilptr
+	fn remove(mut *self, mut c: &coroqc) {
+		if c.prev != nil {
+			c.prev.next = c.next
+		} else {
+			self.head = c.next
+		}
+		if c.next != nil {
+			c.next.prev = c.prev
+		} else {
+			self.tail = c.prev
+		}
+		c.prev = nil
+		c.next = nil
+		self.len--
+	}
+}

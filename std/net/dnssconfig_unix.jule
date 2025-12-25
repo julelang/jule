@@ -11,7 +11,7 @@ use "std/time"
 
 const osConfigPath = "/etc/resolv.conf"
 
-fn osResolveConfig() {
+async fn osResolveConfig() {
 	conf.ndots = 1
 	conf.timeout = 5 * time::Second
 	conf.attempts = 2
@@ -32,9 +32,8 @@ fn osResolveConfig() {
 		ret
 	}
 	conf.mtime = fi.ModTime()
-	defer { file.close() }
-	mut line, ok := file.readLine()
-	for ok; line, ok = file.readLine() {
+	mut line, ok := file.readLine().await
+	for ok; line, ok = file.readLine().await {
 		if len(line) > 0 && (line[0] == ';' || line[0] == '#') {
 			// comment.
 			continue
@@ -123,6 +122,7 @@ fn osResolveConfig() {
 			conf.search = dnsDefaultSearch()
 		}
 	}
+	file.close().await
 }
 
 fn dnsDefaultSearch(): []str {

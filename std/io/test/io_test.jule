@@ -11,14 +11,14 @@ struct testbuffer {
 }
 
 impl io::Writer for testbuffer {
-	fn Write(mut *self, data: []byte)!: int {
+	async fn Write(mut *self, data: []byte)!: int {
 		self.buf = append(self.buf, data...)
 		ret len(data)
 	}
 }
 
 impl io::Reader for testbuffer {
-	fn Read(mut *self, mut data: []byte)!: int {
+	async fn Read(mut *self, mut data: []byte)!: int {
 		if len(data) == 0 {
 			ret 0
 		}
@@ -38,55 +38,55 @@ impl testbuffer {
 }
 
 #test
-fn testCopyN(t: &testing::T) {
+async fn testCopyN(t: &testing::T) {
 	mut rb := new(testbuffer)
 	mut wb := new(testbuffer)
-	io::WriteStr(rb, "hello, world.")!
-	io::CopyN(wb, rb, 5)!
+	io::WriteStr(rb, "hello, world.").await!
+	io::CopyN(wb, rb, 5).await!
 	if wb.Str() != "hello" {
 		t.Errorf("CopyN did not work properly")
 	}
 }
 
 #test
-fn testCopy(t: &testing::T) {
+async fn testCopy(t: &testing::T) {
 	mut rb := new(testbuffer)
 	mut wb := new(testbuffer)
 	rb.buf = append(rb.buf, "hello, world."...)
-	io::Copy(wb, rb)!
+	io::Copy(wb, rb).await!
 	if str(wb.buf) != "hello, world." {
 		t.Errorf("Copy did not work properly")
 	}
 }
 
 #test
-fn testCopyBuffer(t: &testing::T) {
+async fn testCopyBuffer(t: &testing::T) {
 	mut rb := new(testbuffer)
 	mut wb := new(testbuffer)
 	rb.buf = append(rb.buf, "hello, world."...)
-	io::CopyBuffer(wb, rb, make([]byte, 1))! // Tiny buffer to keep it honest.
+	io::CopyBuffer(wb, rb, make([]byte, 1)).await! // Tiny buffer to keep it honest.
 	if str(wb.buf) != "hello, world." {
 		t.Errorf("CopyBuffer did not work properly")
 	}
 }
 
 #test
-fn testCopyBufferNil(t: &testing::T) {
+async fn testCopyBufferNil(t: &testing::T) {
 	mut rb := new(testbuffer)
 	mut wb := new(testbuffer)
 	rb.buf = append(rb.buf, "hello, world."...)
-	io::CopyBuffer(wb, rb, nil)! // Should allocate a buffer.
+	io::CopyBuffer(wb, rb, nil).await! // Should allocate a buffer.
 	if str(wb.buf) != "hello, world." {
 		t.Errorf("CopyBuffer did not work properly")
 	}
 }
 
 #test
-fn testReadAtLeast(t: &testing::T) {
+async fn testReadAtLeast(t: &testing::T) {
 	mut rb := new(testbuffer)
-	rb.Write([]byte("0123"))!
+	rb.Write([]byte("0123")).await!
 	mut buf := make([]byte, 2)
-	mut n := io::ReadAtLeast(rb, buf, 2) else {
+	mut n := io::ReadAtLeast(rb, buf, 2).await else {
 		t.Errorf("{}", error)
 		use 0
 	}
@@ -94,7 +94,7 @@ fn testReadAtLeast(t: &testing::T) {
 		t.Errorf("expected to have read 2 bytes, got {}", n)
 	}
 	let mut err: any
-	n = io::ReadAtLeast(rb, buf, 4) else {
+	n = io::ReadAtLeast(rb, buf, 4).await else {
 		err = error
 		use 0
 	}
@@ -104,23 +104,23 @@ fn testReadAtLeast(t: &testing::T) {
 	if n != 0 {
 		t.Errorf("expected to have read 0 bytes, got {}", n)
 	}
-	n = io::ReadAtLeast(rb, buf, 1) else {
+	n = io::ReadAtLeast(rb, buf, 1).await else {
 		t.Errorf("{}", error)
 		use 0
 	}
 	if n != 2 {
 		t.Errorf("expected to have read 2 bytes, got {}", n)
 	}
-	n = io::ReadAtLeast(rb, buf, 2) else {
+	n = io::ReadAtLeast(rb, buf, 2).await else {
 		t.Errorf("{}", error)
 		use 0
 	}
 	if n != io::EOF {
 		t.Errorf("expected EOF, got {}", n)
 	}
-	rb.Write([]byte("4"))!
+	rb.Write([]byte("4")).await!
 	err = nil
-	n = io::ReadAtLeast(rb, buf, 2) else {
+	n = io::ReadAtLeast(rb, buf, 2).await else {
 		err = error
 		use 0
 	}

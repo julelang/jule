@@ -10,6 +10,7 @@ use "std/sys"
 
 extern use "<iphlpapi.h>"
 
+extern let WSAGetOverlappedResult: *unsafe
 extern let GetSystemDirectoryW: *unsafe
 extern let GetAdaptersAddresses: *unsafe
 extern let GetComputerNameExW: *unsafe
@@ -217,3 +218,14 @@ const (
 	MSG_TRUNC  = 0x0100
 	MSG_CTRUNC = 0x0200
 )
+
+fn WSAGetOverlappedResult(h: sys::Handle, &o: *sys::Overlapped, &bytes: *u32, wait: bool, &flags: *u32)! {
+	let mut _p0: u32
+	if wait {
+		_p0 = 1
+	}
+	r := sys::Addrcall[i32](uintptr(extern.WSAGetOverlappedResult), h, o, bytes, _p0, flags)
+	if r == 0 {
+		error(sys::WSAGetLastError())
+	}
+}

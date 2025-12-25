@@ -255,9 +255,9 @@ fn parseResponseBody(msg: []byte): ([]IPAddr, ok: bool) {
 }
 
 // Looks up the addresses and the canonical name for the given host from static host.
-fn lookupStaticHost(mut host: str): (ips: []str, canonical: str) {
-	hosts.mu.Lock()
-	readHosts()
+async fn lookupStaticHost(mut host: str): (ips: []str, canonical: str) {
+	hosts.mu.lock()
+	readHosts().await
 	if len(hosts.byName) != 0 {
 		if hasUpperCase(host) {
 			mut lowerHost := []byte(host)
@@ -271,13 +271,13 @@ fn lookupStaticHost(mut host: str): (ips: []str, canonical: str) {
 			canonical = byName.canonicalName
 		}
 	}
-	hosts.mu.Unlock()
+	hosts.mu.unlock()
 	ret
 }
 
 // lookup entries from static host
-fn lookupIPFiles(name: str): (addrs: []IPAddr, canonical: str) {
-	addr, canonical := lookupStaticHost(name)
+async fn lookupIPFiles(name: str): (addrs: []IPAddr, canonical: str) {
+	addr, canonical := lookupStaticHost(name).await
 	for (_, mut haddr) in addr {
 		haddr, zone := splitHostZone(haddr)
 		mut ip := ParseIP(haddr)
@@ -288,32 +288,32 @@ fn lookupIPFiles(name: str): (addrs: []IPAddr, canonical: str) {
 	ret addrs, canonical
 }
 
-fn lookupParallel(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype1: u16, qtype2: u16, qtypePos: int): (results: []IPAddr, ok: bool) {
+async fn lookupParallel(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype1: u16, qtype2: u16, qtypePos: int): (results: []IPAddr, ok: bool) {
 	id1 := getDNSId()
 	mut id2 := id1
 	for id2 == id1 {
 		id2 = getDNSId()
 	}
 
-	write := fn(mut &buf: *[]byte, id: u16, qtype: u16): (ok: bool) {
+	write := async fn(mut &buf: *[]byte, id: u16, qtype: u16): (ok: bool) {
 		binary::BigEndian.PutU16((*buf)[idPos:], id)       // Write id to buf.
 		binary::BigEndian.PutU16((*buf)[qtypePos:], qtype) // Write current qtype to buf.
-		conn.Write(*buf) else { ret false }
+		conn.Write(*buf).await else { ret false }
 		ret true
 	}
 
-	read := fn(mut &buf: *[]byte, mut &results: *[]IPAddr): (id: u16, ok: bool) {
+	read := async fn(mut &buf: *[]byte, mut &results: *[]IPAddr): (id: u16, ok: bool) {
 		let mut n: int
 		if conf.useTCP {
-			n = io::ReadFull(conn, (*buf)[:bigEndianU16Size]) else { use io::EOF }
+			n = io::ReadFull(conn, (*buf)[:bigEndianU16Size]).await else { use io::EOF }
 			if n > 0 {
 				ln := binary::BigEndian.DecodeU16((*buf)[:bigEndianU16Size])
 				growBuffer(buf, int(ln))
-				n = io::ReadFull(conn, *buf) else { use io::EOF }
+				n = io::ReadFull(conn, *buf).await else { use io::EOF }
 			}
 		} else {
 			for {
-				n = conn.Read((*buf)[:maxDNSPacketSize]) else { use io::EOF }
+				n = conn.Read((*buf)[:maxDNSPacketSize]).await else { use io::EOF }
 				break
 			}
 		}
@@ -340,10 +340,10 @@ fn lookupParallel(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype1: u16, qt
 	mut read1, mut read2 := false, false
 	mut attempt := 0
 	for attempt < conf.attempts; attempt++ {
-		if !write1 && write(buf, id1, qtype1) {
+		if !write1 && write(buf, id1, qtype1).await {
 			write1 = true
 		}
-		if !write2 && write(buf, id2, qtype2) {
+		if !write2 && write(buf, id2, qtype2).await {
 			write2 = true
 		}
 
@@ -357,7 +357,7 @@ fn lookupParallel(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype1: u16, qt
 			break
 		}
 
-		id, readOk := read(buf, &results)
+		id, readOk := read(buf, &results).await
 		if !readOk {
 			continue
 		}
@@ -374,7 +374,7 @@ fn lookupParallel(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype1: u16, qt
 	ret
 }
 
-fn lookupSingle(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype: u16, qtypePos: int): (results: []IPAddr, ok: bool) {
+async fn lookupSingle(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype: u16, qtypePos: int): (results: []IPAddr, ok: bool) {
 	id := getDNSId()
 
 	// Write id to buf.
@@ -385,18 +385,18 @@ fn lookupSingle(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype: u16, qtype
 
 	mut attempt := 0
 	for attempt < conf.attempts; attempt++ {
-		conn.Write(*buf) else { continue }
+		conn.Write(*buf).await else { continue }
 
 		let mut n: int
 		if conf.useTCP {
-			n = io::ReadFull(conn, (*buf)[:bigEndianU16Size]) else { use io::EOF }
+			n = io::ReadFull(conn, (*buf)[:bigEndianU16Size]).await else { use io::EOF }
 			if n > 0 {
 				ln := binary::BigEndian.DecodeU16((*buf)[:bigEndianU16Size])
 				growBuffer(buf, int(ln))
-				n = io::ReadFull(conn, *buf) else { use io::EOF }
+				n = io::ReadFull(conn, *buf).await else { use io::EOF }
 			}
 		} else {
-			n = conn.Read((*buf)[:maxDNSPacketSize]) else { use io::EOF }
+			n = conn.Read((*buf)[:maxDNSPacketSize]).await else { use io::EOF }
 		}
 		if n <= 0 {
 			continue
@@ -414,7 +414,7 @@ fn lookupSingle(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype: u16, qtype
 	ret nil, false
 }
 
-fn lookupQuery(mut &buf: *[]byte, mut conn: Conn, network: Network, query: str)!: (results: []IPAddr, ok: bool) {
+async fn lookupQuery(mut &buf: *[]byte, mut conn: Conn, network: Network, query: str)!: (results: []IPAddr, ok: bool) {
 	let mut idPos: int
 	let mut qtypePos: int
 	buildQuery(buf, query, &idPos, &qtypePos, conf.trustAD)?
@@ -438,11 +438,11 @@ fn lookupQuery(mut &buf: *[]byte, mut conn: Conn, network: Network, query: str)!
 	| IP | TCP | UDP:
 		// Lookup for IPv4 (A) and IPv6 (AAAA).
 		if DefaultResolver.ForceParallel || !conf.singleRequest {
-			ret lookupParallel(buf, conn, idPos, _QTYPE_A, _QTYPE_AAAA, qtypePos)
+			ret lookupParallel(buf, conn, idPos, _QTYPE_A, _QTYPE_AAAA, qtypePos).await
 		}
 		// Lookup sequentially.
-		mut results1, ok1 := lookupSingle(buf, conn, idPos, _QTYPE_A, qtypePos)
-		mut results2, ok2 := lookupSingle(buf, conn, idPos, _QTYPE_AAAA, qtypePos)
+		mut results1, ok1 := lookupSingle(buf, conn, idPos, _QTYPE_A, qtypePos).await
+		mut results2, ok2 := lookupSingle(buf, conn, idPos, _QTYPE_AAAA, qtypePos).await
 		match {
 		| ok1 && ok2:
 			ret append(results1, results2...), true
@@ -453,10 +453,10 @@ fn lookupQuery(mut &buf: *[]byte, mut conn: Conn, network: Network, query: str)!
 		}
 	| IP4 | TCP4 | UDP4:
 		// Lookup for IPv4.
-		ret lookupSingle(buf, conn, idPos, _QTYPE_A, qtypePos)
+		ret lookupSingle(buf, conn, idPos, _QTYPE_A, qtypePos).await
 	| IP6 | TCP6 | UDP6:
 		// Lookup for IPv6 (AAAA).
-		ret lookupSingle(buf, conn, idPos, _QTYPE_AAAA, qtypePos)
+		ret lookupSingle(buf, conn, idPos, _QTYPE_AAAA, qtypePos).await
 	}
 
 	ret nil, false
@@ -464,16 +464,16 @@ fn lookupQuery(mut &buf: *[]byte, mut conn: Conn, network: Network, query: str)!
 
 // Native implementation for the DNS lookup.
 #disable boundary
-fn juleLookupIP(net: Network, host: str)!: []IPAddr {
+async fn juleLookupIP(net: Network, host: str)!: []IPAddr {
 	// Lookup files first.
 	{
-		mut addrs, _ := lookupIPFiles(host)
+		mut addrs, _ := lookupIPFiles(host).await
 		if len(addrs) > 0 {
 			ret addrs
 		}
 	}
 
-	resolveConfig()
+	resolveConfig().await
 
 	dots := strings::Count(host, ".")
 	isFQDN := strings::HasSuffix(host, ".")
@@ -493,29 +493,29 @@ fn juleLookupIP(net: Network, host: str)!: []IPAddr {
 		server := conf.servers[(serverOffset+i)%serversLen]
 
 		// Get connection for the server.
-		mut conn := DialTimeout(network, server, conf.timeout)?
+		mut conn := DialTimeout(network, server, conf.timeout).await?
 		if conf.timeout > 0 {
-			conn.SetReadTimeout(conf.timeout)?
-			conn.SetWriteTimeout(conf.timeout)?
+			conn.SetReadDeadline(conf.timeout)?
+			conn.SetWriteDeadline(conf.timeout)?
 		}
 
 		if isFQDN || dots >= conf.ndots {
-			mut results, ok := lookupQuery(&buf, conn, net, host)?
+			mut results, ok := lookupQuery(&buf, conn, net, host).await?
 			if ok {
-				conn.Close() else {}
+				conn.Close().await else {}
 				ret results
 			}
 		}
 		for _, suffix in conf.search {
 			fqdn := baseName + "." + suffix
-			mut results, ok := lookupQuery(&buf, conn, net, fqdn)?
+			mut results, ok := lookupQuery(&buf, conn, net, fqdn).await?
 			if ok {
-				conn.Close() else {}
+				conn.Close().await else {}
 				ret results
 			}
 		}
 
-		conn.Close() else {}
+		conn.Close().await else {}
 	}
 
 	error(errors::New("resolution failed for " + host))
@@ -523,7 +523,7 @@ fn juleLookupIP(net: Network, host: str)!: []IPAddr {
 
 // Looks up host using the local resolver and particular network.
 // It returns a slice of that host's IPv4 and IPv6 addresses.
-fn lookupIPAddr(net: Network, host: str)!: []IPAddr {
+async fn lookupIPAddr(net: Network, host: str)!: []IPAddr {
 	// Make sure that no matter what we do later, host=="" is rejected.
 	if host == "" {
 		error(newDNSError("no such host", host, ""))
@@ -534,7 +534,7 @@ fn lookupIPAddr(net: Network, host: str)!: []IPAddr {
 		// Host is not literal.
 		// We need to lookup DNS and resolve the IP.
 		if DefaultResolver.PreferJule {
-			ret juleLookupIP(net, host)?
+			ret juleLookupIP(net, host).await?
 		}
 		ret integLookupIP(net, host)?
 	}
@@ -579,7 +579,7 @@ fn lookupPortMapWithNetwork(network: Network, errNetwork: str, service: str)!: (
 	error(&DNSError{Err: "unknown network", Name: errNetwork + "/" + service})
 }
 
-fn lookupPort(net: Network, service: str)!: (port: int) {
+async fn lookupPort(net: Network, service: str)!: (port: int) {
 	port, needsLookup := parsePort(service)
 	if needsLookup {
 		match net {
@@ -588,7 +588,7 @@ fn lookupPort(net: Network, service: str)!: (port: int) {
 		|:
 			error(&AddrError{Err: "unknown network", Addr: net})
 		}
-		port = _lookupPort(net, service)?
+		port = _lookupPort(net, service).await?
 	}
 	if 0 > port || port > 65535 {
 		error(&AddrError{Err: "invalid port", Addr: service})
@@ -610,10 +610,10 @@ fn growBuffer(mut &buf: *[]byte, n: int) {
 // Looks up for IPv4 addresses only, if network is IP4.
 // Looks up for IPv6 addresses only, if network is IP6.
 // Looks up for IPv4 and IPv6 addresses, if network is IP.
-fn LookupIP(mut network: Network, address: str)!: []&IPAddr {
+async fn LookupIP(mut network: Network, address: str)!: []&IPAddr {
 	match network {
 	| IP | IP4 | IP6:
-		mut addrs := resolveInternetAddrList(network, address)?
+		mut addrs := resolveInternetAddrList(network, address).await?
 		ret addrs.forResolveAll(network)
 	|:
 		error(&AddrError{Err: "invalid network: " + str(network)})

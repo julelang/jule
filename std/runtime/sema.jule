@@ -13,11 +13,11 @@ struct semaNode {
 	next: &semaNode
 }
 
-const semaRootSize = fmutexSize + runtime::SmartptrSize + 4 // +4 for u32
+const semaRootSize = qmutexSize + runtime::SmartptrSize + 4 // +4 for u32
 
 // Stores all space collections of sema.
 struct semaRoot {
-	lock:  fmutex
+	lock:  qmutex
 	tree:  &semaNode // Root of tree of unique sema spaces.
 	nwait: u32       // Number of waiters. Read w/o the lock, should be atomic.
 }
@@ -31,7 +31,6 @@ impl semaRoot {
 		// Reset them to default to avoid data misunderstanding.
 		p.next = nil
 		p.ticket = 0
-		p.parker.init()
 
 		mut t := self.tree
 		mut otru := (&semaNode)(nil)
@@ -141,7 +140,88 @@ fn cansemacquire(mut &sema: *u32): bool {
 // If lifo is true, queue waiter at the head of wait queue.
 // wg reports whether the semacqure called by a waitgroup.
 #disable nilptr
-fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
+async fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
+	// Easy case.
+	if cansemacquire(sema) {
+		ret
+	}
+
+	// Harder case:
+	//	increment waiter count
+	//	try cansemacquire one more time, return if succeeded
+	//	enqueue itself as a waiter
+	//	sleep
+	//	(waiter descriptor is dequeued by signaler)
+	mut root := semtable_rootFor(sema)
+	mut p := new(parkerList)
+	for {
+		root.lock.lock()
+		// Add ourselves to nwait to disable "easy case" in semrelease.
+		atomic::Add(&root.nwait, 1, atomic::AcqRel)
+		// Check cansemacquire to avoid missed wakeup.
+		if cansemacquire(sema) {
+			atomic::Add(&root.nwait, ^u32(0), atomic::AcqRel)
+			root.lock.unlock()
+			break
+		}
+		// Any semrelease after the cansemacquire knows we're waiting
+		// (we set nwait above), so go to sleep.
+		root.queue(sema, p, lifo)
+		p.coro = gett().coro
+		park(p.coro, uintptr(&root.lock), reason).await
+		// Try to acquire semaphore before enqueue again.
+		if p.ticket != 0 || cansemacquire(sema) {
+			break
+		}
+	}
+}
+
+// Atomically increments sema and notifies a waiting coroutine
+// if one is blocked in semacquire.
+// It is intended as a simple wakeup primitive for use by the synchronization
+// library and should not be used directly.
+// If handoff is true, tries to pass count directly to the first waiter.
+#disable nilptr
+fn semrelease(mut &sema: *u32, handoff: bool) {
+	mut root := semtable_rootFor(sema)
+	atomic::Add(sema, 1, atomic::AcqRel)
+
+	// Easy case: no waiters?
+	// This check must happen after the atomicAdd, to avoid a missed wakeup
+	// (see loop in semacquire).
+	if atomic::Load(&root.nwait, atomic::Acquire) == 0 {
+		ret
+	}
+
+	// Harder case: search for a waiter and wake it.
+	root.lock.lock()
+	if atomic::Load(&root.nwait, atomic::Acquire) == 0 {
+		// The count is already consumed by another coroutine,
+		// so no need to wake up another coroutine.
+		root.lock.unlock()
+		ret
+	}
+
+	mut p := root.dequeue(sema)
+	if p != nil {
+		atomic::Add(&root.nwait, ^u32(0), atomic::AcqRel)
+	}
+	root.lock.unlock()
+	// May be slow or even yield, so unlock first.
+	if p != nil {
+		if p.ticket != 0 {
+			panic("runtime: invalid semaphore ticket")
+		}
+		if handoff && cansemacquire(sema) {
+			p.ticket = 1
+		}
+		unpark(&p.coro)
+	}
+}
+
+// Same as semacquire, but based-on thread parking instead of coroutine parking.
+#disable nilptr
+fn tsemacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 	// Easy case.
 	if cansemacquire(sema) {
 		ret
@@ -165,26 +245,25 @@ fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 		if cansemacquire(sema) {
 			atomic::Add(&root.nwait, ^u32(0), atomic::AcqRel)
 			root.lock.unlock()
+			p.parker.release() // Release memory.
 			break
 		}
 		// Any semrelease after the cansemacquire knows we're waiting
 		// (we set nwait above), so go to sleep.
 		root.queue(sema, p, lifo)
-		park(uintptr(&root.lock), &(*p.parker), reason)
+		root.lock.unlock()
+		p.parker.park()
 		// Try to acquire semaphore before enqueue again.
 		if p.ticket != 0 || cansemacquire(sema) {
+			p.parker.release() // Release memory.
 			break
 		}
 	}
 }
 
-// Atomically increments sema and notifies a waiting thread
-// if one is blocked in semacquire.
-// It is intended as a simple wakeup primitive for use by the synchronization
-// library and should not be used directly.
-// If handoff is true, tries to pass count directly to the first waiter.
+// Same as semrelease, but based-on thread parking instead of coroutine parking.
 #disable nilptr
-fn semrelease(mut &sema: *u32, handoff: bool) {
+fn tsemrelease(mut &sema: *u32, handoff: bool) {
 	mut root := semtable_rootFor(sema)
 	atomic::Add(sema, 1, atomic::AcqRel)
 
@@ -246,7 +325,7 @@ struct notifyList {
 	//
 	// Both wait & notify can wrap around, and such cases will be correctly
 	// handled as long as their "unwrapped" difference is bounded by 2^31.
-	// For this not to be the case, we'd need to have 2^31+ threads
+	// For this not to be the case, we'd need to have 2^31+ coroutines
 	// blocked on the same condvar, which is currently not possible.
 	notify: u32
 
@@ -254,7 +333,7 @@ struct notifyList {
 	head: &parkerList
 	tail: &parkerList
 
-	lock: qmutex
+	lock: mutex
 }
 
 // Adds new notify ticked to list l and returns the ticket number.
@@ -266,7 +345,7 @@ fn notifyListAdd(mut &l: *notifyList): u32 {
 // Waits for a notification. If one has been sent since
 // notifyListAdd was called, it returns immediately. Otherwise, it blocks.
 #disable nilptr
-fn notifyListWait(mut &l: *notifyList, t: u32) {
+async fn notifyListWait(mut &l: *notifyList, t: u32) {
 	// Return right away if this ticket has already been notified.
 	l.lock.lock()
 	if less(t, l.notify) {
@@ -275,9 +354,8 @@ fn notifyListWait(mut &l: *notifyList, t: u32) {
 	}
 
 	// Enqueue itself.
-	mut thread := acquireThread()
 	mut p := new(parkerList)
-	p.parker = thread.parker
+	p.coro = gett().coro
 	p.ticket = t
 	if l.tail == nil {
 		l.head = p
@@ -286,7 +364,7 @@ fn notifyListWait(mut &l: *notifyList, t: u32) {
 	}
 	l.tail = p
 
-	park2(&(*thread), uintptr(&l.lock), &(*p.parker), reasonCond)
+	park(p.coro, uintptr(&l.lock), reasonCond).await
 }
 
 // Notifies one entry in the list.
@@ -337,7 +415,7 @@ fn notifyListNotifyOne(mut &l: *notifyList) {
 			}
 			l.lock.unlock()
 			s.next = nil
-			s.parker.unpark()
+			unpark(&s.coro)
 			ret
 		}
 	}
@@ -373,7 +451,7 @@ fn notifyListNotifyAll(mut &l: *notifyList) {
 	for s != nil {
 		mut next := s.next
 		s.next = nil
-		s.parker.unpark()
+		unpark(&s.coro)
 		s = next
 	}
 }

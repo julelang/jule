@@ -6,10 +6,10 @@ use "std/sync"
 use "std/sync/atomic"
 use "std/testing"
 
-fn reader(mut rwm: &sync::RWMutex, numIterations: int, mut activity: &i32, cdone: chan bool) {
+async fn reader(mut rwm: &sync::RWMutex, numIterations: int, mut activity: &i32, cdone: chan bool) {
 	mut i := 0
 	for i < numIterations; i++ {
-		rwm.RLock()
+		rwm.RLock().await
 		n := atomic::Add(&(*activity), 1, atomic::SeqCst)
 		if n < 1 || n >= 10000 {
 			rwm.RUnlock()
@@ -24,10 +24,10 @@ fn reader(mut rwm: &sync::RWMutex, numIterations: int, mut activity: &i32, cdone
 	cdone <- true
 }
 
-fn writer(mut rwm: &sync::RWMutex, numIterations: int, mut activity: &i32, cdone: chan bool) {
+async fn writer(mut rwm: &sync::RWMutex, numIterations: int, mut activity: &i32, cdone: chan bool) {
 	mut i := 0
 	for i < numIterations; i++ {
-		rwm.Lock()
+		rwm.Lock().await
 		n := atomic::Add(&(*activity), 10000, atomic::SeqCst)
 		if n != 10000 {
 			rwm.Unlock()
@@ -42,7 +42,7 @@ fn writer(mut rwm: &sync::RWMutex, numIterations: int, mut activity: &i32, cdone
 	cdone <- true
 }
 
-fn hammerRWMutex(numReaders: int, numIterations: int) {
+async fn hammerRWMutex(numReaders: int, numIterations: int) {
 	// Number of active readers + 10000 * number of active writers.
 	mut activity := new(i32)
 	mut rwm := new(sync::RWMutex)
@@ -64,9 +64,9 @@ fn hammerRWMutex(numReaders: int, numIterations: int) {
 }
 
 #test
-fn testRWMutex(t: &testing::T) {
+async fn testRWMutex(t: &testing::T) {
 	m := sync::RWMutex{}
-	m.Lock()
+	m.Lock().await
 	if m.TryLock() {
 		t.Errorf("TryLock succeeded with mutex locked")
 		ret
@@ -97,32 +97,32 @@ fn testRWMutex(t: &testing::T) {
 	m.RUnlock()
 	m.RUnlock()
 	n := 1000
-	hammerRWMutex(1, n)
-	hammerRWMutex(3, n)
-	hammerRWMutex(10, n)
-	hammerRWMutex(1, n)
-	hammerRWMutex(3, n)
-	hammerRWMutex(10, n)
-	hammerRWMutex(1, n)
-	hammerRWMutex(3, n)
-	hammerRWMutex(10, n)
-	hammerRWMutex(5, n)
+	hammerRWMutex(1, n).await
+	hammerRWMutex(3, n).await
+	hammerRWMutex(10, n).await
+	hammerRWMutex(1, n).await
+	hammerRWMutex(3, n).await
+	hammerRWMutex(10, n).await
+	hammerRWMutex(1, n).await
+	hammerRWMutex(3, n).await
+	hammerRWMutex(10, n).await
+	hammerRWMutex(5, n).await
 }
 
 #test
-fn testRLocker(t: &testing::T) {
+async fn testRLocker(t: &testing::T) {
 	mut wl := new(sync::RWMutex)
 	wlocked := make(chan bool, 1)
 	rlocked := make(chan bool, 1)
 	rl := wl.RLocker()
 	n := 10
-	co fn() {
+	co async fn() {
 		mut i := 0
 		for i < n; i++ {
-			rl.Lock()
-			rl.Lock()
+			rl.Lock().await
+			rl.Lock().await
 			rlocked <- true
-			wl.Lock()
+			wl.Lock().await
 			wlocked <- true
 		}
 	}()

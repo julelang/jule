@@ -2,8 +2,12 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+// TODO: add async I/O support with overlapped file handles.
+// TODO: optimize with FILE_SKIP_COMPLETION_PORT_ON_SUCCESS
+
 use "std/internal/sys/windows"
 use "std/mem"
+use "std/runtime"
 use "std/sys"
 use "std/unicode/utf16"
 use "std/unicode/utf8"
@@ -19,6 +23,22 @@ const maxRW = 1 << 30 // 1GB is large enough and keeps subsequent reads aligned
 // Provides internal, common implementation for
 // file descriptors, console handles, and sockets.
 struct FD {
+	// Lock File and serialize access to Read and Write methods.
+	fdmu: fdMutex
+
+	// Semaphore signaled when file is closed.
+	csema: u32
+
+	// Poll descriptor for the FD.
+	pd:       &runtime::polldesc
+	pollable: bool
+
+	// Read operation.
+	rop: operation
+
+	// Write operation.
+	wop: operation
+
 	// The file descriptor should be compatible
 	// with pointers and other integer kinds such as UNIX file descriptors.
 	File:  u64
@@ -40,23 +60,79 @@ struct FD {
 }
 
 impl FD {
-	fn Init(mut *self)! {
+	fn Init(mut &self, pollable: bool)! {
 		// Disable SIO_UDP_CONNRESET behavior.
 		// http://support.microsoft.com/kb/263823
 		if self.Flags&SocketNoConn == SocketNoConn {
 			r := u32(0)
 			flag := u32(0)
 			size := u32(mem::SizeOf(flag))
-			fr := unsafe { sys::WSAIoctl(self.File, sys::SIO_UDP_CONNRESET, (*byte)(&flag), size, nil, 0, &r) }
+			fr := unsafe { sys::WSAIoctl(sys::Handle(self.File), sys::SIO_UDP_CONNRESET, (*byte)(&flag), size, nil, 0, &r) }
 			if fr != 0 {
 				error(sys::Errno(sys::WSAGetLastError()))
 			}
 		}
+
+		if pollable {
+			self.pd = runtime::eventpollnew(self.File)
+			self.pollable = true
+		}
+
+		self.rop.mode = 'r'
+		self.rop.fd = self
+		self.rop.pd = self.pd
+		self.wop.mode = 'w'
+		self.wop.fd = self
+		self.wop.pd = self.pd
 	}
 
 	// Writes bytes to the file descriptor and returns written byte count.
 	// The number of bytes written can never exceed the length of the buf.
-	fn Write(mut *self, buf: []byte)!: (n: int) {
+	async fn Write(mut *self, buf: []byte)!: (n: int) {
+		if len(buf) == 0 {
+			// If the caller wanted a zero byte write, return immediately
+			// without trying to write.
+			ret 0
+		}
+
+		if self.Flags&File == File {
+			self.readWriteLock().await?
+			defer { self.readWriteUnlock() }
+		} else {
+			self.writeLock().await?
+			defer { self.writeUnlock() }
+		}
+
+		mut buf2 := unsafe { *(&buf) } // break immutability, do not mutable the content
+		for len(buf2) > 0 {
+			mut b := buf2
+			if len(b) > maxRW {
+				b = b[:maxRW]
+			}
+			mut nn := 0
+			match {
+			| self.Flags&Console == Console:
+				nn = self.writeConsole(b)?
+			| self.Flags&File == File | self.Flags&Pipe == Pipe:
+				nn = self.writeFile(b)?
+			| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
+				mut &o := &self.wop
+				o.InitBuf(b)
+				nn = execIO(o, fn|mut o| {
+					sys::WSASend(sys::Handle(o.fd.File), &o.buf, 1, &o.qty, 0, &o.o, nil)?
+				}).await?
+			|:
+				panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Write")
+			}
+			n += nn
+			buf2 = buf2[n:]
+		}
+		ret n
+	}
+
+	// Writes bytes to the file descriptor and returns written byte count.
+	// The number of bytes written can never exceed the length of the buf.
+	fn WriteSync(mut *self, buf: []byte)!: (n: int) {
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte write, return immediately
 			// without trying to write.
@@ -76,14 +152,7 @@ impl FD {
 			| self.Flags&File == File | self.Flags&Pipe == Pipe:
 				nn = self.writeFile(b)?
 			| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
-				handle := NetHandle(self.File)
-				nn = execIO(operation{
-					bufSize: len(b),
-					op: fn|| {
-						sys::Send(handle, b, 0)?
-						ret len(b)
-					},
-				})?
+				panic("unsupported")
 			|:
 				panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Write")
 			}
@@ -95,34 +164,46 @@ impl FD {
 
 	// Like Write, but wraps sendto syscall.
 	// General for V4 and V6. Unsafe variant.
-	fn WriteV(mut *self, buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
+	async fn WriteV(mut *self, buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
 		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for WriteV")
 		}
 		if len(buf) == 0 {
-			// If the caller wanted a zero byte read, return immediately
-			// without trying to read.
-			ret 0
+			// handle zero-byte payload
+			mut &o := &self.wop
+			o.InitBuf(buf)
+			o.sa = addr
+			ret execIO(o, fn|mut o| {
+				&sa := unsafe { &(*(*sys::RawSockaddrAny)(o.sa)) }
+				sys::WSASendto(sys::Handle(o.fd.File), &o.buf, 1, &o.qty, 0, sa, i32(addrLen), &o.o, nil)?
+			}).await?
 		}
+		self.writeLock().await?
+		defer { self.writeUnlock() }
 		for {
 			mut max := len(buf)
 			if max-n > maxRW {
 				max = n + maxRW
 			}
 			part := buf[n:max]
-			handle := NetHandle(self.File)
-			execIO(operation{
-				bufSize: len(part),
-				op: fn|| {
-					sys::Sendto(handle, part, 0, addr, addrLen)?
-					ret 0
-				},
-			})?
-			n += len(part)
+			mut &o := &self.wop
+			o.InitBuf(part)
+			o.sa = addr
+			o.sal = addrLen
+			n += execIO(o, fn|mut o| {
+				&sa := unsafe { &(*(*sys::RawSockaddrAny)(o.sa)) }
+				sys::WSASendto(sys::Handle(o.fd.File), &o.buf, 1, &o.qty, 0, sa, i32(addrLen), &o.o, nil)?
+			}).await?
 			if n == len(buf) {
 				ret
 			}
 		}
+	}
+
+	// Like Write, but wraps sendto syscall.
+	// General for V4 and V6. Unsafe variant.
+	fn WriteVSync(mut *self, buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
+		panic("unsupported")
 	}
 
 	// Writes buf to file handle, returns written byte count.
@@ -177,7 +258,43 @@ impl FD {
 	// If the buf is larger than the number of bytes that can be read,
 	// the buffer will not cause an overflow. Offset will be shifted
 	// by the number of bytes read.
-	fn Read(mut *self, mut buf: []byte)!: (n: int) {
+	async fn Read(mut *self, mut buf: []byte)!: (n: int) {
+		if self.Flags&File == File {
+			self.readWriteLock().await?
+			defer { self.readWriteUnlock() }
+		} else {
+			self.readLock().await?
+			defer { self.readUnlock() }
+		}
+
+		if len(buf) > maxRW {
+			buf = buf[:maxRW]
+		}
+
+		match {
+		| self.Flags&Console == Console:
+			n = self.readConsole(buf)?
+		| self.Flags&File == File | self.Flags&Pipe == Pipe:
+			n = self.readFile(buf)?
+		| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
+			mut &o := &self.rop
+			o.InitBuf(buf)
+			n = execIO(o, fn|o| {
+				sys::WSARecv(sys::Handle(o.fd.File), &o.buf, 1, &o.qty, &o.flags, &o.o, nil)?
+			}).await?
+		|:
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Read")
+		}
+		n = self.statEOF(n)
+		ret
+	}
+
+	// Read bytes to buffer from the file descriptor and returns read byte count.
+	// The number of bytes read can never exceed the length of the buf.
+	// If the buf is larger than the number of bytes that can be read,
+	// the buffer will not cause an overflow. Offset will be shifted
+	// by the number of bytes read.
+	fn ReadSync(mut *self, mut buf: []byte)!: (n: int) {
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte read, return immediately
 			// without trying to read.
@@ -194,11 +311,7 @@ impl FD {
 		| self.Flags&File == File | self.Flags&Pipe == Pipe:
 			n = self.readFile(buf)?
 		| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
-			handle := NetHandle(self.File)
-			n = execIO(operation{
-				bufSize: len(buf),
-				op: fn|| sys::Recv(handle, buf, 0)?,
-			})?
+			panic("unsupported")
 		|:
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Read")
 		}
@@ -208,7 +321,7 @@ impl FD {
 
 	// Like Read, but wraps recvfrom syscall.
 	// General for V4 and V6. Unsafe variant.
-	fn ReadV(mut *self, mut buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
+	async fn ReadV(mut *self, mut buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
 		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
 		}
@@ -220,13 +333,29 @@ impl FD {
 		if len(buf) > maxRW {
 			buf = buf[:maxRW]
 		}
-		handle := NetHandle(self.File)
-		n = execIO(operation{
-			bufSize: len(buf),
-			op: fn|| sys::Recvfrom(handle, buf, 0, addr, addrLen)?,
-		})?
+		self.readLock().await?
+		defer { self.readUnlock() }
+		mut &o := &self.rop
+		o.InitBuf(buf)
+		n = execIO(o, fn|mut o| {
+			let mut sab: &sys::RawSockaddrAny
+			if o.sa == 0 {
+				sab = new(sys::RawSockaddrAny)
+				o.sa = uintptr(sab)
+			}
+			&sa := unsafe { &(*(*sys::RawSockaddrAny)(o.sa)) }
+			o.sal = sys::Socklen(mem::SizeOf(*sa))
+			sal := i32(addrLen)
+			sys::WSARecvFrom(sys::Handle(o.fd.File), &o.buf, 1, &o.qty, &o.flags, sa, &sal, &o.o, nil)?
+		}).await?
 		n = self.statEOF(n)
 		ret n
+	}
+
+	// Like Read, but wraps recvfrom syscall.
+	// General for V4 and V6. Unsafe variant.
+	fn ReadVSync(mut *self, mut buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
+		panic("unsupported")
 	}
 
 	// Reads from file handle into buf, returns read byte count.
@@ -312,25 +441,106 @@ impl FD {
 		ret i
 	}
 
+	// Call ConnectEx. This doesn't need any locking, since it is only
+	// called when the descriptor is first created. This is here rather
+	// than in the net package so that it can use self.wop.
+	async fn ConnectEx(mut *self, sockaddr: uintptr, addrsize: sys::Socklen)! {
+		mut &o := &self.wop
+		execIO(o, fn|o| {
+			ConnectEx(sys::Handle(o.fd.File), sockaddr, i32(addrsize), nil, 0, nil, &o.o)?
+		}).await?
+	}
+
+	async fn acceptOne(mut *self, s: sys::Handle, &rawsa: *[2]sys::RawSockaddrAny, mut &o: *operation)! {
+		// Submit accept request.
+		execIO(o, fn|mut o| {
+			rsan := unsafe { u32(mem::SizeOf((*rawsa)[0])) }
+			unsafe { AcceptEx(sys::Handle(o.fd.File), s, (*byte)(&(*rawsa)[0]), 0, rsan, rsan, &o.qty, &o.o)? }
+		}).await else {
+			sys::CloseSocket(s) else {}
+			error(error)
+		}
+		// Inherit properties of the listening socket.
+		sys::Setsockopt(s, sys::SOL_SOCKET, sys::SO_UPDATE_ACCEPT_CONTEXT, uintptr(&self.File), sys::Socklen(mem::SizeOf(self.File))) else {
+			sys::CloseSocket(s) else {}
+			error(error)
+		}
+	}
+
+	// Handles accepting a socket. The sysSocket parameter is used
+	// to allocate the net socket.
+	async fn Accept(mut *self, sysSocket: fn()!: sys::Handle, sockaddr: uintptr, &addrsize: *sys::Socklen)!: NetHandle {
+		self.readLock().await?
+		defer { self.readUnlock() }
+
+		mut &o := &self.rop
+		let mut rawsa: [2]sys::RawSockaddrAny
+		for {
+			s := sysSocket()?
+			self.acceptOne(s, &rawsa, o).await else {
+				// Sometimes we see WSAECONNRESET and ERROR_NETNAME_DELETED is
+				// returned here. These happen if connection reset is received
+				// before AcceptEx could complete. These errors relate to new
+				// connection, not to AcceptEx, so ignore broken connection and
+				// try AcceptEx again for more connections.
+				match error {
+				| sys::ERROR_NETNAME_DELETED | sys::WSAECONNRESET:
+					// Ignore these and try again.
+					continue
+				|:
+					error(error)
+				}
+			}
+			// Get peer addr out of AcceptEx buffer.
+			SetSockaddrFromRaw(&rawsa[0], sockaddr)?
+			ret s
+		}
+	}
+
 	// Sets offset to next Read/Write operation and returns the new offset.
 	// whence: 0 (Seek.Set) means, relative to the whence of the file, 1 (Seek.Cur)
 	// means relative to the current offset, and 2 (Seek.End) means relative to end.
-	fn Seek(mut *self, offset: i64, whence: int)!: (newoffset: i64) {
+	async fn Seek(mut *self, offset: i64, whence: int)!: (newoffset: i64) {
+		self.readWriteLock().await?
+		defer { self.readWriteUnlock() }
 		ret sys::Seek(sys::Handle(self.File), offset, whence)?
 	}
 
 	// Imitates the POSIX ftruncate function.
 	fn Ftruncate(mut *self, size: i64)! {
+		self.incref()?
+		defer { self.decref() else {} }
 		sys::Ftruncate(sys::Handle(self.File), size)?
 	}
 
 	// Wraps sys::FlushFileBuffers.
 	fn Fsync(mut *self)! {
+		self.incref()?
+		defer { self.decref() else {} }
 		sys::FlushFileBuffers(sys::Handle(self.File))?
 	}
 
 	// Closes file descriptor.
-	fn Close(mut *self)! {
+	fn destroy(mut *self)! {
+		if self.pollable {
+			// Poller may want to unregister fd in notification mechanism,
+			// so this must be executed before Close.
+			runtime::eventpollfree(self.pd)
+		}
+
+		match {
+		| self.Flags&File == File | self.Flags&Pipe == Pipe | self.Flags&Pipe == Pipe | self.Flags&Console == Console:
+			sys::CloseHandle(sys::Handle(self.File))?
+		| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
+			sys::CloseSocket(NetHandle(self.File))?
+		|:
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Close")
+		}
+		semrelease(&self.csema)
+	}
+
+	// Closes file descriptor.
+	fn CloseSync(mut *self)! {
 		match {
 		| self.Flags&File == File | self.Flags&Pipe == Pipe | self.Flags&Pipe == Pipe | self.Flags&Console == Console:
 			sys::CloseHandle(sys::Handle(self.File))?
@@ -340,20 +550,109 @@ impl FD {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Close")
 		}
 	}
+
+	// Closes file descriptor.
+	async fn Close(mut *self)! {
+		if !self.fdmu.increfAndClose() {
+			errClosing(self.isFile())?
+		}
+
+		// The call to decref will call destroy if there are no other
+		// references.
+		let mut err: any
+		self.decref() else { err = error }
+
+		// Wait until the descriptor is closed. If this was the only
+		// reference, it is already closed.
+		semacquire(&self.csema).await
+
+		if err != nil {
+			error(err)
+		}
+	}
+
+	// Waits for cancellation.
+	// See documentation of the [eventpollwaitcanceled].
+	async fn waitCanceled(mut *self, mode: i32) {
+		runtime::eventpollwaitcanceled(self.pd, mode).await
+	}
 }
 
 struct operation {
 	bufSize: int
 	op:      fn()!: int
+
+	fd:    &FD
+	buf:   sys::WSABuf
+	sa:    uintptr
+	sal:   sys::Socklen
+	qty:   u32
+	flags: u32
+
+	// Fields mut be the same as [runtime/polloperation].
+	o:    sys::Overlapped
+	pd:   &runtime::polldesc
+	mode: i32
+}
+
+impl operation {
+	fn InitBuf(mut *self, buf: []byte) {
+		self.buf.Len = u32(len(buf))
+		self.buf.Buf = nil
+		if len(buf) != 0 {
+			self.buf.Buf = &buf[0]
+		}
+	}
 }
 
 // Executes a single IO operation o.
-fn execIO(o: operation)!: int {
-	ret o.op() else {
+async fn execIO(mut &o: *operation, submit: fn(mut &o: *operation)!)!: int {
+	// Start IO.
+	submit(o) else {
+		if error != sys::ERROR_IO_PENDING {
+			error(error)
+		}
+		// IO started, and we have to wait for its completion.
+	}
+	h := sys::Handle(o.fd.File)
+	// If there is no error, IO completed immediately.
+	// Need to get our completion message anyway.
+	o.fd.Wait(o.mode).await else {
+		// IO is interrupted by "close" or "timeout".
+		match error {
+		| runtime::netpollClosing | runtime::netpollDeadline:
+			// Will deal with those.
+		|:
+			error(error)
+		}
+		// Cancel our request.
+		sys::CancelIoEx(h, &o.o) else {
+			// Assuming ERROR_NOT_FOUND is returned, if IO is completed.
+			if error != sys::ERROR_NOT_FOUND {
+				panic("poll: execIO error")
+			}
+		}
+		// Wait for cancellation to complete.
+		o.fd.waitCanceled(i32(o.mode)).await
+		mut err := error
+		windows::WSAGetOverlappedResult(h, &o.o, &o.qty, false, &o.flags) else {
+			if error == sys::ERROR_OPERATION_ABORTED { // IO Canceled
+				error(err)
+			}
+			error(error)
+		}
+		// We issued a cancellation request. But, it seems, IO operation succeeded
+		// before the cancellation request run. We need to treat the IO operation as
+		// succeeded (the bytes are actually sent/recv from network).
+		ret int(o.qty)
+	}
+	windows::WSAGetOverlappedResult(h, &o.o, &o.qty, false, &o.flags) else {
 		// More data available. Return back the size of received data.
 		if error == sys::ERROR_MORE_DATA || error == windows::WSAEMSGSIZE {
-			ret o.bufSize
+			ret int(o.qty)
 		}
 		error(error)
 	}
+	// All is good.
+	ret int(o.qty)
 }

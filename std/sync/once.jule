@@ -35,6 +35,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ====================================================
 
+use "std/runtime"
 use "std/sync/atomic"
 
 // Once is an object that will perform exactly one action.
@@ -46,7 +47,7 @@ struct Once {
 	// Placing done first allows more compact instructions on some architectures (amd64/i386),
 	// and fewer instructions (to calculate offset) on other architectures.
 	mut done: atomic::U8
-	mut m:    Mutex
+	mut m:    runtime::mutex
 }
 
 impl Once {
@@ -88,7 +89,7 @@ impl Once {
 		// call f, and the second would return immediately, without
 		// waiting for the first's call to f to complete.
 		// This is why the slow path falls back to a mutex, and why
-		// the self.done.store must be delayed until after f returns.
+		// the self.done.Store must be delayed until after f returns.
 
 		if self.done.Load(atomic::Acquire) == 0 {
 			// Outlined slow-path to allow inlining of the fast-path.
@@ -97,9 +98,78 @@ impl Once {
 	}
 
 	fn doSlow(*self, f: fn()) {
-		self.m.Lock()
+		self.m.lock()
 		if self.done.Load(atomic::Acquire) == 0 {
 			f()
+			self.done.Store(1, atomic::Release)
+		}
+		self.m.unlock()
+	}
+}
+
+// AsyncOnce is an object that will perform exactly one action.
+// An AsyncOnce must not be copied after first use.
+struct AsyncOnce {
+	// done indicates whether the action has been performed.
+	// It is first in the struct because it is used in the hot path.
+	// The hot path is inlined at every call site.
+	// Placing done first allows more compact instructions on some architectures (amd64/i386),
+	// and fewer instructions (to calculate offset) on other architectures.
+	mut done: atomic::U8
+	mut m:    Mutex
+}
+
+impl AsyncOnce {
+	// Returns new instance for AsyncOnce.
+	fn New(): AsyncOnce {
+		ret AsyncOnce{}
+	}
+
+	// Calls the function f if and only if Do is being called for the
+	// first time for this instance of AsyncOnce. In other words, given
+	//
+	//	once := AsyncOnce{}
+	//
+	// if once.Do(f) is called multiple times, only the first call will invoke f,
+	// even if f has a different value in each invocation. A new instance of
+	// AsyncOnce is required for each function to execute.
+	//
+	// Do is intended for initialization that must be run exactly once. Since f
+	// is niladic, it may be necessary to use a function literal to capture the
+	// arguments to a function to be invoked by Do:
+	//
+	//	config.once.Do(func() { config.init(filename) })
+	//
+	// Because no call to Do returns until the one call to f returns, if f causes
+	// Do to be called, it will deadlock.
+	//
+	// If f panics, Do considers it to have returned; future calls of Do return
+	// without calling f.
+	async fn Do(*self, f: async fn()) {
+		// Note: Here is an incorrect implementation of Do:
+		//
+		//	if self.done.CompareAndSwap(0, 1, atomic::SeqCst, atomic::SeqCst) {
+		//		f()
+		//	}
+		//
+		// Do guarantees that when it returns, f has finished.
+		// This implementation would not implement that guarantee:
+		// given two simultaneous calls, the winner of the cas would
+		// call f, and the second would return immediately, without
+		// waiting for the first's call to f to complete.
+		// This is why the slow path falls back to a mutex, and why
+		// the self.done.Store must be delayed until after f returns.
+
+		if self.done.Load(atomic::Acquire) == 0 {
+			// Outlined slow-path to allow inlining of the fast-path.
+			self.doSlow(f).await
+		}
+	}
+
+	async fn doSlow(*self, f: async fn()) {
+		self.m.Lock().await
+		if self.done.Load(atomic::Acquire) == 0 {
+			f().await
 			self.done.Store(1, atomic::Release)
 		}
 		self.m.Unlock()

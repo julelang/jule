@@ -56,41 +56,49 @@ impl mpmcQueue {
 		ret
 	}
 
-	// Attempts to enqueue val; returns false if the queue appears full.
-	// Non-blocking; uses polite backoff on contention.
 	#disable boundary nilptr
 	fn enqueue(mut *self, mut &val: *T): (ok: bool, closed: bool, full: bool) {
 		for {
-			closed = atomic::Load(&self.closed, atomic::Relaxed) != 0
-			if closed {
-				ret false, true, false
-			}
 			pos := atomic::Load(&self.enqueuePos.v, atomic::Relaxed)
 			mut &c := unsafe { &(*(&self.buf[pos%self.cap])) }
 			seq := atomic::Load(&c.seq, atomic::Acquire)
 			dif := i64(seq - pos)
 
 			if dif == 0 {
-				// slot is EMPTY for this producer position: try to claim it
+				// Try to claim slot
 				newPos := pos + 1
-				if atomic::CompareAndSwapWeak(&self.enqueuePos.v, pos, newPos, atomic::Release, atomic::Relaxed) {
-					// exclusive ownership of this slot
-					c.val = *val
+				if atomic::CompareAndSwapWeak(&self.enqueuePos.v, pos, newPos, atomic::AcqRel, atomic::Relaxed) {
+					// Slot is ours — now check closed
+					if closed {
+						// Roll back publication by marking slot empty again
+						atomic::Store(&c.seq, pos, atomic::Release)
+						ret false, true, false
+					}
+
 					// check if the buffer is full
 					deqPos := atomic::Load(&self.dequeuePos.v, atomic::Acquire)
 					full = newPos-deqPos == self.act
-					// publish for consumer at pos
-					atomic::Store(&c.seq, newPos, atomic::Release)
+
+					c.val = *val
+					atomic::Store(&c.seq, pos+1, atomic::Release)
 					ret true, false, full
 				}
-				// lost race → retry
-			} else if dif < 0 {
-				// seq < pos ⇒ consumer has not yet advanced for this slot in this wrap; FULL
-				ret false, false, true
-			} else {
-				// another producer is ahead / not our turn yet → polite backoff
-				osyield()
+				continue
 			}
+
+			if dif < 0 {
+				// Slot not ready — MAY be full, confirm via cursors
+				deq := atomic::Load(&self.dequeuePos.v, atomic::Acquire)
+				if pos-deq >= self.cap {
+					ret false, false, true // FULL is guaranteed
+				}
+				// Not guaranteed full → retry
+				osyield()
+				continue
+			}
+
+			// dif > 0 → another producer ahead
+			osyield()
 		}
 	}
 
@@ -109,7 +117,7 @@ impl mpmcQueue {
 
 			if dif == 0 {
 				// slot is FULL for this consumer position: try to claim it
-				if atomic::CompareAndSwapWeak(&self.dequeuePos.v, pos, pos+1, atomic::Release, atomic::Relaxed) {
+				if atomic::CompareAndSwapWeak(&self.dequeuePos.v, pos, pos+1, atomic::AcqRel, atomic::Relaxed) {
 					// exclusive access to this slot
 					*val = c.val
 					// help GC: clear the slot's value
@@ -133,5 +141,13 @@ impl mpmcQueue {
 	#disable nilptr
 	fn close(mut *self) {
 		atomic::Store(&self.closed, 1, atomic::Release)
+	}
+
+	// Returns length of the available elements.
+	#disable nilptr
+	fn len(*self): int {
+		h := atomic::Load(&self.dequeuePos.v, atomic::Acquire)
+		t := atomic::Load(&self.enqueuePos.v, atomic::Acquire)
+		ret int(t - h)
 	}
 }

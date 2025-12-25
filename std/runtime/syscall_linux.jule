@@ -1,0 +1,48 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+#build linux
+
+use "std/internal/runtime/syscall"
+use "std/sys"
+
+const _NO_ERROR = 0
+
+#typedef
+extern struct epoll_data {
+	_u64: u64 `#export:"u64"`
+}
+
+#typedef
+extern struct epoll_event {
+	events: u32
+	data:   extern.epoll_data
+}
+
+type epollEvent = extern.epoll_event
+
+fn syscall(num: uintptr, arg1: uintptr, arg2: uintptr, arg3: uintptr, arg4: uintptr, arg5: uintptr, arg6: uintptr): (r: uintptr, err: sys::Errno) {
+	err = _NO_ERROR
+	r0, e0 := syscall::Syscall(num, arg1, arg2, arg3, arg4, arg5, arg6)
+	r = uintptr(r0)
+	if e0 != syscall::NO_ERROR {
+		err = sys::Errno(e0)
+	}
+	ret
+}
+
+fn syscall_EpollCreate1(flags: i32): (fd: i32, errno: sys::Errno) {
+	r1, e := syscall(sys::SYS_EPOLL_CREATE1, uintptr(flags), 0, 0, 0, 0, 0)
+	ret i32(r1), e
+}
+
+fn syscall_EpollWait(epfd: i32, mut &events: *epollEvent, maxev: i32, waitms: i32): (n: i32, sys::Errno) {
+	r1, e := syscall(sys::SYS_EPOLL_PWAIT, uintptr(epfd), uintptr(events), uintptr(maxev), uintptr(waitms), 0, 0)
+	ret i32(r1), e
+}
+
+fn syscall_EpollCtl(epfd: i32, op: i32, fd: i32, mut &event: *epollEvent): (errno: sys::Errno) {
+	_, e := syscall(sys::SYS_EPOLL_CTL, uintptr(epfd), uintptr(op), uintptr(fd), uintptr(event), 0, 0)
+	ret e
+}

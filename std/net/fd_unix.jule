@@ -1,0 +1,65 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/poll"
+use "std/sys"
+use "std/time"
+
+impl netFD {
+	#disable nilptr
+	async fn connect(mut *self, ipv: int, sockaddr: uintptr, socksize: sys::Socklen, timeout: time::Duration)! {
+		fd := self.Handle()
+		if timeout > 0 {
+			self.SetDeadline(timeout)
+			defer { self.SetDeadline(0) }
+		}
+		sys::Connect(fd, sockaddr, socksize) else {
+			if error == sys::EISCONN {
+				ret
+			}
+			if error != sys::EINPROGRESS &&
+				error != sys::EALREADY &&
+				error != sys::EINTR {
+				error(error)
+			}
+			for {
+				// Performing multiple connect system calls on a
+				// non-blocking socket under Unix variants does not
+				// necessarily result in earlier errors being
+				// returned. Instead, once runtime-integrated network
+				// poller tells us that the socket is ready, get the
+				// SO_ERROR socket option to see if the connection
+				// succeeded or failed. See Go's issue 7474 for further
+				// details.
+				self.pfd.WaitWrite().await?
+				let mut errc: i32
+				vallen := sys::Socklen(4)
+				sys::Getsockopt(fd, sys::SOL_SOCKET, sys::SO_ERROR, uintptr(&errc), vallen)?
+				err := sys::Errno(errc)
+				match err {
+				| sys::Errno(0):
+					// The runtime poller can wake us up spuriously;
+					// see Go's issues 14548 and 19289. Check that we are
+					// really connected; if not, wait again.
+					sys::Getpeername(fd) else { continue }
+					ret
+				| sys::EINPROGRESS | sys::EALREADY | sys::EINTR:
+					continue
+				| sys::EISCONN:
+					ret
+				|:
+					error(err)
+				}
+			}
+		}
+		ret
+	}
+
+	#disable nilptr
+	async fn accept(mut *self, ipv: int, addr: uintptr, mut &addrlen: *sys::Socklen)!: poll::NetHandle {
+		fd := self.pfd.Accept(addr, addrlen).await?
+		getSocketAddr(fd, addr, *addrlen)?
+		ret fd
+	}
+}

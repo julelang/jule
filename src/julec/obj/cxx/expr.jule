@@ -1014,6 +1014,9 @@ impl exprCoder {
 
 	fn pureFuncCall(mut &self, mut m: &sema::FuncCallExpr) {
 		wrapped := self.isWrapped(m)
+		if m.Await {
+			self.oc.write("co_await ")
+		}
 		self.modelForCall(m.Expr)
 		if !m.Func.IsBuiltin() {
 			if m.Func.Decl.Extern && len(m.Func.Generics) > 0 {
@@ -1109,74 +1112,49 @@ impl exprCoder {
 		self.oc.addIndent()
 		self.oc.indent()
 
-		const noWrap = ""
 		const argData = "__jule_argdata"
-		mut i := noWrap
-		if len(m.Func.Params) > 0 || m.Func.AsAnon {
-			i = conv::Itoa(self.oc.pushCoSpawn(m.Func))
-			t := coSpawnPrefix + coSpawnArgDataSuffix + i
-			self.oc.write(t)
-			self.oc.write(" *")
-			self.oc.write(argData)
-			self.oc.write(" = new (std::nothrow) ")
-			self.oc.write(t)
-			self.oc.write("; if (!")
-			self.oc.write(argData)
-			self.oc.write(`) __jule_panic((`)
-			self.oc.write(typeU8)
-			self.oc.write(`*)"memory allocation failed for concurrent call", 44);` + "\n")
-			self.oc.indent()
+		i := conv::Itoa(self.oc.pushCoSpawn(m.Func))
+		t := coSpawnPrefix + coSpawnArgDataSuffix + i
+		self.oc.write(t)
+		self.oc.write(" *")
+		self.oc.write(argData)
+		self.oc.write(" = new (std::nothrow) ")
+		self.oc.write(t)
+		self.oc.write("; if (!")
+		self.oc.write(argData)
+		self.oc.write(`) __jule_panic((`)
+		self.oc.write(typeU8)
+		self.oc.write(`*)"memory allocation failed for coroutine call", 44);` + "\n")
+		self.oc.indent()
 
-			// setup function data
+		// setup function data
+		self.oc.write(argData)
+		self.oc.write("->")
+		self.oc.write(coSpawnArgDataFunc)
+		self.oc.write(" = ")
+		self.modelForCall(m.Expr)
+		self.oc.write(";\n")
+
+		// setup argument data
+		for j in m.Func.Params {
+			self.oc.indent()
 			self.oc.write(argData)
 			self.oc.write("->")
-			self.oc.write(coSpawnArgDataFunc)
+			self.oc.write(coSpawnArgDataParam)
+			self.oc.write(conv::Itoa(j))
 			self.oc.write(" = ")
-			self.modelForCall(m.Expr)
+			self.possibleRefExpr(m.Args[j])
 			self.oc.write(";\n")
+		}
+		self.oc.indent()
 
-			// setup argument data
-			for j in m.Func.Params {
-				self.oc.indent()
-				self.oc.write(argData)
-				self.oc.write("->")
-				self.oc.write(coSpawnArgDataParam)
-				self.oc.write(conv::Itoa(j))
-				self.oc.write(" = ")
-				self.possibleRefExpr(m.Args[j])
-				self.oc.write(";\n")
-			}
-			self.oc.indent()
-		}
-
-		// spawn thread
-		if i != noWrap {
-			self.oc.write("if (!")
-		}
-		self.oc.write("__jule_coSpawn((void*)")
-		if i == noWrap {
-			identCoder.funcIns(&self.oc.Buf, m.Func)
-		} else {
-			self.oc.write(coSpawnPrefix + coSpawnMethodSuffix + i)
-		}
-		self.oc.write(", ")
-		if i == noWrap {
-			self.oc.write("NULL")
-		} else {
-			self.oc.write("(void*)")
-			self.oc.write(argData)
-		}
-		self.oc.write(")")
-		if i == noWrap {
-			self.oc.write(";")
-		} else {
-			self.oc.write(") { delete ")
-			self.oc.write(argData)
-			self.oc.write("; __jule_panic((")
-			self.oc.write(typeU8)
-			self.oc.write(`*)"thread creation failed for concurrent call", 42); }`)
-		}
-		self.oc.write("\n")
+		// spawn coroutine
+		self.oc.write("__jule_cospawn(")
+		self.oc.write(coSpawnPrefix + coSpawnMethodSuffix + i)
+		self.oc.write("(")
+		self.oc.write("(void*)")
+		self.oc.write(argData)
+		self.oc.write(").handle);\n")
 		self.oc.doneIndent()
 		self.oc.indent()
 		self.oc.write("}")
@@ -1315,7 +1293,36 @@ impl exprCoder {
 	}
 
 	fn funcCall(mut &self, mut m: &sema::FuncCallExpr, ignoreExceptional: bool) {
-		if m.Func == meta::Program.Runtime.FastmemcopyImpl {
+		// Compiler implemented functions.
+		match m.Func {
+		| meta::Program.Runtime.Park:
+			self.oc.write("{\n")
+			self.oc.addIndent()
+			for (i, mut param) in meta::Program.Runtime.Park.Params {
+				self.oc.indent()
+				self.oc.tc.paramIns(&self.oc.Buf, param)
+				self.oc.write(" ")
+				identCoder.param(&self.oc.Buf, param.Decl)
+				self.oc.write(" = ")
+				self.possibleRefExpr(m.Args[i])
+				self.oc.write(";\n")
+			}
+			self.oc.indent()
+			self.oc.sc.funcScope(m.Func, true)
+			self.oc.write("\n")
+			self.oc.indent()
+			self.oc.write("co_await __jule_Park{&")
+			identCoder.param(&self.oc.Buf, meta::Program.Runtime.Park.Decl.Params[0])
+			self.oc.write(".alloc->")
+			identCoder.field(&self.oc.Buf, meta::Program.Runtime.Coro.FindField("handle").Decl)
+			self.oc.write(", ")
+			identCoder.param(&self.oc.Buf, meta::Program.Runtime.Park.Decl.Params[1])
+			self.oc.write("};\n")
+			self.oc.doneIndent()
+			self.oc.indent()
+			self.oc.write("}")
+			ret
+		| meta::Program.Runtime.FastmemcopyImpl:
 			self.oc.write("memmove(")
 			self.args(m)
 			self.oc.write(")")
@@ -1661,7 +1668,8 @@ impl exprCoder {
 		if m.Func.Decl.IsVoid() {
 			mut v, _ := m.Err.Model.(&sema::Var)
 			if v != nil && v.Name == "error" {
-				self.oc.write("return __jule_VoidExceptional{.error=")
+				self.oc.write(returnKw(m.Func))
+				self.oc.write(" __jule_VoidExceptional{.error=")
 				if hasDefer {
 					self.oc.write("({ auto __result = ")
 				}
@@ -1676,9 +1684,11 @@ impl exprCoder {
 				self.oc.write("}")
 				ret
 			}
-			self.oc.write("return __jule_VoidExceptional{.error=")
+			self.oc.write(returnKw(m.Func))
+			self.oc.write(" __jule_VoidExceptional{.error=")
 		} else {
-			self.oc.write("return __jule_Exceptional<")
+			self.oc.write(returnKw(m.Func))
+			self.oc.write(" __jule_Exceptional<")
 			self.oc.tc.rc.codeMut1(&self.oc.Buf, m.Func.Result)
 			mut v, _ := m.Err.Model.(&sema::Var)
 			if v != nil && v.Name == "error" {
@@ -2022,6 +2032,9 @@ impl exprCoder {
 		} else {
 			f = ins.FindMethod("tryRecv", Static).Instances[0]
 		}
+		if block {
+			self.oc.write("co_await ")
+		}
 		identCoder.funcIns(&self.oc.Buf, f)
 		self.oc.write("((")
 		self.possibleRefExpr(m.Expr.Model)
@@ -2052,6 +2065,9 @@ impl exprCoder {
 			f = ins.FindMethod("send", Static).Instances[0]
 		} else {
 			f = ins.FindMethod("trySend", Static).Instances[0]
+		}
+		if block {
+			self.oc.write("co_await ")
 		}
 		identCoder.funcIns(&self.oc.Buf, f)
 		self.oc.write("((")

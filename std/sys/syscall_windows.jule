@@ -36,6 +36,7 @@ extern struct FILETIME{}
 // It is a C enum in the Windows API.
 extern type GET_FILEEX_INFO_LEVELS: int
 
+extern let CancelIoEx: *unsafe
 extern let LoadLibraryW: *unsafe
 extern let LoadLibraryExW: *unsafe
 extern let GetProcAddress: *unsafe
@@ -77,6 +78,7 @@ extern unsafe fn GetFileAttributesW(name: *c::Wchar): extern.DWORD
 extern unsafe fn SetHandleInformation(hObject: extern.HANDLE, dwMask: extern.DWORD, dwFlags: extern.DWORD): bool
 extern fn GetCurrentProcess(): extern.HANDLE
 extern unsafe fn DuplicateHandle(hSourceProcessHandle: extern.HANDLE, hSourceHandle: extern.HANDLE, hTargetProcessHandle: extern.HANDLE, lpTargetHandle: *extern.HANDLE, dwDesiredAccess: extern.DWORD, bInheritHandle: bool, dwOptions: extern.DWORD): bool
+extern unsafe fn QueryPerformanceFrequency(mut counter: *extern.LARGE_INTEGER): bool
 extern unsafe fn QueryPerformanceCounter(mut counter: *extern.LARGE_INTEGER): bool
 extern unsafe fn GetSystemTimeAsFileTime(mut ft: *extern.FILETIME)
 
@@ -280,8 +282,8 @@ unsafe fn ReadConsole(handle: Handle, mut buffer: *u16, toRead: u32, mut &read: 
 }
 
 // Calls Windows's WSAGetLastError function.
-fn WSAGetLastError(): int {
-	ret extern.WSAGetLastError()
+fn WSAGetLastError(): Errno {
+	ret Errno(extern.WSAGetLastError())
 }
 
 // Call's Windows FindFirstFileW function.
@@ -477,6 +479,14 @@ fn Exit(code: int) {
 	ExitProcess(u32(code))
 }
 
+fn QueryPerformanceFrequency()!: i64 {
+	mut counter := i64(0)
+	if unsafe { !extern.QueryPerformanceFrequency((*extern.LARGE_INTEGER)(&counter)) } {
+		panic("runtime: nanotime failed")
+	}
+	ret counter
+}
+
 fn QueryPerformanceCounter()!: i64 {
 	mut counter := i64(0)
 	if unsafe { !extern.QueryPerformanceCounter((*extern.LARGE_INTEGER)(&counter)) } {
@@ -518,6 +528,13 @@ fn GetProcAddress(module: Handle, procname: str)!: (proc: uintptr) {
 
 fn FreeLibrary(handle: Handle)! {
 	r := Addrcall[i32](uintptr(extern.FreeLibrary), unsafe { (*unsafe)(handle) })
+	if r == 0 {
+		error(GetLastErrno())
+	}
+}
+
+fn CancelIoEx(s: Handle, &o: *Overlapped)! {
+	r := Addrcall[i32](uintptr(extern.CancelIoEx), s, o)
 	if r == 0 {
 		error(GetLastErrno())
 	}

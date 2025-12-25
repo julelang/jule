@@ -13,10 +13,10 @@ use "std/time"
 // If the network parameter is points UDP network, function will panic.
 //
 // See the [Dial] function for a description of the network and addr parameters.
-fn Listen(network: Network, addr: str)!: Listener {
+async fn Listen(network: Network, addr: str)!: Listener {
 	match network {
 	| TCP | TCP4 | TCP6:
-		ret tcpBind(network, addr)?
+		ret tcpBind(network, addr).await?
 	|:
 		error(&AddrError{Err: "invalid network: " + str(network)})
 	}
@@ -27,8 +27,8 @@ fn Listen(network: Network, addr: str)!: Listener {
 // Just for UDP networks.
 //
 // See the [Dial] function for a description of the network and addr parameters.
-fn ListenUDP(network: Network, addr: str)!: &UDPConn {
-	ret udpBind(network, addr)?
+async fn ListenUDP(network: Network, addr: str)!: &UDPConn {
+	ret udpBind(network, addr).await?
 }
 
 // Connects to the address on the named network.
@@ -70,20 +70,20 @@ fn ListenUDP(network: Network, addr: str)!: &UDPConn {
 //	is converted to IPv4 successfully, will use Udp4, otherwise IPv6 and Udp6 preferred.
 //
 // It will forward any exceptional from network connectors.
-fn Dial(network: Network, addr: str)!: Conn {
-	ret DialTimeout(network, addr, 0)?
+async fn Dial(network: Network, addr: str)!: Conn {
+	ret DialTimeout(network, addr, 0).await?
 }
 
 // Same as Dial, but uses timeout.
 // For UDP networks, timeout will be ignored.
 // Timeout precision is microseconds.
 // If the timeout is below one microsecond it will be ignored.
-fn DialTimeout(network: Network, addr: str, timeout: time::Duration)!: Conn {
+async fn DialTimeout(network: Network, addr: str, timeout: time::Duration)!: Conn {
 	match network {
 	| TCP | TCP4 | TCP6:
-		ret tcpDial(network, addr, timeout)?
+		ret tcpDial(network, addr, timeout).await?
 	| UDP | UDP4 | UDP6:
-		ret udpDial(network, addr)?
+		ret udpDial(network, addr).await?
 	|:
 		error(&AddrError{Err: "invalid network: " + str(network)})
 	}
@@ -93,13 +93,10 @@ fn getSocketAddr(handle: poll::NetHandle, addr: uintptr, len: sys::Socklen)! {
 	sys::Getsockname(handle, addr, len)?
 }
 
-fn connectSocketNoTimeout(handle: poll::NetHandle, sockAddr: uintptr, sockLen: sys::Socklen)! {
-	sys::Connect(handle, sockAddr, sockLen)?
+fn tcpsocketipv4()!: poll::NetHandle {
+	ret socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)?
 }
 
-fn timevalFromDuration(timeout: time::Duration): (tv: sys::Timeval, ok: bool) {
-	sec := i64(timeout.Seconds())
-	usec := i64((timeout - time::Duration(i64(time::Second)*sec)).Microseconds())
-	ok = sys::NewTimeval(sec, usec, &tv)
-	ret
+fn tcpsocketipv6()!: poll::NetHandle {
+	ret socket(sys::AF_INET6, sys::SOCK_STREAM, sys::IPPROTO_TCP)?
 }

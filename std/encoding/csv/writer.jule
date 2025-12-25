@@ -108,7 +108,7 @@ impl Writer {
 
 	// Writes a single CSV record along with any necessary quoting.
 	// A record is a slice of strings with each string being one field.
-	fn Write(mut *self, record: []str)! {
+	async fn Write(mut *self, record: []str)! {
 		if !validDelim(self.Comma) {
 			error(errInvalidDelim)
 		}
@@ -116,7 +116,7 @@ impl Writer {
 			if n > 0 {
 				mut bytes := make([]byte, utf8::UTFMax)
 				j := utf8::EncodeRune(bytes, self.Comma)
-				self.w.Write(bytes[:j])?
+				self.w.Write(bytes[:j]).await?
 			}
 
 			// Use fb instead of field to avoid copying.
@@ -125,11 +125,11 @@ impl Writer {
 			// If we don't have to have a quoted field then just
 			// write out the field and continue to the next field.
 			if !self.fieldNeedsQuotes(fb) {
-				self.w.Write(fb)?
+				self.w.Write(fb).await?
 				continue
 			}
 
-			self.w.Write(['"'])?
+			self.w.Write(['"']).await?
 
 			for len(fb) > 0 {
 				// Search for special characters.
@@ -139,42 +139,42 @@ impl Writer {
 				}
 
 				// Copy verbatim everything before the special character.
-				self.w.Write(fb[:i])?
+				self.w.Write(fb[:i]).await?
 				fb = fb[i:]
 
 				// Encode the special character.
 				if len(fb) > 0 {
 					match fb[0] {
 					| '"':
-						self.w.Write(unsafe::StrBytes(`""`))?
+						self.w.Write(unsafe::StrBytes(`""`)).await?
 					| '\r':
 						if !self.UseCRLF {
-							self.w.Write(['\r'])?
+							self.w.Write(['\r']).await?
 						}
 					| '\n':
 						if self.UseCRLF {
-							self.w.Write(unsafe::StrBytes("\r\n"))?
+							self.w.Write(unsafe::StrBytes("\r\n")).await?
 						} else {
-							self.w.Write(unsafe::StrBytes("\n"))?
+							self.w.Write(unsafe::StrBytes("\n")).await?
 						}
 					}
 					fb = fb[1:]
 				}
 			}
 
-			self.w.Write(unsafe::StrBytes("\""))?
+			self.w.Write(unsafe::StrBytes("\"")).await?
 		}
 		if self.UseCRLF {
-			self.w.Write(unsafe::StrBytes("\r\n"))?
+			self.w.Write(unsafe::StrBytes("\r\n")).await?
 		} else {
-			self.w.Write(unsafe::StrBytes("\n"))?
+			self.w.Write(unsafe::StrBytes("\n")).await?
 		}
 	}
 
 	// Writes multiple CSV records using [Writer.Write].
-	fn WriteAll(mut *self, records: [][]str)! {
+	async fn WriteAll(mut *self, records: [][]str)! {
 		for _, record in records {
-			self.Write(record)?
+			self.Write(record).await?
 		}
 	}
 }

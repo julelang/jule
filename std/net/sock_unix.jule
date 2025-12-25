@@ -3,91 +3,13 @@
 // license that can be found in the LICENSE file.
 
 use "std/internal/poll"
-use "std/mem"
 use "std/sys"
-use "std/time"
 
-fn closeSocketBlockingMode(handle: poll::NetHandle)! {
-	mut arg := sys::Fcntl(handle, sys::F_GETFL, 0)?
-	arg |= sys::O_NONBLOCK
-	sys::Fcntl(handle, sys::F_SETFL, arg)?
+fn handleprepare(handle: poll::NetHandle)! {
+	sys::CloseOnExec(handle)
+	sys::SetNonblock(handle, true)?
 }
 
-fn openSocketBlockingMode(handle: poll::NetHandle)! {
-	mut arg := sys::Fcntl(handle, sys::F_GETFL, 0)?
-	arg &= ^sys::O_NONBLOCK
-	sys::Fcntl(handle, sys::F_SETFL, arg)?
-}
-
-fn connectSocket(handle: poll::NetHandle, sockAddr: uintptr, sockLen: sys::Socklen, timeout: time::Duration)! {
-	if timeout == 0 {
-		connectSocketNoTimeout(handle, sockAddr, sockLen)?
-		ret
-	}
-	mut tv, ok := timevalFromDuration(timeout)
-	if !ok {
-		error(ErrInvalidTimeout)
-	}
-	if tv.Sec == 0 && tv.Usec == 0 {
-		connectSocketNoTimeout(handle, sockAddr, sockLen)?
-		ret
-	}
-	closeSocketBlockingMode(handle)?
-	sys::Connect(handle, sockAddr, sockLen) else {
-		if error != sys::EINPROGRESS {
-			error(error)
-		}
-		goto Select
-	}
-	ret
-Select:
-	mut fd := sys::FdSet{}
-	fd.Zero()
-	fd.Set(handle)
-	for {
-		res := sys::Select(handle+1, nil, &fd, nil, &tv) else {
-			if error != sys::EINTR {
-				error(error)
-			}
-			use 0
-		}
-		if res > 0 {
-			len2 := sys::Socklen(mem::SizeOf(int))
-			opt := 0
-			sys::Getsockopt(handle, sys::SOL_SOCKET, sys::SO_ERROR, uintptr(&opt), len2)?
-			if opt != 0 {
-				error(sys::Errno(opt))
-			}
-			break
-		} else {
-			// Timeout.
-			error(ErrTimeout)
-		}
-	}
-	openSocketBlockingMode(handle)?
-}
-
-fn setSocketTimeout(handle: poll::NetHandle, scope: int, timeout: time::Duration)! {
-	tv, ok := timevalFromDuration(timeout)
-	if !ok {
-		error(ErrInvalidTimeout)
-	}
-	sys::Setsockopt(handle, sys::SOL_SOCKET, scope, uintptr(&tv), sys::Socklen(mem::SizeOf(tv)))?
-}
-
-fn accept(h: poll::NetHandle, addr: uintptr, addrlen: sys::Socklen)!: poll::NetHandle {
-	for {
-		ret sys::Accept(h, addr, &addrlen) else {
-			match error {
-			| sys::EINTR:
-				continue
-			| sys::ECONNABORTED:
-				// This means that a socket on the listen
-				// queue was closed before we Accept()ed it;
-				// it's a silly error, so try again.
-				continue
-			}
-			error(error)
-		}
-	}
+fn socket(domain: int, typ: int, proto: int)!: poll::NetHandle {
+	ret sys::Socket(domain, typ, proto)?
 }

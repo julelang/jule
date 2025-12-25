@@ -4,6 +4,8 @@
 
 use "std/sys"
 
+let mut qpcfreq: i64 = 0
+
 // Returns system-wide realtime clock in seconds and nanoseconds.
 // The nanoseconds is not a second yet, always in range (0, 999999999).
 fn timeNow(): (sec: i64, nsec: i64) {
@@ -16,7 +18,16 @@ fn timeNow(): (sec: i64, nsec: i64) {
 }
 
 fn nanotime(): i64 {
-	ret sys::QueryPerformanceCounter() else {
+	ticks := sys::QueryPerformanceCounter() else {
 		panic("runtime: nanotime failed")
+	}
+	sec := ticks / qpcfreq
+	rem := ticks - sec*qpcfreq
+	ret sec*1e9 + rem*1e9/qpcfreq //ret ticks * 1e9 / qpcfreq
+}
+
+fn timeinit() {
+	qpcfreq = sys::QueryPerformanceFrequency() else {
+		panic("runtime: QPC frequency failed")
 	}
 }

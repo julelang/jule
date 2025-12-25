@@ -10,49 +10,55 @@ use "std/unsafe"
 // Prints arguments to w with default formatting.
 // See documentation of the [Sprint] function for formatting.
 // Forwards exceptions, if any.
-fn Fprint(mut w: io::Writer, args: ...any)! {
+async fn Fprint(mut w: io::Writer, args: ...any)! {
 	mut sb := strings::Builder{}
 	sprint(&sb, args...)
-	w.Write(unsafe { sb.Buf() })?
+	w.Write(unsafe { sb.Buf() }).await?
 }
 
 // Prints arguments to w with default formatting.
 // Prints new-line after arguments.
 // See documentation of the [Sprint] function for formatting.
 // Forwards exceptions, if any.
-fn Fprintln(mut w: io::Writer, args: ...any)! {
+async fn Fprintln(mut w: io::Writer, args: ...any)! {
 	mut sb := strings::Builder{}
 	sprint(&sb, args...)
 	sb.WriteByte('\n')!
-	w.Write(unsafe { sb.Buf() })?
+	w.Write(unsafe { sb.Buf() }).await?
 }
 
 // Prints result of formatting to w.
 // See documentation of the [Sprint] function for formatting.
 // Forwards exceptions, if any.
-fn Fprintf(mut w: io::Writer, fmt: str, args: ...any)! {
+async fn Fprintf(mut w: io::Writer, fmt: str, args: ...any)! {
 	format := bprintf(fmt, args...)
-	w.Write(format)?
+	w.Write(format).await?
 }
 
 // Prints result of formatting to stdout.
 // See documentation of the [Sprint] function for formatting.
 // Panics if any exception appears.
 fn Printf(fmt: str, args: ...any) {
-	Fprintf(os::Stdout(), fmt, args...)!
+	format := bprintf(fmt, args...)
+	os::Stdout().WriteSync(format)!
 }
 
 // Prints arguments with default formatting to stdout.
 // Panics if any exception appears.
 fn Print(args: ...any) {
-	Fprint(os::Stdout(), args...)!
+	mut sb := strings::Builder{}
+	sprint(&sb, args...)
+	os::Stdout().WriteSync(unsafe { sb.Buf() })!
 }
 
 // Prints arguments with default formatting to stdout.
 // Prints new-line after arguments.
 // Panics if any exception appears.
 fn Println(args: ...any) {
-	Fprintln(os::Stdout(), args...)!
+	mut sb := strings::Builder{}
+	sprint(&sb, args...)
+	sb.WriteByte('\n')!
+	os::Stdout().WriteSync(unsafe { sb.Buf() })!
 }
 
 // Implements [Sprint], writes result to sb.

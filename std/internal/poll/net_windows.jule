@@ -3,6 +3,88 @@
 // license that can be found in the LICENSE file.
 
 use "std/integ/c"
+use "std/internal/sys/windows"
+use "std/mem"
+use "std/sys"
 
-type NetHandle = uintptr
+type NetHandle = sys::Handle
 type AddrLen = c::Int
+
+let mut _ConnectEx: *unsafe = nil
+let mut _AcceptEx: *unsafe = nil
+
+fn InitWSA() {
+	// Initialize WSA.
+	mut wsaData := sys::WsaData{}
+	verReq := sys::MakeWord(2, 2)
+	sys::WSAStartup(verReq, &wsaData) else {
+		panic("net: WSAStartup failed (Windows specific)")
+	}
+
+	// Get pointer of the ConnectEx and AcceptEx functions.
+	sock := sys::WSASocket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP, nil, 0, windows::WSA_FLAG_OVERLAPPED) else {
+		panic("poll: WSA initialization failed")
+	}
+	mut guid := sys::WSAID_CONNECTEX
+	bytes := u32(0)
+	unsafe {
+		sys::WSAIoctl(
+			sock,
+			sys::SIO_GET_EXTENSION_FUNCTION_POINTER,
+			(*byte)(&guid),
+			u32(mem::SizeOf(guid)),
+			(*byte)(&_ConnectEx),
+			u32(mem::SizeOf(_ConnectEx)),
+			&bytes)
+	}
+	guid = sys::WSAID_ACCEPTEX
+	unsafe {
+		sys::WSAIoctl(
+			sock,
+			sys::SIO_GET_EXTENSION_FUNCTION_POINTER,
+			(*byte)(&guid),
+			u32(mem::SizeOf(guid)),
+			(*byte)(&_AcceptEx),
+			u32(mem::SizeOf(_AcceptEx)),
+			&bytes)
+	}
+	sys::CloseSocket(sock) else {}
+}
+
+fn ConnectEx(h: sys::Handle, sockaddr: uintptr, socksize: i32, &send: *byte, sendn: u32, mut &sent: *u32, &o: *sys::Overlapped)! {
+	r := sys::Addrcall[i32](uintptr(_ConnectEx), h, sockaddr, socksize, send, sendn, sent, o)
+	if r == 0 {
+		error(sys::WSAGetLastError())
+	}
+}
+
+fn AcceptEx(listen: sys::Handle, client: sys::Handle, buf: *byte, z: u32, z1: u32, z2: u32, mut &bytesReceived: *u32, &o: *sys::Overlapped)! {
+	r := sys::Addrcall[i32](uintptr(_AcceptEx), listen, client, buf, z, z1, z2, bytesReceived, o)
+	if r == 0 {
+		error(sys::WSAGetLastError())
+	}
+}
+
+#disable nilptr boundary
+fn SetSockaddrFromRaw(&rsa: *sys::RawSockaddrAny, sockaddr: uintptr)! {
+	match rsa.Addr.Family {
+	| sys::AF_INET:
+		unsafe {
+			pp := (*sys::RawSockaddrInet4)(rsa)
+			mut sa := (*sys::RawSockaddrInet4)(sockaddr)
+			p := (*[2]byte)(&pp.Port)
+			sa.Port = u16(int((*p)[0])<<8 + int((*p)[1]))
+			sa.Addr = pp.Addr
+		}
+	| sys::AF_INET6:
+		unsafe {
+			pp := (*sys::RawSockaddrInet6)(rsa)
+			mut sa := (*sys::RawSockaddrInet6)(sockaddr)
+			p := (*[2]byte)(&pp.Port)
+			sa.Port = u16(int((*p)[0])<<8 + int((*p)[1]))
+			sa.Addr = pp.Addr
+		}
+	|:
+		error(sys::EAFNOSUPPORT)
+	}
+}

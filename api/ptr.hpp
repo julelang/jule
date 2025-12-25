@@ -204,7 +204,7 @@ struct __jule_Ptr
             if (file != nullptr)
             {
                 auto n = strlen(file);
-                char *message = new (std::nothrow) char[84 + n];
+                char *message = new (std::nothrow) char[84 + n + 1];
                 if (!message)
                     __jule_panic((__jule_U8 *)"runtime: memory allocation failed for invalid memory dereferencing error of smart pointer", 89);
                 strncpy(message, __JULE_ERROR__INVALID_MEMORY, 47);

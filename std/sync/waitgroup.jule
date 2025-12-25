@@ -5,9 +5,9 @@
 use "std/runtime"
 use "std/sync/atomic"
 
-// A WaitGroup waits for a collection of threads to finish.
-// The main thread calls [WaitGroup.Add] to set the number of
-// threads to wait for. Then each of the threads runs and
+// A WaitGroup waits for a collection of coroutines to finish.
+// The main coroutine calls [WaitGroup.Add] to set the number of
+// coroutines to wait for. Then each of the coroutines runs and
 // calls [WaitGroup.Done] when finished. At the same time,
 // [WaitGroup.Wait] can be used to block until all goroutines have finished.
 //
@@ -24,7 +24,7 @@ impl WaitGroup {
 	}
 
 	// Adds delta, which may be negative, to the [WaitGroup] counter.
-	// If the counter becomes zero, all threads blocked on [WaitGroup.Wait] are released.
+	// If the counter becomes zero, all coroutines blocked on [WaitGroup.Wait] are released.
 	// If the counter goes negative, Add panics.
 	//
 	// Note that calls with a positive delta that occur when the counter is zero
@@ -32,7 +32,7 @@ impl WaitGroup {
 	// positive delta that start when the counter is greater than zero, may happen
 	// at any time.
 	// Typically this means the calls to Add should execute before the statement
-	// creating the thread or other event to be waited for.
+	// creating the coroutine or other event to be waited for.
 	// If a [WaitGroup] is reused to wait for several independent sets of events,
 	// new Add calls must happen after all previous Wait calls have returned.
 	fn Add(mut *self, delta: int) {
@@ -48,7 +48,7 @@ impl WaitGroup {
 		if v > 0 || w == 0 {
 			ret
 		}
-		// This thread has set counter to 0 when waiters > 0.
+		// This coroutine has set counter to 0 when waiters > 0.
 		// Now there can't be concurrent mutations of state:
 		// - Adds must not happen concurrently with Wait,
 		// - Wait does not increment waiters if it sees counter == 0.
@@ -67,7 +67,7 @@ impl WaitGroup {
 	fn Done(mut *self) { self.Add(-1) }
 
 	// Blocks until the [WaitGroup] counter is zero.
-	fn Wait(mut *self) {
+	async fn Wait(mut *self) {
 		for {
 			state := self.state.Load(atomic::Acquire)
 			v := i32(state >> 32)
@@ -77,7 +77,7 @@ impl WaitGroup {
 			}
 			// Increment waiters count.
 			if self.state.CompareAndSwap(state, state+1, atomic::AcqRel, atomic::Acquire) {
-				runtime::semacquire(&self.sema, false, runtime::reasonWaitGroup)
+				runtime::semacquire(&self.sema, false, runtime::reasonWaitGroup).await
 				if self.state.Load(atomic::Acquire) != 0 {
 					panic("std/sync: WaitGroup is reused before previous Wait has returned")
 				}

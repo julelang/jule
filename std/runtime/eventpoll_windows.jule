@@ -1,0 +1,153 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+#build windows
+
+use "std/sys"
+
+extern let CreateIoCompletionPort: *unsafe
+extern let GetQueuedCompletionStatusEx: *unsafe
+
+const (
+	_DWORD_MAX = 0xffffffff
+
+	_INFINITE     = 0xffffffff
+	_WAIT_TIMEOUT = 0x102
+)
+
+// Contains the information returned by a call to GetQueuedCompletionStatusEx.
+// https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-overlapped_entry
+struct overlappedEntry {
+	key:      uintptr
+	ov:       *sys::Overlapped
+	internal: uintptr
+	qty:      u32
+}
+
+// Must be the same as beginning of internal/poll.operation.
+// Keep these in sync.
+struct polloperation {
+	// used by windows
+	_: sys::Overlapped
+
+	// used by eventpoll
+	pd:   &polldesc
+	mode: i32
+}
+
+// Returns the polloperation contained in e.
+// It can return nil if the entry is not from internal/poll.
+fn polloperationFromOverlappedEntry(mut &e: *overlappedEntry): &polloperation {
+	if e.ov == nil {
+		ret nil
+	}
+	mut opptr := unsafe { (*polloperation)(e.ov) }
+	mut op := unsafe { (&polloperation)(opptr) }
+	ret op
+}
+
+let mut iocphandle = sys::InvalidHandle
+
+fn eventpollinit() {
+	h := unsafe {
+		sys::Addrcall[*unsafe](uintptr(extern.CreateIoCompletionPort),
+			(*unsafe)(sys::InvalidHandle), (*unsafe)(nil), (*unsafe)(nil), u32(_DWORD_MAX))
+	}
+	if h == nil {
+		panic("runtime: IOCP init failed")
+	}
+	iocphandle = sys::Handle(h)
+}
+
+#disable nilptr boundary
+fn eventpollopen(fd: u64, mut &pd: *polldesc) {
+	r := unsafe {
+		sys::Addrcall[*unsafe](uintptr(extern.CreateIoCompletionPort),
+			(*unsafe)(fd), (*unsafe)(iocphandle), (*unsafe)(pd), u32(0))
+	}
+	if r == nil {
+		panic("runtime: IOCP open failed")
+	}
+}
+
+fn eventpollclose(fd: u64): sys::Errno {
+	// nothing to do
+	ret 0
+}
+
+// delay < 0: blocks indefinitely
+// delay == 0: does not block, just polls
+// delay > 0: block for up to that many nanoseconds
+#disable nilptr boundary
+fn eventpoll(mut delay: i64): coroq {
+	if iocphandle == sys::InvalidHandle {
+		ret coroq{}
+	}
+	if delay >= 1e15 {
+		// An arbitrary cap on how long to wait for a timer.
+		// 1e15 ns == ~11.5 days.
+		delay = 1e15
+	}
+	let mut wait: u32
+	if delay < 0 {
+		wait = _INFINITE
+	} else if delay == 0 {
+		wait = 0
+	} else {
+		// Anything < 1ms still sleeps ~1ms on Windows.
+		if delay < _Millisecond {
+			wait = 1
+		} else {
+			// Convert delay to milliseconds, rounding *up* instead of truncating.
+			//
+			// This computation implements a ceiling division without using floating-point:
+			//	wait = ceil(delay / 1ms)
+			// which is equivalent to:
+			//	(delay + 1ms - 1) / 1ms
+			//
+			// Rounding up is critical:
+			//	- It guarantees that the timer never fires *earlier* than requested.
+			//	- Early wakeups break scheduler semantics and can cause subtle race bugs.
+			//
+			// Any delay smaller than 1ms is clamped to 1ms intentionally.
+			// This is NOT a loss of precision but a correctness requirement.
+			//
+			// Therefore, enforcing a minimum wait of 1ms preserves correctness,
+			// avoids spin loops, and aligns with real OS timer granularity.
+			wait = u32((delay + _Millisecond - 1) / _Millisecond)
+		}
+	}
+	let mut entries: [64]overlappedEntry
+	mut n := u32(len(entries) / COMAXPROCS())
+	if n < 8 {
+		n = 8
+	}
+	if unsafe {
+		sys::Addrcall[i32](uintptr(extern.GetQueuedCompletionStatusEx),
+			(*unsafe)(iocphandle), &entries[0], n, &n, wait, i32(0))
+	} == 0 {
+		err := sys::GetLastErrno()
+		if err == _WAIT_TIMEOUT {
+			ret coroq{}
+		}
+		panic("runtime: eventpoll: IOCP failed")
+	}
+	let mut toRun: coroq
+	mut i := u32(0)
+	for i < n; i++ {
+		mut &e := &entries[i]
+		mut op := polloperationFromOverlappedEntry(e)
+		if op == nil {
+			continue
+		}
+		mode := op.mode
+		if mode != 'r' && mode != 'w' {
+			panic("runtime: invalid mode on eventpoll")
+		}
+		op.pd.mu.lock()
+		pollnotified(&(*op.pd), mode, &toRun)
+		op.pd.mu.unlock()
+	}
+	ret toRun
+}

@@ -213,7 +213,7 @@ struct encoder {
 }
 
 impl io::WriteCloser for encoder {
-	fn Write(mut *self, dest: []byte)!: (n: int) {
+	async fn Write(mut *self, dest: []byte)!: (n: int) {
 		// Leading fringe.
 		if self.nbuf > 0 {
 			mut i := 0
@@ -227,7 +227,7 @@ impl io::WriteCloser for encoder {
 				ret
 			}
 			nout := Encode(self.out, self.buf)
-			self.w.Write(self.out[:nout])?
+			self.w.Write(self.out[:nout]).await?
 			self.nbuf = 0
 		}
 
@@ -240,7 +240,7 @@ impl io::WriteCloser for encoder {
 			nn -= nn % 4
 			if nn > 0 {
 				nout := Encode(self.out, dest[:nn])
-				self.w.Write(self.out[:nout])?
+				self.w.Write(self.out[:nout]).await?
 			}
 			n += nn
 			unsafe { *(&dest) = (*(&dest))[nn:] }
@@ -255,12 +255,12 @@ impl io::WriteCloser for encoder {
 
 	// Close flushes any pending output from the encoder.
 	// It is an error to call write after calling close.
-	fn Close(mut *self)! {
+	async fn Close(mut *self)! {
 		// If there's anything left in the buffer, flush it out.
 		if self.nbuf > 0 {
 			nout := Encode(self.out, self.buf[:self.nbuf])
 			self.nbuf = 0
-			self.w.Write(self.out[:nout])?
+			self.w.Write(self.out[:nout]).await?
 		}
 	}
 }
@@ -285,7 +285,7 @@ struct decoder {
 }
 
 impl io::Reader for decoder {
-	fn Read(mut *self, mut p: []byte)!: (n: int) {
+	async fn Read(mut *self, mut p: []byte)!: (n: int) {
 		if len(p) == 0 {
 			ret 0
 		}
@@ -328,7 +328,7 @@ impl io::Reader for decoder {
 			}
 
 			// Read more data.
-			nn = self.r.Read(self.buf[self.nbuf:])?
+			nn = self.r.Read(self.buf[self.nbuf:]).await?
 			if nn == io::EOF {
 				self.eof = true
 			} else {

@@ -1,0 +1,127 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Represents a scheduled event.
+// when is an absolute timestamp in nanoseconds.
+struct timer {
+	coro:  &coro // Associated coroutine, may be nil.
+	when:  i64
+	index: int // heap index, -1 if not in heap
+}
+
+// A min-heap ordered by [timer.when].
+struct timerheap {
+	data: []&timer
+}
+
+impl timerheap {
+	// Returns number of timers.
+	#disable nilptr
+	fn len(*self): int {
+		ret len(self.data)
+	}
+
+	// Returns the earliest timer without removing it.
+	#disable nilptr boundary
+	fn peek(mut *self): &timer {
+		if len(self.data) == 0 {
+			ret nil
+		}
+		ret self.data[0]
+	}
+
+	// Inserts a timer into the heap.
+	#disable nilptr
+	fn push(mut *self, mut t: &timer) {
+		t.index = len(self.data)
+		self.data = append(self.data, t)
+		self.siftup(t.index)
+	}
+
+	// Removes and returns the earliest timer.
+	#disable nilptr boundary
+	fn pop(mut *self): &timer {
+		n := len(self.data)
+		if n == 0 {
+			ret nil
+		}
+
+		mut min := self.data[0]
+		mut last := self.data[n-1]
+
+		self.data = self.data[:n-1]
+		if n > 1 {
+			self.data[0] = last
+			last.index = 0
+			self.siftdown(0)
+		}
+
+		min.index = -1
+		ret min
+	}
+
+	// Deletes a specific timer from the heap.
+	#disable nilptr boundary
+	fn remove(mut *self, mut t: &timer) {
+		i := t.index
+		if i < 0 || i >= len(self.data) {
+			ret
+		}
+
+		mut last := self.data[len(self.data)-1]
+		self.data = self.data[:len(self.data)-1]
+
+		if i != len(self.data) {
+			self.data[i] = last
+			last.index = i
+			self.siftdown(i)
+			self.siftup(i)
+		}
+
+		t.index = -1
+	}
+
+	#disable nilptr boundary
+	fn siftup(mut *self, mut i: int) {
+		for {
+			parent := (i - 1) / 2
+			if i == 0 || self.data[parent].when <= self.data[i].when {
+				break
+			}
+			self.swap(i, parent)
+			i = parent
+		}
+	}
+
+	#disable nilptr boundary
+	fn siftdown(mut *self, mut i: int) {
+		n := len(self.data)
+		for {
+			left := 2*i + 1
+			if left >= n {
+				break
+			}
+
+			mut smallest := left
+			right := left + 1
+			if right < n && self.data[right].when < self.data[left].when {
+				smallest = right
+			}
+
+			if self.data[i].when <= self.data[smallest].when {
+				break
+			}
+
+			self.swap(i, smallest)
+			i = smallest
+		}
+	}
+
+	#disable nilptr boundary
+	fn swap(mut *self, i: int, j: int) {
+		self.data[i], self.data[j] = self.data[j], self.data[i]
+		self.data[i].index = i
+		self.data[j].index = j
+	}
+}

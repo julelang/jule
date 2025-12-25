@@ -1,0 +1,26 @@
+// Copyright 2024 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/poll"
+use "std/mem"
+use "std/sys"
+
+// Boolean to int.
+fn boolint(b: bool): int {
+	if b {
+		ret 1
+	}
+	ret 0
+}
+
+fn setNoDelay(mut fd: &netFD, noDelay: bool)! {
+	delay := boolint(noDelay)
+	sys::Setsockopt(fd.Handle(), sys::IPPROTO_TCP, sys::TCP_NODELAY, uintptr(&delay), sys::Socklen(mem::SizeOf(delay)))?
+}
+
+// Takes conn and applies default behavior of the Jule runtime.
+fn newTCPConn(mut conn: &TCPConn): &TCPConn {
+	setNoDelay(conn.fd, true)!
+	ret conn
+}

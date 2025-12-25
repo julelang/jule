@@ -468,10 +468,10 @@ field"`,
 ]
 
 #test
-fn testRead(t: &testing::T) {
+async fn testRead(t: &testing::T) {
 	newReader := fn(tt: readTest): (&Reader, [][][2]int, map[int][2]int, str) {
 		mut positions, errPositions, input := makePositions(tt.Input)
-		mut r := Reader.New(strings::Reader.New(input))
+		mut r := Reader.New(strings::Reader.New(input).Async())
 
 		if tt.Comma != 0 {
 			r.Comma = tt.Comma
@@ -490,7 +490,7 @@ fn testRead(t: &testing::T) {
 	for (_, mut tt) in readTests {
 		mut r, positions, errPositions, input := newReader(tt)
 		let mut err: any
-		out := r.ReadAll() else {
+		out := r.ReadAll().await else {
 			err = error
 			use nil
 		}
@@ -525,7 +525,7 @@ fn testRead(t: &testing::T) {
 				break
 			}
 			err = nil
-			rec := r.Read() else {
+			rec := r.Read().await else {
 				err = error
 				use nil
 			}

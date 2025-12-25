@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/runtime"
 use "std/sync"
 use "std/sync/atomic"
 use "std/testing"
 
-fn hammerMutex(m: &sync::Mutex, loops: int, mut c: &int) {
+async fn hammerMutex(m: &sync::Mutex, loops: int, mut c: &int) {
 	mut i := 0
 	for i < loops; i++ {
 		if i%3 == 0 {
@@ -15,17 +16,17 @@ fn hammerMutex(m: &sync::Mutex, loops: int, mut c: &int) {
 			}
 			continue
 		}
-		m.Lock()
+		m.Lock().await
 		m.Unlock()
 	}
 	atomic::Add(&(*c), 1, atomic::SeqCst)
 }
 
 #test
-fn testMutex(t: &testing::T) {
+async fn testMutex(t: &testing::T) {
 	m := new(sync::Mutex)
 
-	m.Lock()
+	m.Lock().await
 	if m.TryLock() {
 		t.Errorf("TryLock succeeded with mutex locked")
 		ret
@@ -44,5 +45,6 @@ fn testMutex(t: &testing::T) {
 		co hammerMutex(m, 1000, c)
 	}
 	for atomic::Load(&(*c), atomic::SeqCst) != N {
+		runtime::Yield().await
 	}
 }

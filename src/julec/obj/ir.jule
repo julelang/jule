@@ -8,6 +8,7 @@ use "std/jule/importer"
 use "std/jule/log"
 use "std/jule/sema"
 use "std/jule/token"
+use "std/slices"
 
 // Intermediate representation of the code for compiler.
 struct IR {
@@ -52,7 +53,8 @@ impl IR {
 		// Push runtime package to first file.
 		// Each Jule program should import this standard package.
 		mut firstFile := files[0]
-		pushRuntimeToAST(firstFile)
+		pushInternalRuntimeBuiltinToAST(firstFile)
+		pushRuntimeToAST(firstFile) // Must be the last import.
 
 		mut pkg, logs := sema::AnalyzePackage(files, importer, flags)
 		if len(logs) > 0 {
@@ -205,10 +207,6 @@ fn buildCompileInfo(): importer::CompileInfo {
 	}
 
 	match env::CppStd {
-	| importer::CppStd.Cpp14:
-		info.CppStd = importer::CppStd.Cpp14
-	| importer::CppStd.Cpp17:
-		info.CppStd = importer::CppStd.Cpp17
 	| importer::CppStd.Cpp20:
 		info.CppStd = importer::CppStd.Cpp20
 	}
@@ -227,11 +225,19 @@ fn pushRuntimeToAST(mut f: &ast::AST) {
 		Alias: nil,
 		Extern: false,
 	}
-	f.UseDecls = append(f.UseDecls, decl)
-	if len(f.UseDecls) > 1 {
-		// If we have another use declarations, move decl to first item.
-		// Import order must remain same.
-		copy(f.UseDecls[1:], f.UseDecls)
-		f.UseDecls[0] = decl
+	f.UseDecls = slices::Insert(f.UseDecls, 0, decl)
+}
+
+// See "std/jule" developer reference (8).
+fn pushInternalRuntimeBuiltinToAST(mut f: &ast::AST) {
+	mut decl := &ast::Use{
+		Token: nil, // Nil token is a flag for implicit declaration.
+		Path: &token::Token{
+			ID: token::STR,
+			Kind: `"std/internal/runtime/builtin"`,
+		},
+		Alias: nil,
+		Extern: false,
 	}
+	f.UseDecls = slices::Insert(f.UseDecls, 0, decl)
 }

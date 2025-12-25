@@ -8,28 +8,28 @@ use "std/sync/atomic"
 use "std/testing"
 
 #test
-fn testCond(t: &testing::T) {
+async fn testCond(t: &testing::T) {
 	cond := sync::Cond.New(new(sync::Mutex))
 	mut ready := new(bool)
 	mut wg := &sync::WaitGroup{}
 	wg.Add(1)
-	co fn() {
-		cond.Lock()
+	co async fn() {
+		cond.Lock().await
 		for !*ready {
-			cond.Wait()
+			cond.Wait().await
 		}
 		cond.Unlock()
 		wg.Done()
 	}()
 	wg.Add(1)
-	co fn() {
-		cond.Lock()
+	co async fn() {
+		cond.Lock().await
 		*ready = true
 		cond.Signal()
 		cond.Unlock()
 		wg.Done()
 	}()
-	wg.Wait()
+	wg.Wait().await
 	if !*ready {
 		t.Errorf("condition did not set correctly")
 	}

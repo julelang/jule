@@ -18,9 +18,10 @@ const (
 	parkerSelectConsumed
 )
 
-// Linked-list for parkers.
+// Linked-list for coroutine parkers.
 struct parkerList {
 	parker: &parker
+	coro:   &coro
 	state:  &int
 	ticket: u32
 	stack:  uintptr
@@ -76,7 +77,7 @@ impl waitq {
 	}
 
 	// Dequeue according to channel tickets.
-	// If waiter is a select statement thread, skips if it is consumed.
+	// If waiter is a select statement coroutine, skips if it is consumed.
 	#disable nilptr
 	fn dequeueChan(mut *self): &parkerList {
 		for {
@@ -85,7 +86,7 @@ impl waitq {
 				ret nil
 			}
 			// If waiter is a select statement, check if it is consumed.
-			// If the state is not zero, thread is consumed.
+			// If the state is not zero, coroutine is consumed.
 			// Set state as consumed to prevent false dequeue.
 			if deq.ticket&parkerSelect == parkerSelect &&
 				!atomic::CompareAndSwap(&(*deq.state), parkerSelectWaiting, parkerSelectConsumed, atomic::AcqRel, atomic::AcqRel) {
@@ -96,10 +97,10 @@ impl waitq {
 	}
 }
 
-// Unparks all threads from the waiters q.
+// Unparks all coroutines from the waiters q.
 #disable nilptr
 fn unparkAll(mut &q: *waitq, clearSpuriousSigns: bool) {
-	// Go through the local list and ready all waiters.
+	// Go through the local list and make ready all waiters.
 	mut s := q.head
 	for s != nil {
 		mut next := s.next
@@ -108,7 +109,7 @@ fn unparkAll(mut &q: *waitq, clearSpuriousSigns: bool) {
 			s.stack = 0  // Set stack pointer to zero, marked as received/sent.
 			s.ticket = 0 // Set ticket to zero, marked as received/sent for select statements.
 		}
-		s.parker.unpark()
+		unpark(&s.coro)
 		s = next
 	}
 }
