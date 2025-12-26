@@ -171,8 +171,14 @@ fn coropoll(): (polled: &coro) {
 
 	// Handle expired I/O deadlines.
 	//
-	// Waiting coroutines with read/write deadlines are made runnable
-	// when their deadlines expire.
+	// Coroutines blocked on I/O with an associated deadline
+	// are made runnable once their deadline expires.
+	//
+	// Coroutines are NOT removed from pd here.
+	// The coroutine itself is responsible for verifying whether it is still
+	// associated with this pd upon wakeup. If the association is unchanged,
+	// the wakeup indicates a deadline-exceeded condition; otherwise, the coroutine
+	// was resumed for another reason (e.g. notified by eventpoll).
 	if iodeadline && t.proc.pds.head != nil {
 		t.proc.pdsmu.lock()
 		mut q := t.proc.pds.head
@@ -183,14 +189,14 @@ fn coropoll(): (polled: &coro) {
 			mut pd := q.pd
 			pd.mu.lock()
 
-			if pd.rdeadline > 0 && pd.rdeadline <= now && pd.rcoro != nil {
+			if pd.rdeadline > 0 && pd.rdeadline <= now && pd.rcoro != nil && pd.rcoro != pollrace {
 				ok = t.proc.runq.push(pd.rcoro)
 				if !ok {
 					panic("runtime: coroutine scheduler queue corruption")
 				}
 				n++
 			}
-			if pd.wdeadline > 0 && pd.wdeadline <= now && pd.wcoro != nil {
+			if pd.wdeadline > 0 && pd.wdeadline <= now && pd.wcoro != nil && pd.wcoro != pollrace {
 				ok = t.proc.runq.push(pd.wcoro)
 				if !ok {
 					panic("runtime: coroutine scheduler queue corruption")
@@ -198,14 +204,14 @@ fn coropoll(): (polled: &coro) {
 				n++
 			}
 			if pd.deadline > 0 && pd.deadline <= now {
-				if pd.rcoro != nil {
+				if pd.rcoro != nil && pd.rcoro != pollrace {
 					ok = t.proc.runq.push(pd.rcoro)
 					if !ok {
 						panic("runtime: coroutine scheduler queue corruption")
 					}
 					n++
 				}
-				if pd.wcoro != nil {
+				if pd.wcoro != nil && pd.wcoro != pollrace {
 					ok = t.proc.runq.push(pd.wcoro)
 					if !ok {
 						panic("runtime: coroutine scheduler queue corruption")
