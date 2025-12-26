@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/internal/runtime/atomic"
+
 // Selects a runnable coroutine for execution.
 //
 // This function is one of the core components of the coroutine scheduler.
@@ -19,33 +21,9 @@
 // The `poll` flag is a scheduler hint used to amortize eventpoll costs
 // under high I/O traffic.
 #disable nilptr boundary
-fn coropoll(mut &poll: *bool): (polled: &coro) {
-	// Fast-path: if poll is set, attempt a non-blocking eventpoll first.
-	//
-	// This is used to avoid starvation under high I/O load by allowing
-	// the scheduler to re-check pending events on the next iteration.
-	if *poll {
-		// Clear the flag immediately; this attempt is sufficient.
-		*poll = false
-
-		// Use 0-delay to perform a non-blocking poll.
-		mut toRun := eventpoll(0)
-
-		// If any coroutines are ready, return the first and enqueue the rest.
-		// Timers possibly expired here will be handled in a later iteration.
-		if toRun.len > 0 {
-			polled = toRun.head.coro
-			toRun.remove(toRun.head)
-			for toRun.head != nil {
-				runqput(&toRun.head.coro, false)
-				toRun.remove(toRun.head)
-			}
-			ret
-		}
-	}
-
+fn coropoll(): (polled: &coro) {
 	mut t := gett()
-	gsched.enterspin()
+	sched.enterspin()
 
 	// Highest priority: runnext slot.
 	//
@@ -53,7 +31,7 @@ fn coropoll(mut &poll: *bool): (polled: &coro) {
 	if t.proc.runnext != nil {
 		polled = t.proc.runnext
 		t.proc.runnext = nil
-		gsched.exitspin()
+		sched.exitspin()
 		ret
 	}
 
@@ -61,30 +39,45 @@ fn coropoll(mut &poll: *bool): (polled: &coro) {
 	let mut ok: bool
 	polled, ok = t.proc.runq.pop()
 	if ok {
-		gsched.exitspin()
+		sched.exitspin()
 		ret
+	}
+
+	// Before the look for global runq, check for the lastpoll enforcement.
+	// If the lastpoll value is -1, check eventpoll.
+	if atomic::CompareAndSwap(&sched.lastpoll, pollCheckRequested, pollCheckIn, atomic::AcqRel, atomic::Relaxed) {
+		mut toRun := eventpoll(0) // Use 0-delay to perform a non-blocking poll.
+		now := nanotime()
+		atomic::Store(&sched.lastpoll, now, atomic::Release)
+		// If any coroutines are ready, return the first and enqueue the rest.
+		// Timers possibly expired here will be handled in a later iteration.
+		if toRun.len > 0 {
+			sched.exitspin()
+			injecteventpollrunq(&polled, &toRun)
+			ret
+		}
 	}
 
 	// Local queue empty: attempt to fetch a batch from the global run queue.
 	//
 	// The batch size is capped to coroprocRunQueueSize to preserve
 	// locality and reduce contention on the global lock.
-	gsched.runqmu.lock()
-	if gsched.runq.head != nil {
+	sched.runqmu.lock()
+	if sched.runq.head != nil {
 		let mut batch: [coroprocRunQueueSize]&coro
 		mut n := 0
 
 		for n < len(batch); n++ {
-			if gsched.runq.head == nil {
+			if sched.runq.head == nil {
 				break
 			}
-			batch[n] = gsched.runq.head.coro
-			gsched.runq.remove(gsched.runq.head)
+			batch[n] = sched.runq.head.coro
+			sched.runq.remove(sched.runq.head)
 		}
-		gsched.runqmu.unlock()
+		sched.runqmu.unlock()
 
 		if n > 0 {
-			gsched.exitspin()
+			sched.exitspin()
 			polled = batch[0]
 
 			// Push remaining coroutines into the local run queue.
@@ -98,7 +91,7 @@ fn coropoll(mut &poll: *bool): (polled: &coro) {
 			ret
 		}
 	} else {
-		gsched.runqmu.unlock()
+		sched.runqmu.unlock()
 	}
 
 	// No work found locally or globally: attempt work stealing.
@@ -108,8 +101,8 @@ fn coropoll(mut &poll: *bool): (polled: &coro) {
 	const StealTries = 4
 	mut n := 0
 	for n < StealTries; n++ {
-		idx := absint(int(rand() % u64(len(gsched.procs))))
-		mut proc := gsched.procs[idx]
+		idx := absint(int(rand() % u64(len(sched.procs))))
+		mut proc := sched.procs[idx]
 
 		// Do not steal from ourselves.
 		if proc == t.proc {
@@ -118,11 +111,11 @@ fn coropoll(mut &poll: *bool): (polled: &coro) {
 
 		polled, ok = proc.runq.steal()
 		if ok {
-			gsched.exitspin()
+			sched.exitspin()
 			ret
 		}
 	}
-	gsched.exitspin()
+	sched.exitspin()
 
 	// No runnable coroutine found yet.
 	// Determine how long we can block based on timers and deadlines.
@@ -161,7 +154,7 @@ fn coropoll(mut &poll: *bool): (polled: &coro) {
 		}
 
 		// If we already found a runnable coroutine, return immediately
-		// without entering event polling.
+		// without entering eventpoll.
 		if polled != nil {
 			ret
 		}
@@ -232,26 +225,31 @@ fn coropoll(mut &poll: *bool): (polled: &coro) {
 		ret
 	}
 
-	// Final step: perform eventpoll.
-	mut toRun := eventpoll(delay)
-
-	if toRun.len > 0 {
-		// Set poll flag so the next scheduler iteration performs
-		// a fast non-blocking eventpoll. This is critical under
-		// sustained high I/O load.
-		*poll = true
-
-		// eventpoll guarantees len(toRun) <= local run queue capacity.
-		polled = toRun.head.coro
-		toRun.remove(toRun.head)
-		for toRun.head != nil {
-			ok = t.proc.runq.push(toRun.head.coro)
-			if !ok {
-				panic("runtime: coroutine scheduler queue corruption")
-			}
-			toRun.remove(toRun.head)
+	// Final step: poll eventpoll.
+	if delay != -1 || atomic::Swap(&sched.lastpoll, pollCheckIn, atomic::AcqRel) != pollCheckIn {
+		mut toRun := eventpoll(delay)
+		now = nanotime()
+		atomic::Store(&sched.lastpoll, now, atomic::Release)
+		if toRun.len > 0 {
+			injecteventpollrunq(&polled, &toRun)
 		}
 	}
 
 	ret
+}
+
+// Dispatches a coroq returned from eventpoll.
+// Sets polled to a runnable coroutine from toRun.
+fn injecteventpollrunq(mut &polled: *&coro, mut &toRun: *coroq) {
+	if toRun.len < 1 {
+		ret
+	}
+	// eventpoll guarantees len(toRun) <= local run queue capacity.
+	// If P's local queue is empty, all corotoutines will be enqueued in there.
+	*polled = toRun.head.coro
+	toRun.remove(toRun.head)
+	for toRun.head != nil {
+		runqput(&toRun.head.coro, false)
+		toRun.remove(toRun.head)
+	}
 }

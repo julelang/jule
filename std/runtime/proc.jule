@@ -74,77 +74,105 @@ struct coroproc {
 	timers: timerheap
 }
 
-// A scheduler environment for the whole Jule program.
+const (
+	pollCheckRequested = -1 // Indicates that an eventpoll check has been explicitly prioritized.
+	pollCheckIn        = -2 // Indicates that an M is currently performing an eventpoll check.
+)
+
+// Scheduler is the global scheduling environment for the entire Jule program.
+// It owns coroutine processors, global run queues, and tracks system-wide
+// polling and spinning states for load-balancing and sleep/wakeup decisions.
 struct scheduler {
-	// All coroutine processors.
+	// All coroutine processors (logical execution units).
+	// Each processor is responsible for running coroutines on a worker thread.
 	procs: []&coroproc
 
-	// Idle coroutine processors of the scheduler.
+	// Queue of idle coroutine processors that are not currently executing work.
+	// Used to quickly assign work without scanning all processors.
 	idleprocs: mpmcQueue[&coroproc]
 
-	// Global queue for runnable coroutines with guard.
+	// Global runnable coroutine queue.
+	// Protected by runqmu to synchronize cross-processor scheduling.
 	runqmu: mutex
 	runq:   &coroq
 
-	// Count of the coroutines actively polling for I/O.
-	// Atomic if used with relevant scheduler functions.
-	_ncpolling: int
+	// Stores the timestamp of the most recent eventpoll.
+	// A value of -1 indicates that the next coropoll invocation
+	// must perform a non-blocking eventpoll if possible.
+	// A value of -2 indicates that a coroutine is checking eventpoll.
+	lastpoll: i64
 
-	// Count of the worker threads actively polling for a coroutine.
-	// Atomic if used with relevant scheduler functions.
-	_nmspinning: int
+	// Number of coroutines currently polling for I/O.
+	// This is used by the scheduler to decide whether to block,
+	// spin, or wake worker threads.
+	//
+	// Must be accessed atomically when used by scheduler logic.
+	_ncpoll: int
+
+	// Number of worker threads currently spinning (actively searching
+	// for runnable coroutines instead of sleeping).
+	//
+	// Must be accessed atomically when used by scheduler logic.
+	_nmspin: int
 }
 
 impl scheduler {
-	// A coroutine should call this before polling for I/O.
+	// Marks that a coroutine is about to enter an I/O polling state.
+	// Must be called immediately before the coroutine blocks on I/O.
 	fn enterpoll(mut *self) {
-		atomic::Add(&self._ncpolling, 1, atomic::Relaxed)
+		atomic::Add(&self._ncpoll, 1, atomic::Relaxed)
 	}
 
-	// A coroutine should call this after polling for I/O.
+	// Marks that a coroutine has exited an I/O polling state.
+	// Must be called immediately after the coroutine finishes polling.
 	fn exitpoll(mut *self) {
-		atomic::Add(&self._ncpolling, -1, atomic::Relaxed)
+		atomic::Add(&self._ncpoll, -1, atomic::Relaxed)
 	}
 
-	// Count of the coroutines actively polling for I/O.
+	// Returns the number of coroutines currently polling for I/O.
+	// Used by the scheduler to make global scheduling decisions.
 	fn ncpolling(*self): int {
-		ret atomic::Load(&self._ncpolling, atomic::Relaxed)
+		ret atomic::Load(&self._ncpoll, atomic::Relaxed)
 	}
 
-	// A worker thread should call this before polling for a corouitine.
+	// Marks that a worker thread is entering a spin state.
+	// Spinning means actively searching for runnable coroutines
+	// instead of blocking or sleeping.
 	fn enterspin(mut *self) {
-		atomic::Add(&self._nmspinning, 1, atomic::Relaxed)
+		atomic::Add(&self._nmspin, 1, atomic::Relaxed)
 	}
 
-	// A worker thread should call this after polled a corouitine.
+	// Marks that a worker thread has exited the spin state.
+	// Must be called when the thread stops actively searching for work.
 	fn exitspin(mut *self) {
-		atomic::Add(&self._nmspinning, -1, atomic::Relaxed)
+		atomic::Add(&self._nmspin, -1, atomic::Relaxed)
 	}
 
-	// Returns count of the worker threads actively polling for a coroutine.
+	// Returns the number of worker threads currently spinning
+	// while searching for runnable coroutines.
 	fn nmspinning(*self): int {
-		ret atomic::Load(&self._nmspinning, atomic::Relaxed)
+		ret atomic::Load(&self._nmspin, atomic::Relaxed)
 	}
 }
 
 // A global scheduler instance of the program.
 // Just a declaration, compiler will not initialize it by default.
 // It will be initialized by the runtime.
-let mut gsched = scheduler{}
+let mut sched = scheduler{}
 
 // Should be called when a corotuine enqueued to the global runnable queue.
 #disable nilptr
 fn onglobalrunqput() {
 	// There is not actively spinning worker thread.
 	// Try to wake or create worker thread, if an idle coroutine processor available.
-	if gsched.nmspinning() < 1 {
+	if sched.nmspinning() < 1 {
 		let mut rproc: &coroproc
-		ok, _ := gsched.idleprocs.dequeue(&rproc)
+		ok, _ := sched.idleprocs.dequeue(&rproc)
 		if ok {
 			// We found an idle coroutine processor.
 			// Wake a thread or spawn a new one with the coroutine processor.
 			threadMutex.lock()
-			spawnSchedThread(rproc)
+			newm(rproc)
 			ret
 		}
 	}
@@ -170,12 +198,12 @@ LoadBalance:
 			break
 		}
 	}
-	gsched.runqmu.lock()
+	sched.runqmu.lock()
 	mut i := 0
 	for i < n; i++ {
-		gsched.runq.push(batch[i])
+		sched.runq.push(batch[i])
 	}
-	gsched.runqmu.unlock()
+	sched.runqmu.unlock()
 
 	// The queue is not full, now the enqueue must succeed.
 	ok = t.proc.runq.push(*c)
@@ -212,9 +240,9 @@ fn runqput(mut &c: *&coro, next: bool) {
 	}
 
 	// No other option, push it directly to the global queue.
-	gsched.runqmu.lock()
-	gsched.runq.push(*c)
-	gsched.runqmu.unlock()
+	sched.runqmu.lock()
+	sched.runq.push(*c)
+	sched.runqmu.unlock()
 
 	onglobalrunqput()
 }
@@ -222,16 +250,15 @@ fn runqput(mut &c: *&coro, next: bool) {
 // A coroutine scheduler routine.
 // Works like and event-loop, looks for a coroutine and executes it.
 #disable nilptr
-fn sched() {
+fn schedule() {
 	sett(acquireThread())
 	threadMutex.unlock()
 	mut t := gett()
 Sched:
 	// If poll is set, attempt a non-blocking eventpoll first.
-	mut poll := false
 	for {
 		// Poll a coroutine to run.
-		mut c := coropoll(&poll)
+		mut c := coropoll()
 		// coropoll failed to find a runnable coroutine.
 		if c == nil {
 			// There are timers in this worker, clean them.
@@ -241,7 +268,7 @@ Sched:
 				continue
 			}
 			// There are coroutines polling for I/O.
-			if gsched.ncpolling() > 0 {
+			if sched.ncpolling() > 0 {
 				continue
 			}
 			// No coroutine to run, no timer, not poll.
@@ -256,17 +283,11 @@ Sched:
 		}
 
 		t.coro = c
-		c.state &= ^reasonSched // Remove sched-reason flag, if exist.
 		c.state |= coroRunning
 		resume(c)
 		trampolinerun()
 		retiredrain() // Destroy the retire coroutines.
 		t.coro = nil
-
-		// If coropoll return true for poll, save it.
-		// Otherwise make it true if coroutine is yield
-		// because of scheduler starvation risk.
-		poll = poll || c.state&reasonSched == reasonSched
 	}
 	schedAgain := closeThread(t)
 	if schedAgain {
@@ -283,7 +304,7 @@ Sched:
 // The operating system thread API passes a pointer to the function when calling it.
 // In the final stage, this function's signature fits with the OS thread API.
 fn schedthread() {
-	sched()
+	schedule()
 }
 
 // Suspends the current coroutine and yields the CPU.
@@ -342,39 +363,64 @@ async fn Yield() {
 	// Push the coroutine to the global queue, otherwise the next
 	// scheduler iteration after park may run it from the local queue.
 	mut coro := gett().coro
-	gsched.runqmu.lock()
-	gsched.runq.push(coro)
+	sched.runqmu.lock()
+	sched.runq.push(coro)
 	// Do not call onglobalrunqput here.
 	// We are doing this out of necessity because
 	// when it gets stuck in the local queue,
 	// it can be immediately retrieved and resumed.
 	// We need to prevent that. This is not an actual overflow.
-	park(coro, uintptr(&gsched.runqmu), reasonSched).await
+	park(coro, uintptr(&sched.runqmu), reasonNA).await
 }
 
 #disable nilptr boundary
 fn schedinit() {
 	// Initialize the global scheduler instance.
-	gsched = scheduler{}
-	gsched.runq = new(coroq)
+	sched = scheduler{}
+	sched.runq = new(coroq)
 
-	// We mutate gsched here but mutex is not need to be acquired.
+	// We mutate sched here but mutex is not need to be acquired.
 	// Because we are in the program initialize state, no concurrency risk.
 
 	// Initialize corotuine processors.
 	maxprocs := u64(COMAXPROCS())
-	gsched.procs = make([]&coroproc, maxprocs)
-	gsched.idleprocs = mpmcQueue[&coroproc].new(maxprocs)
+	sched.procs = make([]&coroproc, maxprocs)
+	sched.idleprocs = mpmcQueue[&coroproc].new(maxprocs)
 	mut i := u64(0)
 	for i < maxprocs; i++ {
 		mut p := new(coroproc)
 		p.runq.init(coroprocRunQueueSize)
-		gsched.procs[i] = p
+		sched.procs[i] = p
 		if i == 0 {
 			// Set proc of the main program thread.
 			threadHead.proc = p
 		} else {
-			gsched.idleprocs.enqueue(&p)
+			sched.idleprocs.enqueue(&p)
+		}
+	}
+}
+
+// The sysmon (system-monitor) thread.
+//
+// This function handled like an anonymous function.
+// Therefore the compiler will add *unsafe argument to
+// the head of the argument list implicitly for anonymous function context.
+// The operating system thread API passes a pointer to the function when calling it.
+// In the final stage, this function's signature fits with the OS thread API.
+fn sysmon() {
+	for {
+		// Sleep for the next period.
+		threadsleep(_Millisecond * 10)
+		// eventpoll if not polled for more than 10ms and
+		// there is a coroutine waiting for eventpoll.
+		// If eventpoll is not triggered, all coroutines may accumulate in
+		// local and global queues, leading to starvation.
+		// The eventpoll must be checked regularly.
+		if sched.ncpolling() > 0 {
+			lastpoll := atomic::Load(&sched.lastpoll, atomic::Acquire)
+			if lastpoll >= 0 && nanotime()-lastpoll > _Millisecond*10 {
+				atomic::CompareAndSwap(&sched.lastpoll, lastpoll, pollCheckRequested, atomic::AcqRel, atomic::Relaxed)
+			}
 		}
 	}
 }

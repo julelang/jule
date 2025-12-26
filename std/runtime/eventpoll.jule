@@ -9,7 +9,7 @@ type netpollError: str
 
 const (
 	netpollClosing     = "descriptor is closed"
-	netpollNotPollable = "general error polling descriptor"
+	netpollNotPollable = "not pollable"
 	netpollDeadline    = "deadline exceeded"
 )
 
@@ -197,9 +197,9 @@ async fn eventpollwait(mut pd: &polldesc, mode: i32)! {
 	| 'w':
 		pd.wcoro = coro
 	}
-	gsched.enterpoll()
+	sched.enterpoll()
 	park(coro, uintptr(&pd.mu), reasonNA).await
-	gsched.exitpoll()
+	sched.exitpoll()
 	eventpollgeterr(pd, mode)?
 }
 
@@ -230,7 +230,7 @@ async fn eventpollwaitcanceled(mut pd: &polldesc, mode: i32) {
 	| 'w':
 		pd.wcoro = coro
 	}
-	gsched.enterpoll()
+	sched.enterpoll()
 	for {
 		park(coro, uintptr(&pd.mu), reasonNA).await
 		pd.mu.lock()
@@ -245,7 +245,7 @@ async fn eventpollwaitcanceled(mut pd: &polldesc, mode: i32) {
 			break
 		}
 	}
-	gsched.exitpoll()
+	sched.exitpoll()
 }
 
 // Throws error if needed after polling for an event.
