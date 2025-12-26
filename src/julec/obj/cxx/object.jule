@@ -1580,7 +1580,8 @@ impl ObjectCoder {
 				v == meta::Program.Runtime.Epfd ||
 				v == meta::Program.Runtime.Iocphandle ||
 				v == meta::Program.Runtime.Qpcfreq ||
-				v == meta::Program.Runtime.WorkerCount {
+				v == meta::Program.Runtime.WorkerCount ||
+				v == meta::Program.Runtime.Asynctime {
 				continue
 			}
 			self.Buf.WriteByte(indentKind)!
@@ -1604,11 +1605,13 @@ impl ObjectCoder {
 	}
 
 	fn end(mut &self) {
+		asyncRuntime := env::Test || meta::Program.EntryPoint.Async
+		self.meta.concurrent = self.meta.concurrent || asyncRuntime
+
 		self.addIndent()
 
 		if !env::Test {
 			// Write the fake main function.
-			asyncRuntime := meta::Program.EntryPoint.Async
 			if asyncRuntime {
 				self.write("__jule_DetachTask ")
 			} else {
@@ -1637,15 +1640,17 @@ impl ObjectCoder {
 	__jule_envp = reinterpret_cast<__jule_U8**>(envp);
 
 	`)
+		identCoder.var(&self.Buf, meta::Program.Runtime.Asynctime)
+		self.write(" = ")
+		self.ec.boolean(asyncRuntime)
+		self.write(";\n")
+		self.indent()
 		identCoder.funcIns(&self.Buf, meta::Program.Runtime.Init)
 		self.write("();\n\n")
 		self.initGlobals()
 		self.write(`
 	__jule_call_initializers();
 	`)
-
-		asyncRuntime := env::Test || meta::Program.EntryPoint.Async
-		self.meta.concurrent = self.meta.concurrent || asyncRuntime
 
 		if env::Test {
 			identCoder.funcIns(&self.Buf, meta::Program.Runtime.Spawnmaincoro)
