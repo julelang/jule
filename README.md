@@ -4,7 +4,7 @@
 </p>
 <h1>The Jule Programming Language</h1>
 
-Simple and safe programming language with first-class C/C++ interoperability and powerful compile-time capabilities.
+Simple and safe programming language with built-in concurrency, first-class C/C++ interoperability and powerful compile-time capabilities.
 
 This repository is the main source tree of Jule. \
 It contains the reference compiler, API, and the standard library.
@@ -27,7 +27,7 @@ It contains the reference compiler, API, and the standard library.
 - Easy and efficient low-level development
 - [Cross compilation](https://manual.jule.dev/compiler/cross-compilation) made simple: standard library support, target-specific IR generation, and architecture imitation
 - Lightweight error handling with [exceptionals](https://manual.jule.dev/error-handling/exceptionals), similar to optional types
-- Built-in [concurrency](https://manual.jule.dev/concurrency): managed threads, channels, mutexes, condition variables, and more
+- Built-in [concurrency](https://manual.jule.dev/concurrency): async runtime and coroutines, channels, mutexes, condition variables, and more
 - High [interoperability](https://manual.jule.dev/integrated-jule/interoperability) with C, C++, Objective-C, and Objective-C++
 - C++ [API](https://manual.jule.dev/api) for extending Jule or integrating with existing codebases
 
@@ -35,7 +35,7 @@ It contains the reference compiler, API, and the standard library.
 > Jule does not have a stable release yet and continues to improve with each commit.
 > Some changes may be unstable or affected by compiler or API issues.
 > If you encounter any problems, please report them through the [Jule Issue Tracker](https://github.com/julelang/jule/issues).
-> You can also join the Discord community](https://discord.gg/XNSUUDuGGQ) to discuss the language, get help, or contribute to its development.
+> You can also join the [Discord community](https://discord.gg/XNSUUDuGGQ) to discuss the language, get help, or contribute to its development.
 
 ## Community
 
