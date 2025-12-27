@@ -64,7 +64,7 @@ struct coroproc {
 	runnext: &coro
 
 	// List of the runnable coroutines.
-	runq: deque
+	runq: localrunq
 
 	// Poll descriptors that are still alive.
 	pdsmu: mutex
@@ -183,17 +183,17 @@ fn onglobalrunqput() {
 #disable nilptr boundary
 fn runqputl(mut &c: *&coro): (ok: bool) {
 	mut t := gett()
-	ok = t.proc.runq.push(*c)
+	ok = t.proc.runq.enqueue(&(*(*c)))
 	if ok {
 		ret
 	}
 LoadBalance:
 	// Load balancing.
 	// Move half of the local queue to the global queue, if possible.
-	let mut batch: [coroprocRunQueueSize / 2]&coro
+	let mut batch: [coroprocRunQueueSize / 2]coro
 	mut n := 0
 	for n < len(batch); n++ {
-		batch[n], ok = t.proc.runq.pop()
+		ok = t.proc.runq.dequeue(&batch[n])
 		if !ok {
 			break
 		}
@@ -201,12 +201,14 @@ LoadBalance:
 	sched.runqmu.lock()
 	mut i := 0
 	for i < n; i++ {
-		sched.runq.push(batch[i])
+		mut coro := new(coro)
+		*coro = batch[i]
+		sched.runq.push(coro)
 	}
 	sched.runqmu.unlock()
 
 	// The queue is not full, now the enqueue must succeed.
-	ok = t.proc.runq.push(*c)
+	ok = t.proc.runq.enqueue(&(*(*c)))
 	if !ok {
 		goto LoadBalance
 	}

@@ -36,9 +36,11 @@ fn coropoll(): (polled: &coro) {
 	}
 
 	// Second priority: local run queue.
-	let mut ok: bool
-	polled, ok = t.proc.runq.pop()
+	let mut raw: coro
+	mut ok := t.proc.runq.dequeue(&raw)
 	if ok {
+		polled = new(coro)
+		*polled = raw
 		sched.exitspin()
 		ret
 	}
@@ -83,7 +85,7 @@ fn coropoll(): (polled: &coro) {
 			// Push remaining coroutines into the local run queue.
 			mut i := 1
 			for i < n; i++ {
-				ok = t.proc.runq.push(batch[i])
+				ok = t.proc.runq.enqueue(&(*batch[i]))
 				if !ok {
 					panic("runtime: coroutine scheduler queue corruption")
 				}
@@ -109,8 +111,10 @@ fn coropoll(): (polled: &coro) {
 			continue
 		}
 
-		polled, ok = proc.runq.steal()
+		ok = proc.runq.steal(&raw)
 		if ok {
+			polled = new(coro)
+			*polled = raw
 			sched.exitspin()
 			ret
 		}
@@ -141,7 +145,7 @@ fn coropoll(): (polled: &coro) {
 				if polled == nil {
 					polled = coro
 				} else {
-					ok = t.proc.runq.push(coro)
+					ok = t.proc.runq.enqueue(&(*coro))
 					if !ok {
 						panic("runtime: coroutine scheduler queue corruption")
 					}
@@ -190,14 +194,14 @@ fn coropoll(): (polled: &coro) {
 			pd.mu.lock()
 
 			if pd.rdeadline > 0 && pd.rdeadline <= now && pd.rcoro != nil && pd.rcoro != pollrace {
-				ok = t.proc.runq.push(pd.rcoro)
+				ok = t.proc.runq.enqueue(&(*pd.rcoro))
 				if !ok {
 					panic("runtime: coroutine scheduler queue corruption")
 				}
 				n++
 			}
 			if pd.wdeadline > 0 && pd.wdeadline <= now && pd.wcoro != nil && pd.wcoro != pollrace {
-				ok = t.proc.runq.push(pd.wcoro)
+				ok = t.proc.runq.enqueue(&(*pd.wcoro))
 				if !ok {
 					panic("runtime: coroutine scheduler queue corruption")
 				}
@@ -205,14 +209,14 @@ fn coropoll(): (polled: &coro) {
 			}
 			if pd.deadline > 0 && pd.deadline <= now {
 				if pd.rcoro != nil && pd.rcoro != pollrace {
-					ok = t.proc.runq.push(pd.rcoro)
+					ok = t.proc.runq.enqueue(&(*pd.rcoro))
 					if !ok {
 						panic("runtime: coroutine scheduler queue corruption")
 					}
 					n++
 				}
 				if pd.wcoro != nil && pd.wcoro != pollrace {
-					ok = t.proc.runq.push(pd.wcoro)
+					ok = t.proc.runq.enqueue(&(*pd.wcoro))
 					if !ok {
 						panic("runtime: coroutine scheduler queue corruption")
 					}
@@ -224,10 +228,12 @@ fn coropoll(): (polled: &coro) {
 		}
 		t.proc.pdsmu.unlock()
 
-		polled, ok = t.proc.runq.pop()
+		ok = t.proc.runq.dequeue(&raw)
 		if !ok {
 			panic("runtime: coroutine scheduler queue corruption")
 		}
+		polled = new(coro)
+		*polled = raw
 		ret
 	}
 
