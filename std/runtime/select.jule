@@ -39,7 +39,7 @@ async fn emptyselect() {
 	// It always yields CPU due to empty select statement,
 	// so put it into deep sleep.
 	mut coro := gett().coro
-	park(coro, 0, reasonSelect|reasonSelectEmpty).await
+	park(&coro, 0, reasonSelect|reasonSelectEmpty).await
 	panic("unreachable")
 }
 
@@ -244,7 +244,7 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 	}
 	// There is no waiter in the queue.
 	// We have to park this coroutine, eventually.
-	mut coro := gett().coro
+	mut c := gett().coro
 	// Allocate and prepare a parker per operation.
 	// Use round-robin iteration to achieve randomness.
 	mut parkers := make([]parkerList, nrecv+nsend)
@@ -274,7 +274,7 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 		}
 
 		// Prepare and enqeueue parker.
-		parker.coro = coro
+		parker.coro = unsafe { (&coro)(&c) }
 		parker.ticket = parkerSelect
 		parker.state = state // Use shared state pointer for all parkers.
 		parker.stack = case.data
@@ -292,7 +292,7 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 	for {
 		// Unlock channels and park the coroutine.
 		unlockchans(chans, nchan)
-		park(coro, 0, reasonSelect).await
+		park(&c, 0, reasonSelect).await
 
 		// Look for the selected channel.
 		for i in parkers {

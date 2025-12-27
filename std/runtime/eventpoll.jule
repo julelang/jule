@@ -85,8 +85,8 @@ struct polldesc {
 	fdseq: uintptr // Atomic seq protects against stale pollDesc.
 
 	mu:        mutex       // Mutex protecting all mutable fields below.
-	rcoro:     &coro       // Coroutine waiting for read readiness.
-	wcoro:     &coro       // Coroutine waiting for write readiness.
+	rcoro:     &coro       // A fake smart-pointer for stack allocated coroutine waiting for read readiness.
+	wcoro:     &coro       // A fake smart-pointer for stack allocated coroutine waiting for write readiness.
 	proc:      &coroproc   // Owning coroutine process.
 	procq:     &polldescqp // The queue node.
 	eventerr:  bool
@@ -154,28 +154,6 @@ async fn eventpollwait(mut pd: &polldesc, mode: i32)! {
 	}
 	mut t := gett()
 	pd.mu.lock()
-	// Check for completion signals first.
-	if mode == 'r' && pd.rcoro == pollrace {
-		pd.rcoro = nil
-		pd.mu.unlock()
-		ret
-	}
-	if mode == 'w' && pd.wcoro == pollrace {
-		pd.wcoro = nil
-		pd.mu.unlock()
-		ret
-	}
-	if pd.closing {
-		pd.mu.unlock()
-		error(netpollClosing)
-	}
-	// Report an event scanning error only on a read event.
-	// An error on a write event will be captured in a subsequent
-	// write call that is able to report a more specific error.
-	if mode == 'r' && pd.eventerr {
-		pd.mu.unlock()
-		error(netpollNotPollable)
-	}
 	// Check for deadline because scheduler will remove it
 	// from the timers after expiration.
 	now := nanotime()
@@ -190,15 +168,38 @@ async fn eventpollwait(mut pd: &polldesc, mode: i32)! {
 		pd.mu.unlock()
 		error(netpollDeadline)
 	}
-	mut coro := t.coro
+	// Check for completion signals first.
+	if mode == 'r' && pd.rcoro == pollrace {
+		pd.rcoro = nil
+		pd.mu.unlock()
+		ret
+	}
+	if mode == 'w' && pd.wcoro == pollrace {
+		pd.wcoro = nil
+		pd.mu.unlock()
+		ret
+	}
+	// Check for closing FD.
+	if pd.closing {
+		pd.mu.unlock()
+		error(netpollClosing)
+	}
+	// Report an event scanning error only on a read event.
+	// An error on a write event will be captured in a subsequent
+	// write call that is able to report a more specific error.
+	if mode == 'r' && pd.eventerr {
+		pd.mu.unlock()
+		error(netpollNotPollable)
+	}
+	mut c := t.coro
 	match mode {
 	| 'r':
-		pd.rcoro = coro
+		pd.rcoro = unsafe { (&coro)(&c) }
 	| 'w':
-		pd.wcoro = coro
+		pd.wcoro = unsafe { (&coro)(&c) }
 	}
 	sched.enterpoll()
-	park(coro, uintptr(&pd.mu), reasonNA).await
+	park(&c, uintptr(&pd.mu), reasonNA).await
 	sched.exitpoll()
 	eventpollgeterr(pd, mode)?
 }
@@ -223,16 +224,16 @@ async fn eventpollwaitcanceled(mut pd: &polldesc, mode: i32) {
 		pd.mu.unlock()
 		ret
 	}
-	mut coro := t.coro
-	match mode {
-	| 'r':
-		pd.rcoro = coro
-	| 'w':
-		pd.wcoro = coro
-	}
 	sched.enterpoll()
 	for {
-		park(coro, uintptr(&pd.mu), reasonNA).await
+		mut c := t.coro
+		match mode {
+		| 'r':
+			pd.rcoro = unsafe { (&coro)(&c) }
+		| 'w':
+			pd.wcoro = unsafe { (&coro)(&c) }
+		}
+		park(&c, uintptr(&pd.mu), reasonNA).await
 		pd.mu.lock()
 		// Check for relevant coroutine.
 		// If any deadline exist on this pd, a spurious wakeup may occur.
@@ -268,27 +269,27 @@ fn pollnotified(mut &pd: *polldesc, mode: i32, mut &toRun: *coroq) {
 	match mode {
 	| 'r':
 		if pd.rcoro != nil && pd.rcoro != pollrace {
-			toRun.push(pd.rcoro)
+			toRun.push(&(*pd.rcoro))
 			pd.rcoro = nil
 		} else {
 			pd.rcoro = pollrace
 		}
 	| 'w':
 		if pd.wcoro != nil && pd.wcoro != pollrace {
-			toRun.push(pd.wcoro)
+			toRun.push(&(*pd.wcoro))
 			pd.wcoro = nil
 		} else {
 			pd.wcoro = pollrace
 		}
 	| 'r' + 'w':
 		if pd.rcoro != nil && pd.rcoro != pollrace {
-			toRun.push(pd.rcoro)
+			toRun.push(&(*pd.rcoro))
 			pd.rcoro = nil
 		} else {
 			pd.rcoro = pollrace
 		}
 		if pd.wcoro != nil && pd.wcoro != pollrace {
-			toRun.push(pd.wcoro)
+			toRun.push(&(*pd.wcoro))
 			pd.wcoro = nil
 		} else {
 			pd.wcoro = pollrace
@@ -367,10 +368,10 @@ impl pollcachepool {
 
 		// Unpark waiter coroutines, if any.
 		if pd.rcoro != nil && pd.rcoro != pollrace {
-			unpark(&pd.rcoro)
+			unpark(&(*pd.rcoro))
 		}
 		if pd.wcoro != nil && pd.wcoro != pollrace {
-			unpark(&pd.wcoro)
+			unpark(&(*pd.wcoro))
 		}
 		pd.rcoro = nil
 		pd.wcoro = nil

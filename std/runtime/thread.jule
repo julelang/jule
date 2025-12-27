@@ -34,7 +34,7 @@ struct thread {
 	proc: &coroproc
 
 	// Current coroutine of the thread.
-	coro: &coro
+	coro: coro
 }
 
 // Returns the current thread.
@@ -100,7 +100,6 @@ fn pushNewThread(): &thread {
 	for t != nil; t = t.next {
 		if t.state&threadClosed == threadClosed {
 			t.state = threadRunning
-			t.coro = nil
 			ret t
 		}
 	}
@@ -152,7 +151,6 @@ fn closeThread(mut t: &thread): (schedAgain: bool) {
 		}
 		t.prev = nil
 		t.next = nil
-		t.coro = nil
 		t.proc = nil
 		threadMutex.unlock()
 		t.parker.release()
@@ -162,7 +160,6 @@ fn closeThread(mut t: &thread): (schedAgain: bool) {
 	// There is space for caching, cache it.
 	// Park the thread and report true, it will be continue to run when notified.
 	cachedCount++
-	t.coro = nil
 	t.proc = nil
 	t.state = threadClosed
 	threadMutex.unlock()

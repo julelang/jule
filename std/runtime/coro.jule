@@ -21,7 +21,6 @@ const (
 	coroRunning = 1 << iota
 	coroSuspended
 	coroClosed
-	coroMain // Coroutine is the main coroutine.
 
 	// State flags of coroutines for suspend reason.
 	reasonNA          = 0
@@ -54,8 +53,8 @@ struct coro {
 // Creates new coroutine with the handle.
 // Ready for the resume call.
 #disable nilptr boundary
-fn newcoro(h: coroutineHandle): &coro {
-	mut c := new(coro)
+fn newcoro(h: coroutineHandle): coro {
+	let mut c: coro
 	c.state |= coroSuspended
 	c.handle = h
 	ret c
@@ -66,8 +65,8 @@ fn newcoro(h: coroutineHandle): &coro {
 #disable nilptr
 fn spawnmaincoro(h: coroutineHandle) {
 	mut c := newcoro(h)
-	c.state |= coroMain
-	threadHead.proc.runnext = c
+	threadHead.proc.runnext.used = true
+	threadHead.proc.runnext.coro = c
 }
 
 // A low level API function for Jule coroutines.
@@ -83,27 +82,26 @@ fn cospawn(h: coroutineHandle) {
 
 // Basic resume primitive for the coroutine c.
 #disable nilptr
-fn resume(mut c: &coro) {
+fn resume(&c: *coro) {
 	c.handle.resume()
 }
 
 // Reports whether the coroutine done.
 #disable nilptr
-fn done(c: &coro): bool {
+fn done(&c: *coro): bool {
 	ret c.handle.done()
 }
 
 // Closes coroutine, releases memory.
 #disable nilptr
-fn close(mut c: &coro) {
+fn close(&c: *coro) {
 	c.handle.destroy()
-	c = nil
 }
 
 // A coroq coroutine.
 struct coroqc {
 	// The coroutine.
-	coro: &coro
+	coro: coro
 
 	// Pointer to the previous corotuine.
 	prev: &coroqc
@@ -123,17 +121,17 @@ struct coroq {
 impl coroq {
 	// Appends coroutine c to the queue.
 	#disable nilptr
-	fn push(mut *self, mut c: &coro) {
+	fn push(mut *self, mut &c: *coro) {
 		mut qc := new(coroqc)
-		qc.coro = c
+		qc.coro = *c
 		self.pushq(qc)
 	}
 
 	// Appends coroutine c to front of the queue.
 	#disable nilptr
-	fn pushFront(mut *self, mut c: &coro) {
+	fn pushFront(mut *self, mut &c: *coro) {
 		mut qc := new(coroqc)
-		qc.coro = c
+		qc.coro = *c
 		if self.tail == nil {
 			self.head = qc
 			self.tail = qc

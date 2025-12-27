@@ -21,7 +21,7 @@ const (
 // Linked-list for coroutine parkers.
 struct parkerList {
 	parker: &parker
-	coro:   &coro
+	coro:   &coro // A fake smart-pointer for stack allocated coroutine.
 	state:  &int
 	ticket: u32
 	stack:  uintptr
@@ -89,7 +89,7 @@ impl waitq {
 			// If the state is not zero, coroutine is consumed.
 			// Set state as consumed to prevent false dequeue.
 			if deq.ticket&parkerSelect == parkerSelect &&
-				!atomic::CompareAndSwap(&(*deq.state), parkerSelectWaiting, parkerSelectConsumed, atomic::AcqRel, atomic::AcqRel) {
+				!atomic::CompareAndSwap(&(*deq.state), parkerSelectWaiting, parkerSelectConsumed, atomic::AcqRel, atomic::Relaxed) {
 				continue
 			}
 			ret deq
@@ -109,7 +109,7 @@ fn unparkAll(mut &q: *waitq, clearSpuriousSigns: bool) {
 			s.stack = 0  // Set stack pointer to zero, marked as received/sent.
 			s.ticket = 0 // Set ticket to zero, marked as received/sent for select statements.
 		}
-		unpark(&s.coro)
+		unpark(&(*s.coro))
 		s = next
 	}
 }

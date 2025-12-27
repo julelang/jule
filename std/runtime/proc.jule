@@ -43,6 +43,14 @@
 // A coroutine may only be resumed by the scheduler.
 // When a parked coroutine is woken up, it must be enqueued into the runnable
 // coroutine queue. The scheduler decides when it will actually execute.
+//
+// STACK-ORIENTED COROUTINE HANDLING
+//
+// Jule runtime prioritizes avoiding heap allocations for coroutines.
+// Each coroutine instance is used from the stack. When necessary,
+// it can be copied or passed around via references/pointers.
+// Since it is stack-oriented, it must be handled carefully.
+// Otherwise, a stale coroutine copy may be used and cause critical issues.
 
 use "std/internal/runtime/atomic"
 
@@ -58,10 +66,16 @@ const (
 	coroprocRunQueueSize = 256
 )
 
+// Implementation of the runnext field for a coroutine processor.
+struct runnext {
+	used: bool // Indicates whether coro is meaningful.
+	coro: coro // The coroutine.
+}
+
 // A coroutine processor.
 struct coroproc {
 	// Prioritized coroutine, should run at next scheduler loop.
-	runnext: &coro
+	runnext: runnext
 
 	// List of the runnable coroutines.
 	runq: localrunq
@@ -181,9 +195,9 @@ fn onglobalrunqput() {
 // Tries to put coroutine c to the
 // runnable coroutine queue of the current processor.
 #disable nilptr boundary
-fn runqputl(mut &c: *&coro): (ok: bool) {
+fn runqputl(mut &c: *coro): (ok: bool) {
 	mut t := gett()
-	ok = t.proc.runq.enqueue(&(*(*c)))
+	ok = t.proc.runq.enqueue(&(*c))
 	if ok {
 		ret
 	}
@@ -201,14 +215,12 @@ LoadBalance:
 	sched.runqmu.lock()
 	mut i := 0
 	for i < n; i++ {
-		mut coro := new(coro)
-		*coro = batch[i]
-		sched.runq.push(coro)
+		sched.runq.push(&batch[i])
 	}
 	sched.runqmu.unlock()
 
 	// The queue is not full, now the enqueue must succeed.
-	ok = t.proc.runq.enqueue(&(*(*c)))
+	ok = t.proc.runq.enqueue(&(*c))
 	if !ok {
 		goto LoadBalance
 	}
@@ -220,19 +232,21 @@ LoadBalance:
 // Puts coroutine c to the runnable coroutine queue.
 // If next is true, runnext field of the current processor is prioritized.
 #disable nilptr
-fn runqput(mut &c: *&coro, next: bool) {
+fn runqput(mut &c: *coro, next: bool) {
 	// We have a coroutine processor on the current worker thread.
 	mut t := gett()
 	if t != nil && t.proc != nil {
-		if t.proc.runnext == nil {
+		if !t.proc.runnext.used {
 			// The runnext slot is empty, use it.
-			t.proc.runnext = *c
+			t.proc.runnext.coro = *c
+			t.proc.runnext.used = true
 			ret
-		} else if next && runqputl(&t.proc.runnext) {
+		} else if next && runqputl(&t.proc.runnext.coro) {
 			// The runnext slot is not empty, but it is prioritized.
 			// So we tried moving it to local queue and done.
 			// Now we can use the runnext slot.
-			t.proc.runnext = *c
+			t.proc.runnext.coro = *c
+			t.proc.runnext.used = true
 			ret
 		}
 		// The runnext slot is full, try the local queue.
@@ -243,7 +257,7 @@ fn runqput(mut &c: *&coro, next: bool) {
 
 	// No other option, push it directly to the global queue.
 	sched.runqmu.lock()
-	sched.runq.push(*c)
+	sched.runq.push(c)
 	sched.runqmu.unlock()
 
 	onglobalrunqput()
@@ -260,9 +274,9 @@ Sched:
 	// If poll is set, attempt a non-blocking eventpoll first.
 	for {
 		// Poll a coroutine to run.
-		mut c := coropoll()
+		mut c, ok := coropoll()
 		// coropoll failed to find a runnable coroutine.
-		if c == nil {
+		if !ok {
 			// There are timers in this worker, clean them.
 			// Normally, eventpoll returns a timer if exist.
 			// Somehow, a spurious wakeup occurred.
@@ -280,16 +294,15 @@ Sched:
 		}
 
 		// This coroutine is done, poll a new one.
-		if done(c) {
+		if done(&c) {
 			continue
 		}
 
 		t.coro = c
-		c.state |= coroRunning
-		resume(c)
+		t.coro.state |= coroRunning
+		resume(&t.coro)
 		trampolinerun()
 		retiredrain() // Destroy the retire coroutines.
-		t.coro = nil
 	}
 	schedAgain := closeThread(t)
 	if schedAgain {
@@ -309,12 +322,10 @@ fn schedthread() {
 	schedule()
 }
 
-// Suspends the current coroutine and yields the CPU.
+// Suspends the current coroutine c and yields the CPU.
+// The coroutine c should be the coroutine will be used for resume(c).
 // If the mu is not zero, assumes it already locked and releases before yield.
 // The coroutine can be made runnable again by calling [unpark].
-//
-// The coroutine rc is the resume coroutine.
-// Compiler will write the handle to it, resume(rc) must be used to resume.
 //
 // This function will compile inlinely by the compiler.
 // The function must implement additional behavior before the park.
@@ -323,17 +334,19 @@ fn schedthread() {
 // The first parameters must be the resume-coroutine,
 // where park handle will be written, and mutex address.
 // Following parameters may be change.
+//
+// After park, the `gett().coro` will not be affected.
+// So, scheduler cannot reach to up-to-date information of the coroutine.
 #disable nilptr
-async fn park(mut rc: &coro, mu: uintptr, mut reason: u32) {
-	mut c := gett().coro
+async fn park(mut &c: *coro, mu: uintptr, mut reason: u32) {
 	c.state |= coroSuspended | reason
 	// park(c)
 }
 
 // Makes coroutine c runnable.
 #disable nilptr
-fn unpark(mut &c: *&coro) {
-	(*c).state &= ^reasonMask
+fn unpark(mut &c: *coro) {
+	c.state &= ^reasonMask
 	runqput(c, true)
 }
 
@@ -342,10 +355,11 @@ fn unpark(mut &c: *&coro) {
 async fn sleep(dur: sleepDuration) {
 	mut t := gett()
 	mut timer := new(timer)
-	timer.coro = t.coro
+	timer.data.coro = t.coro
+	timer.data.used = true
 	timer.when = nanotime() + dur
 	t.proc.timers.push(timer)
-	park(t.coro, 0, reasonSleep).await
+	park(&timer.data.coro, 0, reasonSleep).await
 }
 
 // Destroys all retired coroutine frames for the current worker thread.
@@ -364,15 +378,16 @@ fn trampolinerun() {
 async fn Yield() {
 	// Push the coroutine to the global queue, otherwise the next
 	// scheduler iteration after park may run it from the local queue.
-	mut coro := gett().coro
+	mut coroq := new(coroqc)
+	coroq.coro = gett().coro
 	sched.runqmu.lock()
-	sched.runq.push(coro)
+	sched.runq.pushq(coroq)
 	// Do not call onglobalrunqput here.
 	// We are doing this out of necessity because
 	// when it gets stuck in the local queue,
 	// it can be immediately retrieved and resumed.
 	// We need to prevent that. This is not an actual overflow.
-	park(coro, uintptr(&sched.runqmu), reasonNA).await
+	park(&coroq.coro, uintptr(&sched.runqmu), reasonNA).await
 }
 
 #disable nilptr boundary

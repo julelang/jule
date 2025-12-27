@@ -21,28 +21,25 @@ use "std/internal/runtime/atomic"
 // The `poll` flag is a scheduler hint used to amortize eventpoll costs
 // under high I/O traffic.
 #disable nilptr boundary
-fn coropoll(): (polled: &coro) {
+fn coropoll(): (polled: coro, ok: bool) {
 	mut t := gett()
 	sched.enterspin()
 
 	// Highest priority: runnext slot.
 	//
 	// This is used for coroutine handoff and latency-sensitive scheduling.
-	if t.proc.runnext != nil {
-		polled = t.proc.runnext
-		t.proc.runnext = nil
+	if t.proc.runnext.used {
+		polled = t.proc.runnext.coro
+		t.proc.runnext.used = false
 		sched.exitspin()
-		ret
+		ret polled, true
 	}
 
 	// Second priority: local run queue.
-	let mut raw: coro
-	mut ok := t.proc.runq.dequeue(&raw)
+	ok = t.proc.runq.dequeue(&polled)
 	if ok {
-		polled = new(coro)
-		*polled = raw
 		sched.exitspin()
-		ret
+		ret polled, true
 	}
 
 	// Before the look for global runq, check for the lastpoll enforcement.
@@ -56,7 +53,7 @@ fn coropoll(): (polled: &coro) {
 		if toRun.len > 0 {
 			sched.exitspin()
 			injecteventpollrunq(&polled, &toRun)
-			ret
+			ret polled, true
 		}
 	}
 
@@ -66,7 +63,7 @@ fn coropoll(): (polled: &coro) {
 	// locality and reduce contention on the global lock.
 	sched.runqmu.lock()
 	if sched.runq.head != nil {
-		let mut batch: [coroprocRunQueueSize]&coro
+		let mut batch: [coroprocRunQueueSize]coro
 		mut n := 0
 
 		for n < len(batch); n++ {
@@ -85,12 +82,12 @@ fn coropoll(): (polled: &coro) {
 			// Push remaining coroutines into the local run queue.
 			mut i := 1
 			for i < n; i++ {
-				ok = t.proc.runq.enqueue(&(*batch[i]))
+				ok = t.proc.runq.enqueue(&batch[i])
 				if !ok {
 					panic("runtime: coroutine scheduler queue corruption")
 				}
 			}
-			ret
+			ret polled, true
 		}
 	} else {
 		sched.runqmu.unlock()
@@ -111,12 +108,10 @@ fn coropoll(): (polled: &coro) {
 			continue
 		}
 
-		ok = proc.runq.steal(&raw)
+		ok = proc.runq.steal(&polled)
 		if ok {
-			polled = new(coro)
-			*polled = raw
 			sched.exitspin()
-			ret
+			ret polled, true
 		}
 	}
 	sched.exitspin()
@@ -134,18 +129,20 @@ fn coropoll(): (polled: &coro) {
 	// Expired timers immediately make their coroutines runnable.
 	// The first such coroutine is returned; others are enqueued.
 	if t.proc.timers.peek() != nil {
+		ok = false
 		n = 0
 		for n < coroprocRunQueueSize {
 			mut timer := t.proc.timers.peek()
 			if timer == nil || timer.when > now {
 				break
 			}
-			mut coro := t.proc.timers.pop().coro
-			if coro != nil {
-				if polled == nil {
-					polled = coro
+			mut data := t.proc.timers.pop().data
+			if data.used {
+				if n == 0 {
+					polled = data.coro
+					ok = true
 				} else {
-					ok = t.proc.runq.enqueue(&(*coro))
+					ok = t.proc.runq.enqueue(&data.coro)
 					if !ok {
 						panic("runtime: coroutine scheduler queue corruption")
 					}
@@ -159,8 +156,8 @@ fn coropoll(): (polled: &coro) {
 
 		// If we already found a runnable coroutine, return immediately
 		// without entering eventpoll.
-		if polled != nil {
-			ret
+		if ok {
+			ret polled, true
 		}
 
 		// Compute delay until the next timer fires.
@@ -228,31 +225,30 @@ fn coropoll(): (polled: &coro) {
 		}
 		t.proc.pdsmu.unlock()
 
-		ok = t.proc.runq.dequeue(&raw)
+		ok = t.proc.runq.dequeue(&polled)
 		if !ok {
 			panic("runtime: coroutine scheduler queue corruption")
 		}
-		polled = new(coro)
-		*polled = raw
-		ret
+		ret polled, true
 	}
 
 	// Final step: poll eventpoll.
-	if delay != -1 || atomic::Swap(&sched.lastpoll, pollCheckIn, atomic::AcqRel) != pollCheckIn {
+	if delay != -1 || sched.ncpolling() > 0 && atomic::Swap(&sched.lastpoll, pollCheckIn, atomic::AcqRel) != pollCheckIn {
 		mut toRun := eventpoll(delay)
 		now = nanotime()
 		atomic::Store(&sched.lastpoll, now, atomic::Release)
 		if toRun.len > 0 {
 			injecteventpollrunq(&polled, &toRun)
+			ret polled, true
 		}
 	}
 
-	ret
+	ret polled, false
 }
 
 // Dispatches a coroq returned from eventpoll.
 // Sets polled to a runnable coroutine from toRun.
-fn injecteventpollrunq(mut &polled: *&coro, mut &toRun: *coroq) {
+fn injecteventpollrunq(mut &polled: *coro, mut &toRun: *coroq) {
 	if toRun.len < 1 {
 		ret
 	}
