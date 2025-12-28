@@ -88,9 +88,16 @@ impl waitq {
 			// If waiter is a select statement, check if it is consumed.
 			// If the state is not zero, coroutine is consumed.
 			// Set state as consumed to prevent false dequeue.
-			if deq.ticket&parkerSelect == parkerSelect &&
-				!atomic::CompareAndSwap(&(*deq.state), parkerSelectWaiting, parkerSelectConsumed, atomic::AcqRel, atomic::Relaxed) {
-				continue
+			if deq.ticket&parkerSelect == parkerSelect {
+				if !atomic::CompareAndSwap(&(*deq.state), parkerSelectWaiting, parkerSelectConsumed, atomic::AcqRel, atomic::Relaxed) {
+					// Lost race, skip.
+					continue
+				}
+				// Won race, make sure the park completed.
+				// See the comment of tp, from the runselect function.
+				for atomic::Load(&deq.coro.race, atomic::Acquire) != selectParked {
+					// This spin should be good because this race is short.
+				}
 			}
 			ret deq
 		}

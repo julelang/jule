@@ -129,7 +129,7 @@ static inline void __jule_compilerBarrier(void) noexcept
 // Unlocks the mutex mu.
 // The mu is actually a pointer to the mutex,
 // which has a compatible memory layout with what this function expects.
-void __jule_mutexUnlock(__jule_Uintptr mu);
+void __jule_mutexUnlock(__jule_U64 mu);
 
 // A very small, allocation-free, thread-local LIFO queue is sufficient for
 // trampoline execution.
@@ -215,7 +215,7 @@ static inline void __jule_trampolineRun(void) noexcept
 struct __jule_Park
 {
     __jule_coroutineHandle *out;
-    __jule_Uintptr mu;
+    __jule_U64 mu;
 
     bool await_ready(void) const noexcept { return false; }
 

@@ -220,10 +220,26 @@ impl mutex {
 	}
 }
 
+// Special mutexunlock tags.
+const (
+	_ = iota
+	mutexunlockSelect
+)
+
 // Unlocks mutex mu, if it is not zero.
 // The mu must point to the `mutex` memory layout.
 #export "__jule_mutexUnlock"
-fn mutexunlock(mu: uintptr) {
+fn mutexunlock(mu: u64) {
+	// Check for tagged pointer cases.
+	tp := taggedPointer(mu)
+	match tp.tag() {
+	| mutexunlockSelect:
+		mut &c := unsafe { &(*(*coro)(tp.pointer())) }
+		atomic::Store(&c.race, selectParked, atomic::Release)
+		ret
+	}
+
+	// Ordinary address.
 	if mu != 0 {
 		// Assume mutex and qmutex have the same memory layout and
 		// implementation for unlock.

@@ -169,7 +169,7 @@ async fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 		root.queue(sema, p, lifo)
 		mut c := gett().coro
 		p.coro = unsafe { (&coro)(&c) }
-		park(&(*p.coro), uintptr(&root.lock), reason).await
+		park(&(*p.coro), u64(uintptr(&root.lock)), reason).await
 		// Try to acquire semaphore before enqueue again.
 		if p.ticket != 0 || cansemacquire(sema) {
 			break
@@ -366,7 +366,7 @@ async fn notifyListWait(mut &l: *notifyList, t: u32) {
 	}
 	l.tail = p
 
-	park(&(*p.coro), uintptr(&l.lock), reasonCond).await
+	park(&(*p.coro), u64(uintptr(&l.lock)), reasonCond).await
 }
 
 // Notifies one entry in the list.

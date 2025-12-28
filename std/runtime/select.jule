@@ -5,6 +5,11 @@
 use "std/internal/runtime/atomic"
 use "std/sys"
 
+const (
+	selectParking = 1
+	selectParked  = 2
+)
+
 // Select case.
 struct scase {
 	// General channel pointer. Can be cast to `&pchan[uintptr]`.
@@ -247,7 +252,7 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 	mut c := gett().coro
 	// Allocate and prepare a parker per operation.
 	// Use round-robin iteration to achieve randomness.
-	mut parkers := make([]parkerList, nrecv+nsend)
+	mut parkers := make([]&parkerList, nrecv+nsend)
 	// Use heap allocated state for parkers.
 	// Because the select statement will not dequeue the parkers from all
 	// channels where they enqueued as waiter coroutine.
@@ -259,7 +264,8 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 	for i in parkers {
 		offset := ((k + i) % totalCases)
 		mut case := cases + offset
-		mut parker := &parkers[offset]
+		mut parker := new(parkerList)
+		parkers[offset] = parker
 
 		// Skip if channel is nil.
 		if *case.ch == nil {
@@ -279,24 +285,45 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 		parker.state = state // Use shared state pointer for all parkers.
 		parker.stack = case.data
 		if i < nrecv {
-			(*ch).recvq.enqueue((&parkerList)(parker))
+			(*ch).recvq.enqueueAvoidDuplicate(parker)
 		} else {
-			(*ch).sendq.enqueue((&parkerList)(parker))
+			(*ch).sendq.enqueueAvoidDuplicate(parker)
 		}
 	}
+
+	// We use a tagged pointer here because multiple channels may be involved,
+	// which means we cannot let the `park` function unlock them individually.
+	// Therefore, all locks must be released before the parking operation.
+	//
+	// At this point, while the parking operation has not yet fully completed,
+	// another thread may attempt to wake the coroutine. If this happens before
+	// the handle is correctly written to the parked coroutine, it may cause the
+	// runtime to crash or, even worse, behave unpredictably.
+	//
+	// To avoid this, we use a tagged pointer so that when the `park` function
+	// attempts to unlock a mutex, the runtime can detect that this is not a real
+	// mutex and update `c.race` to `selectParked` instead.
+	// By setting the `c.race` field to `selectParking` before parking and before
+	// releasing the locks, we guarantee that any thread attempting to wake the
+	// coroutine will observe this state. This forces it to wait until parking
+	// completes, i.e., until the state becomes `selectParked`.
+	tp := taggedPointerPack(&c, mutexunlockSelect)
 
 	// Park and try iteration.
 	// First, parks the coroutine.
 	// When notified, returns immediately if channel notified after hand-off.
 	// If a channel notified spuriously, try again and park it, if it fails.
 	for {
+		// See the comment of tp.
+		atomic::Store(&c.race, selectParking, atomic::Release)
+
 		// Unlock channels and park the coroutine.
 		unlockchans(chans, nchan)
-		park(&c, 0, reasonSelect).await
+		park(&c, u64(tp), reasonSelect).await
 
 		// Look for the selected channel.
-		for i in parkers {
-			if !isSpuriousWake(&(*(&parkers[i]))) {
+		for i, parker in parkers {
+			if !isSpuriousWake(&(*parker)) {
 				ret i // Return position of the handled channel.
 			}
 		}
@@ -384,7 +411,6 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 		for i in parkers {
 			offset := ((k + i) % totalCases)
 			mut case := cases + offset
-			mut parker := &parkers[offset]
 
 			// Skip if channel is nil.
 			if *case.ch == nil {
@@ -399,10 +425,11 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 			}
 
 			// Use [enqueueAvoidDuplicate] to avoid enqueue same parker.
+			mut parker := parkers[offset]
 			if i < nrecv {
-				(*ch).recvq.enqueueAvoidDuplicate((&parkerList)(parker))
+				(*ch).recvq.enqueueAvoidDuplicate(parker)
 			} else {
-				(*ch).sendq.enqueueAvoidDuplicate((&parkerList)(parker))
+				(*ch).sendq.enqueueAvoidDuplicate(parker)
 			}
 		}
 	}
