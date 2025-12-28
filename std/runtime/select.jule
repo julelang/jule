@@ -35,19 +35,6 @@ struct scase {
 	trySendImmediate: uintptr
 }
 
-// Empty select statement implementation.
-#disable nilptr
-async fn emptyselect() {
-	// Park the coroutine indefinitely.
-	// We do not need to yield CPU with temporary parking,
-	// this coroutine will never continue to run.
-	// It always yields CPU due to empty select statement,
-	// so put it into deep sleep.
-	mut coro := gett().coro
-	park(&coro, 0, reasonSelect|reasonSelectEmpty).await
-	panic("unreachable")
-}
-
 // Basic QuickSort for generic chan array.
 #disable nilptr
 unsafe fn sortchans(mut chans: *&uintptr, nchan: int) {
@@ -433,4 +420,20 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 			}
 		}
 	}
+}
+
+// Empty select statement implementation.
+#disable nilptr
+async fn emptyselect() {
+	// Park the coroutine indefinitely.
+	// We do not need to yield CPU with temporary parking,
+	// this coroutine will never continue to run.
+	// It always yields CPU due to empty select statement,
+	// so put it into deep sleep.
+	//
+	// Use `gett().coro` for park handle, because scheduler will destroy
+	// the coroutine after empty select.
+	mut t := gett()
+	park(&t.coro, 0, reasonSelect|reasonSelectEmpty).await
+	panic("unreachable")
 }

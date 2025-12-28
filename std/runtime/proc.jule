@@ -303,6 +303,15 @@ Sched:
 		resume(&t.coro)
 		trampolinerun()
 		retiredrain() // Destroy the retire coroutines.
+
+		// In general, `t.coro` will not be updated by `park`.
+		// But empty select statements yield coroutine indefinitely,
+		// so it will not be runnable again. To prevent memory leak,
+		// because of coroutine handle allocations, it uses `t.coro` as
+		// the park coroutine. So we can catch it here.
+		if t.coro.state&reasonSelectEmpty == reasonSelectEmpty {
+			close(&t.coro)
+		}
 	}
 	schedAgain := closeThread(t)
 	if schedAgain {
