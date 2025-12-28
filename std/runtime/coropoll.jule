@@ -20,23 +20,14 @@ use "std/internal/runtime/atomic"
 //
 // The `poll` flag is a scheduler hint used to amortize eventpoll costs
 // under high I/O traffic.
+//
+// Assumes that the calling thread is counted as spinning.
+// It will exit the spinning state before return.
 #disable nilptr boundary
 fn coropoll(): (polled: coro, ok: bool) {
 	mut t := gett()
-	sched.enterspin()
 
-	// Highest priority: runnext slot.
-	//
-	// This is used for coroutine handoff and latency-sensitive scheduling.
-	if t.proc.runnext.used {
-		polled = t.proc.runnext.coro
-		t.proc.runnext.used = false
-		sched.exitspin()
-		ret polled, true
-	}
-
-	// Second priority: local run queue.
-	ok = t.proc.runq.dequeue(&polled)
+	ok = runqget(t.proc, &polled)
 	if ok {
 		sched.exitspin()
 		ret polled, true
@@ -52,21 +43,21 @@ fn coropoll(): (polled: coro, ok: bool) {
 		// Timers possibly expired here will be handled in a later iteration.
 		if toRun.len > 0 {
 			sched.exitspin()
-			injecteventpollrunq(&polled, &toRun)
+			injecteventpollrunq(t.proc, &polled, &toRun)
 			ret polled, true
 		}
 	}
 
 	// Local queue empty: attempt to fetch a batch from the global run queue.
 	//
-	// The batch size is capped to coroprocRunQueueSize to preserve
+	// The batch size is capped to prunqsize to preserve
 	// locality and reduce contention on the global lock.
 	sched.runqmu.lock()
 	if sched.runq.head != nil {
-		let mut batch: [coroprocRunQueueSize]coro
-		mut n := 0
+		let mut batch: [prunqsize]coro
+		mut n := u32(0)
 
-		for n < len(batch); n++ {
+		for n < prunqsize; n++ {
 			if sched.runq.head == nil {
 				break
 			}
@@ -78,15 +69,7 @@ fn coropoll(): (polled: coro, ok: bool) {
 		if n > 0 {
 			sched.exitspin()
 			polled = batch[0]
-
-			// Push remaining coroutines into the local run queue.
-			mut i := 1
-			for i < n; i++ {
-				ok = t.proc.runq.enqueue(&batch[i])
-				if !ok {
-					panic("runtime: coroutine scheduler queue corruption")
-				}
-			}
+			runqputbatch(t.proc, &batch, 1, n)
 			ret polled, true
 		}
 	} else {
@@ -97,24 +80,11 @@ fn coropoll(): (polled: coro, ok: bool) {
 	//
 	// Stealing is limited to a small fixed number of attempts to
 	// avoid excessive contention and cache thrashing.
-	const StealTries = 4
-	mut n := 0
-	for n < StealTries; n++ {
-		idx := absint(int(rand() % u64(len(sched.procs))))
-		mut proc := sched.procs[idx]
-
-		// Do not steal from ourselves.
-		if proc == t.proc {
-			continue
-		}
-
-		ok = proc.runq.steal(&polled)
-		if ok {
-			sched.exitspin()
-			ret polled, true
-		}
-	}
+	ok = stealWork(t.proc, &polled)
 	sched.exitspin()
+	if ok {
+		ret polled, true
+	}
 
 	// No runnable coroutine found yet.
 	// Determine how long we can block based on timers and deadlines.
@@ -128,10 +98,10 @@ fn coropoll(): (polled: coro, ok: bool) {
 	//
 	// Expired timers immediately make their coroutines runnable.
 	// The first such coroutine is returned; others are enqueued.
+	mut n := 0
 	if t.proc.timers.peek() != nil {
 		ok = false
-		n = 0
-		for n < coroprocRunQueueSize {
+		for n < prunqsize {
 			mut timer := t.proc.timers.peek()
 			if timer == nil || timer.when > now {
 				break
@@ -142,10 +112,7 @@ fn coropoll(): (polled: coro, ok: bool) {
 					polled = data.coro
 					ok = true
 				} else {
-					ok = t.proc.runq.enqueue(&data.coro)
-					if !ok {
-						panic("runtime: coroutine scheduler queue corruption")
-					}
+					runqput(t.proc, &data.coro, false)
 				}
 			} else {
 				// Timer corresponds to an I/O deadline.
@@ -184,39 +151,27 @@ fn coropoll(): (polled: coro, ok: bool) {
 		t.proc.pdsmu.lock()
 		mut q := t.proc.pds.head
 		for {
-			if n >= coroprocRunQueueSize || q == nil {
+			if n >= prunqsize || q == nil {
 				break
 			}
 			mut pd := q.pd
 			pd.mu.lock()
 
 			if pd.rdeadline > 0 && pd.rdeadline <= now && pd.rcoro != nil && pd.rcoro != pollrace {
-				ok = t.proc.runq.enqueue(&(*pd.rcoro))
-				if !ok {
-					panic("runtime: coroutine scheduler queue corruption")
-				}
+				runqput(t.proc, &(*pd.rcoro), false)
 				n++
 			}
 			if pd.wdeadline > 0 && pd.wdeadline <= now && pd.wcoro != nil && pd.wcoro != pollrace {
-				ok = t.proc.runq.enqueue(&(*pd.wcoro))
-				if !ok {
-					panic("runtime: coroutine scheduler queue corruption")
-				}
+				runqput(t.proc, &(*pd.wcoro), false)
 				n++
 			}
 			if pd.deadline > 0 && pd.deadline <= now {
 				if pd.rcoro != nil && pd.rcoro != pollrace {
-					ok = t.proc.runq.enqueue(&(*pd.rcoro))
-					if !ok {
-						panic("runtime: coroutine scheduler queue corruption")
-					}
+					runqput(t.proc, &(*pd.rcoro), false)
 					n++
 				}
 				if pd.wcoro != nil && pd.wcoro != pollrace {
-					ok = t.proc.runq.enqueue(&(*pd.wcoro))
-					if !ok {
-						panic("runtime: coroutine scheduler queue corruption")
-					}
+					runqput(t.proc, &(*pd.wcoro), false)
 					n++
 				}
 			}
@@ -225,7 +180,7 @@ fn coropoll(): (polled: coro, ok: bool) {
 		}
 		t.proc.pdsmu.unlock()
 
-		ok = t.proc.runq.dequeue(&polled)
+		ok = runqget(t.proc, &polled)
 		if !ok {
 			panic("runtime: coroutine scheduler queue corruption")
 		}
@@ -238,7 +193,7 @@ fn coropoll(): (polled: coro, ok: bool) {
 		now = nanotime()
 		atomic::Store(&sched.lastpoll, now, atomic::Release)
 		if toRun.len > 0 {
-			injecteventpollrunq(&polled, &toRun)
+			injecteventpollrunq(t.proc, &polled, &toRun)
 			ret polled, true
 		}
 	}
@@ -248,7 +203,7 @@ fn coropoll(): (polled: coro, ok: bool) {
 
 // Dispatches a coroq returned from eventpoll.
 // Sets polled to a runnable coroutine from toRun.
-fn injecteventpollrunq(mut &polled: *coro, mut &toRun: *coroq) {
+fn injecteventpollrunq(mut p: &coroproc, mut &polled: *coro, mut &toRun: *coroq) {
 	if toRun.len < 1 {
 		ret
 	}
@@ -257,7 +212,7 @@ fn injecteventpollrunq(mut &polled: *coro, mut &toRun: *coroq) {
 	*polled = toRun.head.coro
 	toRun.remove(toRun.head)
 	for toRun.head != nil {
-		runqput(&toRun.head.coro, false)
+		runqput(p, &toRun.head.coro, false)
 		toRun.remove(toRun.head)
 	}
 }

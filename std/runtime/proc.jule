@@ -63,7 +63,7 @@ fn COMAXPROCS(): int { ret numcpu }
 const (
 	// The maximum count of the runnable coroutine queue of a coroutine processor.
 	// Must be power of two.
-	coroprocRunQueueSize = 256
+	prunqsize = 256
 )
 
 // Implementation of the runnext field for a coroutine processor.
@@ -77,8 +77,10 @@ struct coroproc {
 	// Prioritized coroutine, should run at next scheduler loop.
 	runnext: runnext
 
-	// List of the runnable coroutines.
-	runq: localrunq
+	// A lock-free local list for the runnable coroutines.
+	runqhead: u32
+	runqtail: u32
+	runq:     [prunqsize]coro
 
 	// Poll descriptors that are still alive.
 	pdsmu: mutex
@@ -128,6 +130,11 @@ struct scheduler {
 	//
 	// Must be accessed atomically when used by scheduler logic.
 	_nmspin: int
+
+	// Number of coroutines currently working.
+	//
+	// Must be accessed atomically when used by scheduler logic.
+	_ncrun: int
 }
 
 impl scheduler {
@@ -167,6 +174,21 @@ impl scheduler {
 	fn nmspinning(*self): int {
 		ret atomic::Load(&self._nmspin, atomic::Relaxed)
 	}
+
+	// Marks that a worker thread is entering a coroutine runner state.
+	fn enterrun(mut *self) {
+		atomic::Add(&self._ncrun, 1, atomic::Relaxed)
+	}
+
+	// Marks that a worker thread has exited the runner state.
+	fn exitrun(mut *self) {
+		atomic::Add(&self._ncrun, -1, atomic::Relaxed)
+	}
+
+	// Returns the number of worker threads currently runs a coroutine.
+	fn ncrunning(*self): int {
+		ret atomic::Load(&self._ncrun, atomic::Relaxed)
+	}
 }
 
 // A global scheduler instance of the program.
@@ -174,104 +196,243 @@ impl scheduler {
 // It will be initialized by the runtime.
 let mut sched = scheduler{}
 
-// Should be called when a corotuine enqueued to the global runnable queue.
-#disable nilptr
-fn onglobalrunqput() {
-	// There is not actively spinning worker thread.
-	// Try to wake or create worker thread, if an idle coroutine processor available.
-	if sched.nmspinning() < 1 {
-		let mut rproc: &coroproc
-		ok, _ := sched.idleprocs.dequeue(&rproc)
-		if ok {
-			// We found an idle coroutine processor.
-			// Wake a thread or spawn a new one with the coroutine processor.
-			threadMutex.lock()
-			newm(rproc)
-			ret
-		}
-	}
-}
-
-// Tries to put coroutine c to the
-// runnable coroutine queue of the current processor.
-#disable nilptr boundary
-fn runqputl(mut &c: *coro): (ok: bool) {
-	mut t := gett()
-	ok = t.proc.runq.enqueue(&(*c))
-	if ok {
+// Tries to add one more P to execute coroutines.
+fn wakep() {
+	// Be conservative about spinning threads,
+	// only start one if none exist already.
+	if !atomic::CompareAndSwap(&sched._nmspin, 0, 1, atomic::Relaxed, atomic::Relaxed) {
 		ret
 	}
-LoadBalance:
-	// Load balancing.
-	// Move half of the local queue to the global queue, if possible.
-	let mut batch: [coroprocRunQueueSize / 2]coro
-	mut n := 0
-	for n < len(batch); n++ {
-		ok = t.proc.runq.dequeue(&batch[n])
-		if !ok {
-			break
-		}
+	let mut rproc: &coroproc
+	ok, _ := sched.idleprocs.dequeue(&rproc)
+	if ok {
+		// We found an idle coroutine processor.
+		// Wake a thread or spawn a new one with the coroutine processor.
+		threadMutex.lock()
+		newm(rproc)
+	} else {
+		sched.exitspin()
 	}
-	sched.runqmu.lock()
-	mut i := 0
-	for i < n; i++ {
-		sched.runq.push(&batch[i])
-	}
-	sched.runqmu.unlock()
-
-	// The queue is not full, now the enqueue must succeed.
-	ok = t.proc.runq.enqueue(&(*c))
-	if !ok {
-		goto LoadBalance
-	}
-
-	onglobalrunqput()
-	ret
 }
 
-// Puts coroutine c to the runnable coroutine queue.
-// If next is true, runnext field of the current processor is prioritized.
-#disable nilptr
-fn runqput(mut &c: *coro, next: bool) {
-	// We have a coroutine processor on the current worker thread.
-	mut t := gett()
-	if t != nil && t.proc != nil {
-		if !t.proc.runnext.used {
-			// The runnext slot is empty, use it.
-			t.proc.runnext.coro = *c
-			t.proc.runnext.used = true
-			ret
-		} else if next && runqputl(&t.proc.runnext.coro) {
-			// The runnext slot is not empty, but it is prioritized.
-			// So we tried moving it to local queue and done.
-			// Now we can use the runnext slot.
-			t.proc.runnext.coro = *c
-			t.proc.runnext.used = true
-			ret
-		}
-		// The runnext slot is full, try the local queue.
-		if runqputl(c) {
-			ret
-		}
+// Tries to put c on the local runnable queue.
+// If next is false, it adds c to the tail of the runnable queue if runnext is used.
+// If next is true, runqput puts c in the p.runnext slot.
+// If the run queue is full, runnext puts c on the global queue.
+// Executed only by the owner P.
+#disable nilptr boundary
+fn runqput(mut p: &coroproc, mut &c: *coro, next: bool): (overflow: bool) {
+	if !p.runnext.used {
+		// The runnext slot is empty, use it.
+		p.runnext.coro = *c
+		p.runnext.used = true
+		ret false
 	}
+	// The runnext slot is not empty, but it is prioritized.
+	// So we tried moving it to local queue and done.
+	// Now we can use the runnext slot.
+	let mut old: coro
+	if next {
+		old = p.runnext.coro
+		p.runnext.coro = *c
+		p.runnext.used = true
+		// Kick the old runnext out to the regular run queue.
+		unsafe { *(&c) = &old }
+	}
+	for {
+		h := atomic::Load(&p.runqhead, atomic::Acquire) // load-acquire, synchronize with consumers
+		t := p.runqtail
+		if t-h < prunqsize {
+			p.runq[t&(prunqsize-1)] = *c
+			atomic::Store(&p.runqtail, t+1, atomic::Release) // store-release, makes the item available for consumption
+			ret false
+		}
+		if runqputslow(p, c, h, t) {
+			ret true
+		}
+		// The queue is not full, now the put above must succeed.
+	}
+}
 
-	// No other option, push it directly to the global queue.
+// Put c and a batch of work from local runnable queue on global queue.
+// Executed only by the owner P.
+#disable nilptr boundary
+fn runqputslow(mut p: &coroproc, mut &c: *coro, h: u32, t: u32): bool {
+	let mut batch: [prunqsize/2 + 1]coro
+
+	// First, grab a batch from local queue.
+	mut n := t - h
+	n = n / 2
+	if n != prunqsize/2 {
+		panic("runqputslow: queue is not full")
+	}
+	mut i := u32(0)
+	for i < n; i++ {
+		batch[i] = p.runq[(h+i)&(prunqsize-1)]
+	}
+	if !atomic::CompareAndSwap(&p.runqhead, h, h+n, atomic::Release, atomic::Relaxed) { // cas-release, commits consume
+		ret false
+	}
+	batch[n] = *c
+
+	// Put batch to global runnable queue.
+	batchn := i32(n + 1)
 	sched.runqmu.lock()
-	sched.runq.push(c)
+	mut bi := i32(0)
+	for bi < batchn; bi++ {
+		sched.runq.push(&batch[bi])
+	}
 	sched.runqmu.unlock()
 
-	onglobalrunqput()
+	ret true
+}
+
+// Puts all the coroutines on batch on the local runnable queue.
+// The queue must have enough space for batch.
+// Batch is a ring buffer starting at batchHead.
+// Executed only by the owner P.
+#disable nilptr boundary
+fn runqputbatch(mut p: &coroproc, mut &batch: *[prunqsize]coro, batchHead: u32, mut bsize: u32) {
+	h := atomic::Load(&p.runqhead, atomic::Acquire)
+	mut t := p.runqtail
+	mut n := batchHead
+	for n < bsize && t-h < prunqsize {
+		p.runq[t&(prunqsize-1)] = (*batch)[n]
+		t++
+		n++
+	}
+	bsize -= n
+	atomic::Store(&p.runqtail, t, atomic::Release)
+	if bsize != 0 {
+		panic("batch size corruption")
+	}
+}
+
+// Gets a coroutine from local runnable queue and writes to c.
+// Executed only by the owner P.
+#disable nilptr boundary
+fn runqget(mut p: &coroproc, mut &c: *coro): bool {
+	// If there's a runnext, it's the next coroutine to run.
+	if p.runnext.used {
+		p.runnext.used = false
+		*c = p.runnext.coro
+		ret true
+	}
+	for {
+		h := atomic::Load(&p.runqhead, atomic::Acquire) // load-acquire, synchronize with other consumers
+		t := p.runqtail
+		if t == h {
+			ret false
+		}
+		// Must load *before* acquiring the slot as slot may be overwritten
+		// immediately after acquiring. This load is NOT required to be
+		// atomic even-though it may race with an overwrite as we only return
+		// true if we win the race below guaranteeing we had no race during
+		// our read. If we loose the race then `c` could be corrupt due to
+		// read-during-write race but as coroutine is trivially destructible
+		// this does not matter.
+		//
+		// We cannot store `&coro` instead of `coro` because of the race.
+		// Otherwise, RC counting may be corrupted and cause some critical
+		// issues, such as use-after-free.
+		*c = p.runq[h&(prunqsize-1)]
+		if atomic::CompareAndSwap(&p.runqhead, h, h+1, atomic::Release, atomic::Relaxed) { // cas-release, commits consume
+			ret true
+		}
+	}
+}
+
+// Grabs a batch of coroutines from p's runnable queue into batch.
+// Batch is a ring buffer starting at batchHead.
+// Returns number of grabbed coroutines.
+// Can be executed by any P.
+#disable nilptr boundary
+fn runqgrab(mut p: &coroproc, mut &batch: *[prunqsize]coro, batchHead: u32): u32 {
+	for {
+		h := atomic::Load(&p.runqhead, atomic::Acquire) // load-acquire, synchronize with other consumers
+		t := atomic::Load(&p.runqtail, atomic::Acquire) // load-acquire, synchronize with the producer
+		mut n := t - h
+		n = n - n/2
+		if n == 0 {
+			ret 0
+		}
+		if n > prunqsize/2 { // read inconsistent h and t
+			continue
+		}
+		mut i := u32(0)
+		for i < n; i++ {
+			// See comment of runqget about read-during-write race.
+			(*batch)[(batchHead+i)&(prunqsize-1)] = p.runq[(h+i)&(prunqsize-1)]
+		}
+		if atomic::CompareAndSwap(&p.runqhead, h, h+n, atomic::Release, atomic::Relaxed) { // cas-release, commits consume
+			ret n
+		}
+	}
+}
+
+// Steal half of elements from local runnable queue of p2
+// and put onto local runnable queue of p.
+// Writes one of the stolen coroutines to c.
+// Reports false if failed, otherwise true.
+#disable nilptr boundary
+fn runqsteal(mut p: &coroproc, mut p2: &coroproc, mut &c: *coro): bool {
+	t := p.runqtail
+	mut n := runqgrab(p2, &p.runq, t)
+	if n == 0 {
+		ret false
+	}
+	n--
+	*c = p.runq[(t+n)&(prunqsize-1)]
+	if n == 0 {
+		ret true
+	}
+	h := atomic::Load(&p.runqhead, atomic::Acquire) // load-acquire, synchronize with consumers
+	if t-h+n >= prunqsize {
+		panic("runqsteal: runq overflow")
+	}
+	atomic::Store(&p.runqtail, t+n, atomic::Release) // store-release, makes the item available for consumption
+	ret true
+}
+
+// Tries to steal a batch of coroutines for p.
+// Writes one of the stolen coroutines to c.
+// Reports false if failed, otherwise true.
+fn stealWork(mut p: &coroproc, mut &c: *coro): bool {
+	const StealTries = 4
+	mut n := 0
+	pcount := COMAXPROCS()
+	startIdx := int(rand() % u64(pcount))
+	for n < StealTries; n++ {
+		mut i := 0
+		mut idx := startIdx
+		for i < pcount; i, idx = i+1, (idx+1)%pcount {
+			mut p2 := sched.procs[idx]
+			if p == p2 {
+				continue
+			}
+			ok := runqsteal(p, p2, c)
+			if ok {
+				ret true
+			}
+		}
+	}
+	ret false
 }
 
 // A coroutine scheduler routine.
 // Works like and event-loop, looks for a coroutine and executes it.
 #disable nilptr
-fn schedule() {
+fn schedule(spinning: bool) {
 	sett(acquireThread())
 	threadMutex.unlock()
 	mut t := gett()
+	// If thread is not counted as spinning, enter spin.
+	if !spinning {
+		sched.enterspin()
+	}
 Sched:
 	// If poll is set, attempt a non-blocking eventpoll first.
+	mut tried := 0
 	for {
 		// Poll a coroutine to run.
 		mut c, ok := coropoll()
@@ -287,20 +448,25 @@ Sched:
 			if sched.ncpolling() > 0 {
 				continue
 			}
-			// No coroutine to run, no timer, not poll.
+			// No coroutine to run, no timer, no eventpoll.
+			// Under high contention, new coroutines may be available since last poll.
+			// Try again if reasonable.
+			tried++
+			if tried < 4 && sched.ncrunning() > 0 {
+				continue
+			}
+			// We tried enough.
 			// Nothing to do, break the loop.
 			// Park or destroy the worker thread.
 			break
 		}
-
-		// This coroutine is done, poll a new one.
-		if done(&c) {
-			continue
-		}
+		tried = 0
 
 		t.coro = c
 		t.coro.state |= coroRunning
+		sched.enterrun()
 		resume(&t.coro)
+		sched.exitrun()
 		trampolinerun()
 		retiredrain() // Destroy the retire coroutines.
 
@@ -312,6 +478,10 @@ Sched:
 		if t.coro.state&reasonSelectEmpty == reasonSelectEmpty {
 			close(&t.coro)
 		}
+
+		// coropoll assumes we are counted as spinning.
+		// So enter spinning for proper handling of coropoll.
+		sched.enterspin()
 	}
 	schedAgain := closeThread(t)
 	if schedAgain {
@@ -321,6 +491,7 @@ Sched:
 }
 
 // Start point of a scheduler thread.
+// When a scheduler thread is started, it must be counted as spinning.
 //
 // This function handled like an anonymous function.
 // Therefore the compiler will add *unsafe argument to
@@ -328,7 +499,7 @@ Sched:
 // The operating system thread API passes a pointer to the function when calling it.
 // In the final stage, this function's signature fits with the OS thread API.
 fn schedthread() {
-	schedule()
+	schedule(true)
 }
 
 // A hint function for the compiler.
@@ -366,7 +537,16 @@ async fn park2(mut &c: *coro, mu: taggedPointer, mut reason: u32) {
 #disable nilptr
 fn unpark(mut &c: *coro) {
 	c.state &= ^reasonMask
-	runqput(c, true)
+	mut t := gett()
+	runqput(t.proc, c, true)
+	// Try to wake up a new M. If there is an idle M, this is something that can be
+	// used to increase concurrency. If we only try to wake up a new M in more
+	// restricted situations, for example only when a runqput overflow occurs,
+	// we may not achieve sufficient concurrency. For instance, a small number of
+	// coroutines that could run concurrently may never cause an overflow and thus
+	// end up behaving effectively synchronously or single-threaded concurrency.
+	// Therefore, wake up an M so that runnable work can be executed multi-threaded.
+	wakep()
 }
 
 // Puts the current coroutine sleep for duration dur.
@@ -401,11 +581,6 @@ async fn Yield() {
 	coroq.coro = gett().coro
 	sched.runqmu.lock()
 	sched.runq.pushq(coroq)
-	// Do not call onglobalrunqput here.
-	// We are doing this out of necessity because
-	// when it gets stuck in the local queue,
-	// it can be immediately retrieved and resumed.
-	// We need to prevent that. This is not an actual overflow.
 	park(&coroq.coro, uintptr(&sched.runqmu), reasonNA).await
 }
 
@@ -419,13 +594,12 @@ fn schedinit() {
 	// Because we are in the program initialize state, no concurrency risk.
 
 	// Initialize corotuine processors.
-	maxprocs := u64(COMAXPROCS())
+	maxprocs := u32(COMAXPROCS())
 	sched.procs = make([]&coroproc, maxprocs)
-	sched.idleprocs = mpmcQueue[&coroproc].new(maxprocs)
-	mut i := u64(0)
+	sched.idleprocs = mpmcQueue[&coroproc].new(u64(maxprocs))
+	mut i := u32(0)
 	for i < maxprocs; i++ {
 		mut p := new(coroproc)
-		p.runq.init(coroprocRunQueueSize)
 		sched.procs[i] = p
 		if i == 0 {
 			// Set proc of the main program thread.

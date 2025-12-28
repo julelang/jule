@@ -78,9 +78,25 @@ fn spawnmaincoro(h: coroutineHandle) {
 // The coroutine handle h is the handle of the coroutine.
 #export "__jule_cospawn"
 #disable nilptr
-fn cospawn(h: coroutineHandle) {
+async fn cospawn(h: coroutineHandle) {
 	mut c := newcoro(h)
-	runqput(&c, true)
+	mut t := gett()
+	overflow := runqput(t.proc, &c, true)
+	// Try to wake up a new M. If there is an idle M, this is something that can be
+	// used to increase concurrency. If we only try to wake up a new M in more
+	// restricted situations, for example only when a runqput overflow occurs,
+	// we may not achieve sufficient concurrency. For example, a small number of
+	// coroutines that could run concurrently may never cause an overflow and thus
+	// end up behaving effectively synchronously or single-threaded concurrency.
+	// Therefore, wake up an M so that runnable work can be executed multi-threaded.
+	wakep()
+	// If an overflow occurs in the global runnable queue, yield this coroutine.
+	// This allows the runtime to wait briefly before creating more
+	// coroutines and gives other coroutines a chance to run.
+	// It is also effective at reducing memory usage.
+	if overflow {
+		Yield().await
+	}
 }
 
 // Basic resume primitive for the coroutine c.
