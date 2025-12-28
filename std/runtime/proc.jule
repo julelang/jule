@@ -322,14 +322,17 @@ fn schedthread() {
 	schedule()
 }
 
+// A hint function for the compiler.
+// At the call site of this function, the compiler emits a runtime park call
+// and performs the parking operation for the coroutine c. It also releases
+// the mutex mu via `mutexunlock`. This is a low-level mechanism and must be
+// used with great care.
+async fn runtimepark(c: *coro, mu: u64) {}
+
 // Suspends the current coroutine c and yields the CPU.
 // The coroutine c should be the coroutine will be used for resume(c).
 // If the mu is not zero, assumes it already locked and releases before yield.
 // The coroutine can be made runnable again by calling [unpark].
-//
-// This function will compile inlinely by the compiler.
-// The function must implement additional behavior before the park.
-// Compiler will park the coroutine at the placeholder comment.
 //
 // The first parameters must be the resume-coroutine,
 // where park handle will be written, and mutex address.
@@ -338,9 +341,16 @@ fn schedthread() {
 // After park, the `gett().coro` will not be affected.
 // So, scheduler cannot reach to up-to-date information of the coroutine.
 #disable nilptr
-async fn park(mut &c: *coro, mu: u64, mut reason: u32) {
+async fn park(mut &c: *coro, mu: uintptr, mut reason: u32) {
 	c.state |= coroSuspended | reason
-	// park(c)
+	runtimepark(c, u64(mu)).await
+}
+
+// Same as park, but takes a tagged pointer for mu.
+#disable nilptr
+async fn park2(mut &c: *coro, mu: taggedPointer, mut reason: u32) {
+	c.state |= coroSuspended | reason
+	runtimepark(c, u64(mu)).await
 }
 
 // Makes coroutine c runnable.
@@ -387,7 +397,7 @@ async fn Yield() {
 	// when it gets stuck in the local queue,
 	// it can be immediately retrieved and resumed.
 	// We need to prevent that. This is not an actual overflow.
-	park(&coroq.coro, u64(uintptr(&sched.runqmu)), reasonNA).await
+	park(&coroq.coro, uintptr(&sched.runqmu), reasonNA).await
 }
 
 #disable nilptr boundary

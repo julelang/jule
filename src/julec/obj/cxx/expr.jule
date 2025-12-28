@@ -1295,31 +1295,13 @@ impl exprCoder {
 	fn funcCall(mut &self, mut m: &sema::FuncCallExpr, ignoreExceptional: bool) {
 		// Compiler implemented functions.
 		match m.Func {
-		| meta::Program.Runtime.Park:
-			self.oc.write("{\n")
-			self.oc.addIndent()
-			for (i, mut param) in meta::Program.Runtime.Park.Params {
-				self.oc.indent()
-				self.oc.tc.paramIns(&self.oc.Buf, param)
-				self.oc.write(" ")
-				identCoder.param(&self.oc.Buf, param.Decl)
-				self.oc.write(" = ")
-				self.possibleRefExpr(m.Args[i])
-				self.oc.write(";\n")
-			}
-			self.oc.indent()
-			self.oc.sc.funcScope(m.Func, true)
-			self.oc.write("\n")
-			self.oc.indent()
-			self.oc.write("co_await __jule_Park{&")
-			identCoder.param(&self.oc.Buf, meta::Program.Runtime.Park.Decl.Params[0])
+		| meta::Program.Runtime.Runtimepark:
+			self.oc.write("co_await __jule_Park{&(")
+			self.possibleRefExpr(m.Args[0])
 			self.oc.write("->")
 			identCoder.field(&self.oc.Buf, meta::Program.Runtime.Coro.FindField("handle").Decl)
-			self.oc.write(", ")
-			identCoder.param(&self.oc.Buf, meta::Program.Runtime.Park.Decl.Params[1])
-			self.oc.write("};\n")
-			self.oc.doneIndent()
-			self.oc.indent()
+			self.oc.write("), ")
+			self.possibleRefExpr(m.Args[1])
 			self.oc.write("}")
 			ret
 		| meta::Program.Runtime.FastmemcopyImpl:
