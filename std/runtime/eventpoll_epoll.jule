@@ -43,9 +43,9 @@ fn eventpollclose(fd: u64): sys::Errno {
 // delay == 0: does not block, just polls
 // delay > 0: block for up to that many nanoseconds
 #disable nilptr boundary
-fn eventpoll(delay: i64): coroq {
+fn eventpoll(delay: i64, mut &toRun: *[prunqsize]coro): u32 {
 	if epfd == -1 {
-		ret coroq{}
+		ret 0
 	}
 	let mut wait: i32
 	if delay < 0 {
@@ -87,12 +87,12 @@ retry:
 		// If a timed sleep was interrupted, just return to
 		// recalculate how long we should sleep now.
 		if wait >= 0 {
-			ret coroq{}
+			ret 0
 		}
 		goto retry
 	}
-	let mut toRun: coroq
 	mut i := i32(0)
+	mut b := u32(0)
 	for i < n; i++ {
 		&ev := &events[i]
 		if ev.events == 0 {
@@ -117,8 +117,8 @@ retry:
 		}
 		pd.mu.lock()
 		pd.eventerr = pd.eventerr || ev.events == sys::EPOLLERR
-		pollnotified(pd, mode, &toRun)
+		pollnotified(pd, mode, toRun, &b)
 		pd.mu.unlock()
 	}
-	ret toRun
+	ret b
 }

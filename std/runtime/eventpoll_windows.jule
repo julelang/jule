@@ -80,9 +80,9 @@ fn eventpollclose(fd: u64): sys::Errno {
 // delay == 0: does not block, just polls
 // delay > 0: block for up to that many nanoseconds
 #disable nilptr boundary
-fn eventpoll(mut delay: i64): coroq {
+fn eventpoll(mut delay: i64, mut &toRun: *[prunqsize]coro): u32 {
 	if iocphandle == sys::InvalidHandle {
-		ret coroq{}
+		ret 0
 	}
 	if delay >= 1e15 {
 		// An arbitrary cap on how long to wait for a timer.
@@ -129,12 +129,12 @@ fn eventpoll(mut delay: i64): coroq {
 	} == 0 {
 		err := sys::GetLastErrno()
 		if err == _WAIT_TIMEOUT {
-			ret coroq{}
+			ret 0
 		}
 		panic("runtime: eventpoll: IOCP failed")
 	}
-	let mut toRun: coroq
 	mut i := u32(0)
+	mut b := u32(0)
 	for i < n; i++ {
 		mut &e := &entries[i]
 		mut op := polloperationFromOverlappedEntry(e)
@@ -146,8 +146,8 @@ fn eventpoll(mut delay: i64): coroq {
 			panic("runtime: invalid mode on eventpoll")
 		}
 		op.pd.mu.lock()
-		pollnotified(&(*op.pd), mode, &toRun)
+		pollnotified(&(*op.pd), mode, toRun, &b)
 		op.pd.mu.unlock()
 	}
-	ret toRun
+	ret b
 }

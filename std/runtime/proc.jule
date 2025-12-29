@@ -457,14 +457,17 @@ fn findRunnable(spinning: bool): (c: coro, ok: bool) {
 	// Before the look for global runq, check for the lastpoll enforcement.
 	// If the lastpoll value is -1, check eventpoll.
 	if atomic::CompareAndSwap(&sched.lastpoll, pollCheckRequested, pollCheckIn, atomic::AcqRel, atomic::Relaxed) {
-		mut toRun := eventpoll(0) // Use 0-delay to perform a non-blocking poll.
+		// eventpoll guarantees len(toRun) <= local run queue capacity.
+		let mut toRun: [prunqsize]coro
+		bn := eventpoll(0, &toRun) // Use 0-delay to perform a non-blocking poll.
 		now := nanotime()
 		atomic::Store(&sched.lastpoll, now, atomic::Release)
 		// If any coroutines are ready, return the first and enqueue the rest.
 		// Timers possibly expired here will be handled in a later iteration.
-		if toRun.len > 0 {
+		if bn > 0 {
 			sched.exitspin()
-			injecteventpollrunq(p, &c, &toRun)
+			c = toRun[0]
+			runqputbatch(p, &toRun, 1, bn)
 			ret c, true
 		}
 	}
@@ -609,32 +612,19 @@ fn findRunnable(spinning: bool): (c: coro, ok: bool) {
 
 	// Final step: poll eventpoll.
 	if delay != -1 || sched.ncpolling() > 0 && atomic::Swap(&sched.lastpoll, pollCheckIn, atomic::AcqRel) != pollCheckIn {
-		mut toRun := eventpoll(delay)
+		// eventpoll guarantees len(toRun) <= local run queue capacity.
+		let mut toRun: [prunqsize]coro
+		bn := eventpoll(delay, &toRun)
 		now = nanotime()
 		atomic::Store(&sched.lastpoll, now, atomic::Release)
-		if toRun.len > 0 {
-			injecteventpollrunq(p, &c, &toRun)
+		if bn > 0 {
+			c = toRun[0]
+			runqputbatch(p, &toRun, 1, bn)
 			ret c, true
 		}
 	}
 
 	ret c, false
-}
-
-// Dispatches a coroq returned from eventpoll.
-// Sets polled to a runnable coroutine from toRun.
-fn injecteventpollrunq(mut p: &coroproc, mut &polled: *coro, mut &toRun: *coroq) {
-	if toRun.len < 1 {
-		ret
-	}
-	// eventpoll guarantees len(toRun) <= local run queue capacity.
-	// If P's local queue is empty, all corotoutines will be enqueued in there.
-	*polled = toRun.head.coro
-	toRun.remove(toRun.head)
-	for toRun.head != nil {
-		runqput(p, &toRun.head.coro, false)
-		toRun.remove(toRun.head)
-	}
 }
 
 // A coroutine scheduler routine.

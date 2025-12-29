@@ -264,32 +264,36 @@ fn eventpollgeterr(mut pd: &polldesc, mode: i32)! {
 
 // Adds notified coroutines of pd to toRun according to mode.
 // It assumes pd mutex is locked.
-#disable nilptr
-fn pollnotified(mut &pd: *polldesc, mode: i32, mut &toRun: *coroq) {
+#disable nilptr boundary
+fn pollnotified(mut &pd: *polldesc, mode: i32, mut &toRun: *[prunqsize]coro, mut &i: *u32) {
 	match mode {
 	| 'r':
 		if pd.rcoro != nil && pd.rcoro != pollrace {
-			toRun.push(&(*pd.rcoro))
+			(*toRun)[*i] = *pd.rcoro
+			*i++
 			pd.rcoro = nil
 		} else {
 			pd.rcoro = pollrace
 		}
 	| 'w':
 		if pd.wcoro != nil && pd.wcoro != pollrace {
-			toRun.push(&(*pd.wcoro))
+			(*toRun)[*i] = *pd.wcoro
+			*i++
 			pd.wcoro = nil
 		} else {
 			pd.wcoro = pollrace
 		}
 	| 'r' + 'w':
 		if pd.rcoro != nil && pd.rcoro != pollrace {
-			toRun.push(&(*pd.rcoro))
+			(*toRun)[*i] = *pd.rcoro
+			*i++
 			pd.rcoro = nil
 		} else {
 			pd.rcoro = pollrace
 		}
 		if pd.wcoro != nil && pd.wcoro != pollrace {
-			toRun.push(&(*pd.wcoro))
+			(*toRun)[*i] = *pd.wcoro
+			*i++
 			pd.wcoro = nil
 		} else {
 			pd.wcoro = pollrace
