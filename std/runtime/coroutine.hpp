@@ -61,7 +61,7 @@ inline thread_local __jule_Ptr<__jule_thread> __jule_ct;
 
 // Non-templated coroutine handle used by the runtime.
 // The runtime never needs promise-type information.
-using __jule_coroutineHandle = std::coroutine_handle<>;
+using __jule_cHandle = std::coroutine_handle<>;
 
 // A retire node represents a coroutine frame that must be destroyed,
 // but *not immediately*.
@@ -84,7 +84,7 @@ struct __jule_RetireNode
 inline thread_local __jule_RetireNode *__jule_retireHead = nullptr;
 
 // Pushes a coroutine frame onto the retire list.
-static inline void __jule_retirePush(__jule_RetireNode &n, __jule_coroutineHandle h) noexcept
+static inline void __jule_retirePush(__jule_RetireNode &n, __jule_cHandle h) noexcept
 {
 #ifndef NDEBUG
     // If this triggers, the runtime attempted to retire
@@ -111,7 +111,7 @@ static inline void __jule_retireDrain(void) noexcept
         __jule_RetireNode *n = list;
         list = list->next;
         // Reconstruct handle from raw address and destroy frame.
-        __jule_coroutineHandle::from_address(n->addr).destroy();
+        __jule_cHandle::from_address(n->addr).destroy();
     }
 }
 
@@ -139,7 +139,7 @@ void __jule_mutexUnlock(__jule_U64 mu);
 struct __jule_TrampNode
 {
     __jule_TrampNode *next = nullptr;
-    __jule_coroutineHandle h{};
+    __jule_cHandle h{};
 };
 
 inline thread_local __jule_TrampNode *__jule_trampHead = nullptr;
@@ -147,7 +147,7 @@ inline thread_local __jule_TrampNode *__jule_trampHead = nullptr;
 // Enqueue a coroutine handle into trampoline run list.
 // Precondition: h is either empty or a valid handle.
 // Empty handles are ignored.
-static inline void __jule_trampolineEnqueue(__jule_coroutineHandle h) noexcept
+static inline void __jule_trampolineEnqueue(__jule_cHandle h) noexcept
 {
     if (!h)
         return;
@@ -166,7 +166,7 @@ static inline void __jule_trampolineEnqueue(__jule_coroutineHandle h) noexcept
 }
 
 // Enqueue using a persistent node (embedded in a promise or other stable storage).
-static inline void __jule_trampolineEnqueueNode(__jule_TrampNode &n, __jule_coroutineHandle h) noexcept
+static inline void __jule_trampolineEnqueueNode(__jule_TrampNode &n, __jule_cHandle h) noexcept
 {
 #ifndef NDEBUG
     if (!h)
@@ -191,7 +191,7 @@ static inline void __jule_trampolineRun(void) noexcept
         __jule_TrampNode *n = __jule_trampHead;
         __jule_trampHead = n->next;
 
-        __jule_coroutineHandle h = n->h;
+        __jule_cHandle h = n->h;
         n->h = {};
         n->next = nullptr;
 
@@ -214,12 +214,12 @@ static inline void __jule_trampolineRun(void) noexcept
 // - Transfers control back to the scheduler boundary (noop)
 struct __jule_Park
 {
-    __jule_coroutineHandle *out;
+    __jule_cHandle *out;
     __jule_U64 mu;
 
     bool await_ready(void) const noexcept { return false; }
 
-    __jule_coroutineHandle await_suspend(__jule_coroutineHandle h) const noexcept
+    __jule_cHandle await_suspend(__jule_cHandle h) const noexcept
     {
         *out = h;
         __jule_mutexUnlock(mu);
@@ -239,7 +239,7 @@ public:
         std::optional<T> value{};
 
         // Continuation coroutine (awaiter).
-        __jule_coroutineHandle continuation{};
+        __jule_cHandle continuation{};
 
         // Persistent trampoline nodes (allocation-free).
         __jule_TrampNode self_node{};
@@ -260,7 +260,7 @@ public:
         {
             bool await_ready(void) noexcept { return false; }
 
-            __jule_coroutineHandle await_suspend(std::coroutine_handle<promise_type> h) noexcept
+            __jule_cHandle await_suspend(std::coroutine_handle<promise_type> h) noexcept
             {
                 auto &p = h.promise();
                 if (p.continuation)
@@ -322,7 +322,7 @@ public:
                 return h.done();
             }
 
-            __jule_coroutineHandle await_suspend(__jule_coroutineHandle caller) noexcept
+            __jule_cHandle await_suspend(__jule_cHandle caller) noexcept
             {
                 auto &p = h.promise();
                 p.continuation = caller;
@@ -354,7 +354,7 @@ class __jule_VoidTask
 public:
     struct promise_type
     {
-        __jule_coroutineHandle continuation{};
+        __jule_cHandle continuation{};
 
         // Persistent trampoline nodes (allocation-free).
         __jule_TrampNode self_node{};
@@ -371,7 +371,7 @@ public:
         {
             bool await_ready(void) noexcept { return false; }
 
-            __jule_coroutineHandle await_suspend(std::coroutine_handle<promise_type> h) noexcept
+            __jule_cHandle await_suspend(std::coroutine_handle<promise_type> h) noexcept
             {
                 auto &p = h.promise();
                 if (p.continuation)
@@ -420,7 +420,7 @@ public:
                 return h.done();
             }
 
-            __jule_coroutineHandle await_suspend(__jule_coroutineHandle caller) noexcept
+            __jule_cHandle await_suspend(__jule_cHandle caller) noexcept
             {
                 auto &p = h.promise();
                 p.continuation = caller;
@@ -461,7 +461,7 @@ public:
         {
             bool await_ready(void) noexcept { return false; }
 
-            __jule_coroutineHandle await_suspend(std::coroutine_handle<promise_type> h) noexcept
+            __jule_cHandle await_suspend(std::coroutine_handle<promise_type> h) noexcept
             {
                 auto &p = h.promise();
                 __jule_retirePush(p.retire_node, h);

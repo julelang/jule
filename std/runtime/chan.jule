@@ -58,7 +58,7 @@ impl pchan {
 				}
 				recvp.stack = 0  // Set stack pointer to zero, marked as received.
 				recvp.ticket = 0 // Set ticket to zero, marked as received for select statements.
-				unpark(&(*recvp.coro))
+				unpark(&(*recvp.cp))
 			}
 		}
 
@@ -89,18 +89,18 @@ impl pchan {
 				recvp.stack = 0 // Set stack pointer to zero, marked as sent.
 			}
 			recvp.ticket = 0 // Set ticket to zero, marked as sent for select statements.
-			unpark(&(*recvp.coro))
+			unpark(&(*recvp.cp))
 			ret false
 		}
 
 		// We have to park the coroutine.
 		mut stackp := parkerList{}
 		mut p := unsafe { (&parkerList)(&stackp) }
-		mut c := gett().coro
-		p.coro = unsafe { (&coro)(&c) }
+		mut tc := gett().c
+		p.cp = unsafe { (&c)(&tc) }
 		p.stack = uintptr(data)
 		self.sendq.enqueue(p)
-		park(&(*p.coro), uintptr(&self.lock), reasonSend).await
+		park(&(*p.cp), uintptr(&self.lock), reasonSend).await
 		ret isSpuriousWake(&stackp)
 	}
 
@@ -121,7 +121,7 @@ impl pchan {
 				mut recvp := self.recvq.dequeueChan()
 				self.lock.unlock()
 				if recvp != nil {
-					unpark(&(*recvp.coro))
+					unpark(&(*recvp.cp))
 				}
 			}
 			// Enqueued, return.
@@ -198,7 +198,7 @@ impl pchan {
 				recvp.stack = 0 // Set stack pointer to zero, marked as sent.
 			}
 			recvp.ticket = 0 // Set ticket to zero, marked as sent for select statements.
-			unpark(&(*recvp.coro))
+			unpark(&(*recvp.cp))
 			*ok = true
 		} else {
 			// Fail.
@@ -222,7 +222,7 @@ impl pchan {
 			mut recvp := self.recvq.dequeueChan()
 			self.lock.unlock()
 			if recvp != nil {
-				unpark(&(*recvp.coro))
+				unpark(&(*recvp.cp))
 			}
 		}
 		// Enqueued, return.
@@ -247,7 +247,7 @@ impl pchan {
 				recvp.stack = 0 // Set stack pointer to zero, marked as sent.
 			}
 			recvp.ticket = 0 // Set ticket to zero, marked as sent for select statements.
-			unpark(&(*recvp.coro))
+			unpark(&(*recvp.cp))
 			*ok = true
 		} else {
 			// Fail.
@@ -283,7 +283,7 @@ impl pchan {
 			*data = unsafe { *(*T)(sendp.stack) }
 			sendp.stack = 0  // Set stack pointer to zero, marked as received.
 			sendp.ticket = 0 // Set ticket to zero, marked as received for select statements.
-			unpark(&(*sendp.coro))
+			unpark(&(*sendp.cp))
 			if ok != nil {
 				*ok = true
 			}
@@ -293,11 +293,11 @@ impl pchan {
 		// We have to park the coroutine.
 		mut stackp := parkerList{}
 		mut p := unsafe { (&parkerList)(&stackp) }
-		mut c := gett().coro
-		p.coro = unsafe { (&coro)(&c) }
+		mut tc := gett().c
+		p.cp = unsafe { (&c)(&tc) }
 		p.stack = uintptr(data)
 		self.recvq.enqueue(p)
-		park(&(*p.coro), uintptr(&self.lock), reasonRecv).await
+		park(&(*p.cp), uintptr(&self.lock), reasonRecv).await
 		spurious = isSpuriousWake(&stackp)
 		if ok != nil {
 			*ok = !spurious
@@ -405,7 +405,7 @@ impl pchan {
 			}
 			sendp.stack = 0  // Set stack pointer to zero, marked as received.
 			sendp.ticket = 0 // Set ticket to zero, marked as received for select statements.
-			unpark(&(*sendp.coro))
+			unpark(&(*sendp.cp))
 			*ok = true
 		} else {
 			// Fail.
@@ -449,7 +449,7 @@ impl pchan {
 			}
 			sendp.stack = 0  // Set stack pointer to zero, marked as received.
 			sendp.ticket = 0 // Set ticket to zero, marked as received for select statements.
-			unpark(&(*sendp.coro))
+			unpark(&(*sendp.cp))
 			*ok = true
 		} else {
 			// Fail.

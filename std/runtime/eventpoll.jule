@@ -70,8 +70,8 @@ impl polldescq {
 //
 // This design prevents missed wake-ups and incorrect blocking in the presence
 // of concurrent event handling across multiple scheduler threads.
-let mut _coro = coro{}
-let mut pollrace = unsafe { (&coro)(&_coro) }
+let mut _c = c{}
+let mut pollrace = unsafe { (&c)(&_c) }
 
 // Represents a pollable file descriptor and its runtime state.
 // It encapsulates coroutine coordination, lifetime management, deadlines,
@@ -85,9 +85,9 @@ struct polldesc {
 	fdseq: uintptr // Atomic seq protects against stale pollDesc.
 
 	mu:        mutex       // Mutex protecting all mutable fields below.
-	rcoro:     &coro       // A fake smart-pointer for stack allocated coroutine waiting for read readiness.
-	wcoro:     &coro       // A fake smart-pointer for stack allocated coroutine waiting for write readiness.
-	proc:      &coroproc   // Owning coroutine process.
+	rcp:       &c          // A fake smart-pointer for stack allocated coroutine waiting for read readiness.
+	wcp:       &c          // A fake smart-pointer for stack allocated coroutine waiting for write readiness.
+	pp:        &p          // Owning P.
 	procq:     &polldescqp // The queue node.
 	eventerr:  bool
 	closing:   bool
@@ -111,7 +111,7 @@ impl polldesc {
 		}
 		self.deadline = deadline
 		mut t := gett()
-		t.proc.timers.push(&timer{when: deadline})
+		t.pp.timers.push(&timer{when: deadline})
 	}
 
 	#disable nilptr
@@ -127,7 +127,7 @@ impl polldesc {
 		}
 		self.rdeadline = deadline
 		mut t := gett()
-		t.proc.timers.push(&timer{when: deadline})
+		t.pp.timers.push(&timer{when: deadline})
 	}
 
 	#disable nilptr
@@ -143,7 +143,7 @@ impl polldesc {
 		}
 		self.wdeadline = deadline
 		mut t := gett()
-		t.proc.timers.push(&timer{when: deadline})
+		t.pp.timers.push(&timer{when: deadline})
 	}
 }
 
@@ -169,13 +169,13 @@ async fn eventpollwait(mut pd: &polldesc, mode: i32)! {
 		error(netpollDeadline)
 	}
 	// Check for completion signals first.
-	if mode == 'r' && pd.rcoro == pollrace {
-		pd.rcoro = nil
+	if mode == 'r' && pd.rcp == pollrace {
+		pd.rcp = nil
 		pd.mu.unlock()
 		ret
 	}
-	if mode == 'w' && pd.wcoro == pollrace {
-		pd.wcoro = nil
+	if mode == 'w' && pd.wcp == pollrace {
+		pd.wcp = nil
 		pd.mu.unlock()
 		ret
 	}
@@ -191,15 +191,15 @@ async fn eventpollwait(mut pd: &polldesc, mode: i32)! {
 		pd.mu.unlock()
 		error(netpollNotPollable)
 	}
-	mut c := t.coro
+	mut tc := t.c
 	match mode {
 	| 'r':
-		pd.rcoro = unsafe { (&coro)(&c) }
+		pd.rcp = unsafe { (&c)(&tc) }
 	| 'w':
-		pd.wcoro = unsafe { (&coro)(&c) }
+		pd.wcp = unsafe { (&c)(&tc) }
 	}
 	sched.enterpoll()
-	park(&c, uintptr(&pd.mu), reasonNA).await
+	park(&tc, uintptr(&pd.mu), reasonNA).await
 	sched.exitpoll()
 	eventpollgeterr(pd, mode)?
 }
@@ -214,34 +214,34 @@ async fn eventpollwaitcanceled(mut pd: &polldesc, mode: i32) {
 	mut t := gett()
 	pd.mu.lock()
 	// Check for completion signals first.
-	if mode == 'r' && pd.rcoro == pollrace {
-		pd.rcoro = nil
+	if mode == 'r' && pd.rcp == pollrace {
+		pd.rcp = nil
 		pd.mu.unlock()
 		ret
 	}
-	if mode == 'w' && pd.wcoro == pollrace {
-		pd.wcoro = nil
+	if mode == 'w' && pd.wcp == pollrace {
+		pd.wcp = nil
 		pd.mu.unlock()
 		ret
 	}
 	sched.enterpoll()
 	for {
-		mut c := t.coro
+		mut tc := t.c
 		match mode {
 		| 'r':
-			pd.rcoro = unsafe { (&coro)(&c) }
+			pd.rcp = unsafe { (&c)(&tc) }
 		| 'w':
-			pd.wcoro = unsafe { (&coro)(&c) }
+			pd.wcp = unsafe { (&c)(&tc) }
 		}
-		park(&c, uintptr(&pd.mu), reasonNA).await
+		park(&tc, uintptr(&pd.mu), reasonNA).await
 		pd.mu.lock()
 		// Check for relevant coroutine.
 		// If any deadline exist on this pd, a spurious wakeup may occur.
-		if mode == 'r' && pd.rcoro == nil {
+		if mode == 'r' && pd.rcp == nil {
 			pd.mu.unlock()
 			break
 		}
-		if mode == 'w' && pd.wcoro == nil {
+		if mode == 'w' && pd.wcp == nil {
 			pd.mu.unlock()
 			break
 		}
@@ -252,12 +252,12 @@ async fn eventpollwaitcanceled(mut pd: &polldesc, mode: i32) {
 // Throws error if needed after polling for an event.
 #disable nilptr
 fn eventpollgeterr(mut pd: &polldesc, mode: i32)! {
-	if mode == 'r' && pd.rcoro != nil && pd.rcoro != pollrace {
-		pd.rcoro = nil
+	if mode == 'r' && pd.rcp != nil && pd.rcp != pollrace {
+		pd.rcp = nil
 		error(netpollDeadline)
 	}
-	if mode == 'w' && pd.wcoro != nil && pd.wcoro != pollrace {
-		pd.wcoro = nil
+	if mode == 'w' && pd.wcp != nil && pd.wcp != pollrace {
+		pd.wcp = nil
 		error(netpollDeadline)
 	}
 }
@@ -265,38 +265,38 @@ fn eventpollgeterr(mut pd: &polldesc, mode: i32)! {
 // Adds notified coroutines of pd to toRun according to mode.
 // It assumes pd mutex is locked.
 #disable nilptr boundary
-fn pollnotified(mut &pd: *polldesc, mode: i32, mut &toRun: *[prunqsize]coro, mut &i: *u32) {
+fn pollnotified(mut &pd: *polldesc, mode: i32, mut &toRun: *[prunqsize]c, mut &i: *u32) {
 	match mode {
 	| 'r':
-		if pd.rcoro != nil && pd.rcoro != pollrace {
-			(*toRun)[*i] = *pd.rcoro
+		if pd.rcp != nil && pd.rcp != pollrace {
+			(*toRun)[*i] = *pd.rcp
 			*i++
-			pd.rcoro = nil
+			pd.rcp = nil
 		} else {
-			pd.rcoro = pollrace
+			pd.rcp = pollrace
 		}
 	| 'w':
-		if pd.wcoro != nil && pd.wcoro != pollrace {
-			(*toRun)[*i] = *pd.wcoro
+		if pd.wcp != nil && pd.wcp != pollrace {
+			(*toRun)[*i] = *pd.wcp
 			*i++
-			pd.wcoro = nil
+			pd.wcp = nil
 		} else {
-			pd.wcoro = pollrace
+			pd.wcp = pollrace
 		}
 	| 'r' + 'w':
-		if pd.rcoro != nil && pd.rcoro != pollrace {
-			(*toRun)[*i] = *pd.rcoro
+		if pd.rcp != nil && pd.rcp != pollrace {
+			(*toRun)[*i] = *pd.rcp
 			*i++
-			pd.rcoro = nil
+			pd.rcp = nil
 		} else {
-			pd.rcoro = pollrace
+			pd.rcp = pollrace
 		}
-		if pd.wcoro != nil && pd.wcoro != pollrace {
-			(*toRun)[*i] = *pd.wcoro
+		if pd.wcp != nil && pd.wcp != pollrace {
+			(*toRun)[*i] = *pd.wcp
 			*i++
-			pd.wcoro = nil
+			pd.wcp = nil
 		} else {
-			pd.wcoro = pollrace
+			pd.wcp = pollrace
 		}
 	|:
 		panic("unimplemented case")
@@ -310,10 +310,10 @@ fn eventpollnew(fd: u64): &polldesc {
 	eventpollopen(fd, &(*pd))
 	pd.fd = fd
 	mut t := gett()
-	pd.proc = t.proc
-	pd.proc.pdsmu.lock()
-	pd.procq = pd.proc.pds.push(pd)
-	pd.proc.pdsmu.unlock()
+	pd.pp = t.pp
+	pd.pp.pdsmu.lock()
+	pd.procq = pd.pp.pds.push(pd)
+	pd.pp.pdsmu.unlock()
 	ret pd
 }
 
@@ -371,14 +371,14 @@ impl pollcachepool {
 		pd.closing = true
 
 		// Unpark waiter coroutines, if any.
-		if pd.rcoro != nil && pd.rcoro != pollrace {
-			unpark(&(*pd.rcoro))
+		if pd.rcp != nil && pd.rcp != pollrace {
+			unpark(&(*pd.rcp))
 		}
-		if pd.wcoro != nil && pd.wcoro != pollrace {
-			unpark(&(*pd.wcoro))
+		if pd.wcp != nil && pd.wcp != pollrace {
+			unpark(&(*pd.wcp))
 		}
-		pd.rcoro = nil
-		pd.wcoro = nil
+		pd.rcp = nil
+		pd.wcp = nil
 
 		// Increment the fdseq field, so that any currently
 		// running eventpoll calls will not mark pd as ready.
@@ -387,10 +387,10 @@ impl pollcachepool {
 		atomic::Store(&pd.fdseq, fdseq, atomic::Release)
 
 		// Remove processor.
-		pd.proc.pdsmu.lock()
-		pd.proc.pds.remove(pd.procq)
-		pd.proc.pdsmu.unlock()
-		pd.proc = nil
+		pd.pp.pdsmu.lock()
+		pd.pp.pds.remove(pd.procq)
+		pd.pp.pdsmu.unlock()
+		pd.pp = nil
 
 		// Clean deadlines.
 		pd.rdeadline = 0

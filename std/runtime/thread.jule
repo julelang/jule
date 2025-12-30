@@ -30,11 +30,11 @@ struct thread {
 	// Threads stored in the thread stack with a doubly linked-list.
 	next: &thread
 
-	// The coroutine processor owned by the thread.
-	proc: &coroproc
+	// The P owned by the thread.
+	pp: &p
 
 	// Current coroutine of the thread.
-	coro: coro
+	c: c
 }
 
 // Returns the current thread.
@@ -115,11 +115,11 @@ fn pushNewThread(): &thread {
 // The thread t must be a scheduler thread.
 #disable nilptr
 fn closeThread(mut t: &thread): (schedAgain: bool) {
-	// Thread is have a coroutine processor.
+	// Thread have a P.
 	// We have to put back it to idle processes.
-	if t.proc != nil {
+	if t.pp != nil {
 		for {
-			ok, _, full := sched.idleprocs.enqueue(&t.proc)
+			ok, _, full := sched.idlepps.enqueue(&t.pp)
 			if !ok && full {
 				panic("malformed internal schedule queue")
 			}
@@ -151,7 +151,7 @@ fn closeThread(mut t: &thread): (schedAgain: bool) {
 		}
 		t.prev = nil
 		t.next = nil
-		t.proc = nil
+		t.pp = nil
 		threadMutex.unlock()
 		t.parker.release()
 		t = nil
@@ -160,7 +160,7 @@ fn closeThread(mut t: &thread): (schedAgain: bool) {
 	// There is space for caching, cache it.
 	// Park the thread and report true, it will be continue to run when notified.
 	cachedCount++
-	t.proc = nil
+	t.pp = nil
 	t.state = threadClosed
 	threadMutex.unlock()
 	t.parker.park()
@@ -188,23 +188,23 @@ fn getThread(): &thread {
 	ret nil
 }
 
-// Spawns a new scheduler thread with the coroutine processor.
+// Spawns a new scheduler thread with the P.
 // The thread-mutex must be acquired before the call, it will release before return.
 #disable nilptr
-fn newm(mut proc: &coroproc) {
+fn startm(mut pp: &p) {
 	workerCount++
 	// We have a cached scheduler thread.
 	// Notify it.
 	if cachedCount > 0 {
 		mut t := pushNewThread() // It will return a cached thread instance.
-		t.proc = proc
+		t.pp = pp
 		cachedCount--
 		threadMutex.unlock()
 		t.parker.unpark()
 		ret
 	}
 	// Spawn a new one.
-	unsafe { threadSpawn(proc, (*unsafe)(uintptr(schedthread)), nil) }
+	unsafe { threadSpawn(pp, (*unsafe)(uintptr(schedthread)), nil) }
 }
 
 fn threadinit() {

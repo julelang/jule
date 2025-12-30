@@ -6,15 +6,15 @@ extern use "std/runtime/coroutine.hpp"
 
 // Jule coroutine handle type.
 #typedef
-extern struct __jule_coroutineHandle {
+extern struct __jule_cHandle {
 	address: fn(): *unsafe
 	resume:  fn()       // Resume execution.
 	done:    fn(): bool // Reports whether the coroutine is done.
 	destroy: fn()       // Destroys coroutine.
 }
 
-// Type alias for extern Jule coroutine.
-type coroutineHandle = extern.__jule_coroutineHandle
+// Type alias for extern Jule coroutine handle.
+type cHandle = extern.__jule_cHandle
 
 const (
 	// State flags of coroutines.
@@ -40,117 +40,115 @@ const (
 // A Jule coroutine.
 //
 // When represented on the C++ side,
-// a coro must be trivially destructible and copyable.
-struct coro {
-	// Handle of the coroutine.
-	handle: coroutineHandle
+// a C must be trivially destructible and copyable.
+struct c {
+	// Handle of the C.
+	handle: cHandle
 
-	// Coroutine state and suspend reasons if it is suspended.
-	// The reasons may be not zeroed after coroutine closed or woken.
+	// State and suspend reasons if it is suspended.
+	// The reasons may be not zeroed after C closed or woken.
 	state: u32
 
 	// A flag invented to prevent short-lived race conditions.
 	race: u32
 }
 
-// Creates new coroutine with the handle.
+// Creates new C with the handle.
 // Ready for the resume call.
 #disable nilptr boundary
-fn newcoro(h: coroutineHandle): coro {
-	let mut c: coro
+fn newc(h: cHandle): c {
+	let mut c: c
 	c.state |= coroSuspended
 	c.handle = h
 	ret c
 }
 
-// Appends the main coroutine of the program.
-// Implicitly called by the compiler to add the main coroutine.
+// Appends the main C of the program.
+// Implicitly called by the compiler to add the main C.
 #disable nilptr
-fn spawnmaincoro(h: coroutineHandle) {
-	mut c := newcoro(h)
-	threadHead.proc.runnext.used = true
-	threadHead.proc.runnext.coro = c
+fn spawnmainc(h: cHandle) {
+	threadHead.pp.runnext.used = true
+	threadHead.pp.runnext.c = newc(h)
 }
 
-// A low level API function for Jule coroutines.
+// A low level API function for Jule Cs.
 // It doesn't provide much abstraction.
-// It just creates a coroutine using API.
-// The coroutine handle h is the handle of the coroutine.
+// It just creates a C using API.
+// The handle h is the handle of the C.
 #export "__jule_cospawn"
 #disable nilptr
-async fn cospawn(h: coroutineHandle) {
-	mut c := newcoro(h)
+async fn cospawn(h: cHandle) {
+	mut c := newc(h)
 	mut t := gett()
-	overflow := runqput(t.proc, &c, true)
+	overflow := runqput(t.pp, &c, true)
 	// Try to wake up a new M. If there is an idle M, this is something that can be
 	// used to increase concurrency. If we only try to wake up a new M in more
 	// restricted situations, for example only when a runqput overflow occurs,
 	// we may not achieve sufficient concurrency. For example, a small number of
-	// coroutines that could run concurrently may never cause an overflow and thus
+	// Cs that could run concurrently may never cause an overflow and thus
 	// end up behaving effectively synchronously or single-threaded concurrency.
 	// Therefore, wake up an M so that runnable work can be executed multi-threaded.
 	wakep()
-	// If an overflow occurs in the global runnable queue, yield this coroutine.
+	// If an overflow occurs in the global runnable queue, yield this C.
 	// This allows the runtime to wait briefly before creating more
-	// coroutines and gives other coroutines a chance to run.
+	// Cs and gives other Cs a chance to run.
 	// It is also effective at reducing memory usage.
 	if overflow {
 		Yield().await
 	}
 }
 
-// Basic resume primitive for the coroutine c.
+// Resumes execution of cp.
 #disable nilptr
-fn resume(&c: *coro) {
-	c.handle.resume()
+fn resume(&cp: *c) {
+	cp.handle.resume()
 }
 
-// Reports whether the coroutine done.
+// Reports whether cp done.
 #disable nilptr
-fn done(&c: *coro): bool {
-	ret c.handle.done()
+fn done(&cp: *c): bool {
+	ret cp.handle.done()
 }
 
-// Closes coroutine, releases memory.
+// Closes cp, releases memory.
 #disable nilptr
-fn close(&c: *coro) {
-	c.handle.destroy()
+fn close(&cp: *c) {
+	cp.handle.destroy()
 }
 
-// A coroq coroutine.
+// A coroq C.
 struct coroqc {
-	// The coroutine.
-	coro: coro
+	// The C.
+	c: c
 
 	// Pointer to the previous corotuine.
 	prev: &coroqc
 
-	// Pointer to the next coroutine.
+	// Pointer to the next C.
 	next: &coroqc
 }
 
-// A coroutine doubly linked-list queue.
+// A C doubly linked-list queue.
 // Not safe for concurrent use.
 struct coroq {
-	len:  int
 	head: &coroqc
 	tail: &coroqc
 }
 
 impl coroq {
-	// Appends coroutine c to the queue.
+	// Appends cp to the queue.
 	#disable nilptr
-	fn push(mut *self, mut &c: *coro) {
+	fn push(mut *self, mut &cp: *c) {
 		mut qc := new(coroqc)
-		qc.coro = *c
+		qc.c = *cp
 		self.pushq(qc)
 	}
 
-	// Appends coroutine c to front of the queue.
+	// Appends cp to front of the queue.
 	#disable nilptr
-	fn pushFront(mut *self, mut &c: *coro) {
+	fn pushFront(mut *self, mut &cp: *c) {
 		mut qc := new(coroqc)
-		qc.coro = *c
+		qc.c = *cp
 		if self.tail == nil {
 			self.head = qc
 			self.tail = qc
@@ -159,7 +157,6 @@ impl coroq {
 			self.head.prev = qc
 			self.head = qc
 		}
-		self.len++
 	}
 
 	// Same as push, but takes a coroq.
@@ -173,10 +170,9 @@ impl coroq {
 			self.tail.next = qc
 			self.tail = qc
 		}
-		self.len++
 	}
 
-	// Removes coroutine c from the queue.
+	// Removes c from the queue.
 	#disable nilptr
 	fn remove(mut *self, mut c: &coroqc) {
 		if c.prev != nil {
@@ -191,6 +187,5 @@ impl coroq {
 		}
 		c.prev = nil
 		c.next = nil
-		self.len--
 	}
 }

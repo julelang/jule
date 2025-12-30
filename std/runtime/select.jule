@@ -236,7 +236,7 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 	}
 	// There is no waiter in the queue.
 	// We have to park this coroutine, eventually.
-	mut c := gett().coro
+	mut tc := gett().c
 	// Allocate and prepare a parker per operation.
 	// Use round-robin iteration to achieve randomness.
 	mut parkers := make([]&parkerList, nrecv+nsend)
@@ -267,7 +267,7 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 		}
 
 		// Prepare and enqeueue parker.
-		parker.coro = unsafe { (&coro)(&c) }
+		parker.cp = unsafe { (&c)(&tc) }
 		parker.ticket = parkerSelect
 		parker.state = state // Use shared state pointer for all parkers.
 		parker.stack = case.data
@@ -289,12 +289,12 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 	//
 	// To avoid this, we use a tagged pointer so that when the `park` function
 	// attempts to unlock a mutex, the runtime can detect that this is not a real
-	// mutex and update `c.race` to `selectParked` instead.
-	// By setting the `c.race` field to `selectParking` before parking and before
+	// mutex and update `tc.race` to `selectParked` instead.
+	// By setting the `tc.race` field to `selectParking` before parking and before
 	// releasing the locks, we guarantee that any thread attempting to wake the
 	// coroutine will observe this state. This forces it to wait until parking
 	// completes, i.e., until the state becomes `selectParked`.
-	tp := taggedPointerPack(&c, mutexunlockSelect)
+	tp := taggedPointerPack(&tc, mutexunlockSelect)
 
 	// Park and try iteration.
 	// First, parks the coroutine.
@@ -302,11 +302,11 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 	// If a channel notified spuriously, try again and park it, if it fails.
 	for {
 		// See the comment of tp.
-		atomic::Store(&c.race, selectParking, atomic::Release)
+		atomic::Store(&tc.race, selectParking, atomic::Release)
 
 		// Unlock channels and park the coroutine.
 		unlockchans(chans, nchan)
-		park2(&c, tp, reasonSelect).await
+		park2(&tc, tp, reasonSelect).await
 
 		// Look for the selected channel.
 		for i, parker in parkers {
@@ -431,9 +431,9 @@ async fn emptyselect() {
 	// It always yields CPU due to empty select statement,
 	// so put it into deep sleep.
 	//
-	// Use `gett().coro` for park handle, because scheduler will destroy
+	// Use `gett().c` for park handle, because scheduler will destroy
 	// the coroutine after empty select.
 	mut t := gett()
-	park(&t.coro, 0, reasonSelect|reasonSelectEmpty).await
+	park(&t.c, 0, reasonSelect|reasonSelectEmpty).await
 	panic("unreachable")
 }
