@@ -680,8 +680,10 @@ Sched:
 			if m.pp.timers.len() > 0 {
 				continue
 			}
-			// There are coroutines polling for I/O or waiting for a blocking job.
-			if sched.ncpolling() > 0 || sched.ncblocking() > 0 {
+			// There are coroutines polling for I/O or waiting for a blocking job,
+			// and there is no M looking for eventpoll.
+			if atomic::Load(&sched.lastpoll, atomic::Acquire) != pollCheckIn &&
+				(sched.ncpolling() > 0 || sched.ncblocking() > 0) {
 				continue
 			}
 			// No coroutine to run, no timer, no eventpoll.
