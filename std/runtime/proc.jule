@@ -119,11 +119,14 @@ struct scheduler {
 	lastpoll: i64
 
 	// Number of coroutines currently polling for I/O.
-	// This is used by the scheduler to decide whether to block,
-	// spin, or wake worker threads.
 	//
 	// Must be accessed atomically when used by scheduler logic.
 	_ncpoll: int
+
+	// Number of coroutines currently in blocking call.
+	//
+	// Must be accessed atomically when used by scheduler logic.
+	_ncblock: int
 
 	// Number of worker threads currently spinning (actively searching
 	// for runnable coroutines instead of sleeping).
@@ -154,6 +157,24 @@ impl scheduler {
 	// Used by the scheduler to make global scheduling decisions.
 	fn ncpolling(*self): int {
 		ret atomic::Load(&self._ncpoll, atomic::Relaxed)
+	}
+
+	// Marks that a coroutine is about to enter an I/O polling state.
+	// Must be called immediately before the coroutine blocks on I/O.
+	fn enterblock(mut *self) {
+		atomic::Add(&self._ncblock, 1, atomic::Relaxed)
+	}
+
+	// Marks that a coroutine has exited an I/O polling state.
+	// Must be called immediately after the coroutine finishes polling.
+	fn exitblock(mut *self) {
+		atomic::Add(&self._ncblock, -1, atomic::Relaxed)
+	}
+
+	// Returns the number of coroutines currently polling for I/O.
+	// Used by the scheduler to make global scheduling decisions.
+	fn ncblocking(*self): int {
+		ret atomic::Load(&self._ncblock, atomic::Relaxed)
 	}
 
 	// Marks that a worker thread is entering a spin state.
@@ -222,6 +243,16 @@ fn wakep() {
 // Executed only by the owner P.
 #disable nilptr boundary
 fn runqput(mut pp: &p, mut &cp: *c, next: bool): (overflow: bool) {
+	// pp is nil, the caller is probably a blocking thread-pool worker thread.
+	// Not an actual M, it is not have a P by design.
+	// Nothing to do, overflow to the global runnable queue.
+	if pp == nil {
+		sched.runqmu.lock()
+		sched.runq.push(cp)
+		sched.runqmu.unlock()
+		ret true
+	}
+
 	if !pp.runnext.used {
 		// The runnext slot is empty, use it.
 		pp.runnext.c = *cp
@@ -633,9 +664,8 @@ fn findRunnable(spinning: bool): (c: c, ok: bool) {
 fn schedule(mut spinning: bool) {
 	sett(acquireThread())
 	threadMutex.unlock()
-	mut t := gett()
+	mut m := gett()
 Sched:
-	// If poll is set, attempt a non-blocking eventpoll first.
 	const MaxSpin = 4
 	mut tried := 0
 	for {
@@ -647,11 +677,11 @@ Sched:
 			// There are timers in this worker, clean them.
 			// Normally, eventpoll returns a timer if exist.
 			// Somehow, a spurious wakeup occurred.
-			if t.pp.timers.len() > 0 {
+			if m.pp.timers.len() > 0 {
 				continue
 			}
-			// There are coroutines polling for I/O.
-			if sched.ncpolling() > 0 {
+			// There are coroutines polling for I/O or waiting for a blocking job.
+			if sched.ncpolling() > 0 || sched.ncblocking() > 0 {
 				continue
 			}
 			// No coroutine to run, no timer, no eventpoll.
@@ -668,24 +698,24 @@ Sched:
 		}
 		tried = 0
 
-		t.c = c
-		t.c.state |= coroRunning
+		m.c = c
+		m.c.state |= coroRunning
 		sched.enterrun()
-		resume(&t.c)
+		resume(&m.c)
 		sched.exitrun()
 		trampolinerun()
 		retiredrain() // Destroy the retire coroutines.
 
-		// In general, `t.c` will not be updated by `park`.
+		// In general, `m.c` will not be updated by `park`.
 		// But empty select statements yield coroutine indefinitely,
 		// so it will not be runnable again. To prevent memory leak,
-		// because of coroutine handle allocations, it uses `t.c` as
+		// because of coroutine handle allocations, it uses `m.c` as
 		// the park coroutine. So we can catch it here.
-		if t.c.state&reasonSelectEmpty == reasonSelectEmpty {
-			close(&t.c)
+		if m.c.state&reasonSelectEmpty == reasonSelectEmpty {
+			close(&m.c)
 		}
 	}
-	schedAgain := closeThread(t)
+	schedAgain := stopm(m)
 	if schedAgain {
 		// We must have a P by waker.
 		goto Sched
@@ -739,8 +769,8 @@ async fn park2(mut &cp: *c, mu: taggedPointer, mut reason: u32) {
 #disable nilptr
 fn unpark(mut &cp: *c) {
 	cp.state &= ^reasonMask
-	mut t := gett()
-	runqput(t.pp, cp, true)
+	mut m := gett()
+	runqput(m.pp, cp, true)
 	// Try to wake up a new M. If there is an idle M, this is something that can be
 	// used to increase concurrency. If we only try to wake up a new M in more
 	// restricted situations, for example only when a runqput overflow occurs,
@@ -754,12 +784,12 @@ fn unpark(mut &cp: *c) {
 // Puts the current coroutine sleep for duration dur.
 #disable nilptr
 async fn sleep(dur: sleepDuration) {
-	mut t := gett()
+	mut m := gett()
 	mut timer := new(timer)
-	timer.data.c = t.c
+	timer.data.c = m.c
 	timer.data.used = true
 	timer.when = nanotime() + dur
-	t.pp.timers.push(timer)
+	m.pp.timers.push(timer)
 	park(&timer.data.c, 0, reasonSleep).await
 }
 
@@ -835,4 +865,62 @@ fn sysmon() {
 			}
 		}
 	}
+}
+
+// Spawns a M with the P.
+// The thread-mutex must be acquired before the call, it will release before return.
+#disable nilptr
+fn startm(mut pp: &p) {
+	countm++
+	// We have a cached M. Notify it.
+	if cachedm > 0 {
+		mut t := pushNewThread(roleM) // It will return a cached thread instance.
+		t.pp = pp
+		cachedm--
+		threadMutex.unlock()
+		t.parker.unpark()
+		ret
+	}
+	// Spawn a new one.
+	unsafe { threadSpawn(roleM, pp, (*unsafe)(uintptr(schedthread)), nil) }
+}
+
+// Stops the m, but it may be cached.
+#disable nilptr
+fn stopm(mut m: &thread): (schedAgain: bool) {
+	// Thread have a P.
+	// We have to put back it to idle processes.
+	if m.pp != nil {
+		for {
+			ok, _, full := sched.idlepps.enqueue(&m.pp)
+			if !ok && full {
+				panic("malformed internal schedule queue")
+			}
+			if ok {
+				break
+			}
+		}
+	}
+
+	threadMutex.lock()
+	countm--
+	if countm <= 0 {
+		panic("runtime: all coroutines are asleep - deadlock!")
+	}
+	// We already cached a lot M.
+	// Do not cache it, but keeps it if it is the main thread of the program.
+	if m != threadHead && cachedm >= COMAXPROCS() {
+		removeThread(m)
+		m = nil
+		threadMutex.unlock()
+		ret false
+	}
+	// There is space for caching, cache it.
+	// Park the thread and report true, it will be continue to run when notified.
+	cachedm++
+	m.pp = nil
+	m.state = threadClosed
+	threadMutex.unlock()
+	m.parker.park()
+	ret true
 }

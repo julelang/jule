@@ -1,0 +1,145 @@
+// Copyright 2025 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// A blocking job.
+struct blockingJob {
+	job:  fn()
+	cp:   &c
+	link: &blockingJob
+}
+
+// Environment for the blocking thread-pool.
+struct blockingenv {
+	maxWorkers: i32 // Constant once initialized.
+
+	mu:      mutex
+	jobs:    &blockingJob
+	workers: i32
+	cached:  i32
+}
+
+impl blockingenv {
+	// Gets a job from queues.
+	#disable nilptr boundary
+	fn getjob(mut *self, mut &job: *blockingJob): (ok: bool) {
+		self.mu.lock()
+		if self.jobs != nil {
+			*job = *self.jobs
+			job.link = nil
+			self.jobs = self.jobs.link
+			ok = true
+		}
+		self.mu.unlock()
+		ret
+	}
+
+	// Wakes a worker thread, if needed.
+	// The `blocking.mu` must be locked and it will not release it before return.
+	#disable nilptr
+	fn wakeworker(mut *self) {
+		// We have a cached worker thread. Notify it.
+		if self.cached > 0 {
+			threadMutex.lock()
+			mut t := pushNewThread(roleBlockingWorker) // It will return a cached thread instance.
+			self.cached--
+			threadMutex.unlock()
+			t.parker.unpark()
+			ret
+		}
+		// Spawn a new one, if possible.
+		if self.workers < self.maxWorkers {
+			self.workers++
+			threadMutex.lock()
+			unsafe { threadSpawn(roleBlockingWorker, nil, (*unsafe)(uintptr(blockingWorker)), nil) }
+		}
+	}
+}
+
+// Initialized by the runtime.
+let mut blocking = blockingenv{}
+
+// A blocking thread-pool worker.
+//
+// This function handled like an anonymous function.
+// Therefore the compiler will add *unsafe argument to
+// the head of the argument list implicitly for anonymous function context.
+// The operating system thread API passes a pointer to the function when calling it.
+// In the final stage, this function's signature fits with the OS thread API.
+#disable nilptr
+fn blockingWorker() {
+	sett(acquireThread())
+	threadMutex.unlock()
+	mut w := gett()
+	const MaxSpin = 4
+	mut tried := 0
+	for {
+		let mut job: blockingJob
+		ok := blocking.getjob(&job)
+		if !ok {
+			// No job to run.
+			// Under high contention, new job may be available since last lookup.
+			// Try again if reasonable.
+			if tried < MaxSpin && sched.ncrunning() > 0 {
+				tried++
+				continue
+			}
+			blocking.mu.lock()
+			// A job is enqueued, try again.
+			if blocking.jobs != nil {
+				blocking.mu.unlock()
+				continue
+			}
+			tried = 0
+			// Park the thread and continue it will be continue to run when notified.
+			blocking.cached++
+			threadMutex.lock()
+			w.state = threadClosed
+			threadMutex.unlock()
+			blocking.mu.unlock()
+			w.parker.park()
+			continue
+		}
+		tried = 0
+		// Do job and unpark the coroutine, it is ready to go.
+		job.job()
+		unpark(&(*job.cp))
+	}
+}
+
+fn blockinginit() {
+	blocking = blockingenv{}
+	blocking.maxWorkers = i32(NumCPU())
+}
+
+// Executes the given job on the blocking thread-pool,
+// isolating a potentially blocking operation from the scheduler.
+//
+// The scheduler does NOT automatically detect or offload blocking operations.
+// If a blocking call (e.g. file I/O or FFI) is executed directly,
+// the underlying scheduler thread (M) will block.
+//
+// Use this function when you want to explicitly prevent
+// a blocking operation from stalling scheduler progress.
+//
+// This function is opt-in and never used implicitly by the runtime.
+#disable nilptr
+async fn Blocking(job: fn()) {
+	mut m := gett()
+	mc := m.c
+	mut bj := blockingJob{job: job, cp: unsafe { (&c)(&mc) }}
+	blocking.mu.lock()
+	if blocking.jobs == nil {
+		blocking.jobs = unsafe { (&blockingJob)(&bj) }
+	} else {
+		bj.link = blocking.jobs
+		blocking.jobs = unsafe { (&blockingJob)(&bj) }
+	}
+	// We use the tagged pointer to call `blocking.wakeworker` after adding
+	// a new job to the queue. It is done by mutex-unlock algorithm.
+	// The `blocking.mu` will be released after park due to `mutexunlockJobAdd`.
+	tp := taggedPointerPack(nil, mutexunlockJobAdd)
+	sched.enterblock()
+	park2(&(*bj.cp), tp, reasonNA).await
+	sched.exitblock()
+}

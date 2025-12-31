@@ -220,33 +220,6 @@ impl mutex {
 	}
 }
 
-// Special mutexunlock tags.
-const (
-	_ = iota
-	mutexunlockSelect
-)
-
-// Unlocks mutex mu, if it is not zero.
-// The mu must point to the `mutex` memory layout.
-#export "__jule_mutexUnlock"
-fn mutexunlock(mu: u64) {
-	// Check for tagged pointer cases.
-	tp := taggedPointer(mu)
-	match tp.tag() {
-	| mutexunlockSelect:
-		mut &c := unsafe { &(*(*c)(tp.pointer())) }
-		atomic::Store(&c.race, selectParked, atomic::Release)
-		ret
-	}
-
-	// Ordinary address.
-	if mu != 0 {
-		// Assume mutex and qmutex have the same memory layout and
-		// implementation for unlock.
-		unsafe { (*mutex)(mu).unlock() }
-	}
-}
-
 const qmutexSize = 4 // i32
 
 // Simpler mutex implementation for elementary purposes and short-critical sections.
@@ -275,5 +248,37 @@ impl qmutex {
 	#disable nilptr
 	fn tryLock(*self): bool {
 		ret atomic::CompareAndSwap(&self.state, 0, 1, atomic::Acquire, atomic::Relaxed)
+	}
+}
+
+// Special mutexunlock tags.
+const (
+	_ = iota
+	mutexunlockSelect
+	mutexunlockJobAdd
+)
+
+// Unlocks mutex mu, if it is not zero.
+// The mu must point to the `mutex` memory layout.
+#export "__jule_mutexUnlock"
+fn mutexunlock(mu: u64) {
+	// Check for tagged pointer cases.
+	tp := taggedPointer(mu)
+	match tp.tag() {
+	| mutexunlockSelect:
+		mut &c := unsafe { &(*(*c)(tp.pointer())) }
+		atomic::Store(&c.race, 0, atomic::Release)
+		ret
+	| mutexunlockJobAdd:
+		blocking.wakeworker()
+		blocking.mu.unlock()
+		ret
+	}
+
+	// Ordinary address.
+	if mu != 0 {
+		// Assume mutex and qmutex have the same memory layout and
+		// implementation for unlock.
+		unsafe { (*mutex)(mu).unlock() }
 	}
 }

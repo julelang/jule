@@ -7,7 +7,6 @@ use "std/sys"
 
 const (
 	selectParking = 1
-	selectParked  = 2
 )
 
 // Select case.
@@ -289,11 +288,11 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 	//
 	// To avoid this, we use a tagged pointer so that when the `park` function
 	// attempts to unlock a mutex, the runtime can detect that this is not a real
-	// mutex and update `tc.race` to `selectParked` instead.
+	// mutex and update `tc.race` to `0` instead.
 	// By setting the `tc.race` field to `selectParking` before parking and before
 	// releasing the locks, we guarantee that any thread attempting to wake the
 	// coroutine will observe this state. This forces it to wait until parking
-	// completes, i.e., until the state becomes `selectParked`.
+	// completes, i.e., until the state becomes `0`.
 	tp := taggedPointerPack(&tc, mutexunlockSelect)
 
 	// Park and try iteration.
@@ -433,7 +432,7 @@ async fn emptyselect() {
 	//
 	// Use `gett().c` for park handle, because scheduler will destroy
 	// the coroutine after empty select.
-	mut t := gett()
-	park(&t.c, 0, reasonSelect|reasonSelectEmpty).await
+	mut m := gett()
+	park(&m.c, 0, reasonSelect|reasonSelectEmpty).await
 	panic("unreachable")
 }

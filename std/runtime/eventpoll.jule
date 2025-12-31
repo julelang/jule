@@ -110,8 +110,8 @@ impl polldesc {
 			deadline = 1<<63 - 1
 		}
 		self.deadline = deadline
-		mut t := gett()
-		t.pp.timers.push(&timer{when: deadline})
+		mut m := gett()
+		m.pp.timers.push(&timer{when: deadline})
 	}
 
 	#disable nilptr
@@ -126,8 +126,8 @@ impl polldesc {
 			deadline = 1<<63 - 1
 		}
 		self.rdeadline = deadline
-		mut t := gett()
-		t.pp.timers.push(&timer{when: deadline})
+		mut m := gett()
+		m.pp.timers.push(&timer{when: deadline})
 	}
 
 	#disable nilptr
@@ -142,8 +142,8 @@ impl polldesc {
 			deadline = 1<<63 - 1
 		}
 		self.wdeadline = deadline
-		mut t := gett()
-		t.pp.timers.push(&timer{when: deadline})
+		mut m := gett()
+		m.pp.timers.push(&timer{when: deadline})
 	}
 }
 
@@ -152,7 +152,7 @@ async fn eventpollwait(mut pd: &polldesc, mode: i32)! {
 	if mode != 'r' && mode != 'w' {
 		panic("runtime: invalid poll mode")
 	}
-	mut t := gett()
+	mut m := gett()
 	pd.mu.lock()
 	// Check for deadline because scheduler will remove it
 	// from the timers after expiration.
@@ -191,15 +191,15 @@ async fn eventpollwait(mut pd: &polldesc, mode: i32)! {
 		pd.mu.unlock()
 		error(netpollNotPollable)
 	}
-	mut tc := t.c
+	mut mc := m.c
 	match mode {
 	| 'r':
-		pd.rcp = unsafe { (&c)(&tc) }
+		pd.rcp = unsafe { (&c)(&mc) }
 	| 'w':
-		pd.wcp = unsafe { (&c)(&tc) }
+		pd.wcp = unsafe { (&c)(&mc) }
 	}
 	sched.enterpoll()
-	park(&tc, uintptr(&pd.mu), reasonNA).await
+	park(&mc, uintptr(&pd.mu), reasonNA).await
 	sched.exitpoll()
 	eventpollgeterr(pd, mode)?
 }
@@ -211,7 +211,7 @@ async fn eventpollwaitcanceled(mut pd: &polldesc, mode: i32) {
 	if mode != 'r' && mode != 'w' {
 		panic("runtime: invalid poll mode")
 	}
-	mut t := gett()
+	mut m := gett()
 	pd.mu.lock()
 	// Check for completion signals first.
 	if mode == 'r' && pd.rcp == pollrace {
@@ -226,7 +226,7 @@ async fn eventpollwaitcanceled(mut pd: &polldesc, mode: i32) {
 	}
 	sched.enterpoll()
 	for {
-		mut tc := t.c
+		mut tc := m.c
 		match mode {
 		| 'r':
 			pd.rcp = unsafe { (&c)(&tc) }
@@ -309,8 +309,8 @@ fn eventpollnew(fd: u64): &polldesc {
 	mut pd := pollcache.alloc()
 	eventpollopen(fd, &(*pd))
 	pd.fd = fd
-	mut t := gett()
-	pd.pp = t.pp
+	mut m := gett()
+	pd.pp = m.pp
 	pd.pp.pdsmu.lock()
 	pd.procq = pd.pp.pds.push(pd)
 	pd.pp.pdsmu.unlock()

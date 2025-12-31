@@ -8,6 +8,12 @@ const (
 	// State flags of threads.
 	threadRunning = 1 << iota // Header group specifier of running thread state.
 	threadClosed              // Thread execution completed, thread closed.
+
+	// Thread roles.
+	roleProgram        // The main thread of the program.
+	roleM              // A machine (M) thread.
+	roleSysmon         // The sysmon thread.
+	roleBlockingWorker // A worker thread for the blocking thread-pool.
 )
 
 // A thread instance is represents a spawned thread.
@@ -18,6 +24,9 @@ struct thread {
 
 	// Thread state.
 	state: u32
+
+	// Role of the thread for runtime.
+	role: int
 
 	// Parker of the thread.
 	parker: &parker
@@ -60,8 +69,8 @@ fn sett(mut t: &thread) {
 let threadMutex = mutex{}
 let mut threadHead = (&thread)(nil)
 let mut threadTail = (&thread)(nil)
-let mut cachedCount = 0 // Count of cached and parked coroutine scheduler threads.
-let mut workerCount = 0 // Count of worker threads at least runs or able to run a coroutine.
+let mut countm = 0  // Count of Ms at able to run a coroutine.
+let mut cachedm = 0 // Count of cached and parked coroutine scheduler threads.
 
 // Stores total number of logical threads.
 let mut numcpu = 0
@@ -75,9 +84,10 @@ fn NumCPU(): int { ret numcpu }
 
 // Allocates a new thread and sets state as running.
 #disable nilptr
-fn newThread(): &thread {
+fn newThread(role: int): &thread {
 	mut t := new(thread)
 	t.state |= threadRunning
+	t.role = role
 
 	// Initialized once and never deallocated if thread waiting for reuse.
 	t.parker = new(parker)
@@ -94,77 +104,21 @@ fn newThread(): &thread {
 // associated with a thread in thread stack, it should be the main thread.
 // New created threads should be added to the main thread's tail.
 #disable nilptr
-fn pushNewThread(): &thread {
+fn pushNewThread(role: int): &thread {
 	// Lookup for empty threads to caught ready to reuse thread if exist.
 	mut t := threadHead
 	for t != nil; t = t.next {
-		if t.state&threadClosed == threadClosed {
+		if t.role == role && t.state&threadClosed == threadClosed {
 			t.state = threadRunning
 			ret t
 		}
 	}
 	// We have not any reusable thread, so create a new one.
-	mut newt := newThread()
+	mut newt := newThread(role)
 	newt.prev = threadTail
 	threadTail.next = newt
 	threadTail = newt
 	ret newt
-}
-
-// Closes the thread t, but it may be cached.
-// The thread t must be a scheduler thread.
-#disable nilptr
-fn closeThread(mut t: &thread): (schedAgain: bool) {
-	// Thread have a P.
-	// We have to put back it to idle processes.
-	if t.pp != nil {
-		for {
-			ok, _, full := sched.idlepps.enqueue(&t.pp)
-			if !ok && full {
-				panic("malformed internal schedule queue")
-			}
-			if ok {
-				break
-			}
-		}
-	}
-
-	threadMutex.lock()
-	workerCount--
-	if workerCount <= 0 {
-		panic("runtime: all coroutines are asleep - deadlock!")
-	}
-	// We already cached a lot scheduler thread.
-	// Do not cache it, but keeps it if it is the main thread of the program.
-	if t != threadHead && cachedCount > COMAXPROCS() {
-		// Remove the instance from the queue.
-		if t.prev != nil {
-			t.prev.next = t.next
-		} else {
-			// Be safe, but this case must be unreachable.
-			threadHead = t.next
-		}
-		if t.next != nil {
-			t.next.prev = t.prev
-		} else {
-			threadTail = t.prev
-		}
-		t.prev = nil
-		t.next = nil
-		t.pp = nil
-		threadMutex.unlock()
-		t.parker.release()
-		t = nil
-		ret false
-	}
-	// There is space for caching, cache it.
-	// Park the thread and report true, it will be continue to run when notified.
-	cachedCount++
-	t.pp = nil
-	t.state = threadClosed
-	threadMutex.unlock()
-	t.parker.park()
-	ret true
 }
 
 // Locks the thread-mutex and returns the thread associated with current thread.
@@ -188,28 +142,30 @@ fn getThread(): &thread {
 	ret nil
 }
 
-// Spawns a new scheduler thread with the P.
-// The thread-mutex must be acquired before the call, it will release before return.
+// Removes thread t from the list, releases parker and drops references.
+// Assumes the threadMutex is locked and will not release before return.
 #disable nilptr
-fn startm(mut pp: &p) {
-	workerCount++
-	// We have a cached scheduler thread.
-	// Notify it.
-	if cachedCount > 0 {
-		mut t := pushNewThread() // It will return a cached thread instance.
-		t.pp = pp
-		cachedCount--
-		threadMutex.unlock()
-		t.parker.unpark()
-		ret
+fn removeThread(mut t: &thread) {
+	// Remove the instance from the queue.
+	if t.prev != nil {
+		t.prev.next = t.next
+	} else {
+		// This case must be unreachable, but be safe.
+		threadHead = t.next
 	}
-	// Spawn a new one.
-	unsafe { threadSpawn(pp, (*unsafe)(uintptr(schedthread)), nil) }
+	if t.next != nil {
+		t.next.prev = t.prev
+	} else {
+		threadTail = t.prev
+	}
+	t.prev = nil
+	t.next = nil
+	t.pp = nil
+	t.role = 0
+	t.parker.release()
 }
 
 fn threadinit() {
 	// Platform specific initialization.
 	_threadinit()
-
-	workerCount = 1 // The main program thread.
 }
