@@ -100,8 +100,10 @@ struct polldesc {
 impl polldesc {
 	#disable nilptr
 	fn setDeadline(mut *self, mut deadline: i64) {
+		self.mu.lock()
 		if deadline == 0 {
 			self.deadline = 0
+			self.mu.unlock()
 			ret
 		}
 		deadline = nanotime() + deadline
@@ -110,14 +112,17 @@ impl polldesc {
 			deadline = 1<<63 - 1
 		}
 		self.deadline = deadline
+		self.mu.unlock()
 		mut m := gett()
 		m.pp.timers.push(&timer{when: deadline})
 	}
 
 	#disable nilptr
 	fn setReadDeadline(mut *self, mut deadline: i64) {
+		self.mu.lock()
 		if deadline == 0 {
 			self.rdeadline = 0
+			self.mu.unlock()
 			ret
 		}
 		deadline = nanotime() + deadline
@@ -126,14 +131,17 @@ impl polldesc {
 			deadline = 1<<63 - 1
 		}
 		self.rdeadline = deadline
+		self.mu.unlock()
 		mut m := gett()
 		m.pp.timers.push(&timer{when: deadline})
 	}
 
 	#disable nilptr
 	fn setWriteDeadline(mut *self, mut deadline: i64) {
+		self.mu.lock()
 		if deadline == 0 {
 			self.wdeadline = 0
+			self.mu.unlock()
 			ret
 		}
 		deadline = nanotime() + deadline
@@ -142,8 +150,21 @@ impl polldesc {
 			deadline = 1<<63 - 1
 		}
 		self.wdeadline = deadline
+		self.mu.unlock()
 		mut m := gett()
 		m.pp.timers.push(&timer{when: deadline})
+	}
+
+	#disable nilptr boundary
+	fn evict(mut *self) {
+		let mut batch: [2]c
+		mut n := u32(0)
+		self.mu.lock()
+		eventpollunblock(self, 'r', &batch[0], &n)
+		eventpollunblock(self, 'w', &batch[1], &n)
+		self.mu.unlock()
+		mut m := gett()
+		runqputbatch(m.pp, unsafe { &(*(*[prunqsize]c)(&batch)) }, 0, n)
 	}
 }
 
@@ -262,42 +283,35 @@ fn eventpollgeterr(mut pd: &polldesc, mode: i32)! {
 	}
 }
 
+#disable nilptr
+fn eventpollunblock(mut &pd: *polldesc, mode: i32, mut &cp: *c, mut &delta: *u32) {
+	mut &pdcp := &pd.rcp
+	if mode == 'w' {
+		unsafe { *(&pdcp) = &pd.wcp }
+	}
+	if *pdcp != nil && *pdcp != pollrace {
+		*cp = **pdcp
+		if delta != nil {
+			*delta++
+		}
+		*pdcp = nil
+	} else {
+		*pdcp = pollrace
+	}
+}
+
 // Adds notified coroutines of pd to toRun according to mode.
 // It assumes pd mutex is locked.
 #disable nilptr boundary
 fn pollnotified(mut &pd: *polldesc, mode: i32, mut &toRun: *[prunqsize]c, mut &i: *u32) {
 	match mode {
 	| 'r':
-		if pd.rcp != nil && pd.rcp != pollrace {
-			(*toRun)[*i] = *pd.rcp
-			*i++
-			pd.rcp = nil
-		} else {
-			pd.rcp = pollrace
-		}
+		eventpollunblock(pd, 'r', &(*toRun)[*i], i)
 	| 'w':
-		if pd.wcp != nil && pd.wcp != pollrace {
-			(*toRun)[*i] = *pd.wcp
-			*i++
-			pd.wcp = nil
-		} else {
-			pd.wcp = pollrace
-		}
+		eventpollunblock(pd, 'w', &(*toRun)[*i], i)
 	| 'r' + 'w':
-		if pd.rcp != nil && pd.rcp != pollrace {
-			(*toRun)[*i] = *pd.rcp
-			*i++
-			pd.rcp = nil
-		} else {
-			pd.rcp = pollrace
-		}
-		if pd.wcp != nil && pd.wcp != pollrace {
-			(*toRun)[*i] = *pd.wcp
-			*i++
-			pd.wcp = nil
-		} else {
-			pd.wcp = pollrace
-		}
+		eventpollunblock(pd, 'r', &(*toRun)[*i], i)
+		eventpollunblock(pd, 'w', &(*toRun)[*i], i)
 	|:
 		panic("unimplemented case")
 	}

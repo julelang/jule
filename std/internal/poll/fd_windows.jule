@@ -52,7 +52,7 @@ struct FD {
 	// message based socket connection.
 	ZeroReadIsEOF: bool
 
-	// For console input/output.
+	// For console I/O.
 	lastbits:       []byte // first few bytes of the last incomplete rune in last write
 	readu16:        []u16  // buffer to hold u16s obtained with ReadConsole
 	readbyte:       []byte // buffer to hold decoding of readu16 from utf16 to utf8
@@ -209,7 +209,15 @@ impl FD {
 	// Writes buf to file handle, returns written byte count.
 	// Returns -1 if error occurred.
 	fn writeFile(mut *self, mut buf: []byte)!: (n: int) {
-		ret sys::WriteFile(sys::Handle(self.File), buf)?
+		ret sys::WriteFile(sys::Handle(self.File), buf) else {
+			if self.Flags&Pipe == Pipe && error == sys::ERROR_OPERATION_ABORTED {
+				// Close uses CancelIoEx to interrupt concurrent I/O for pipes.
+				// If the fd is a pipe and the Write was interrupted by CancelIoEx,
+				// we assume it is interrupted by Close.
+				error(ErrFileClosing)
+			}
+			error(error)
+		}
 	}
 
 	// Writes buf to console handle, returns written byte count.
@@ -365,6 +373,12 @@ impl FD {
 				// Work around ERROR_BROKEN_PIPE is returned on reading EOF from stdin.
 				ret 0
 			}
+			if self.Flags&Pipe == Pipe && error == sys::ERROR_OPERATION_ABORTED {
+				// Close uses CancelIoEx to interrupt concurrent I/O for pipes.
+				// If the fd is a pipe and the Read was interrupted by CancelIoEx,
+				// we assume it is interrupted by Close.
+				error(ErrFileClosing)
+			}
 			error(error)
 		}
 	}
@@ -501,8 +515,11 @@ impl FD {
 	// whence: 0 (Seek.Set) means, relative to the whence of the file, 1 (Seek.Cur)
 	// means relative to the current offset, and 2 (Seek.End) means relative to end.
 	async fn Seek(mut *self, offset: i64, whence: int)!: (newoffset: i64) {
-		self.readWriteLock().await?
-		defer { self.readWriteUnlock() }
+		if self.Flags&Pipe == Pipe {
+			error(sys::ESPIPE)
+		}
+		self.incref()?
+		defer { self.decref() else {} }
 		ret sys::Seek(sys::Handle(self.File), offset, whence)?
 	}
 
@@ -556,16 +573,16 @@ impl FD {
 		if !self.fdmu.increfAndClose() {
 			errClosing(self.isFile())?
 		}
-
-		// The call to decref will call destroy if there are no other
-		// references.
+		if self.Flags&Pipe == Pipe {
+			sys::CancelIoEx(sys::Handle(self.File), nil) else {}
+		}
+		// Unblock pending reader and writer.
+		self.pd.evict()
 		let mut err: any
 		self.decref() else { err = error }
-
 		// Wait until the descriptor is closed. If this was the only
 		// reference, it is already closed.
 		semacquire(&self.csema).await
-
 		if err != nil {
 			error(err)
 		}
