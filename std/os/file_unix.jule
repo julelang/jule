@@ -3,6 +3,8 @@
 // license that can be found in the LICENSE file.
 
 use "std/internal/poll"
+use "std/internal/sys/unix"
+use "std/runtime"
 use "std/sys"
 
 const devNull = "/dev/null"
@@ -11,19 +13,103 @@ fn openFile(path: str, flag: int, perm: FileMode)!: &File {
 	if path == "" {
 		error(sys::ENOENT)
 	}
-	fd := sys::Open(path, flag|sys::O_CLOEXEC, syscallMode(perm))?
-	ret newFile(u64(fd), poll::File)?
+	let mut fd: int
+	mut &_fd := &fd //For closure.
+	ignoringEINTR(fn|| {
+		unsafe { *_fd = sys::Open(path, flag|sys::O_CLOEXEC, syscallMode(perm))? }
+	})?
+	ret newFile(fd, poll::File, unix::HasNonblockFlag(flag))?
 }
 
-fn newFile(h: u64, mut flags: int)!: &File {
-	mut fd := &poll::FD{
-		File: u64(h),
+fn newFile(fd: int, mut flags: int, nonBlocking: bool)!: &File {
+	mut pfd := &poll::FD{
+		File: u64(fd),
 		Flags: flags,
 		IsStream: true,
 		ZeroReadIsEOF: true,
 	}
-	fd.Init(false)?
-	ret &File{fd: fd}
+
+	mut pollable := nonBlocking || flags&poll::File == poll::File || flags&poll::Pipe == poll::Pipe
+
+	// Things like regular files and FIFOs in kqueue on *BSD/Darwin
+	// may not work properly (or accurately according to its manual).
+	// As a result, we should avoid adding those to the kqueue-based
+	// eventpoller. Check out Go's #19093, #24164, and #66239 for more contexts.
+	//
+	// If the fd was passed to us via any path other than OpenFile,
+	// we assume those callers know what they were doing, so we won't
+	// perform this check and allow it to be added to the kqueue.
+	if flags&poll::File == poll::File {
+		// Use comptime match here, because only matched systems have
+		// this syscalls, not all UNIX-like.
+		const match runtime::OS {
+		| "darwin":
+			let mut st: sys::SysStat
+			let mut err: any
+			mut &_err := &err // For closure.
+			mut &_st := &st   // For closure.
+			ignoringEINTR(fn|| {
+				unsafe {
+					sys::Fstat(fd, _st) else {
+						*_err = error
+					}
+				}
+			})!
+			typ := st.Mode & sys::S_IFMT
+			// Don't try to use kqueue with regular files on *BSDs.
+			// On FreeBSD a regular file is always
+			// reported as ready for writing.
+			// On Dragonfly, NetBSD and OpenBSD the fd is signaled
+			// only once as ready (both read and write).
+			// Go's issue 19093.
+			// Also don't add directories to the eventpoller.
+			if err == nil && (typ == sys::S_IFREG || typ == sys::S_IFDIR) {
+				pollable = false
+			}
+
+			// In addition to the behavior described above for regular files,
+			// on Darwin, kqueue does not work properly with fifos:
+			// closing the last writer does not cause a kqueue event
+			// for any readers. See Go's issue #24164.
+			if (runtime::OS == "darwin" || runtime::OS == "ios") && typ == sys::S_IFIFO {
+				pollable = false
+			}
+		}
+	}
+
+	mut clearNonBlock := false
+	if pollable {
+		// The descriptor is already in non-blocking mode.
+		// We only set f.nonblock if we put the file into
+		// non-blocking mode.
+		if nonBlocking {
+			// no-op
+		} else {
+			let mut err: bool
+			sys::SetNonblock(fd, true) else {
+				err = true
+			}
+			if err {
+				pollable = false
+			} else {
+				clearNonBlock = true
+			}
+		}
+	}
+
+	// An error here indicates a failure to register
+	// with the eventpoll system. That can happen for
+	// a file descriptor that is not supported by
+	// epoll/kqueue; for example, disk files on
+	// Linux systems. We assume that any real error
+	// will show up in later I/O.
+	// We do restore the blocking behavior if it was set by us.
+	pfd.Init(pollable) else {
+		if clearNonBlock {
+			sys::SetNonblock(fd, false) else {}
+		}
+	}
+	ret &File{fd: pfd}
 }
 
 fn remove(path: str)! {

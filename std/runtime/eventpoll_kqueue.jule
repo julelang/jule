@@ -34,7 +34,7 @@ fn eventpollinit() {
 }
 
 #disable nilptr boundary
-fn eventpollopen(fd: u64, mut &pd: *polldesc) {
+fn eventpollopen(fd: u64, mut &pd: *polldesc)! {
 	let mut ev: [2]keventt
 	ev[0].ident = fd
 	ev[0].filter = sys::EVFILT_READ
@@ -55,7 +55,7 @@ fn eventpollopen(fd: u64, mut &pd: *polldesc) {
 	ev[1].filter = sys::EVFILT_WRITE
 	r := sys::Addrcall[i32](uintptr(extern.kevent), kq, &ev[0], i32(2), (*unsafe)(nil), i32(0), (*unsafe)(nil))
 	if r < 0 {
-		panic("runtime: eventpollopen: kevent failed")
+		error(sys::GetLastErrno())
 	}
 }
 

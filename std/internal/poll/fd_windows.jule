@@ -74,16 +74,18 @@ impl FD {
 		}
 
 		if pollable {
-			self.pd = runtime::eventpollnew(self.File)
+			// If we could not initialize the runtime poller,
+			// assume we are using blocking mode.
+			self.pd = runtime::eventpollnew(self.File)?
 			self.pollable = true
-		}
 
-		self.rop.mode = 'r'
-		self.rop.fd = self
-		self.rop.pd = self.pd
-		self.wop.mode = 'w'
-		self.wop.fd = self
-		self.wop.pd = self.pd
+			self.rop.mode = 'r'
+			self.rop.fd = self
+			self.rop.pd = self.pd
+			self.wop.mode = 'w'
+			self.wop.fd = self
+			self.wop.pd = self.pd
+		}
 	}
 
 	// Writes bytes to the file descriptor and returns written byte count.

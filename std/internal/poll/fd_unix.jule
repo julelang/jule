@@ -47,7 +47,9 @@ struct FD {
 impl FD {
 	fn Init(mut *self, pollable: bool)! {
 		if pollable {
-			self.pd = runtime::eventpollnew(self.File)
+			// If we could not initialize the runtime poller,
+			// assume we are using blocking mode.
+			self.pd = runtime::eventpollnew(self.File)?
 			self.pollable = true
 		}
 	}
@@ -308,7 +310,8 @@ impl FD {
 	fn Ftruncate(mut *self, size: i64)! {
 		self.incref()?
 		defer { self.decref() else {} }
-		sys::Ftruncate(int(self.File), size)?
+		fd := int(self.File)
+		ignoringEINTR(fn|| sys::Ftruncate(fd, size)?)?
 	}
 
 	// Wraps the accept network call.

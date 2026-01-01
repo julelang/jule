@@ -319,9 +319,12 @@ fn pollnotified(mut &pd: *polldesc, mode: i32, mut &toRun: *[prunqsize]c, mut &i
 
 // Returns a polldesc for the fd.
 #disable nilptr
-fn eventpollnew(fd: u64): &polldesc {
+fn eventpollnew(fd: u64)!: &polldesc {
 	mut pd := pollcache.alloc()
-	eventpollopen(fd, &(*pd))
+	eventpollopen(fd, &(*pd)) else {
+		pollcache.free(pd)
+		error(error)
+	}
 	pd.fd = fd
 	mut m := gett()
 	pd.pp = m.pp
@@ -401,10 +404,12 @@ impl pollcachepool {
 		atomic::Store(&pd.fdseq, fdseq, atomic::Release)
 
 		// Remove processor.
-		pd.pp.pdsmu.lock()
-		pd.pp.pds.remove(pd.procq)
-		pd.pp.pdsmu.unlock()
-		pd.pp = nil
+		if pd.pp != nil {
+			pd.pp.pdsmu.lock()
+			pd.pp.pds.remove(pd.procq)
+			pd.pp.pdsmu.unlock()
+			pd.pp = nil
+		}
 
 		// Clean deadlines.
 		pd.rdeadline = 0

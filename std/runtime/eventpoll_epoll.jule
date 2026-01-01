@@ -22,7 +22,7 @@ fn eventpollinit() {
 }
 
 #disable nilptr boundary
-fn eventpollopen(fd: u64, mut &pd: *polldesc) {
+fn eventpollopen(fd: u64, mut &pd: *polldesc)! {
 	let mut ev: epollEvent
 	ev.events = sys::EPOLLIN | sys::EPOLLOUT | sys::EPOLLRDHUP | sys::EPOLLET
 	fdseq := atomic::Load(&pd.fdseq, atomic::Acquire)
@@ -30,7 +30,7 @@ fn eventpollopen(fd: u64, mut &pd: *polldesc) {
 	ev.data._u64 = u64(tp)
 	e := syscall_EpollCtl(epfd, sys::EPOLL_CTL_ADD, i32(fd), &ev)
 	if e != _NO_ERROR {
-		panic("runtime: eventpollopen: epoll failed")
+		error(sys::GetLastErrno())
 	}
 }
 
