@@ -662,8 +662,6 @@ fn findRunnable(spinning: bool): (c: c, ok: bool) {
 // Works like and event-loop, looks for a coroutine and executes it.
 #disable nilptr
 fn schedule(mut spinning: bool) {
-	sett(acquireThread())
-	threadMutex.unlock()
 	mut m := gett()
 Sched:
 	const MaxSpin = 4
@@ -733,6 +731,10 @@ Sched:
 // The operating system thread API passes a pointer to the function when calling it.
 // In the final stage, this function's signature fits with the OS thread API.
 fn schedthread() {
+	// Set thread-local data before scheduling.
+	sett(acquireThread())
+	threadMutex.unlock()
+
 	schedule(true)
 }
 

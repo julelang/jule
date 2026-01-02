@@ -44,11 +44,14 @@ struct thread {
 
 	// Current coroutine of the thread.
 	c: c
+
+	// Local random state.
+	rand:      randmach
+	cheaprand: u64
 }
 
 // Returns the current thread.
 // Uses the thread-local data.
-// On sync runtime, returns nil.
 fn gett(): &thread {
 	ret extern.__jule_ct
 }
@@ -92,6 +95,9 @@ fn newThread(role: int): &thread {
 	// Initialized once and never deallocated if thread waiting for reuse.
 	t.parker = new(parker)
 	t.parker.init()
+
+	// Initialize local random state.
+	trandinit(t)
 
 	ret t
 }
@@ -168,4 +174,8 @@ fn removeThread(mut t: &thread) {
 fn threadinit() {
 	// Platform specific initialization.
 	_threadinit()
+
+	// Program started by the main thread.
+	// Use `sett(threadHead)` to set thread-local &thread data for the main thread.
+	sett(threadHead)
 }

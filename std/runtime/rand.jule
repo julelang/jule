@@ -70,6 +70,29 @@ impl randmach {
 		hi *= (lo | 1)
 		ret hi
 	}
+
+	// Same as next (stay sync), but not concurrency-safe.
+	// See next for documentation.
+	fn nextl(*self): u64 {
+		const (
+			mulHi = 2549297995355413924
+			mulLo = 4865540595714422341
+			incHi = 6364136223846793005
+			incLo = 1442695040888963407
+		)
+		mut hi, mut lo := mul64(self.lo, mulLo)
+		hi = hi + self.hi*mulLo + self.lo*mulHi
+		lo, c := add64(lo, incLo, 0)
+		hi, _ = add64(hi, incHi, c)
+		self.lo = lo
+		self.hi = hi
+		const cheapMul = 0xda942042e4dd58b5
+		hi ^= hi >> 32
+		hi *= cheapMul
+		hi ^= hi >> 48
+		hi *= (lo | 1)
+		ret hi
+	}
 }
 
 // Runtime PRNG instance.
@@ -80,17 +103,61 @@ let __rand = randmach{}
 // If any initializer function uses random function directly or undirectly,
 // be aware of that risk. Runtime randmach instance should be initialized before use.
 fn randinit() {
-	__rand.init(u64(nanotime()), u64(uintptr(threadHead)))
+	__rand.init(u64(nanotime()), u64(uintptr(&__rand)))
 }
 
-// Returns pseudo-random number.
+// Returns pseudo-random number from the global random state.
 // It is safe for concurrent use by multiple coroutines.
-fn rand(): u64 {
+fn randg(): u64 {
 	ret __rand.next()
+}
+
+// Returns pseudo-random number from the thread local random state.
+fn rand(): u64 {
+	ret gett().rand.nextl()
 }
 
 // Like rand() % n but faster.
 fn randn(n: u32): u32 {
 	// See https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction
 	ret u32((u64(u32(rand())) * u64(n)) >> 32)
+}
+
+#disable nilptr
+fn trandinit(mut t: &thread) {
+	seed := randg()
+	t.cheaprand = seed
+	t.rand.init(seed, u64(nanotime()))
+}
+
+// A non-cryptographic-quality 32-bit random generator
+// suitable for calling at very high frequency.
+// it is "cheap" in the sense of both expense and quality.
+#disable nilptr
+fn cheaprand(): u32 {
+	// Implement xorshift64+: 2 32-bit xorshift sequences added together.
+	// Shift triplet [17,7,16] was calculated as indicated in Marsaglia's
+	// Xorshift paper: https://www.jstatsoft.org/article/view/v008i14/xorshift.pdf
+	m := gett()
+	unsafe {
+		mut t := (*[2]u32)(&m.cheaprand)
+		mut s1, s0 := (*t)[0], (*t)[1]
+		s1 ^= s1 << 17
+		s1 = s1 ^ s0 ^ s1>>7 ^ s0>>16
+		(*t)[0], (*t)[1] = s0, s1
+		ret s0 + s1
+	}
+}
+
+// A non-cryptographic-quality 63-bit random generator
+// suitable for calling at very high frequency.
+// it is "cheap" in the sense of both expense and quality.
+fn cheaprand64(): i64 {
+	ret i64(cheaprand())<<31 ^ i64(cheaprand())
+}
+
+// Like cheaprand() % n but faster.
+fn cheaprandn(n: u32): u32 {
+	// See https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
+	ret u32((u64(cheaprand()) * u64(n)) >> 32)
 }
