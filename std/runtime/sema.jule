@@ -6,23 +6,17 @@ use "std/internal/cpu"
 use "std/internal/runtime"
 use "std/internal/runtime/atomic"
 
-// Stores sema space for unique sema.
-struct semaNode {
-	sema: *u32
-	tree: &parkerList // Root of tree of the waiters.
-	next: &semaNode
-}
-
 const semaRootSize = qmutexSize + runtime::SmartptrSize + 4 // +4 for u32
 
 // Stores all space collections of sema.
 struct semaRoot {
 	lock:  qmutex
-	tree:  &semaNode // Root of tree of unique sema spaces.
-	nwait: u32       // Number of waiters. Read w/o the lock, should be atomic.
+	treap: &parkerList // Root of balanced tree of unique waiters.
+	nwait: u32         // Number of waiters. Read w/o the lock, should be atomic.
 }
 
 impl semaRoot {
+	// Adds p to the blocked coroutines in semaRoot.
 	#disable nilptr
 	fn queue(mut *self, mut &sema: *u32, mut p: &parkerList, lifo: bool) {
 		// The leaf may already used and some fields may be modified.
@@ -30,78 +24,219 @@ impl semaRoot {
 		// enqueued again. So, data of old record may cause errors.
 		// Reset them to default to avoid data misunderstanding.
 		p.next = nil
+		p.prev = nil
 		p.ticket = 0
+		p.stack = uintptr(sema)
 
-		mut t := self.tree
-		mut otru := (&semaNode)(nil)
-		if t != nil {
-			for {
+		let mut last: &parkerList
+		mut &pt := &self.treap
+		mut t := *pt
+		for t != nil; t = *pt {
+			if t.stack == uintptr(sema) {
 				// Already have sema in list.
-				if uintptr(t.sema) == uintptr(sema) {
-					if lifo {
-						// Add p to head of the wait list.
-						p.next = t.tree
-						t.tree = p
-					} else {
-						// Add p to end of the wait list.
-						mut tp := t.tree
-						for tp.next != nil; tp = tp.next {
-						}
-						tp.next = p
+				if lifo {
+					// Substitute p in t's place in treap.
+					*pt = p
+					p.ticket = t.ticket
+					p.parent = t.parent
+					p.prev = t.prev
+					p.next = t.next
+					if p.prev != nil {
+						p.prev.parent = p
 					}
-					ret
+					if p.next != nil {
+						p.next.parent = p
+					}
+					// Add t first in p's wait list.
+					p.waitlink = t
+					p.waittail = t.waittail
+					if p.waittail == nil {
+						p.waittail = t
+					}
+					t.parent = nil
+					t.prev = nil
+					t.next = nil
+					t.waittail = nil
+				} else {
+					// Add p to end of t's wait list.
+					if t.waittail == nil {
+						t.waitlink = p
+					} else {
+						t.waittail.waitlink = p
+					}
+					t.waittail = p
+					p.waitlink = nil
 				}
-				if otru == nil && t.sema == nil {
-					otru = t
-				}
-				if t.next == nil {
-					// Break iteration here.
-					// If needed the last non-nil node will be used.
-					break
-				}
-				t = t.next
+				ret
+			}
+			last = t
+			if uintptr(sema) < t.stack {
+				unsafe { *(&pt) = &t.prev }
+			} else {
+				unsafe { *(&pt) = &t.next }
 			}
 		}
-		// Add new semaNode for sema since it is not exist in the list.
-		if otru != nil {
-			// Found a node in open to reuse state, so use it.
-			otru.sema = sema
-			otru.tree = p
-			ret
-		}
-		mut sn := new(semaNode)
-		sn.sema = sema
-		sn.tree = p
-		if self.tree == nil {
-			// Head is nil, so p will be.
-			self.tree = sn
+
+		// Add p as new leaf in tree of unique addrs.
+		// The balanced tree is a treap using ticket as the random heap priority.
+		// That is, it is a binary tree ordered according to the elem addresses,
+		// but then among the space of possible binary trees respecting those
+		// addresses, it is kept balanced on average by maintaining a heap ordering
+		// on the ticket: p.ticket <= both p.prev.ticket and p.next.ticket.
+		// https://en.wikipedia.org/wiki/Treap
+		// https://faculty.washington.edu/aragon/pubs/rst89.pdf
+		//
+		// p.ticket may be compared with zero, therefore set lowest bit.
+		// It will not affect treap's quality noticeably.
+		//
+		// Only the main and scheduler threads have a gett() result.
+		// When this semaRoot used by other threads, such as blocking thread pool
+		// worker threads, gett() may return nil. When this happened, use the
+		// global random state, otherwise always prefer cheaprand.
+		if gett() == nil {
+			p.ticket = u32(randg()) | 1
 		} else {
-			// Head is not nil and there is no reusable node.
-			// So append p to nodes.
-			t.next = sn
+			p.ticket = cheaprand() | 1
+		}
+		p.parent = last
+		*pt = p
+
+		// Rotate up into tree according to ticket (priority).
+		for p.parent != nil && p.parent.ticket > p.ticket {
+			if p.parent.prev == p {
+				self.rotateRight(p.parent)
+			} else {
+				if p.parent.next != p {
+					panic("semaRoot queue")
+				}
+				self.rotateLeft(p.parent)
+			}
 		}
 	}
 
+	// Searches for and finds the first coroutine in semaRoot blocked on sema.
 	#disable nilptr
 	fn dequeue(mut *self, &sema: *u32): &parkerList {
-		mut t := self.tree
-		for t != nil; t = t.next {
-			// Already have sema in list.
-			if uintptr(t.sema) == uintptr(sema) {
-				if t.tree == nil {
-					break
-				}
-				mut p := t.tree
-				t.tree = p.next
-				// Remove sema if tree reached to nil.
-				// So, open to reuse this allocation for other semas.
-				if t.tree == nil {
-					t.sema = nil
-				}
-				ret p
+		mut &ps := &self.treap
+		mut p := *ps
+		for p != nil; p = *ps {
+			if p.stack == uintptr(sema) {
+				goto Found
+			}
+			if uintptr(sema) < p.stack {
+				unsafe { *(&ps) = &p.prev }
+			} else {
+				unsafe { *(&ps) = &p.next }
 			}
 		}
 		ret nil
+
+	Found:
+		mut t := p.waitlink
+		if t != nil {
+			// Substitute t, also waiting on addr, for p in root tree of unique addrs.
+			*ps = t
+			t.ticket = p.ticket
+			t.parent = p.parent
+			t.prev = p.prev
+			if t.prev != nil {
+				t.prev.parent = t
+			}
+			t.next = p.next
+			if t.next != nil {
+				t.next.parent = t
+			}
+			if t.waitlink != nil {
+				t.waittail = p.waittail
+			} else {
+				t.waittail = nil
+			}
+			p.waitlink = nil
+			p.waittail = nil
+		} else {
+			// Rotate p down to be leaf of tree for removal, respecting priorities.
+			for p.next != nil || p.prev != nil {
+				if p.next == nil || p.prev != nil && p.prev.ticket < p.next.ticket {
+					self.rotateRight(p)
+				} else {
+					self.rotateLeft(p)
+				}
+			}
+			// Remove p, now a leaf.
+			if p.parent != nil {
+				if p.parent.prev == p {
+					p.parent.prev = nil
+				} else {
+					p.parent.next = nil
+				}
+			} else {
+				self.treap = nil
+			}
+		}
+		p.parent = nil
+		p.stack = 0
+		p.next = nil
+		p.prev = nil
+		p.ticket = 0
+		ret p
+	}
+
+	// Rotates the tree rooted at node x.
+	// turning (x a (y b c)) into (y (x a b) c).
+	#disable nilptr
+	fn rotateLeft(mut *self, mut x: &parkerList) {
+		// p -> (x a (y b c))
+		mut p := x.parent
+		mut y := x.next
+		mut b := y.prev
+
+		y.prev = x
+		x.parent = y
+		x.next = b
+		if b != nil {
+			b.parent = x
+		}
+
+		y.parent = p
+		if p == nil {
+			self.treap = y
+		} else if p.prev == x {
+			p.prev = y
+		} else {
+			if p.next != x {
+				panic("semaRoot rotateLeft")
+			}
+			p.next = y
+		}
+	}
+
+	// Rotates the tree rooted at node y.
+	// turning (y (x a b) c) into (x a (y b c)).
+	#disable nilptr
+	fn rotateRight(mut *self, mut y: &parkerList) {
+		// p -> (y (x a b) c)
+		mut p := y.parent
+		mut x := y.prev
+		mut b := x.next
+
+		x.next = y
+		y.parent = x
+		y.prev = b
+		if b != nil {
+			b.parent = y
+		}
+
+		x.parent = p
+		if p == nil {
+			self.treap = x
+		} else if p.prev == y {
+			p.prev = x
+		} else {
+			if p.next != y {
+				panic("semaRoot rotateRight")
+			}
+			p.next = x
+		}
 	}
 }
 
