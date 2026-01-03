@@ -82,6 +82,9 @@ struct p {
 	runqtail: u32
 	runq:     [prunqsize]c
 
+	// Incremented on every scheduler call.
+	schedtick: u32
+
 	// Poll descriptors that are still alive.
 	pdsmu: mutex
 	pds:   polldescq
@@ -236,6 +239,35 @@ fn wakep() {
 	}
 }
 
+// Try get a batch of C's from the global runnable queue.
+// sched.runqmu must be held and will not be released before return.
+fn globrunqget(mut pp: &p, max: i32, mut &cp: *c): bool {
+	if sched.runq.len == 0 {
+		ret false
+	}
+
+	mut n := sched.runq.len/COMAXPROCS() + 1
+	if n > sched.runq.len {
+		n = sched.runq.len
+	}
+	if max > 0 && n > int(max) {
+		n = int(max)
+	}
+	if n > len(pp.runq)/2 {
+		n = len(pp.runq) / 2
+	}
+
+	*cp = sched.runq.head.c
+	sched.runq.remove(sched.runq.head)
+	n--
+	for n > 0; n-- {
+		mut c := sched.runq.head.c
+		sched.runq.remove(sched.runq.head)
+		runqput(pp, &c, false)
+	}
+	ret true
+}
+
 // Tries to put cp on the local runnable queue.
 // If next is false, it adds cp to the tail of the runnable queue if runnext is used.
 // If next is true, runqput puts cp in the pp.runnext slot.
@@ -253,7 +285,7 @@ fn runqput(mut pp: &p, mut &cp: *c, next: bool): (overflow: bool) {
 		ret true
 	}
 
-	if !pp.runnext.used {
+	if next && !pp.runnext.used {
 		// The runnext slot is empty, use it.
 		pp.runnext.c = *cp
 		pp.runnext.used = true
@@ -473,6 +505,22 @@ fn stealWork(mut pp: &p, mut &cp: *c): bool {
 fn findRunnable(spinning: bool): (c: c, ok: bool) {
 	mut pp := gett().pp
 
+	// Check the global runnable queue once in a while to ensure fairness.
+	// Otherwise two coroutines can completely occupy the local runqueue
+	// by constantly respawning each other.
+	if pp.schedtick&63 == 0 && sched.runq.len > 0 {
+		sched.runqmu.lock()
+		ok = globrunqget(pp, 1, &c)
+		sched.runqmu.unlock()
+		if ok {
+			if spinning {
+				panic("runtime: spinning when local runnable queue is not empty")
+			}
+			ret
+		}
+	}
+
+	// Local runnable queue.
 	ok = runqget(pp, &c)
 	if ok {
 		if spinning {
@@ -507,28 +555,14 @@ fn findRunnable(spinning: bool): (c: c, ok: bool) {
 	//
 	// The batch size is capped to prunqsize to preserve
 	// locality and reduce contention on the global lock.
-	sched.runqmu.lock()
-	if sched.runq.head != nil {
-		let mut batch: [prunqsize]c
-		mut n := u32(0)
-
-		for n < prunqsize; n++ {
-			if sched.runq.head == nil {
-				break
-			}
-			batch[n] = sched.runq.head.c
-			sched.runq.remove(sched.runq.head)
-		}
+	if sched.runq.len > 0 {
+		sched.runqmu.lock()
+		ok = globrunqget(pp, 0, &c)
 		sched.runqmu.unlock()
-
-		if n > 0 {
+		if ok {
 			sched.exitspin()
-			c = batch[0]
-			runqputbatch(pp, &batch, 1, n)
-			ret c, true
+			ret
 		}
-	} else {
-		sched.runqmu.unlock()
 	}
 
 	// No work found locally or globally: attempt work stealing.
@@ -664,6 +698,7 @@ fn findRunnable(spinning: bool): (c: c, ok: bool) {
 fn schedule(mut spinning: bool) {
 	mut m := gett()
 Sched:
+	m.pp.schedtick = 0
 	const MaxSpin = 4
 	mut tried := 0
 	for {
@@ -697,6 +732,7 @@ Sched:
 			break
 		}
 		tried = 0
+		m.pp.schedtick++
 
 		m.c = c
 		m.c.state |= coroRunning

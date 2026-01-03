@@ -133,6 +133,7 @@ struct coroqc {
 struct coroq {
 	head: &coroqc
 	tail: &coroqc
+	len:  int
 }
 
 impl coroq {
@@ -142,21 +143,6 @@ impl coroq {
 		mut qc := new(coroqc)
 		qc.c = *cp
 		self.pushq(qc)
-	}
-
-	// Appends cp to front of the queue.
-	#disable nilptr
-	fn pushFront(mut *self, mut &cp: *c) {
-		mut qc := new(coroqc)
-		qc.c = *cp
-		if self.tail == nil {
-			self.head = qc
-			self.tail = qc
-		} else {
-			qc.next = self.head
-			self.head.prev = qc
-			self.head = qc
-		}
 	}
 
 	// Same as push, but takes a coroq.
@@ -170,6 +156,7 @@ impl coroq {
 			self.tail.next = qc
 			self.tail = qc
 		}
+		self.len++
 	}
 
 	// Removes c from the queue.
@@ -187,5 +174,6 @@ impl coroq {
 		}
 		c.prev = nil
 		c.next = nil
+		self.len--
 	}
 }
