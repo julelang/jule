@@ -5,25 +5,11 @@
 // For thread parking, Jule runtime uses futex and futex-like APIs.
 // See: https://shift.click/blog/futex-like-apis
 
-use "std/internal/runtime/atomic"
-
-// Special flags for the ticket state.
-const (
-	parkerSelect = iota + 1
-)
-
-// Special flags for the state flags.
-const (
-	parkerSelectWaiting = iota
-	parkerSelectConsumed
-)
-
 // Linked-list for coroutine parkers.
 struct parkerList {
 	parker: &parker
 	cp:     &c // A fake smart-pointer for stack allocated coroutine.
 
-	state:  &int
 	ticket: u32
 	stack:  uintptr
 
@@ -33,108 +19,4 @@ struct parkerList {
 	parent:   &parkerList // semaRoot binary tree
 	waitlink: &parkerList // semaRoot
 	waittail: &parkerList // semaRoot
-}
-
-struct waitq {
-	mut head: &parkerList
-	tail:     &parkerList
-}
-
-impl waitq {
-	#disable nilptr
-	fn exist(*self, p: &parkerList): bool {
-		mut i := self.head
-		for i != nil; i = i.next {
-			if i == p {
-				ret true
-			}
-		}
-		ret false
-	}
-
-	#disable nilptr
-	fn enqueue(mut *self, mut p: &parkerList) {
-		if self.tail == nil {
-			self.head = p
-		} else {
-			self.tail.next = p
-		}
-		self.tail = p
-	}
-
-	#disable nilptr
-	fn enqueueAvoidDuplicate(mut *self, mut p: &parkerList) {
-		if !self.exist(p) {
-			self.enqueue(p)
-		}
-	}
-
-	#disable nilptr
-	fn dequeue(mut *self): &parkerList {
-		if self.head == nil {
-			ret nil
-		}
-		mut p := self.head
-		self.head = p.next
-		if self.head == nil {
-			self.tail = nil
-		}
-		p.next = nil
-		ret p
-	}
-
-	// Dequeue according to channel tickets.
-	// If waiter is a select statement coroutine, skips if it is consumed.
-	#disable nilptr
-	fn dequeueChan(mut *self): &parkerList {
-		for {
-			mut deq := self.dequeue()
-			if deq == nil {
-				ret nil
-			}
-			// If waiter is a select statement, check if it is consumed.
-			// If the state is not zero, coroutine is consumed.
-			// Set state as consumed to prevent false dequeue.
-			if deq.ticket&parkerSelect == parkerSelect {
-				if !atomic::CompareAndSwap(&(*deq.state), parkerSelectWaiting, parkerSelectConsumed, atomic::AcqRel, atomic::Relaxed) {
-					// Lost race, skip.
-					continue
-				}
-				// Won race, make sure the park completed.
-				// See the comment of tp, from the runselect function.
-				for atomic::Load(&deq.cp.race, atomic::Acquire) != 0 {
-					// This spin should be good because this race is short.
-				}
-			}
-			ret deq
-		}
-	}
-}
-
-// Unparks all coroutines from the waiters q.
-#disable nilptr
-fn unparkAll(mut &q: *waitq, clearSpuriousSigns: bool) {
-	// Go through the local list and make ready all waiters.
-	mut s := q.head
-	for s != nil {
-		mut next := s.next
-		s.next = nil
-		if clearSpuriousSigns {
-			s.stack = 0  // Set stack pointer to zero, marked as received/sent.
-			s.ticket = 0 // Set ticket to zero, marked as received/sent for select statements.
-		}
-		unpark(&(*s.cp))
-		s = next
-	}
-}
-
-// Reports whether the parker is notified spuriously.
-// Implemented for channels and select statements.
-#disable nilptr
-fn isSpuriousWake(&p: *parkerList): bool {
-	// If stack is not zero, it is not consumed.
-	// But select statement may pass zero stack pointer for no receiver memory cases.
-	// Check for the ticket, if ticket is parkerSelect, it is not consumed.
-	// Appropriate consumption will set them to zero.
-	ret p.ticket != 0 || p.stack != 0
 }

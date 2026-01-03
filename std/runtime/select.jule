@@ -238,7 +238,7 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 	mut tc := gett().c
 	// Allocate and prepare a parker per operation.
 	// Use round-robin iteration to achieve randomness.
-	mut parkers := make([]&parkerList, nrecv+nsend)
+	mut parkers := make([]&chanlist, nrecv+nsend)
 	// Use heap allocated state for parkers.
 	// Because the select statement will not dequeue the parkers from all
 	// channels where they enqueued as waiter coroutine.
@@ -250,7 +250,7 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 	for i in parkers {
 		offset := ((k + i) % totalCases)
 		mut case := cases + offset
-		mut parker := new(parkerList)
+		mut parker := new(chanlist)
 		parkers[offset] = parker
 
 		// Skip if channel is nil.
@@ -266,7 +266,7 @@ unsafe async fn runselect(mut chans: *&uintptr, mut nchan: int, mut cases: *scas
 		}
 
 		// Prepare and enqeueue parker.
-		parker.cp = unsafe { (&c)(&tc) }
+		parker.cp = &tc
 		parker.ticket = parkerSelect
 		parker.state = state // Use shared state pointer for all parkers.
 		parker.stack = case.data

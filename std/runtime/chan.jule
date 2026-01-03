@@ -3,6 +3,8 @@
 // license that can be found in the LICENSE file.
 
 use "std/internal/runtime"
+use "std/internal/runtime/atomic"
+use "std/mem"
 
 // The low-level base channel implementation of the language runtime.
 // The generic type represents the data type of the channel. Instances required
@@ -12,7 +14,7 @@ use "std/internal/runtime"
 // The compiler creates channels in the background using the [pchan[T].new].
 // Behind the scenes, each channel is treated as a smart pointer.
 struct pchan[T] {
-	lock:   qmutex       // Protects all fields, except lock-free ones.
+	lock:   mutex        // Protects all fields, except lock-free ones.
 	cap:    int          // Immutable capacity of the channel. Zero if channel is unbuffered.
 	closed: u32          // Closed state of the channel. Boolean.
 	sendq:  waitq        // List of send waiters.
@@ -58,7 +60,7 @@ impl pchan {
 				}
 				recvp.stack = 0  // Set stack pointer to zero, marked as received.
 				recvp.ticket = 0 // Set ticket to zero, marked as received for select statements.
-				unpark(&(*recvp.cp))
+				unsafe { unpark(&(*recvp.cp)) }
 			}
 		}
 
@@ -73,115 +75,85 @@ impl pchan {
 		self.lock.unlock()
 	}
 
-	// Final implementation of the [pchan.send] function.
-	// Focuses on parked coroutines.
-	// Mutex must be locked. It will be released before return.
-	// Reports whether the stack pointer is used (data handled).
-	#disable nilptr
-	async fn sendFinal(mut *self, mut &data: *T): (spurious: bool) {
-		// Before park the coroutine, check for a waiting receiver, if any.
-		// If we lucky, write data to the stack of the receiver and return.
-		mut recvp := self.recvq.dequeueChan()
-		if recvp != nil {
-			self.lock.unlock()
-			if recvp.stack != 0 {
-				unsafe { *(*T)(recvp.stack) = *data }
-				recvp.stack = 0 // Set stack pointer to zero, marked as sent.
-			}
-			recvp.ticket = 0 // Set ticket to zero, marked as sent for select statements.
-			unpark(&(*recvp.cp))
-			ret false
-		}
-
-		// We have to park the coroutine.
-		mut stackp := parkerList{}
-		mut p := unsafe { (&parkerList)(&stackp) }
-		mut tc := gett().c
-		p.cp = unsafe { (&c)(&tc) }
-		p.stack = uintptr(data)
-		self.sendq.enqueue(p)
-		park(&(*p.cp), uintptr(&self.lock), reasonSend).await
-		ret isSpuriousWake(&stackp)
-	}
-
-	// Implementation of the buffered [pchan.send] function.
-	#disable nilptr
-	async fn sendBuffered(mut *self, mut data: T) {
-		for {
-			// Fast-path: enqueue data using the lock-free MPMC queue.
-			mut enq, mut closed, full := self.queue.enqueue(&data)
-			// If queue is full now (or with new sent data), wake a receiver.
-			// This is a spurious wake, do not write the data to it's stack pointer.
-			// It must be try to receive it from the queue.
-			//
-			// This is needed because all receivers might be parked.
-			// Queue is full and no reader, deadlock. Bad.
-			if full {
-				self.lock.lock()
-				mut recvp := self.recvq.dequeueChan()
-				self.lock.unlock()
-				if recvp != nil {
-					unpark(&(*recvp.cp))
-				}
-			}
-			// Enqueued, return.
-			if enq {
-				ret
-			}
-			if closed {
-				panic("runtime: send on closed channel")
-			}
-
-			// Slow-path: enqueue the coroutine to waiters and park.
-			// A coroutine must notify (might be spurious) this coroutine.
-			self.lock.lock()
-			if self.closed != 0 {
-				panic("runtime: send on closed channel")
-			}
-			// Last chance, try the lock-free MPMC queue.
-			// When we try to lock the channel mutex, a data might be received from queue.
-			enq, _, _ = self.queue.enqueue(&data)
-			// Enqueued, lucky. Return.
-			if enq {
-				self.lock.unlock()
-				ret
-			}
-			// Send data (hand-off) to a waiting receiver, if any.
-			// Otherwise, park the coroutine until a coroutine notify (might be spurious) us.
-			if !self.sendFinal(&data).await {
-				// Not a spurious wakeup, return.
-				ret
-			}
-			// Spurious wakeup, we have to try again.
-		}
-	}
-
-	// Implementation of the unbuffered [pchan.send] function.
-	#disable nilptr
-	async fn sendUnbuffered(mut *self, mut data: T) {
-		self.lock.lock()
-
-		// Check for closed case in lock, to make sure channel is alive.
-		if self.closed != 0 {
-			panic("runtime: send on closed channel")
-		}
-
-		// Unbuffered channels works with direct data hand-off.
-		// No spurious wakeups, but closing channel will notify us spuriously.
-		spurious := self.sendFinal(&data).await
-		if spurious {
-			panic("runtime: send on closed channel")
-		}
-	}
-
 	// Sends the data to the channel.
 	// Blocks until success.
 	#disable nilptr
 	async fn send(mut *self, mut data: T) {
-		if self.cap == 0 {
-			self.sendUnbuffered(data).await
-		} else {
-			self.sendBuffered(data).await
+		for {
+			if self.cap > 0 {
+				// Fast-path: enqueue data using the lock-free MPMC queue.
+				mut enq, mut closed, full := self.queue.enqueue(&data)
+				// If queue is full now (or with new sent data), wake a receiver.
+				// This is a spurious wake, do not write the data to it's stack pointer.
+				// It must be try to receive it from the queue.
+				//
+				// This is needed because all receivers might be parked.
+				// Queue is full and no reader, deadlock. Bad.
+				if full {
+					self.lock.lock()
+					mut recvp := self.recvq.dequeueChan()
+					self.lock.unlock()
+					if recvp != nil {
+						unsafe { unpark(&(*recvp.cp)) }
+					}
+				}
+				// Enqueued, return.
+				if enq {
+					ret
+				}
+				if closed {
+					panic("runtime: send on closed channel")
+				}
+			}
+
+			self.lock.lock()
+
+			if self.cap > 0 {
+				// Last chance, try the lock-free MPMC queue.
+				// When we try to lock the channel mutex, a data might be received from queue.
+				enq, _, _ := self.queue.enqueue(&data)
+				// Enqueued, lucky. Return.
+				if enq {
+					self.lock.unlock()
+					ret
+				}
+			}
+
+			// Check for closed case in lock, to make sure channel is alive.
+			if self.closed != 0 {
+				panic("runtime: send on closed channel")
+			}
+
+			// Before park the coroutine, check for a waiting receiver, if any.
+			// If we lucky, write data to the stack of the receiver and return.
+			mut recvp := self.recvq.dequeueChan()
+			if recvp != nil {
+				self.lock.unlock()
+				if recvp.stack != 0 {
+					unsafe { *(*T)(recvp.stack) = data }
+					recvp.stack = 0 // Set stack pointer to zero, marked as sent.
+				}
+				recvp.ticket = 0 // Set ticket to zero, marked as sent for select statements.
+				unsafe { unpark(&(*recvp.cp)) }
+				ret
+			}
+
+			// We have to park the coroutine.
+			mut stackp := chanlist{}
+			mut p := unsafe { (&chanlist)(&stackp) }
+			mut tc := gett().c
+			p.cp = &tc
+			p.stack = uintptr(&data)
+			self.sendq.enqueue(p)
+			park(&tc, uintptr(&self.lock), reasonSend).await
+			if isSpuriousWake(&stackp) {
+				if self.cap > 0 {
+					// Spurious wakeup, we have to try again.
+					continue
+				}
+				panic("runtime: send on closed channel")
+			}
+			ret
 		}
 	}
 
@@ -198,7 +170,7 @@ impl pchan {
 				recvp.stack = 0 // Set stack pointer to zero, marked as sent.
 			}
 			recvp.ticket = 0 // Set ticket to zero, marked as sent for select statements.
-			unpark(&(*recvp.cp))
+			unsafe { unpark(&(*recvp.cp)) }
 			*ok = true
 		} else {
 			// Fail.
@@ -222,7 +194,7 @@ impl pchan {
 			mut recvp := self.recvq.dequeueChan()
 			self.lock.unlock()
 			if recvp != nil {
-				unpark(&(*recvp.cp))
+				unsafe { unpark(&(*recvp.cp)) }
 			}
 		}
 		// Enqueued, return.
@@ -247,7 +219,7 @@ impl pchan {
 				recvp.stack = 0 // Set stack pointer to zero, marked as sent.
 			}
 			recvp.ticket = 0 // Set ticket to zero, marked as sent for select statements.
-			unpark(&(*recvp.cp))
+			unsafe { unpark(&(*recvp.cp)) }
 			*ok = true
 		} else {
 			// Fail.
@@ -269,67 +241,36 @@ impl pchan {
 		}
 	}
 
-	// Final implementation of the [pchan.recv] function.
-	// Focuses on parked coroutines.
-	// Mutex must be locked. It will be released before return.
-	// Reports whether the stack pointer is used (data handled).
+	// Receives the data from the channel.
+	// Blocks until success.
+	// The |ok| is the reference that points to boolean and
+	// it reports whether data dequeued and received successfully.
 	#disable nilptr
-	async fn recvFinal(mut *self, mut &ok: *bool, mut &data: *T): (spurious: bool) {
-		// Before park the coroutine, check for a waiting sender, if any.
-		// If we lucky, read data from the stack of the sender and return.
-		mut sendp := self.sendq.dequeueChan()
-		if sendp != nil {
-			self.lock.unlock()
-			*data = unsafe { *(*T)(sendp.stack) }
-			sendp.stack = 0  // Set stack pointer to zero, marked as received.
-			sendp.ticket = 0 // Set ticket to zero, marked as received for select statements.
-			unpark(&(*sendp.cp))
-			if ok != nil {
-				*ok = true
-			}
-			ret false
-		}
-
-		// We have to park the coroutine.
-		mut stackp := parkerList{}
-		mut p := unsafe { (&parkerList)(&stackp) }
-		mut tc := gett().c
-		p.cp = unsafe { (&c)(&tc) }
-		p.stack = uintptr(data)
-		self.recvq.enqueue(p)
-		park(&(*p.cp), uintptr(&self.lock), reasonRecv).await
-		spurious = isSpuriousWake(&stackp)
-		if ok != nil {
-			*ok = !spurious
-		}
-		ret
-	}
-
-	// Implementation of the buffered [pchan.recv] function.
-	#disable nilptr
-	async fn recvBuffered(mut *self, mut &ok: *bool): (data: T) {
+	async fn recv(mut *self, mut &ok: *bool): (data: T) {
 		for {
-			// Fast-path: dequeue data using the lock-free MPMC queue.
-			mut deq, mut closed := self.queue.dequeue(&data)
-			// Dequeued, return.
-			if deq {
-				if ok != nil {
-					*ok = true
+			if self.cap > 0 {
+				// Fast-path: dequeue data using the lock-free MPMC queue.
+				mut deq, mut closed := self.queue.dequeue(&data)
+				// Dequeued, return.
+				if deq {
+					if ok != nil {
+						*ok = true
+					}
+					ret
 				}
-				ret
-			}
-			// Not dequeued and MPMC queue is closed.
-			// This means channel is closed and buffer is empty.
-			if closed {
-				if ok != nil {
-					*ok = false
+				// Not dequeued and MPMC queue is closed.
+				// This means channel is closed and buffer is empty.
+				if closed {
+					if ok != nil {
+						*ok = false
+					}
+					ret
 				}
-				ret
 			}
 
-			// Slow-path: enqueue the coroutine to waiters and park.
-			// A coroutine must notify (might be spurious) this coroutine.
 			self.lock.lock()
+
+			// Check for closed case in lock, to make sure channel is alive.
 			if self.closed != 0 {
 				self.lock.unlock()
 				if ok != nil {
@@ -337,58 +278,53 @@ impl pchan {
 				}
 				ret
 			}
-			// Last chance, try the lock-free MPMC queue.
-			// When we try to lock the channel mutex, a data might be sent to queue.
-			deq, closed = self.queue.dequeue(&data)
-			// Dequeued, lucky. Return.
-			if deq {
+
+			if self.cap > 0 {
+				// Last chance, try the lock-free MPMC queue.
+				// When we try to lock the channel mutex, a data might be sent to queue.
+				deq, _ := self.queue.dequeue(&data)
+				// Dequeued, lucky. Return.
+				if deq {
+					self.lock.unlock()
+					if ok != nil {
+						*ok = true
+					}
+					ret
+				}
+			}
+
+			// Before park the coroutine, check for a waiting sender, if any.
+			// If we lucky, read data from the stack of the sender and return.
+			mut sendp := self.sendq.dequeueChan()
+			if sendp != nil {
 				self.lock.unlock()
+				data = unsafe { *(*T)(sendp.stack) }
+				sendp.stack = 0  // Set stack pointer to zero, marked as received.
+				sendp.ticket = 0 // Set ticket to zero, marked as received for select statements.
+				unsafe { unpark(&(*sendp.cp)) }
 				if ok != nil {
 					*ok = true
 				}
 				ret
 			}
-			// Receive (hand-off) data from a waiting sender, if any.
-			// Otherwise, park the coroutine until a coroutine notify (might be spurious) us.
-			if !self.recvFinal(ok, &data).await {
-				// Not a spurious wakeup, return.
-				ret
+
+			// We have to park the coroutine.
+			mut stackp := chanlist{}
+			mut p := unsafe { (&chanlist)(&stackp) }
+			mut tc := gett().c
+			p.cp = &tc
+			p.stack = uintptr(&data)
+			self.recvq.enqueue(p)
+			park(&tc, uintptr(&self.lock), reasonRecv).await
+			spurious := isSpuriousWake(&stackp)
+			if spurious && self.cap > 0 {
+				// Spurious wakeup, we have to try again.
+				continue
 			}
-			// Spurious wakeup, we have to try again.
-		}
-	}
-
-	// Implementation of the unbuffered [pchan.recv] function.
-	#disable nilptr
-	async fn recvUnbuffered(mut *self, mut &ok: *bool): (data: T) {
-		self.lock.lock()
-
-		// Check for closed case in lock, to make sure channel is alive.
-		if self.closed != 0 {
-			self.lock.unlock()
 			if ok != nil {
-				*ok = false
+				*ok = !spurious
 			}
 			ret
-		}
-
-		// Unbuffered channels works with direct data hand-off.
-		// No spurious wakeups, but closing channel will notify us spuriously.
-		// Is is handled like hand-off but failed.
-		self.recvFinal(ok, &data).await
-		ret
-	}
-
-	// Receives the data from the channel.
-	// Blocks until success.
-	// The |ok| is the reference that points to boolean and
-	// it reports whether data dequeued and received successfully.
-	#disable nilptr
-	async fn recv(mut *self, mut &ok: *bool): T {
-		if self.cap == 0 {
-			ret self.recvUnbuffered(ok).await
-		} else {
-			ret self.recvBuffered(ok).await
 		}
 	}
 
@@ -405,7 +341,7 @@ impl pchan {
 			}
 			sendp.stack = 0  // Set stack pointer to zero, marked as received.
 			sendp.ticket = 0 // Set ticket to zero, marked as received for select statements.
-			unpark(&(*sendp.cp))
+			unsafe { unpark(&(*sendp.cp)) }
 			*ok = true
 		} else {
 			// Fail.
@@ -449,7 +385,7 @@ impl pchan {
 			}
 			sendp.stack = 0  // Set stack pointer to zero, marked as received.
 			sendp.ticket = 0 // Set ticket to zero, marked as received for select statements.
-			unpark(&(*sendp.cp))
+			unsafe { unpark(&(*sendp.cp)) }
 			*ok = true
 		} else {
 			// Fail.
@@ -487,4 +423,132 @@ impl pchan {
 		}
 		ret self.cap
 	}
+}
+
+// Special flags for the ticket state.
+const (
+	parkerSelect = iota + 1
+)
+
+// Special flags for the state flags.
+const (
+	parkerSelectWaiting = iota
+	parkerSelectConsumed
+)
+
+// Linked-list for coroutine parkers.
+struct chanlist {
+	cp: *c // A fake smart-pointer for stack allocated coroutine.
+
+	state:  &int
+	ticket: u32
+	stack:  uintptr
+
+	link: &chanlist
+}
+
+struct waitq {
+	mut head: &chanlist
+	tail:     &chanlist
+}
+
+impl waitq {
+	#disable nilptr
+	fn exist(*self, p: &chanlist): bool {
+		mut i := self.head
+		for i != nil; i = i.link {
+			if i == p {
+				ret true
+			}
+		}
+		ret false
+	}
+
+	#disable nilptr
+	fn enqueue(mut *self, mut p: &chanlist) {
+		if self.tail == nil {
+			self.head = p
+		} else {
+			self.tail.link = p
+		}
+		self.tail = p
+	}
+
+	#disable nilptr
+	fn enqueueAvoidDuplicate(mut *self, mut p: &chanlist) {
+		if !self.exist(p) {
+			self.enqueue(p)
+		}
+	}
+
+	#disable nilptr
+	fn dequeue(mut *self): &chanlist {
+		if self.head == nil {
+			ret nil
+		}
+		mut p := self.head
+		self.head = p.link
+		if self.head == nil {
+			self.tail = nil
+		}
+		p.link = nil
+		ret p
+	}
+
+	// Dequeue according to channel tickets.
+	// If waiter is a select statement coroutine, skips if it is consumed.
+	#disable nilptr
+	fn dequeueChan(mut *self): &chanlist {
+		for {
+			mut deq := self.dequeue()
+			if deq == nil {
+				ret nil
+			}
+			// If waiter is a select statement, check if it is consumed.
+			// If the state is not zero, coroutine is consumed.
+			// Set state as consumed to prevent false dequeue.
+			if deq.ticket&parkerSelect == parkerSelect {
+				if !atomic::CompareAndSwap(&(*deq.state), parkerSelectWaiting, parkerSelectConsumed, atomic::AcqRel, atomic::Relaxed) {
+					// Lost race, skip.
+					continue
+				}
+				unsafe {
+					// Won race, make sure the park completed.
+					// See the comment of tp, from the runselect function.
+					for atomic::Load(&deq.cp.race, atomic::Acquire) != 0 {
+						// This spin should be good because this race is short.
+					}
+				}
+			}
+			ret deq
+		}
+	}
+}
+
+// Unparks all coroutines from the waiters q.
+#disable nilptr
+fn unparkAll(mut &q: *waitq, clearSpuriousSigns: bool) {
+	// Go through the local list and make ready all waiters.
+	mut s := q.head
+	for s != nil {
+		mut next := s.link
+		s.link = nil
+		if clearSpuriousSigns {
+			s.stack = 0  // Set stack pointer to zero, marked as received/sent.
+			s.ticket = 0 // Set ticket to zero, marked as received/sent for select statements.
+		}
+		unsafe { unpark(&(*s.cp)) }
+		s = next
+	}
+}
+
+// Reports whether the parker is notified spuriously.
+// Implemented for channels and select statements.
+#disable nilptr
+fn isSpuriousWake(&p: *chanlist): bool {
+	// If stack is not zero, it is not consumed.
+	// But select statement may pass zero stack pointer for no receiver memory cases.
+	// Check for the ticket, if ticket is parkerSelect, it is not consumed.
+	// Appropriate consumption will set them to zero.
+	ret p.ticket != 0 || p.stack != 0
 }
