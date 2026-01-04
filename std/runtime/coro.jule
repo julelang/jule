@@ -67,8 +67,9 @@ fn newc(h: cHandle): c {
 // Implicitly called by the compiler to add the main C.
 #disable nilptr
 fn spawnmainc(h: cHandle) {
-	threadHead.pp.runnext.used = true
-	threadHead.pp.runnext.c = newc(h)
+	mut m := gett()
+	m.pp.runnext.used = true
+	m.pp.runnext.c = newc(h)
 }
 
 // A low level API function for Jule Cs.
@@ -81,13 +82,6 @@ async fn cospawn(h: cHandle) {
 	mut c := newc(h)
 	mut m := gett()
 	overflow := runqput(m.pp, &c, true)
-	// Try to wake up a new M. If there is an idle M, this is something that can be
-	// used to increase concurrency. If we only try to wake up a new M in more
-	// restricted situations, for example only when a runqput overflow occurs,
-	// we may not achieve sufficient concurrency. For example, a small number of
-	// Cs that could run concurrently may never cause an overflow and thus
-	// end up behaving effectively synchronously or single-threaded concurrency.
-	// Therefore, wake up an M so that runnable work can be executed multi-threaded.
 	wakep()
 	// If an overflow occurs in the global runnable queue, yield this C.
 	// This allows the runtime to wait briefly before creating more

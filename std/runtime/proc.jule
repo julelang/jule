@@ -57,6 +57,9 @@ use "std/internal/runtime/atomic"
 extern fn __jule_retireDrain()
 extern fn __jule_trampolineRun()
 
+// Calls schedthread with P.
+extern let __jule_trampoline_schedthread: *unsafe
+
 // Returns the maximum number of CPUs that can be executing simultaneously.
 fn COMAXPROCS(): int { ret numcpu }
 
@@ -91,6 +94,8 @@ struct p {
 
 	// Local timers of the P.
 	timers: timerheap
+
+	link: &p // Link to the next P.
 }
 
 const (
@@ -102,24 +107,34 @@ const (
 // It owns Ps, global run queues, and tracks system-wide
 // polling and spinning states for load-balancing and sleep/wakeup decisions.
 struct scheduler {
-	// All Ps (logical execution units).
-	// Each processor is responsible for running coroutines on a worker thread.
-	pps: []&p
+	mu: mutex
 
-	// Queue of idle Ps that are not currently executing work.
-	// Used to quickly assign work without scanning all processors.
-	idlepps: mpmcQueue[&p]
+	// All P's of the runtime.
+	// All Ps here remain at the count they were initially added with.
+	// Each P is a real reference-counted smart pointer.
+	allp: []&p
 
-	// Global runnable coroutine queue.
-	// Protected by runqmu to synchronize cross-processor scheduling.
-	runqmu: mutex
-	runq:   &coroq
+	pidle:  &p  // Idle M's waiting for work.
+	npidle: i32 // Count of the pidle list.
+
+	nm: i32 // Count of the all working Ms.
+
+	midle:  &thread // Number of idle M's waiting for work.
+	nmidle: i32     // Count of the midle list.
+
+	// Global runnable queue.
+	runq: &coroq
 
 	// Stores the timestamp of the most recent eventpoll.
 	// A value of -1 indicates that the next findRunnable invocation
 	// must perform a non-blocking eventpoll if possible.
 	// A value of -2 indicates that a coroutine is checking eventpoll.
 	lastpoll: i64
+
+	// Number of worker threads currently spinning (actively searching
+	// for runnable coroutines instead of sleeping).
+	nmspinning:   i32
+	needspinning: i32
 
 	// Number of coroutines currently polling for I/O.
 	//
@@ -130,12 +145,6 @@ struct scheduler {
 	//
 	// Must be accessed atomically when used by scheduler logic.
 	_ncblock: int
-
-	// Number of worker threads currently spinning (actively searching
-	// for runnable coroutines instead of sleeping).
-	//
-	// Must be accessed atomically when used by scheduler logic.
-	_nmspin: int
 
 	// Number of coroutines currently working.
 	//
@@ -180,25 +189,6 @@ impl scheduler {
 		ret atomic::Load(&self._ncblock, atomic::Relaxed)
 	}
 
-	// Marks that a worker thread is entering a spin state.
-	// Spinning means actively searching for runnable coroutines
-	// instead of blocking or sleeping.
-	fn enterspin(mut *self) {
-		atomic::Add(&self._nmspin, 1, atomic::Relaxed)
-	}
-
-	// Marks that a worker thread has exited the spin state.
-	// Must be called when the thread stops actively searching for work.
-	fn exitspin(mut *self) {
-		atomic::Add(&self._nmspin, -1, atomic::Relaxed)
-	}
-
-	// Returns the number of worker threads currently spinning
-	// while searching for runnable coroutines.
-	fn nmspinning(*self): int {
-		ret atomic::Load(&self._nmspin, atomic::Relaxed)
-	}
-
 	// Marks that a worker thread is entering a coroutine runner state.
 	fn enterrun(mut *self) {
 		atomic::Add(&self._ncrun, 1, atomic::Relaxed)
@@ -220,23 +210,71 @@ impl scheduler {
 // It will be initialized by the runtime.
 let mut sched = scheduler{}
 
-// Tries to add one more P to execute coroutines.
+// Puts P on the pidle list.
+//
+// This releases ownership of P.
+// Once sched.lock is released it is no longer safe to use P.
+//
+// sched.lock must be held.
+#disable nilptr
+fn pidleput(mut pp: &p) {
+	pp.link = sched.pidle
+	sched.pidle = pp
+	atomic::Add(&sched.npidle, 1, atomic::Relaxed)
+}
+
+// Tries to get a P from the pidle list, acquiring ownership.
+//
+// sched.lock must be held.
+#disable nilptr
+fn pidleget(): &p {
+	mut pp := sched.pidle
+	if pp != nil {
+		sched.pidle = pp.link
+		atomic::Add(&sched.npidle, -1, atomic::Relaxed)
+	}
+	ret pp
+}
+
+// Tries to get a P from the pidle list, acquiring ownership.
+// This is called by spinning Ms (or callers than need a spinning M) that have
+// found work. If no P is available, this must synchronized with non-spinning
+// Ms that may be preparing to drop their P without discovering this work.
+//
+// sched.lock must be held.
+fn pidlegetSpinning(): &p {
+	mut pp := pidleget()
+	if pp == nil {
+		// We found work that we cannot take, we must synchronize with non-spinning
+		// Ms that may be preparing to drop their P.
+		atomic::Store(&sched.needspinning, 1, atomic::Release)
+		ret nil
+	}
+
+	ret pp
+}
+
+// Tries to add one more P to execute G's.
+// Called when a G is made runnable (newproc, ready).
 fn wakep() {
 	// Be conservative about spinning threads,
 	// only start one if none exist already.
-	if sched.nmspinning() != 0 || !atomic::CompareAndSwap(&sched._nmspin, 0, 1, atomic::Relaxed, atomic::Relaxed) {
+	if atomic::Load(&sched.nmspinning, atomic::SeqCst) != 0 ||
+		!atomic::CompareAndSwap(&sched.nmspinning, 0, 1, atomic::SeqCst, atomic::Relaxed) {
 		ret
 	}
-	let mut pp: &p
-	ok, _ := sched.idlepps.dequeue(&pp)
-	if ok {
-		// We found an idle P.
-		// Wake a thread or spawn a new one with the P.
-		threadMutex.lock()
-		startm(pp)
-	} else {
-		sched.exitspin()
+	sched.mu.lock()
+	mut pp := pidlegetSpinning()
+	if pp == nil {
+		if atomic::Add(&sched.nmspinning, -1, atomic::SeqCst) < 0 {
+			panic("wakep: negative nmspinning")
+		}
+		sched.mu.unlock()
+		ret
 	}
+	sched.mu.unlock()
+
+	startm(pp)
 }
 
 // Try get a batch of C's from the global runnable queue.
@@ -279,9 +317,9 @@ fn runqput(mut pp: &p, mut &cp: *c, next: bool): (overflow: bool) {
 	// Not an actual M, it is not have a P by design.
 	// Nothing to do, overflow to the global runnable queue.
 	if pp == nil {
-		sched.runqmu.lock()
+		sched.mu.lock()
 		sched.runq.push(cp)
-		sched.runqmu.unlock()
+		sched.mu.unlock()
 		ret true
 	}
 
@@ -340,12 +378,14 @@ fn runqputslow(mut pp: &p, mut &cp: *c, h: u32, t: u32): bool {
 
 	// Put batch to global runnable queue.
 	batchn := i32(n + 1)
-	sched.runqmu.lock()
+	sched.mu.lock()
 	mut bi := i32(0)
 	for bi < batchn; bi++ {
 		sched.runq.push(&batch[bi])
 	}
-	sched.runqmu.unlock()
+	sched.mu.unlock()
+
+	wakep()
 
 	ret true
 }
@@ -469,7 +509,7 @@ fn stealWork(mut pp: &p, mut &cp: *c): bool {
 		mut i := 0
 		mut idx := startIdx
 		for i < pcount; i, idx = i+1, (idx+1)%pcount {
-			mut pp2 := sched.pps[idx]
+			mut pp2 := sched.allp[idx]
 			if pp == pp2 {
 				continue
 			}
@@ -502,20 +542,19 @@ fn stealWork(mut pp: &p, mut &cp: *c): bool {
 // Assumes that the calling thread is counted as spinning.
 // It will exit the spinning state before return.
 #disable nilptr boundary
-fn findRunnable(spinning: bool): (c: c, ok: bool) {
-	mut pp := gett().pp
+fn findRunnable(): (c: c, ok: bool) {
+	mut m := gett()
+	mut pp := m.pp
 
+top:
 	// Check the global runnable queue once in a while to ensure fairness.
 	// Otherwise two coroutines can completely occupy the local runqueue
 	// by constantly respawning each other.
 	if pp.schedtick&63 == 0 && sched.runq.len > 0 {
-		sched.runqmu.lock()
+		sched.mu.lock()
 		ok = globrunqget(pp, 1, &c)
-		sched.runqmu.unlock()
+		sched.mu.unlock()
 		if ok {
-			if spinning {
-				panic("runtime: spinning when local runnable queue is not empty")
-			}
 			ret
 		}
 	}
@@ -523,16 +562,9 @@ fn findRunnable(spinning: bool): (c: c, ok: bool) {
 	// Local runnable queue.
 	ok = runqget(pp, &c)
 	if ok {
-		if spinning {
-			panic("runtime: spinning when local runnable queue is not empty")
-		}
 		ret c, true
 	}
 
-	// Enter spinning.
-	if !spinning {
-		sched.enterspin()
-	}
 	// Before the look for global runq, check for the lastpoll enforcement.
 	// If the lastpoll value is -1, check eventpoll.
 	if atomic::CompareAndSwap(&sched.lastpoll, pollCheckRequested, pollCheckIn, atomic::AcqRel, atomic::Relaxed) {
@@ -544,7 +576,6 @@ fn findRunnable(spinning: bool): (c: c, ok: bool) {
 		// If any coroutines are ready, return the first and enqueue the rest.
 		// Timers possibly expired here will be handled in a later iteration.
 		if bn > 0 {
-			sched.exitspin()
 			c = toRun[0]
 			runqputbatch(pp, &toRun, 1, bn)
 			ret c, true
@@ -556,11 +587,10 @@ fn findRunnable(spinning: bool): (c: c, ok: bool) {
 	// The batch size is capped to prunqsize to preserve
 	// locality and reduce contention on the global lock.
 	if sched.runq.len > 0 {
-		sched.runqmu.lock()
+		sched.mu.lock()
 		ok = globrunqget(pp, 0, &c)
-		sched.runqmu.unlock()
+		sched.mu.unlock()
 		if ok {
-			sched.exitspin()
 			ret
 		}
 	}
@@ -569,10 +599,26 @@ fn findRunnable(spinning: bool): (c: c, ok: bool) {
 	//
 	// Stealing is limited to a small fixed number of attempts to
 	// avoid excessive contention and cache thrashing.
-	ok = stealWork(pp, &c)
-	sched.exitspin()
-	if ok {
-		ret c, true
+	if m.spinning || 2*atomic::Load(&sched.nmspinning, atomic::SeqCst) < i32(COMAXPROCS())-atomic::Load(&sched.npidle, atomic::Relaxed) {
+		if !m.spinning {
+			becomeSpinning(m)
+		}
+		ok = stealWork(pp, &c)
+		if ok {
+			ret c, true
+		}
+	}
+
+	if !m.spinning && atomic::Load(&sched.needspinning, atomic::Acquire) == 1 {
+		becomeSpinning(m)
+		goto top
+	}
+
+	if m.spinning {
+		m.spinning = false
+		if atomic::Add(&sched.nmspinning, -1, atomic::SeqCst) < 0 {
+			panic("findrunnable: negative nmspinning")
+		}
 	}
 
 	// No runnable coroutine found yet.
@@ -703,8 +749,7 @@ Sched:
 	mut tried := 0
 	for {
 		// Poll a coroutine to run.
-		mut c, ok := findRunnable(spinning)
-		spinning = false
+		mut c, ok := findRunnable()
 		// findRunnable failed to find a runnable coroutine.
 		if !ok {
 			// There are timers in this worker, clean them.
@@ -728,9 +773,23 @@ Sched:
 			}
 			// We tried enough.
 			// Nothing to do, break the loop.
-			// Park or destroy the worker thread.
+			// Park the M.
+			if m.spinning {
+				m.spinning = false
+				if atomic::Add(&sched.nmspinning, -1, atomic::SeqCst) < 0 {
+					panic("findrunnable: negative nmspinning")
+				}
+			}
 			break
 		}
+
+		// This thread is going to run a coroutine and is not spinning anymore,
+		// so if it was marked as spinning we need to reset it now and potentially
+		// start a new spinning M.
+		if m.spinning {
+			resetspinning()
+		}
+
 		tried = 0
 		m.pp.schedtick++
 
@@ -751,25 +810,25 @@ Sched:
 			close(&m.c)
 		}
 	}
-	schedAgain := stopm(m)
-	if schedAgain {
-		// We must have a P by waker.
-		goto Sched
-	}
+	stopm(m)
+	goto Sched
 }
 
-// Start point of a scheduler thread.
-// When a scheduler thread is started, it must be counted as spinning.
-//
-// This function handled like an anonymous function.
-// Therefore the compiler will add *unsafe argument to
-// the head of the argument list implicitly for anonymous function context.
-// The operating system thread API passes a pointer to the function when calling it.
-// In the final stage, this function's signature fits with the OS thread API.
-fn schedthread() {
+// Start point of a M.
+// When a M is first started, it starts from here.
+// This function called by the trampoline, with P.
+// The pp is a pointer to a P.
+#disable nilptr
+#export "__jule_schedthread"
+fn schedthread(mut pp: *unsafe) {
 	// Set thread-local data before scheduling.
-	sett(acquireThread())
-	threadMutex.unlock()
+	mut m := newThread(roleM)
+	m.spinning = true
+	// We use pp like reference-counted smart pointer.
+	// But this is actually not, however there is no risk about GC.
+	// Because all Ps are stored on the scheduler's allp list.
+	m.pp = unsafe { (&p)((*p)(pp)) }
+	sett(m)
 
 	schedule(true)
 }
@@ -811,13 +870,6 @@ fn unpark(mut &cp: *c) {
 	cp.state &= ^reasonMask
 	mut m := gett()
 	runqput(m.pp, cp, true)
-	// Try to wake up a new M. If there is an idle M, this is something that can be
-	// used to increase concurrency. If we only try to wake up a new M in more
-	// restricted situations, for example only when a runqput overflow occurs,
-	// we may not achieve sufficient concurrency. For instance, a small number of
-	// coroutines that could run concurrently may never cause an overflow and thus
-	// end up behaving effectively synchronously or single-threaded concurrency.
-	// Therefore, wake up an M so that runnable work can be executed multi-threaded.
 	wakep()
 }
 
@@ -846,14 +898,15 @@ fn trampolinerun() {
 
 // Yields the processor, allowing other coroutiens to run. It does not
 // suspend the current coroutine, so execution resumes automatically.
+#disable nilptr
 async fn Yield() {
 	// Push the coroutine to the global queue, otherwise the next
 	// scheduler iteration after park may run it from the local queue.
 	mut coroq := new(coroqc)
 	coroq.c = gett().c
-	sched.runqmu.lock()
+	sched.mu.lock()
 	sched.runq.pushq(coroq)
-	park(&coroq.c, uintptr(&sched.runqmu), reasonNA).await
+	park(&coroq.c, uintptr(&sched.mu), reasonNA).await
 }
 
 #disable nilptr boundary
@@ -861,23 +914,25 @@ fn schedinit() {
 	// Initialize the global scheduler instance.
 	sched = scheduler{}
 	sched.runq = new(coroq)
+	sched.nm = 1 // The main program thread.
 
 	// We mutate sched here but mutex is not need to be acquired.
 	// Because we are in the program initialize state, no concurrency risk.
 
-	// Initialize corotuine processors.
-	maxprocs := u32(COMAXPROCS())
-	sched.pps = make([]&p, maxprocs)
-	sched.idlepps = mpmcQueue[&p].new(u64(maxprocs))
-	mut i := u32(0)
+	// Initialize Ps.
+	maxprocs := i32(COMAXPROCS())
+	sched.allp = make([]&p, maxprocs)
+	sched.npidle = maxprocs - sched.nm
+	mut i := i32(0)
 	for i < maxprocs; i++ {
 		mut pp := new(p)
-		sched.pps[i] = pp
+		sched.allp[i] = pp
 		if i == 0 {
 			// Set P of the main program thread.
-			threadHead.pp = pp
+			mainm.pp = pp
 		} else {
-			sched.idlepps.enqueue(&pp)
+			pp.link = sched.pidle
+			sched.pidle = pp
 		}
 	}
 }
@@ -889,6 +944,9 @@ fn schedinit() {
 // the head of the argument list implicitly for anonymous function context.
 // The operating system thread API passes a pointer to the function when calling it.
 // In the final stage, this function's signature fits with the OS thread API.
+//
+// Since this function never returns, there should be no risk about return value.
+#disable nilptr
 fn sysmon() {
 	for {
 		// Sleep for the next period.
@@ -907,60 +965,84 @@ fn sysmon() {
 	}
 }
 
-// Spawns a M with the P.
-// The thread-mutex must be acquired before the call, it will release before return.
+// Schedules some M to run the P (creates an M if necessary).
+// If P==nil, the behavior is undefined. P is always should be a valid pointer.
+// All started Ms is spinning by default.
 #disable nilptr
 fn startm(mut pp: &p) {
-	countm++
-	// We have a cached M. Notify it.
-	if cachedm > 0 {
-		mut t := pushNewThread(roleM) // It will return a cached thread instance.
-		t.pp = pp
-		cachedm--
-		threadMutex.unlock()
-		t.parker.unpark()
+	sched.mu.lock()
+	sched.nm++
+	mut m := mget()
+	sched.mu.unlock()
+	if m == nil {
+		ok := unsafe { threadSpawn((*unsafe)(uintptr(extern.__jule_trampoline_schedthread)), (*p)(pp)) }
+		if !ok {
+			panic("runtime: M creation failed")
+		}
 		ret
 	}
-	// Spawn a new one.
-	unsafe { threadSpawn(roleM, pp, (*unsafe)(uintptr(schedthread)), nil) }
+	m.pp = pp
+	m.spinning = true
+	m.parker.unpark()
 }
 
-// Stops the m, but it may be cached.
+// Stops execution of the M until new work is available.
+// Returns with acquired P.
 #disable nilptr
-fn stopm(mut m: &thread): (schedAgain: bool) {
-	// Thread have a P.
-	// We have to put back it to idle processes.
-	if m.pp != nil {
-		for {
-			ok, _, full := sched.idlepps.enqueue(&m.pp)
-			if !ok && full {
-				panic("malformed internal schedule queue")
-			}
-			if ok {
-				break
-			}
-		}
-	}
-
-	threadMutex.lock()
-	countm--
-	if countm <= 0 {
+fn stopm(mut m: &thread) {
+	sched.mu.lock()
+	sched.nm--
+	if sched.nm <= 0 {
 		panic("runtime: all coroutines are asleep - deadlock!")
 	}
-	// We already cached a lot M.
-	// Do not cache it, but keeps it if it is the main thread of the program.
-	if m != threadHead && cachedm >= COMAXPROCS() {
-		removeThread(m)
-		m = nil
-		threadMutex.unlock()
-		ret false
+	if m.pp != nil {
+		pidleput(m.pp)
 	}
-	// There is space for caching, cache it.
-	// Park the thread and report true, it will be continue to run when notified.
-	cachedm++
-	m.pp = nil
-	m.state = threadClosed
-	threadMutex.unlock()
+	mput(m)
+	sched.mu.unlock()
 	m.parker.park()
-	ret true
+}
+
+// Put M on midle list.
+// sched.lock must be held.
+#disable nilptr
+fn mput(mut m: &thread) {
+	m.link = sched.midle
+	sched.midle = m
+	sched.nmidle++
+}
+
+// Try to get an M from midle list.
+// sched.lock must be held.
+#disable nilptr
+fn mget(): &thread {
+	mut m := sched.midle
+	if m != nil {
+		sched.midle = m.link
+		sched.nmidle--
+	}
+	ret m
+}
+
+#disable nilptr
+fn becomeSpinning(mut m: &thread) {
+	m.spinning = true
+	atomic::Add(&sched.nmspinning, 1, atomic::SeqCst)
+	atomic::Store(&sched.needspinning, 0, atomic::SeqCst)
+}
+
+#disable nilptr
+fn resetspinning() {
+	mut m := gett()
+	if !m.spinning {
+		panic("resetspinning: not a spinning m")
+	}
+	m.spinning = false
+	nmspinning := atomic::Add(&sched.nmspinning, -1, atomic::Release)
+	if nmspinning < 0 {
+		panic("findrunnable: negative nmspinning")
+	}
+	// M wakeup policy is deliberately somewhat conservative, so check if we
+	// need to wakeup another P here.
+	wakep()
 }

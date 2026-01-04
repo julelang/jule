@@ -5,39 +5,21 @@
 extern let mut __jule_ct: &thread
 
 const (
-	// State flags of threads.
-	threadRunning = 1 << iota // Header group specifier of running thread state.
-	threadClosed              // Thread execution completed, thread closed.
-
 	// Thread roles.
-	roleProgram        // The main thread of the program.
-	roleM              // A machine (M) thread.
-	roleSysmon         // The sysmon thread.
-	roleBlockingWorker // A worker thread for the blocking thread pool.
+	roleProgram        = 1 << iota // The main thread of the program.
+	roleM                          // A machine (M) thread.
+	roleBlockingWorker             // A worker thread for the blocking thread pool.
 )
 
 // A thread instance is represents a spawned thread.
 // Used by the Jule runtime to manage threads.
 #export "__jule_thread"
 struct thread {
-	os: osthread
-
-	// Thread state.
-	state: u32
-
-	// Role of the thread for runtime.
-	role: int
-
 	// Parker of the thread.
 	parker: &parker
 
-	// Pointer to the previous thread.
-	// Threads stored in the thread stack with a doubly linked-list.
-	prev: &thread
-
-	// Pointer to the next thread.
-	// Threads stored in the thread stack with a doubly linked-list.
-	next: &thread
+	// Role of the thread for runtime.
+	role: int
 
 	// The P owned by the thread.
 	pp: &p
@@ -48,6 +30,12 @@ struct thread {
 	// Local random state.
 	rand:      randmach
 	cheaprand: u64
+
+	// Actively searching for runnable coroutines instead of sleeping.
+	spinning: bool
+
+	// Link to the next thread.
+	link: &thread
 }
 
 // Returns the current thread.
@@ -62,18 +50,8 @@ fn sett(mut t: &thread) {
 	extern.__jule_ct = t
 }
 
-// A thread stack and associated lock.
-// All spawned threads are stored in the threadHead and threadTail (linked-list).
-// The threadHead variable will always point to the main program thread.
-// A closed thread instance will not be released if it is cacheable,
-// remains allocated and placed in the threads.
-// Subsequent thread generations may use the same allocation
-// of closed threads for the new spawned threads.
-let threadMutex = mutex{}
-let mut threadHead = (&thread)(nil)
-let mut threadTail = (&thread)(nil)
-let mut countm = 0  // Count of Ms at able to run a coroutine.
-let mut cachedm = 0 // Count of cached and parked coroutine scheduler threads.
+// Pointer to the main M, the main program thread.
+let mut mainm = (&thread)(nil)
 
 // Stores total number of logical threads.
 let mut numcpu = 0
@@ -89,83 +67,23 @@ fn NumCPU(): int { ret numcpu }
 #disable nilptr
 fn newThread(role: int): &thread {
 	mut t := new(thread)
-	t.state |= threadRunning
 	t.role = role
 
 	// Initialized once and never deallocated if thread waiting for reuse.
 	t.parker = new(parker)
 	t.parker.init()
 
-	// Initialize local random state.
-	trandinit(t)
+	if role == roleM {
+		// Initialize local random state.
+		trandinit(t)
+	}
 
 	ret t
 }
 
-// Pushes a new thread to the main thread stack and sets state as running.
-// Returns the thread representing the created thread.
-// Assumes the threadMutex is locked and will not release before return.
-//
-// This function assumes |threadHead| is not nil. So we must have a thread pointer
-// associated with a thread in thread stack, it should be the main thread.
-// New created threads should be added to the main thread's tail.
+// Releases thread t, releases parker and drops references.
 #disable nilptr
-fn pushNewThread(role: int): &thread {
-	// Lookup for empty threads to caught ready to reuse thread if exist.
-	mut t := threadHead
-	for t != nil; t = t.next {
-		if t.role == role && t.state&threadClosed == threadClosed {
-			t.state = threadRunning
-			ret t
-		}
-	}
-	// We have not any reusable thread, so create a new one.
-	mut newt := newThread(role)
-	newt.prev = threadTail
-	threadTail.next = newt
-	threadTail = newt
-	ret newt
-}
-
-// Locks the thread-mutex and returns the thread associated with current thread.
-// It does not release the thread-mutex before return.
-#disable nilptr
-fn acquireThread(): &thread {
-	threadMutex.lock()
-	ret getThread()
-}
-
-// Same as acquireThread, but assumes thread-mutex is already locked.
-#disable nilptr
-fn getThread(): &thread {
-	id := currentThreadID()
-	mut t := threadHead
-	for t != nil; t = t.next {
-		if t.os.equal(id) {
-			ret t
-		}
-	}
-	ret nil
-}
-
-// Removes thread t from the list, releases parker and drops references.
-// Assumes the threadMutex is locked and will not release before return.
-#disable nilptr
-fn removeThread(mut t: &thread) {
-	// Remove the instance from the queue.
-	if t.prev != nil {
-		t.prev.next = t.next
-	} else {
-		// This case must be unreachable, but be safe.
-		threadHead = t.next
-	}
-	if t.next != nil {
-		t.next.prev = t.prev
-	} else {
-		threadTail = t.prev
-	}
-	t.prev = nil
-	t.next = nil
+fn releaseThread(mut t: &thread) {
 	t.pp = nil
 	t.role = 0
 	t.parker.release()
@@ -176,6 +94,6 @@ fn threadinit() {
 	_threadinit()
 
 	// Program started by the main thread.
-	// Use `sett(threadHead)` to set thread-local &thread data for the main thread.
-	sett(threadHead)
+	// Use `sett(mainm)` to set thread-local &thread data for the main thread.
+	sett(mainm)
 }

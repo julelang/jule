@@ -36,15 +36,12 @@ impl osthread {
 // The |args| parameter may be nil, passed to the function when call.
 // The thread data, should be fit into the threadData struct.
 // So, the head fields of the thread data should be matched fields of the threadData.
-unsafe fn threadSpawn(role: int, mut pp: &p, func: *unsafe, mut args: *unsafe): bool {
-	mut t := pushNewThread(role)
-	t.pp = pp
-	if sys::Addrcall[i32](uintptr(extern.pthread_create), &t.os.handle, (*unsafe)(nil), func, args) != 0 {
-		threadMutex.unlock()
+unsafe fn threadSpawn(func: *unsafe, mut args: *unsafe): bool {
+	let mut handle: extern.pthread_t
+	if sys::Addrcall[i32](uintptr(extern.pthread_create), &handle, (*unsafe)(nil), func, args) != 0 {
 		ret false
 	}
-	threadMutex.unlock()
-	sys::Addrcall(uintptr(extern.pthread_detach), t.os.handle)
+	sys::Addrcall(uintptr(extern.pthread_detach), handle)
 	ret true
 }
 
@@ -62,8 +59,6 @@ fn _threadinit() {
 	// See the documentation of the pushNewThread function.
 	// The |threads| should be initialized here, because compiler will not do it.
 	// We do not have to lock the mutex for threads, no risk for concurrency.
-	mut t := newThread(roleProgram)
-	t.os.handle = currentThreadID()
-	threadHead = t
-	threadTail = t
+	mut m := newThread(roleProgram)
+	mainm = m
 }

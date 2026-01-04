@@ -13,10 +13,10 @@ struct blockingJob {
 struct blockingenv {
 	maxWorkers: i32 // Constant once initialized.
 
-	mu:      mutex
-	jobs:    &blockingJob
-	workers: i32
-	cached:  i32
+	mu:    mutex
+	jobs:  &blockingJob
+	nw:    i32     // Count of the created worker threads.
+	widle: &thread // Parkers of the idle workers waiting for work.
 }
 
 impl blockingenv {
@@ -37,21 +37,22 @@ impl blockingenv {
 	// Wakes a worker thread, if needed.
 	// The `blocking.mu` must be locked and it will not release it before return.
 	#disable nilptr
-	fn wakeworker(mut *self) {
+	fn wakew(mut *self) {
 		// We have a cached worker thread. Notify it.
-		if self.cached > 0 {
-			threadMutex.lock()
-			mut t := pushNewThread(roleBlockingWorker) // It will return a cached thread instance.
-			self.cached--
-			threadMutex.unlock()
-			t.parker.unpark()
+		if self.widle != nil {
+			mut w := self.widle
+			self.widle = w.link
+			w.link = nil
+			w.parker.unpark()
 			ret
 		}
 		// Spawn a new one, if possible.
-		if self.workers < self.maxWorkers {
-			self.workers++
-			threadMutex.lock()
-			unsafe { threadSpawn(roleBlockingWorker, nil, (*unsafe)(uintptr(blockingWorker)), nil) }
+		if self.nw < self.maxWorkers {
+			self.nw++
+			ok := unsafe { threadSpawn((*unsafe)(uintptr(blockingWorker)), nil) }
+			if !ok {
+				panic("runtime: blocking worker thread creation failed")
+			}
 		}
 	}
 }
@@ -66,11 +67,13 @@ let mut blocking = blockingenv{}
 // the head of the argument list implicitly for anonymous function context.
 // The operating system thread API passes a pointer to the function when calling it.
 // In the final stage, this function's signature fits with the OS thread API.
+//
+// Since this function never returns, there should be no risk about return value.
 #disable nilptr
 fn blockingWorker() {
-	sett(acquireThread())
-	threadMutex.unlock()
+	sett(newThread(roleBlockingWorker))
 	mut w := gett()
+
 	const MaxSpin = 4
 	mut tried := 0
 	for {
@@ -90,12 +93,10 @@ fn blockingWorker() {
 				blocking.mu.unlock()
 				continue
 			}
-			tried = 0
 			// Park the thread and continue it will be continue to run when notified.
-			blocking.cached++
-			threadMutex.lock()
-			w.state = threadClosed
-			threadMutex.unlock()
+			tried = 0
+			w.link = blocking.widle
+			blocking.widle = w
 			blocking.mu.unlock()
 			w.parker.park()
 			continue
@@ -109,7 +110,7 @@ fn blockingWorker() {
 
 fn blockinginit() {
 	blocking = blockingenv{}
-	blocking.maxWorkers = i32(NumCPU())
+	blocking.maxWorkers = 1 //i32(NumCPU())
 }
 
 // Executes the given job on the blocking thread pool,
