@@ -49,7 +49,7 @@ impl pchan {
 		// If channel is buffered, hand-off enqueued data to the waiting receivers.
 		if self.cap > 0 {
 			for {
-				mut recvp := self.recvq.dequeueChan()
+				mut recvp := self.recvq.dequeue()
 				if recvp == nil {
 					break
 				}
@@ -91,7 +91,7 @@ impl pchan {
 				// Queue is full and no reader, deadlock. Bad.
 				if full {
 					self.lock.lock()
-					mut recvp := self.recvq.dequeueChan()
+					mut recvp := self.recvq.dequeue()
 					self.lock.unlock()
 					if recvp != nil {
 						unsafe { unpark(&(*recvp.cp)) }
@@ -126,7 +126,7 @@ impl pchan {
 
 			// Before park the coroutine, check for a waiting receiver, if any.
 			// If we lucky, write data to the stack of the receiver and return.
-			mut recvp := self.recvq.dequeueChan()
+			mut recvp := self.recvq.dequeue()
 			if recvp != nil {
 				self.lock.unlock()
 				if recvp.stack != 0 {
@@ -163,7 +163,7 @@ impl pchan {
 	fn trySendImmediate(mut *self, mut &ok: *bool, mut &data: *T) {
 		// Check for a waiting receiver, if any.
 		// If we lucky, write data to the stack of the receiver and return.
-		mut recvp := self.recvq.dequeueChan()
+		mut recvp := self.recvq.dequeue()
 		if recvp != nil {
 			if recvp.stack != 0 {
 				unsafe { *(*T)(recvp.stack) = *data }
@@ -191,7 +191,7 @@ impl pchan {
 		// Queue is full and no reader, deadlock. Bad.
 		if full {
 			self.lock.lock()
-			mut recvp := self.recvq.dequeueChan()
+			mut recvp := self.recvq.dequeue()
 			self.lock.unlock()
 			if recvp != nil {
 				unsafe { unpark(&(*recvp.cp)) }
@@ -211,7 +211,7 @@ impl pchan {
 		// Check for a waiting receiver, if any.
 		// If we lucky, write data to the stack of the receiver and return.
 		self.lock.lock()
-		mut recvp := self.recvq.dequeueChan()
+		mut recvp := self.recvq.dequeue()
 		self.lock.unlock()
 		if recvp != nil {
 			if recvp.stack != 0 {
@@ -295,7 +295,7 @@ impl pchan {
 
 			// Before park the coroutine, check for a waiting sender, if any.
 			// If we lucky, read data from the stack of the sender and return.
-			mut sendp := self.sendq.dequeueChan()
+			mut sendp := self.sendq.dequeue()
 			if sendp != nil {
 				self.lock.unlock()
 				data = unsafe { *(*T)(sendp.stack) }
@@ -334,7 +334,7 @@ impl pchan {
 	#disable nilptr
 	fn tryRecvImmediate(mut *self, mut &ok: *bool, mut &data: *T, mut &closed: *bool) {
 		*closed = self.closed != 0
-		mut sendp := self.sendq.dequeueChan()
+		mut sendp := self.sendq.dequeue()
 		if sendp != nil {
 			if data != nil {
 				*data = unsafe { *(*T)(sendp.stack) }
@@ -377,7 +377,7 @@ impl pchan {
 		// If we lucky, read data from the stack of the sender and return.
 		self.lock.lock()
 		*closed = self.closed != 0
-		mut sendp := self.sendq.dequeueChan()
+		mut sendp := self.sendq.dequeue()
 		self.lock.unlock()
 		if sendp != nil {
 			if data != nil {
@@ -483,44 +483,33 @@ impl waitq {
 
 	#disable nilptr
 	fn dequeue(mut *self): &chanlist {
-		if self.head == nil {
-			ret nil
-		}
-		mut p := self.head
-		self.head = p.link
-		if self.head == nil {
-			self.tail = nil
-		}
-		p.link = nil
-		ret p
-	}
-
-	// Dequeue according to channel tickets.
-	// If waiter is a select statement coroutine, skips if it is consumed.
-	#disable nilptr
-	fn dequeueChan(mut *self): &chanlist {
 		for {
-			mut deq := self.dequeue()
-			if deq == nil {
+			if self.head == nil {
 				ret nil
 			}
+			mut p := self.head
+			self.head = p.link
+			if self.head == nil {
+				self.tail = nil
+			}
+			p.link = nil
 			// If waiter is a select statement, check if it is consumed.
 			// If the state is not zero, coroutine is consumed.
 			// Set state as consumed to prevent false dequeue.
-			if deq.ticket&parkerSelect == parkerSelect {
-				if !atomic::CompareAndSwap(&(*deq.state), parkerSelectWaiting, parkerSelectConsumed, atomic::AcqRel, atomic::Relaxed) {
+			if p.ticket&parkerSelect == parkerSelect {
+				if !atomic::CompareAndSwap(&(*p.state), parkerSelectWaiting, parkerSelectConsumed, atomic::AcqRel, atomic::Relaxed) {
 					// Lost race, skip.
 					continue
 				}
 				unsafe {
 					// Won race, make sure the park completed.
 					// See the comment of tp, from the runselect function.
-					for atomic::Load(&deq.cp.race, atomic::Acquire) != 0 {
+					for atomic::Load(&p.cp.race, atomic::Acquire) != 0 {
 						// This spin should be good because this race is short.
 					}
 				}
 			}
-			ret deq
+			ret p
 		}
 	}
 }
