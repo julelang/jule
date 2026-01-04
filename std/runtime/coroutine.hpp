@@ -55,7 +55,7 @@
 void __jule_schedthread(void *);
 
 #ifdef __JULE_OS_WINDOWS
-DWORD WINAPI __jule_trampoline_schedtread(LPVOID data)
+DWORD WINAPI __jule_trampoline_schedthread(LPVOID data)
 #else
 void *__jule_trampoline_schedthread(void *data)
 #endif
