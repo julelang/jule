@@ -31,7 +31,7 @@ impl pchan {
 		}
 		if cap > 0 {
 			ch.queue = mpmcQueue[T].new(u64(cap))
-			ch.cap = cap
+			ch.cap = int(ch.queue.cap)
 		}
 		ret ch
 	}
@@ -82,23 +82,21 @@ impl pchan {
 		for {
 			if self.cap > 0 {
 				// Fast-path: enqueue data using the lock-free MPMC queue.
-				mut enq, mut closed, full := self.queue.enqueue(&data)
-				// If queue is full now (or with new sent data), wake a receiver.
-				// This is a spurious wake, do not write the data to it's stack pointer.
-				// It must be try to receive it from the queue.
-				//
-				// This is needed because all receivers might be parked.
-				// Queue is full and no reader, deadlock. Bad.
-				if full {
+				mut enq, mut closed := self.queue.enqueue(&data)
+				// Enqueued, return.
+				if enq {
+					// Queue is not empty now, wake a receiver.
+					// This is a spurious wake, do not write the data to it's stack pointer.
+					// It must be try to receive it from the queue.
+					//
+					// This is needed because all receivers might be parked.
+					// Queue is full and no reader, deadlock. Bad.
 					self.lock.lock()
 					mut recvp := self.recvq.dequeue()
 					self.lock.unlock()
 					if recvp != nil {
 						unsafe { unpark(&(*recvp.cp)) }
 					}
-				}
-				// Enqueued, return.
-				if enq {
 					ret
 				}
 				if closed {
@@ -111,10 +109,20 @@ impl pchan {
 			if self.cap > 0 {
 				// Last chance, try the lock-free MPMC queue.
 				// When we try to lock the channel mutex, a data might be received from queue.
-				enq, _, _ := self.queue.enqueue(&data)
+				enq, _ := self.queue.enqueue(&data)
 				// Enqueued, lucky. Return.
 				if enq {
+					// Queue is not empty now, wake a receiver.
+					// This is a spurious wake, do not write the data to it's stack pointer.
+					// It must be try to receive it from the queue.
+					//
+					// This is needed because all receivers might be parked.
+					// Queue is full and no reader, deadlock. Bad.
+					mut recvp := self.recvq.dequeue()
 					self.lock.unlock()
+					if recvp != nil {
+						unsafe { unpark(&(*recvp.cp)) }
+					}
 					ret
 				}
 			}
@@ -182,23 +190,21 @@ impl pchan {
 	#disable nilptr
 	fn trySendBuffered(mut *self, mut &ok: *bool, mut &data: *T) {
 		// Enqueue data using lock-free MPMC queue.
-		enq, _, full := self.queue.enqueue(data)
-		// If queue is full now (or with new sent data), wake a receiver.
-		// This is a spurious wake, do not write the data to it's stack pointer.
-		// It must be try to receive it from the queue.
-		//
-		// This is needed because all receivers might be parked.
-		// Queue is full and no reader, deadlock. Bad.
-		if full {
+		enq, _ := self.queue.enqueue(data)
+		// Enqueued, return.
+		if enq {
+			// Queue is not empty now, wake a receiver.
+			// This is a spurious wake, do not write the data to it's stack pointer.
+			// It must be try to receive it from the queue.
+			//
+			// This is needed because all receivers might be parked.
+			// Queue is full and no reader, deadlock. Bad.
 			self.lock.lock()
 			mut recvp := self.recvq.dequeue()
 			self.lock.unlock()
 			if recvp != nil {
 				unsafe { unpark(&(*recvp.cp)) }
 			}
-		}
-		// Enqueued, return.
-		if enq {
 			*ok = true
 			ret
 		}
@@ -518,16 +524,16 @@ impl waitq {
 #disable nilptr
 fn unparkAll(mut &q: *waitq, clearSpuriousSigns: bool) {
 	// Go through the local list and make ready all waiters.
-	mut s := q.head
-	for s != nil {
-		mut next := s.link
-		s.link = nil
-		if clearSpuriousSigns {
-			s.stack = 0  // Set stack pointer to zero, marked as received/sent.
-			s.ticket = 0 // Set ticket to zero, marked as received/sent for select statements.
+	for {
+		mut p := q.dequeue()
+		if p == nil {
+			break
 		}
-		unsafe { unpark(&(*s.cp)) }
-		s = next
+		if clearSpuriousSigns {
+			p.stack = 0  // Set stack pointer to zero, marked as received/sent.
+			p.ticket = 0 // Set ticket to zero, marked as received/sent for select statements.
+		}
+		unsafe { unpark(&(*p.cp)) }
 	}
 }
 

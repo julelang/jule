@@ -25,28 +25,26 @@ struct paddedU64 {
 // Primarily designed for channels.
 // Implementation based on the Dmitry Vyukov's MPMC queue.
 struct mpmcQueue[T] {
-	cap:    u64
-	act:    u64
-	closed: u32
-	buf:    []mpmcCell[T]
+	cap:     u64
+	capmask: u64
+	closed:  u32
+	buf:     []mpmcCell[T]
 
 	// Hot cursors on separate cache lines.
-	_:          [cpu::CacheLinePadSize]byte
 	enqueuePos: paddedU64
-	_:          [cpu::CacheLinePadSize]byte
 	dequeuePos: paddedU64
-	_:          [cpu::CacheLinePadSize]byte
 }
 
 impl mpmcQueue {
 	#disable boundary
 	fn new(mut cap: u64): (q: mpmcQueue[T]) {
-		q.act = cap
-		q.cap = cap
-		if q.cap < 2 {
-			q.cap = 2
+		cap = nextPowerOfTwo(cap)
+		if cap < 2 {
+			cap = 2
 		}
+		q.cap = cap
 		q.buf = make([]mpmcCell[T], q.cap)
+		q.capmask = q.cap - 1
 
 		// Initialize per-slot sequence numbers to their indices
 		mut i := u64(0)
@@ -57,10 +55,10 @@ impl mpmcQueue {
 	}
 
 	#disable boundary nilptr
-	fn enqueue(mut *self, mut &val: *T): (ok: bool, closed: bool, full: bool) {
+	fn enqueue(mut *self, mut &val: *T): (ok: bool, closed: bool) {
 		for {
 			pos := atomic::Load(&self.enqueuePos.v, atomic::Relaxed)
-			mut &c := unsafe { &(*(&self.buf[pos%self.cap])) }
+			mut &c := unsafe { &(*(&self.buf[pos&self.capmask])) }
 			seq := atomic::Load(&c.seq, atomic::Acquire)
 			dif := i64(seq - pos)
 
@@ -72,16 +70,12 @@ impl mpmcQueue {
 					if closed {
 						// Roll back publication by marking slot empty again
 						atomic::Store(&c.seq, pos, atomic::Release)
-						ret false, true, false
+						ret false, true
 					}
-
-					// check if the buffer is full
-					deqPos := atomic::Load(&self.dequeuePos.v, atomic::Acquire)
-					full = newPos-deqPos == self.act
 
 					c.val = *val
 					atomic::Store(&c.seq, pos+1, atomic::Release)
-					ret true, false, full
+					ret true, false
 				}
 				continue
 			}
@@ -90,7 +84,7 @@ impl mpmcQueue {
 				// Slot not ready — MAY be full, confirm via cursors
 				deq := atomic::Load(&self.dequeuePos.v, atomic::Acquire)
 				if pos-deq >= self.cap {
-					ret false, false, true // FULL is guaranteed
+					ret false, false // FULL
 				}
 				// Not guaranteed full → retry
 				osyield()
@@ -111,7 +105,7 @@ impl mpmcQueue {
 			// we have to consume all queued data even if it is closed
 			closed = atomic::Load(&self.closed, atomic::Relaxed) != 0
 			pos := atomic::Load(&self.dequeuePos.v, atomic::Relaxed)
-			mut &c := unsafe { &(*(&self.buf[pos%self.cap])) }
+			mut &c := unsafe { &(*(&self.buf[pos&self.capmask])) }
 			seq := atomic::Load(&c.seq, atomic::Acquire)
 			dif := i64(seq - (pos + 1))
 
@@ -141,13 +135,5 @@ impl mpmcQueue {
 	#disable nilptr
 	fn close(mut *self) {
 		atomic::Store(&self.closed, 1, atomic::Release)
-	}
-
-	// Returns length of the available elements.
-	#disable nilptr
-	fn len(*self): int {
-		h := atomic::Load(&self.dequeuePos.v, atomic::Acquire)
-		t := atomic::Load(&self.enqueuePos.v, atomic::Acquire)
-		ret int(t - h)
 	}
 }
