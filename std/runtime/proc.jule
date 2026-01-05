@@ -259,14 +259,14 @@ fn pidlegetSpinning(): &p {
 fn wakep() {
 	// Be conservative about spinning threads,
 	// only start one if none exist already.
-	if atomic::Load(&sched.nmspinning, atomic::SeqCst) != 0 ||
-		!atomic::CompareAndSwap(&sched.nmspinning, 0, 1, atomic::SeqCst, atomic::Relaxed) {
+	if atomic::Load(&sched.nmspinning, atomic::Relaxed) != 0 ||
+		!atomic::CompareAndSwap(&sched.nmspinning, 0, 1, atomic::Relaxed, atomic::Relaxed) {
 		ret
 	}
 	sched.mu.lock()
 	mut pp := pidlegetSpinning()
 	if pp == nil {
-		if atomic::Add(&sched.nmspinning, -1, atomic::SeqCst) < 0 {
+		if atomic::Add(&sched.nmspinning, -1, atomic::Relaxed) < 0 {
 			panic("wakep: negative nmspinning")
 		}
 		sched.mu.unlock()
@@ -599,7 +599,7 @@ top:
 	//
 	// Stealing is limited to a small fixed number of attempts to
 	// avoid excessive contention and cache thrashing.
-	if m.spinning || 2*atomic::Load(&sched.nmspinning, atomic::SeqCst) < i32(COMAXPROCS())-atomic::Load(&sched.npidle, atomic::Relaxed) {
+	if m.spinning || 2*atomic::Load(&sched.nmspinning, atomic::Relaxed) < i32(COMAXPROCS())-atomic::Load(&sched.npidle, atomic::Relaxed) {
 		if !m.spinning {
 			becomeSpinning(m)
 		}
@@ -616,7 +616,7 @@ top:
 
 	if m.spinning {
 		m.spinning = false
-		if atomic::Add(&sched.nmspinning, -1, atomic::SeqCst) < 0 {
+		if atomic::Add(&sched.nmspinning, -1, atomic::Relaxed) < 0 {
 			panic("findrunnable: negative nmspinning")
 		}
 	}
@@ -776,7 +776,7 @@ Sched:
 			// Park the M.
 			if m.spinning {
 				m.spinning = false
-				if atomic::Add(&sched.nmspinning, -1, atomic::SeqCst) < 0 {
+				if atomic::Add(&sched.nmspinning, -1, atomic::Relaxed) < 0 {
 					panic("findrunnable: negative nmspinning")
 				}
 			}
@@ -1027,8 +1027,8 @@ fn mget(): &thread {
 #disable nilptr
 fn becomeSpinning(mut m: &thread) {
 	m.spinning = true
-	atomic::Add(&sched.nmspinning, 1, atomic::SeqCst)
-	atomic::Store(&sched.needspinning, 0, atomic::SeqCst)
+	atomic::Add(&sched.nmspinning, 1, atomic::Relaxed)
+	atomic::Store(&sched.needspinning, 0, atomic::Release)
 }
 
 #disable nilptr
