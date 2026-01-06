@@ -154,8 +154,8 @@ public:
             error += "\nfile: ";
             error += file;
             __jule_panicStr(error);
-#endif
         }
+        #endif
     }
 
     inline void slice_boundary_check(
