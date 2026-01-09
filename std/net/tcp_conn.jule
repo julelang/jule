@@ -137,41 +137,18 @@ impl TCPConn {
 	}
 }
 
-async fn tcpDial(network: Network, addr: str, timeout: time::Duration)!: &TCPConn {
+async fn tcpDial(network: Network, addr: str, mut timeout: time::Duration)!: &TCPConn {
 	mut tcpAddr := TCPAddr.Resolve(network, addr).await?
 	mut fd := (&netFD)(nil)
 	mut v6 := false
-	let mut handle: poll::NetHandle
 	if tcpAddr.IP.Empty() {
 		match network {
 		| TCP | TCP4:
-			handle = tcpsocketipv4()?
-			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
-			mut sockAddr := sys::RawSockaddrInet4{}
-			sockAddr.Family = sys::AF_INET
-			sockAddr.Port = htons(tcpAddr.Port)
-			handleprepare(handle) else {
-				fd.Close().await?
-				error(error)
-			}
-			fd.connect(4, uintptr(&sockAddr), sys::Socklen(mem::SizeOf(sockAddr)), timeout).await else {
-				fd.Close().await?
-				error(error)
-			}
+			mut sockaddr := sys::RawSockaddrInet4{}
+			fd = socketipv4(true, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, timeout).await?
 		| TCP6:
-			handle = tcpsocketipv6()?
-			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
-			mut sockAddr := sys::RawSockaddrInet6{}
-			sockAddr.Family = sys::AF_INET6
-			sockAddr.Port = htons(tcpAddr.Port)
-			handleprepare(handle) else {
-				fd.Close().await?
-				error(error)
-			}
-			fd.connect(6, uintptr(&sockAddr), sys::Socklen(mem::SizeOf(sockAddr)), timeout).await else {
-				fd.Close().await?
-				error(error)
-			}
+			mut sockaddr := sys::RawSockaddrInet6{}
+			fd = socketipv6(true, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, timeout).await?
 		|:
 			error(&AddrError{Err: "invalid network: " + str(network)})
 		}
@@ -182,40 +159,15 @@ async fn tcpDial(network: Network, addr: str, timeout: time::Duration)!: &TCPCon
 				error(&AddrError{Err: "expected IPv4 address but found IPv6", Addr: addr})
 			}
 			v6 = true
-			handle = tcpsocketipv6()?
-			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
-			mut sockAddr := sys::RawSockaddrInet6{}
-			sockAddr.Family = sys::AF_INET6
-			sockAddr.Port = htons(tcpAddr.Port)
-			ipv6 := tcpAddr.IP.To16()
-			copy(sockAddr.Addr[:], ipv6)
-			handleprepare(handle) else {
-				fd.Close().await?
-				error(error)
-			}
-			fd.connect(6, uintptr(&sockAddr), sys::Socklen(mem::SizeOf(sockAddr)), timeout).await else {
-				fd.Close().await?
-				error(error)
-			}
+			mut sockaddr := sys::RawSockaddrInet6{}
+			fd = socketipv6(true, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, timeout).await?
 		} else {
 			if network == Network.TCP6 {
 				error(&AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr})
 			}
 			tcpAddr.IP = ipv4
-			handle = tcpsocketipv4()?
-			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
-			mut sockAddr := sys::RawSockaddrInet4{}
-			sockAddr.Family = sys::AF_INET
-			sockAddr.Port = htons(tcpAddr.Port)
-			copy(sockAddr.Addr[:], ipv4)
-			handleprepare(handle) else {
-				fd.Close().await?
-				error(error)
-			}
-			fd.connect(4, uintptr(&sockAddr), sys::Socklen(mem::SizeOf(sockAddr)), timeout).await else {
-				fd.Close().await?
-				error(error)
-			}
+			mut sockaddr := sys::RawSockaddrInet4{}
+			fd = socketipv4(true, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, timeout).await?
 		}
 	}
 	ret newTCPConn(&TCPConn{

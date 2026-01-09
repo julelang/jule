@@ -12,7 +12,7 @@ fn lastErrorCode(): sys::Errno {
 	ret sys::Errno(sys::WSAGetLastError())
 }
 
-fn socket(domain: int, typ: int, proto: int)!: poll::NetHandle {
+fn syssocket(domain: int, typ: int, proto: int)!: poll::NetHandle {
 	ret sys::WSASocket(domain, typ, proto, nil, 0, windows::WSA_FLAG_OVERLAPPED|windows::WSA_FLAG_NO_HANDLE_INHERIT)?
 }
 
@@ -23,11 +23,20 @@ async fn maxListenerBacklog(): int {
 	ret sys::SOMAXCONN
 }
 
-fn handleprepare(handle: poll::NetHandle)! {
+fn setDefaultSockopts(handle: poll::NetHandle)! {
 	// On Windows, overlapped mode is non-blocking and async.
 	// Created sockets use WSA_FLAG_NO_HANDLE_INHERIT,
 	// which is equals to CloseOnExec on UNIX.
 	// Nothing to do.
+}
+
+fn setDefaultListenerSockopts(handle: poll::NetHandle)! {
+	// Windows will reuse recently-used addresses by default.
+	// SO_REUSEADDR should not be used here, as it allows
+	// a socket to forcibly bind to a port in use by another socket.
+	// This could lead to a non-deterministic behavior, where
+	// connection requests over the port cannot be guaranteed
+	// to be handled by the correct socket.
 }
 
 fn init() {

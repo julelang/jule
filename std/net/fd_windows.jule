@@ -48,12 +48,42 @@ impl netFD {
 	}
 
 	#disable nilptr
-	async fn accept(mut *self, ipv: int, addr: uintptr, mut &addrlen: *sys::Socklen)!: poll::NetHandle {
-		ret self.pfd.Accept(fn|| {
+	async fn accept(mut *self, ipv: int)!: (fd: &netFD, addr: &TCPAddr) {
+		sockfact := fn()!: poll::NetHandle {
 			if ipv == 4 {
-				ret tcpsocketipv4()?
+				ret syssocket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)?
 			}
-			ret tcpsocketipv6()?
-		}, addr, addrlen).await?
+			ret syssocket(sys::AF_INET6, sys::SOCK_STREAM, sys::IPPROTO_TCP)?
+		}
+		let mut h: poll::NetHandle
+		let mut ip: IP
+		let mut port: int
+		match ipv {
+		| 4:
+			mut sockaddr := sys::RawSockaddrInet4{}
+			mut sockaddrlen := sys::Socklen(mem::SizeOf(sockaddr))
+			h = self.pfd.Accept(sockfact, uintptr(&sockaddr), &sockaddrlen).await?
+			// Address will be handled by poll::FD.
+			ip = make(IP, IPv4Len)
+			copy(ip, IP(sockaddr.Addr[:]))
+			port = int(ntohs(int(sockaddr.Port)))
+		| 6:
+			mut sockaddr := sys::RawSockaddrInet6{}
+			mut sockaddrlen := sys::Socklen(mem::SizeOf(sockaddr))
+			h = self.pfd.Accept(sockfact, uintptr(&sockaddr), &sockaddrlen).await?
+			// Address will be handled by poll::FD.
+			ip = make(IP, IPv6Len)
+			copy(ip, IP(sockaddr.Addr[:]))
+			port = int(ntohs(int(sockaddr.Port)))
+		|:
+			panic("unreachable")
+		}
+		addr = &TCPAddr{IP: ip, Port: port}
+		fd = newFD(h, poll::Socket, sys::SOCK_STREAM)
+		fd.init() else {
+			fd.Close().await else {}
+			error(error)
+		}
+		ret
 	}
 }

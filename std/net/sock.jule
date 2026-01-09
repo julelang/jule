@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/comptime"
 use "std/internal/poll"
+use "std/mem"
 use "std/sys"
 use "std/time"
 
@@ -93,10 +95,97 @@ fn getSocketAddr(handle: poll::NetHandle, addr: uintptr, len: sys::Socklen)! {
 	sys::Getsockname(handle, addr, len)?
 }
 
-fn tcpsocketipv4()!: poll::NetHandle {
-	ret socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)?
+async fn socketipv4(remote: bool, sockaddr: uintptr, mut addr: addr, typ: int, timeout: time::Duration)!: &netFD {
+	ret socket(remote, sockaddr, addr, sys::AF_INET, typ, timeout).await?
 }
 
-fn tcpsocketipv6()!: poll::NetHandle {
-	ret socket(sys::AF_INET6, sys::SOCK_STREAM, sys::IPPROTO_TCP)?
+async fn socketipv6(remote: bool, sockaddr: uintptr, mut addr: addr, typ: int, timeout: time::Duration)!: &netFD {
+	ret socket(remote, sockaddr, addr, sys::AF_INET6, typ, timeout).await?
+}
+
+async fn socket(remote: bool, sockaddr: uintptr, mut addr: addr, domain: int, typ: int, timeout: time::Duration)!: (fd: &netFD) {
+	let mut proto: int
+	match typ {
+	| sys::SOCK_STREAM:
+		proto = sys::IPPROTO_TCP
+	| sys::SOCK_DGRAM:
+		proto = sys::IPPROTO_UDP
+	|:
+		panic("unreachable")
+	}
+	sock := syssocket(domain, typ, proto)?
+	match typ {
+	| sys::SOCK_STREAM:
+		fd = newFD(sock, poll::Socket, typ)
+	| sys::SOCK_DGRAM:
+		fd = newFD(sock, poll::SocketNoConn, typ)
+	|:
+		panic("unreachable")
+	}
+	port := htons(addr.port())
+	let mut sockaddrlen: sys::Socklen
+	let mut sockv: int
+	match domain {
+	| sys::AF_INET:
+		sockv = 4
+		mut &addr4 := unsafe { &(*(*sys::RawSockaddrInet4)(sockaddr)) }
+		sockaddrlen = sys::Socklen(mem::SizeOf(*addr4))
+		comptime::TypeAlias(DomainType, comptime::TypeOf(addr4.Family)) // Hack for platform specific compatibility.
+		addr4.Family = DomainType(domain)
+		addr4.Port = port
+		ip := addr.ip().To4()
+		copy(addr4.Addr[:], ip)
+	| sys::AF_INET6:
+		sockv = 6
+		mut &addr6 := unsafe { &(*(*sys::RawSockaddrInet6)(sockaddr)) }
+		sockaddrlen = sys::Socklen(mem::SizeOf(*addr6))
+		comptime::TypeAlias(DomainType, comptime::TypeOf(addr6.Family)) // Hack for platform specific compatibility.
+		addr6.Family = DomainType(domain)
+		addr6.Port = port
+		ip := addr.ip().To16()
+		copy(addr6.Addr[:], ip)
+	}
+	setDefaultSockopts(sock) else {
+		fd.Close().await else {}
+		error(error)
+	}
+	if remote {
+		// Initialize fd here because connect needs eventpoll for timeout.
+		// Timeout is actually implemented like deadline but temporary.
+		// It will be cleared before conect return.
+		fd.init() else {
+			fd.Close().await else {}
+			error(error)
+		}
+		fd.connect(sockv, sockaddr, sockaddrlen, timeout).await else {
+			fd.Close().await else {}
+			error(error)
+		}
+	} else {
+		sys::Bind(sock, sockaddr, sockaddrlen) else {
+			fd.Close().await else {}
+			error(error)
+		}
+		match typ {
+		| sys::SOCK_STREAM:
+			setDefaultListenerSockopts(sock) else {
+				fd.Close().await else {}
+				error(error)
+			}
+			backlog := listenerBacklog().await
+			sys::Listen(sock, backlog) else {
+				fd.Close().await else {}
+				error(error)
+			}
+		| sys::SOCK_DGRAM:
+			// No-op.
+		|:
+			panic("unreachable")
+		}
+		fd.init() else {
+			fd.Close().await else {}
+			error(error)
+		}
+	}
+	ret fd
 }

@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use "std/io"
+use "std/sync"
 use "std/time"
 
 // Represents a DNS lookup error.
@@ -89,4 +90,15 @@ trait Listener {
 	io::Closer
 	async fn Accept(*self)!: Conn
 	fn Network(*self): Network
+}
+
+let mut maxListenerBacklogCacheInit = sync::AsyncOnce{}
+let mut maxListenerBacklogCache = 0
+
+// Caching wrapper around maxListenerBacklog.
+async fn listenerBacklog(): int {
+	maxListenerBacklogCacheInit.Do(async fn() {
+		maxListenerBacklogCache = maxListenerBacklog().await
+	}).await
+	ret maxListenerBacklogCache
 }

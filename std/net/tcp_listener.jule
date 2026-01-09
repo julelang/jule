@@ -11,7 +11,7 @@ use "std/time"
 // In most cases, represents TCP server.
 struct TCPListener {
 	addr:   &TCPAddr
-	mut v6: bool
+	ipv:    int // 4 for IPv4, 6 for IPv6
 	mut fd: &netFD
 }
 
@@ -34,34 +34,8 @@ impl TCPListener {
 		if self.fd == nil {
 			panic("net: TCPListener.Accept: connection is not open")
 		}
-		if self.v6 { // IPv6
-			mut clientAddr := sys::RawSockaddrInet6{}
-			mut clientAddrLen := sys::Socklen(mem::SizeOf(clientAddr))
-			handle := self.fd.accept(6, uintptr(&clientAddr), &clientAddrLen).await?
-			mut ip := make(IP, IPv6Len)
-			copy(ip, IP(clientAddr.Addr[:]))
-			ret newTCPConn(&TCPConn{
-				Addr: &TCPAddr{
-					IP: ip,
-					Port: int(ntohs(int(clientAddr.Port))),
-				},
-				fd: newFD(handle, poll::Socket, sys::SOCK_STREAM),
-				v6: true,
-			})
-		} else { // IPv4
-			mut clientAddr := sys::RawSockaddrInet4{}
-			mut clientAddrLen := sys::Socklen(mem::SizeOf(clientAddr))
-			handle := self.fd.accept(4, uintptr(&clientAddr), &clientAddrLen).await?
-			mut ip := make(IP, IPv4Len)
-			copy(ip, IP(clientAddr.Addr[:]))
-			ret newTCPConn(&TCPConn{
-				Addr: &TCPAddr{
-					IP: ip,
-					Port: int(ntohs(int(clientAddr.Port))),
-				},
-				fd: newFD(handle, poll::Socket, sys::SOCK_STREAM),
-			})
-		}
+		mut fd, mut addr := self.fd.accept(self.ipv).await?
+		ret newTCPConn(&TCPConn{fd: fd, Addr: addr})
 	}
 
 	// Returns network name which is listening.
@@ -70,10 +44,12 @@ impl TCPListener {
 		match {
 		| self.fd == nil:
 			ret Network.TCP
-		| self.v6:
+		| self.ipv == 4:
+			ret Network.TCP4
+		| self.ipv == 6:
 			ret Network.TCP6
 		|:
-			ret Network.TCP4
+			ret Network.TCP
 		}
 	}
 
@@ -84,45 +60,24 @@ impl TCPListener {
 		}
 		self.fd.Close().await?
 		self.fd = nil
-		self.v6 = false
+		self.ipv = 0
 	}
 }
 
 async fn tcpBind(network: Network, addr: str)!: &TCPListener {
 	mut tcpAddr := TCPAddr.Resolve(network, addr).await?
 	mut fd := (&netFD)(nil)
-	mut v6 := false
+	let mut ipv: int
 	if tcpAddr.IP.Empty() {
 		match network {
 		| TCP | TCP4:
-			mut handle := tcpsocketipv4()?
-			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
-			mut sockAddr := sys::RawSockaddrInet4{}
-			sockAddr.Family = sys::AF_INET
-			sockAddr.Port = htons(tcpAddr.Port)
-			handleprepare(handle) else {
-				fd.Close().await?
-				error(error)
-			}
-			sys::Bind(handle, uintptr(&sockAddr), sys::Socklen(mem::SizeOf(sockAddr))) else {
-				fd.Close().await?
-				error(error)
-			}
+			ipv = 4
+			mut sockaddr := sys::RawSockaddrInet4{}
+			fd = socketipv4(false, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, 0).await?
 		| TCP6:
-			v6 = true
-			handle := tcpsocketipv6()?
-			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
-			mut sockAddr := sys::RawSockaddrInet6{}
-			sockAddr.Family = sys::AF_INET6
-			sockAddr.Port = htons(tcpAddr.Port)
-			handleprepare(handle) else {
-				fd.Close().await?
-				error(error)
-			}
-			sys::Bind(handle, uintptr(&sockAddr), sys::Socklen(mem::SizeOf(sockAddr))) else {
-				fd.Close().await?
-				error(error)
-			}
+			ipv = 6
+			mut sockaddr := sys::RawSockaddrInet6{}
+			fd = socketipv6(false, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, 0).await?
 		|:
 			error(&AddrError{Err: "invalid network: " + str(network)})
 		}
@@ -132,50 +87,21 @@ async fn tcpBind(network: Network, addr: str)!: &TCPListener {
 			if network == Network.TCP4 {
 				error(&AddrError{Err: "expected IPv4 address but found IPv6", Addr: addr})
 			}
-			v6 = true
-			handle := tcpsocketipv6()?
-			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
-			mut sockAddr := sys::RawSockaddrInet6{}
-			sockAddr.Family = sys::AF_INET6
-			sockAddr.Port = htons(tcpAddr.Port)
-			ipv6 := tcpAddr.IP.To16()
-			copy(sockAddr.Addr[:], ipv6)
-			handleprepare(handle) else {
-				fd.Close().await?
-				error(error)
-			}
-			sys::Bind(handle, uintptr(&sockAddr), sys::Socklen(mem::SizeOf(sockAddr))) else {
-				fd.Close().await?
-				error(error)
-			}
+			ipv = 6
+			mut sockaddr := sys::RawSockaddrInet6{}
+			fd = socketipv6(false, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, 0).await?
 		} else {
 			if network == Network.TCP6 {
 				error(&AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr})
 			}
+			ipv = 4
 			tcpAddr.IP = ipv4
-			handle := tcpsocketipv4()?
-			fd = newFD(handle, poll::Socket, sys::SOCK_STREAM)
-			mut sockAddr := sys::RawSockaddrInet4{}
-			sockAddr.Family = sys::AF_INET
-			sockAddr.Port = htons(tcpAddr.Port)
-			copy(sockAddr.Addr[:], ipv4)
-			handleprepare(handle) else {
-				fd.Close().await?
-				error(error)
-			}
-			sys::Bind(handle, uintptr(&sockAddr), sys::Socklen(mem::SizeOf(sockAddr))) else {
-				fd.Close().await?
-				error(error)
-			}
+			mut sockaddr := sys::RawSockaddrInet4{}
+			fd = socketipv4(false, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, 0).await?
 		}
 	}
-	backlog := maxListenerBacklog().await
-	sys::Listen(fd.Handle(), backlog) else {
-		fd.Close().await?
-		error(error)
-	}
 	ret &TCPListener{
-		v6: v6,
+		ipv: ipv,
 		addr: tcpAddr,
 		fd: fd,
 	}
