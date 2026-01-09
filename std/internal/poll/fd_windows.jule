@@ -72,8 +72,13 @@ impl FD {
 				error(sys::Errno(sys::WSAGetLastError()))
 			}
 		}
-
-		if pollable {
+		// For eventpoll, just pollable is not enough.
+		// The program must use async runtime instead of sync runtime.
+		// If we initialize eventpoll for this FD on sync runtime, behavior is undefined.
+		// Because eventpoll is an async runtime system and will not be
+		// initialized on sync runtime. Since async functions cannot be accessed
+		// via Safe Jule on sync runtime, this should be safe.
+		if pollable && runtime::asynctime {
 			// If we could not initialize the runtime poller,
 			// assume we are using blocking mode.
 			self.pd = runtime::eventpollnew(self.File)?
