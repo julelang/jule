@@ -5,13 +5,73 @@
 // Represents a scheduled event.
 // when is an absolute timestamp in nanoseconds.
 struct timer {
-	data:  runnext // Associated coroutine, may be empty.
-	when:  i64
-	index: int // heap index, -1 if not in heap
+	mu:    mutex
+	theap: &timerheap                     // A fake smart-pointer to the owner timerheap.
+	f:     fn(arg: uintptr, seq: uintptr) // A function will be invoked when timer fired.
+	arg:   uintptr                        // Any argument provided by the runtime for f.
+	seq:   uintptr                        // Any sequence value provided by the runtime for f.
+	when:  i64                            // Timer wakes up at when. If <=0, should not fire.
+	state: i32                            // State of the timer.
+	index: int                            // Heap index, -1 if not in heap.
+}
+
+impl timer {
+	// Returns new timer.
+	#disable nilptr
+	fn new(when: i64, f: fn(arg: uintptr, seq: uintptr), arg: uintptr, seq: uintptr): &timer {
+		mut t := new(timer)
+		t.modify(when, f, arg, seq)
+		ret t
+	}
+
+	// Modifies an existing timer.
+	// Reports whether the timer was modified before it was run.
+	#disable nilptr
+	fn modify(mut *self, when: i64, f: fn(arg: uintptr, seq: uintptr), arg: uintptr, seq: uintptr) {
+		self.mu.lock()
+		self.when = when
+		self.arg = arg
+		self.seq = seq
+		self.f = f
+		if self.theap != nil && self.index != -1 {
+			self.theap.mu.lock()
+			self.theap.siftdown(self.index)
+			self.theap.siftup(self.index)
+			self.theap.mu.unlock()
+		}
+		self.mu.unlock()
+	}
+
+	// Stops the timer.
+	#disable nilptr
+	fn stop(mut *self) {
+		self.mu.lock()
+		self.f = nil
+		self.when = 0
+		self.mu.unlock()
+	}
+
+	// Fires the timer.
+	// Must be a functionial timer, if timer.f is nil, behavior is undefined.
+	// The timer and timerheap lock must be held.
+	#disable nilptr
+	fn unlockAndFire(mut *self) {
+		arg := self.arg
+		seq := self.seq
+		f := self.f
+		self.f = nil
+		self.when = 0
+		if self.theap != nil && self.index != -1 {
+			self.theap.siftup(self.index)
+		}
+		self.mu.unlock()
+		f(arg, seq)
+	}
 }
 
 // A min-heap ordered by [timer.when].
 struct timerheap {
+	mu:   mutex
 	data: []&timer
 }
 
@@ -24,22 +84,25 @@ impl timerheap {
 
 	// Returns the earliest timer without removing it.
 	#disable nilptr boundary
-	fn peek(mut *self): &timer {
-		if len(self.data) == 0 {
+	fn peek(mut *self, delta: int): &timer {
+		if delta >= len(self.data) {
 			ret nil
 		}
 		ret self.data[0]
 	}
 
 	// Inserts a timer into the heap.
+	// Timer lock must be held.
 	#disable nilptr
 	fn push(mut *self, mut t: &timer) {
+		t.theap = unsafe { (&timerheap)(self) }
 		t.index = len(self.data)
 		self.data = append(self.data, t)
 		self.siftup(t.index)
 	}
 
 	// Removes and returns the earliest timer.
+	// Timer lock must be held.
 	#disable nilptr boundary
 	fn pop(mut *self): &timer {
 		n := len(self.data)
@@ -58,10 +121,12 @@ impl timerheap {
 		}
 
 		min.index = -1
+		min.theap = nil
 		ret min
 	}
 
 	// Deletes a specific timer from the heap.
+	// Timer lock must be held.
 	#disable nilptr boundary
 	fn remove(mut *self, mut t: &timer) {
 		i := t.index
@@ -80,13 +145,14 @@ impl timerheap {
 		}
 
 		t.index = -1
+		t.theap = nil
 	}
 
 	#disable nilptr boundary
 	fn siftup(mut *self, mut i: int) {
 		for {
 			parent := (i - 1) / 2
-			if i == 0 || self.data[parent].when <= self.data[i].when {
+			if i == 0 || cmpwhen(self.data[parent].when, self.data[i].when) < 1 {
 				break
 			}
 			self.swap(i, parent)
@@ -105,11 +171,11 @@ impl timerheap {
 
 			mut smallest := left
 			right := left + 1
-			if right < n && self.data[right].when < self.data[left].when {
+			if right < n && cmpwhen(self.data[right].when, self.data[left].when) == -1 {
 				smallest = right
 			}
 
-			if self.data[i].when <= self.data[smallest].when {
+			if cmpwhen(self.data[i].when, self.data[smallest].when) < 1 {
 				break
 			}
 
@@ -124,4 +190,23 @@ impl timerheap {
 		self.data[i].index = i
 		self.data[j].index = j
 	}
+}
+
+fn cmpwhen(w1: i64, w2: i64): int {
+	if w1 <= 0 {
+		if w2 > 0 {
+			ret +1
+		}
+		ret 0
+	}
+	if w2 <= 0 {
+		ret -1
+	}
+	if w1 < w2 {
+		ret -1
+	}
+	if w1 > w2 {
+		ret +1
+	}
+	ret 0
 }

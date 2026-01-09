@@ -137,7 +137,7 @@ retry:
 		let mut tag: uintptr
 		if runtime::PtrSize == 4 {
 			// No sequence protection on 32-bit systems.
-			// See netpollopen for details.
+			// See eventpollopen for details.
 			unsafe { *(&pd) = &(*(*polldesc)(ev.udata)) }
 			tag = 0
 		} else {
@@ -148,10 +148,8 @@ retry:
 				continue // stale
 			}
 		}
-		pd.mu.lock()
-		pd.eventerr = pd.eventerr || ev.flags == sys::EV_ERROR
-		pollnotified(pd, mode, toRun, &b)
-		pd.mu.unlock()
+		pd.setEventErr(ev.flags == sys::EV_ERROR, tag)
+		eventpollready(pd, mode, toRun, &b)
 	}
 	ret b
 }

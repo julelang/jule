@@ -63,13 +63,14 @@ impl FD {
 		if self.Flags&File != File && self.Flags&Pipe != Pipe && self.Flags&Console != Console && self.Flags&Socket != Socket && self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Write")
 		}
+		self.writeLock().await?
+		defer { self.writeUnlock() }
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte write, return immediately
 			// without trying to write.
 			ret 0
 		}
-		self.writeLock().await?
-		defer { self.writeUnlock() }
+		self.PrepareWrite()?
 		for {
 			mut max := len(buf)
 			if self.IsStream && max-n > maxRW {
@@ -140,13 +141,14 @@ impl FD {
 		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
 		}
+		self.writeLock().await?
+		defer { self.writeUnlock() }
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte read, return immediately
 			// without trying to read.
 			ret 0
 		}
-		self.writeLock().await?
-		defer { self.writeUnlock() }
+		self.PrepareWrite()?
 		for {
 			sys::Sendto(int(self.File), buf, 0, addr, addrLen) else {
 				if error == sys::EINTR {
@@ -196,16 +198,17 @@ impl FD {
 		if self.Flags&File != File && self.Flags&Pipe != Pipe && self.Flags&Console != Console && self.Flags&Socket != Socket && self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Read")
 		}
+		self.readLock().await?
+		defer { self.readUnlock() }
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte read, return immediately
 			// without trying to read.
 			ret 0
 		}
+		self.PrepareRead()?
 		if self.IsStream && len(buf) > maxRW {
 			buf = buf[:maxRW]
 		}
-		self.readLock().await?
-		defer { self.readUnlock() }
 		for {
 			n = ignoringEINTRIO(sys::Read, int(self.File), buf) else {
 				if error == sys::EAGAIN && self.pollable {
@@ -251,13 +254,14 @@ impl FD {
 		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
 		}
+		self.readLock().await?
+		defer { self.readUnlock() }
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte read, return immediately
 			// without trying to read.
 			ret 0
 		}
-		self.readLock().await?
-		defer { self.readUnlock() }
+		self.PrepareRead()?
 		for {
 			n = sys::Recvfrom(int(self.File), buf, 0, addr, addrLen) else {
 				if error == sys::EINTR {
@@ -319,6 +323,7 @@ impl FD {
 		self.readLock().await?
 		defer { self.readUnlock() }
 
+		self.PrepareRead()?
 		for {
 			h := sys::Accept(NetHandle(self.File), addr, addrlen) else {
 				match error {
@@ -352,6 +357,7 @@ impl FD {
 			// Poller may want to unregister fd in notification mechanism,
 			// so this must be executed before Close.
 			runtime::eventpollfree(self.pd)
+			self.pd = nil
 		}
 
 		// All kinds are supports the Close function.
@@ -370,6 +376,11 @@ impl FD {
 	async fn Close(mut *self)! {
 		if !self.fdmu.increfAndClose() {
 			errClosing(self.isFile())?
+		}
+
+		// Unblock pending reader and writer.
+		if self.pollable && self.pd != nil {
+			self.pd.evict()
 		}
 
 		// The call to decref will call destroy if there are no other

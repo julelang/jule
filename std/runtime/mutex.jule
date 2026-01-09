@@ -256,23 +256,34 @@ const (
 	_ = iota
 	mutexunlockSelect
 	mutexunlockJobAdd
+	mutexunlockIOWait
 )
 
 // Unlocks mutex mu, if it is not zero.
 // The mu must point to the `mutex` memory layout.
 #export "__jule_mutexUnlock"
-fn mutexunlock(mu: u64) {
+fn mutexunlock(mu: u64): bool {
 	// Check for tagged pointer cases.
 	tp := taggedPointer(mu)
 	match tp.tag() {
 	| mutexunlockSelect:
 		mut &c := unsafe { &(*(*c)(tp.pointer())) }
 		atomic::Store(&c.race, 0, atomic::Release)
-		ret
+		ret true
 	| mutexunlockJobAdd:
 		blocking.wakew()
 		blocking.mu.unlock()
-		ret
+		ret true
+	| mutexunlockIOWait:
+		mut &iod := unsafe { &(*(*eventpollIOData)(tp.pointer())) }
+		r := atomic::CompareAndSwap(iod.pdcp, pdWait, uintptr(iod.c), atomic::AcqRel, atomic::Relaxed)
+		if r {
+			// Bump the count of coroutines waiting for the poller.
+			// The scheduler uses this to decide whether to block
+			// waiting for the poller if there is nothing else to do.
+			eventpollAdjustWaiters(1)
+		}
+		ret r
 	}
 
 	// Ordinary address.
@@ -281,4 +292,5 @@ fn mutexunlock(mu: u64) {
 		// implementation for unlock.
 		unsafe { (*mutex)(mu).unlock() }
 	}
+	ret true
 }

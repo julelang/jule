@@ -115,10 +115,8 @@ retry:
 		if atomic::Load(&pd.fdseq, atomic::Acquire) != tag {
 			continue // stale
 		}
-		pd.mu.lock()
-		pd.eventerr = pd.eventerr || ev.events == sys::EPOLLERR
-		pollnotified(pd, mode, toRun, &b)
-		pd.mu.unlock()
+		pd.setEventErr(ev.events == sys::EPOLLERR, tag)
+		eventpollready(pd, mode, toRun, &b)
 	}
 	ret b
 }

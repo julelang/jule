@@ -545,6 +545,7 @@ impl FD {
 			// Poller may want to unregister fd in notification mechanism,
 			// so this must be executed before Close.
 			runtime::eventpollfree(self.pd)
+			self.pd = nil
 		}
 
 		match {
@@ -579,7 +580,9 @@ impl FD {
 			sys::CancelIoEx(sys::Handle(self.File), nil) else {}
 		}
 		// Unblock pending reader and writer.
-		self.pd.evict()
+		if self.pollable && self.pd != nil {
+			self.pd.evict()
+		}
 		let mut err: any
 		self.decref() else { err = error }
 		// Wait until the descriptor is closed. If this was the only
@@ -626,6 +629,8 @@ impl operation {
 
 // Executes a single IO operation o.
 async fn execIO(mut &o: *operation, submit: fn(mut &o: *operation)!)!: int {
+	// Notify runtime eventpoll about starting IO.
+	o.fd.Prepare(o.mode)?
 	// Start IO.
 	submit(o) else {
 		if error != sys::ERROR_IO_PENDING {
@@ -639,7 +644,7 @@ async fn execIO(mut &o: *operation, submit: fn(mut &o: *operation)!)!: int {
 	o.fd.Wait(o.mode).await else {
 		// IO is interrupted by "close" or "timeout".
 		match error {
-		| runtime::netpollClosing | runtime::netpollDeadline:
+		| runtime::pollErrClosing | runtime::pollErrTimeout:
 			// Will deal with those.
 		|:
 			error(error)

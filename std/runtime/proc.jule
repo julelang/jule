@@ -91,10 +91,6 @@ struct p {
 	// Incremented on every scheduler call.
 	schedtick: u32
 
-	// Poll descriptors that are still alive.
-	pdsmu: mutex
-	pds:   polldescq
-
 	// Local timers of the P.
 	timers: timerheap
 
@@ -137,7 +133,7 @@ struct scheduler {
 	// Number of coroutines currently polling for I/O.
 	//
 	// Must be accessed atomically when used by scheduler logic.
-	_ncpoll: int
+	_ncpoll: i32
 
 	// Number of coroutines currently in blocking call.
 	//
@@ -151,22 +147,10 @@ struct scheduler {
 }
 
 impl scheduler {
-	// Marks that a coroutine is about to enter an I/O polling state.
-	// Must be called immediately before the coroutine blocks on I/O.
-	fn enterpoll(mut *self) {
-		atomic::Add(&self._ncpoll, 1, atomic::Relaxed)
-	}
-
-	// Marks that a coroutine has exited an I/O polling state.
-	// Must be called immediately after the coroutine finishes polling.
-	fn exitpoll(mut *self) {
-		atomic::Add(&self._ncpoll, -1, atomic::Relaxed)
-	}
-
 	// Returns the number of coroutines currently polling for I/O.
 	// Used by the scheduler to make global scheduling decisions.
-	fn ncpolling(*self): int {
-		ret atomic::Load(&self._ncpoll, atomic::Relaxed)
+	fn ncpolling(*self): i32 {
+		ret atomic::Load(&self._ncpoll, atomic::Acquire)
 	}
 
 	// Marks that a coroutine is about to enter an I/O polling state.
@@ -540,7 +524,7 @@ fn stealWork(mut pp: &p, mut &cp: *c): bool {
 // Assumes that the calling thread is counted as spinning.
 // It will exit the spinning state before return.
 #disable nilptr boundary
-fn findRunnable(): (c: c, ok: bool) {
+fn findRunnable(): (coro: c, ok: bool) {
 	mut m := gett()
 	mut pp := m.pp
 
@@ -550,17 +534,17 @@ top:
 	// by constantly respawning each other.
 	if pp.schedtick&63 == 0 && sched.runq.len > 0 {
 		sched.mu.lock()
-		ok = globrunqget(pp, 1, &c)
+		ok = globrunqget(pp, 1, &coro)
 		sched.mu.unlock()
 		if ok {
-			ret
+			ret coro, true
 		}
 	}
 
 	// Local runnable queue.
-	ok = runqget(pp, &c)
+	ok = runqget(pp, &coro)
 	if ok {
-		ret c, true
+		ret coro, true
 	}
 
 	// Local queue empty: attempt to fetch a batch from the global run queue.
@@ -569,7 +553,7 @@ top:
 	// locality and reduce contention on the global lock.
 	if sched.runq.len > 0 {
 		sched.mu.lock()
-		ok = globrunqget(pp, 0, &c)
+		ok = globrunqget(pp, 0, &coro)
 		sched.mu.unlock()
 		if ok {
 			ret
@@ -589,9 +573,10 @@ top:
 		// If any coroutines are ready, return the first and enqueue the rest.
 		// Timers possibly expired here will be handled in a later iteration.
 		if bn > 0 {
-			c = toRun[0]
+			coro = toRun[0]
 			runqputbatch(pp, &toRun, 1, bn)
-			ret c, true
+			eventpollAdjustWaiters(-i32(bn))
+			ret coro, true
 		}
 	}
 
@@ -603,9 +588,9 @@ top:
 		if !m.spinning {
 			becomeSpinning(m)
 		}
-		ok = stealWork(pp, &c)
+		ok = stealWork(pp, &coro)
 		if ok {
-			ret c, true
+			ret coro, true
 		}
 	}
 
@@ -626,99 +611,61 @@ top:
 	// The default is -1, which is blocks indefinitely.
 	mut delay := i64(-1)
 	mut now := nanotime()
-	mut iodeadline := false // Indicates presence of expired I/O deadlines.
 
 	// P's local timers.
 	//
 	// Expired timers immediately make their coroutines runnable.
 	// The first such coroutine is returned; others are enqueued.
 	mut n := 0
-	if pp.timers.peek() != nil {
+	mut timerPeekOffs := 0
+	pp.timers.mu.lock()
+	if pp.timers.peek(timerPeekOffs) != nil {
 		ok = false
 		for n < prunqsize {
-			mut timer := pp.timers.peek()
-			if timer == nil || timer.when > now {
+			mut t := pp.timers.peek(timerPeekOffs)
+			if t == nil {
 				break
 			}
-			mut data := pp.timers.pop().data
-			if data.used {
+			t.mu.lock()
+			if t.when > now {
+				// Compute delay until the next timer fires.
+				delay = t.when - now
+				if delay <= 0 {
+					panic("runtime: inconsistent timer state")
+				}
+				t.mu.unlock()
+				break
+			}
+			// We cannot fire this timer.
+			if t.when <= 0 {
+				t.mu.unlock()
+				timerPeekOffs++
+				continue
+			}
+			if t.f == nil {
+				mut &tc := unsafe { &(*(*c)(t.arg)) }
+				pp.timers.pop() // Remove this timer from the heap.
+				t.mu.unlock()
+				// Function is nil, this should be a sleep timer.
 				if n == 0 {
-					c = data.c
+					coro = *tc
 					ok = true
 				} else {
-					runqput(pp, &data.c, false)
+					runqput(pp, tc, false)
+					n++
 				}
 			} else {
-				// Timer corresponds to an I/O deadline.
-				iodeadline = true
+				t.unlockAndFire()
+				timerPeekOffs++
 			}
 			n++
 		}
-
-		// If we already found a runnable coroutine, return immediately
-		// without entering eventpoll.
-		if ok {
-			ret c, true
-		}
-
-		// Compute delay until the next timer fires.
-		soonest := pp.timers.peek()
-		if soonest != nil {
-			delay = soonest.when - now
-			if delay <= 0 {
-				panic("runtime: inconsistent timer state")
-			}
-		}
 	}
-
-	// Handle expired I/O deadlines.
-	//
-	// Coroutines blocked on I/O with an associated deadline
-	// are made runnable once their deadline expires.
-	//
-	// Coroutines are NOT removed from pd here.
-	// The coroutine itself is responsible for verifying whether it is still
-	// associated with this pd upon wakeup. If the association is unchanged,
-	// the wakeup indicates a deadline-exceeded condition; otherwise, the coroutine
-	// was resumed for another reason (e.g. notified by eventpoll).
-	if iodeadline && pp.pds.head != nil {
-		pp.pdsmu.lock()
-		mut q := pp.pds.head
-		for {
-			if n >= prunqsize || q == nil {
-				break
-			}
-			mut pd := q.pd
-			pd.mu.lock()
-
-			if pd.rdeadline > 0 && pd.rdeadline <= now && pd.rcp != nil && pd.rcp != pollrace {
-				runqput(pp, &(*pd.rcp), false)
-				n++
-			}
-			if pd.wdeadline > 0 && pd.wdeadline <= now && pd.wcp != nil && pd.wcp != pollrace {
-				runqput(pp, &(*pd.wcp), false)
-				n++
-			}
-			if pd.deadline > 0 && pd.deadline <= now {
-				if pd.rcp != nil && pd.rcp != pollrace {
-					runqput(pp, &(*pd.rcp), false)
-					n++
-				}
-				if pd.wcp != nil && pd.wcp != pollrace {
-					runqput(pp, &(*pd.wcp), false)
-					n++
-				}
-			}
-			pd.mu.unlock()
-			q = q.next
-		}
-		pp.pdsmu.unlock()
-
-		ok = runqget(pp, &c)
-		if !ok {
-			panic("runtime: coroutine scheduler queue corruption")
-		}
-		ret c, true
+	pp.timers.mu.unlock()
+	// If we already found a runnable coroutine from timers, return immediately
+	// without entering eventpoll.
+	if ok {
+		ret coro, true
 	}
 
 	// Final step: poll eventpoll.
@@ -729,13 +676,14 @@ top:
 		now = nanotime()
 		atomic::Store(&sched.lastpoll, now, atomic::Release)
 		if bn > 0 {
-			c = toRun[0]
+			coro = toRun[0]
 			runqputbatch(pp, &toRun, 1, bn)
-			ret c, true
+			eventpollAdjustWaiters(-i32(bn))
+			ret coro, true
 		}
 	}
 
-	ret c, false
+	ret coro, false
 }
 
 // A coroutine scheduler routine.
@@ -752,12 +700,6 @@ Sched:
 		mut c, ok := findRunnable()
 		// findRunnable failed to find a runnable coroutine.
 		if !ok {
-			// There are timers in this worker, clean them.
-			// Normally, eventpoll returns a timer if exist.
-			// Somehow, a spurious wakeup occurred.
-			if m.pp.timers.len() > 0 {
-				continue
-			}
 			// There are coroutines polling for I/O or waiting for a blocking job,
 			// and there is no M looking for eventpoll.
 			if atomic::Load(&sched.lastpoll, atomic::Acquire) != pollCheckIn &&
@@ -769,6 +711,15 @@ Sched:
 			// Try again if reasonable.
 			if tried < MaxSpin && sched.ncrunning() > 0 {
 				tried++
+				continue
+			}
+			// There are timers in this worker, clean them.
+			// Normally, eventpoll returns a timer if exist.
+			// Somehow, a spurious wakeup occurred.
+			m.pp.timers.mu.lock()
+			ntimers := m.pp.timers.len()
+			m.pp.timers.mu.unlock()
+			if ntimers > 0 {
 				continue
 			}
 			// We tried enough.
@@ -877,12 +828,11 @@ fn unpark(mut &cp: *c) {
 #disable nilptr
 async fn sleep(dur: sleepDuration) {
 	mut m := gett()
-	mut timer := new(timer)
-	timer.data.c = m.c
-	timer.data.used = true
-	timer.when = nanotime() + dur
-	m.pp.timers.push(timer)
-	park(&timer.data.c, 0, reasonSleep).await
+	mut c := m.c
+	when := nanotime() + dur
+	mut t := timer.new(when, nil, uintptr(&c), 0)
+	m.pp.timers.push(t)
+	park(&c, 0, reasonSleep).await
 }
 
 // Destroys all retired coroutine frames for the current worker thread.
@@ -970,6 +920,7 @@ fn sysmon() {
 						sched.runq.push(&toRun[i])
 					}
 					sched.mu.unlock()
+					eventpollAdjustWaiters(-i32(bn))
 				}
 			}
 		}

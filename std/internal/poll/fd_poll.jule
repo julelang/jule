@@ -1,0 +1,52 @@
+use "std/runtime"
+use "std/time"
+
+impl FD {
+	// Sets a general deadline for pd.
+	fn SetDeadline(mut *self, mut deadline: time::Duration) {
+		self.pd.setDeadline(i64(deadline), 'w'+'r')
+	}
+
+	// Sets a read deadline for pd.
+	fn SetReadDeadline(mut *self, mut deadline: time::Duration) {
+		self.pd.setDeadline(i64(deadline), 'r')
+	}
+
+	// Sets a write deadline for pd.
+	fn SetWriteDeadline(mut *self, mut deadline: time::Duration) {
+		self.pd.setDeadline(i64(deadline), 'w')
+	}
+
+	// Waits until an event is triggered by eventpoll according to the mode.
+	// After returning, either the coroutine is ready to be executed
+	// according to the mode, or an error has occurred (e.g., deadline exceeded).
+	async fn Wait(mut *self, mode: i32)! {
+		runtime::eventpollwait(self.pd, mode).await?
+	}
+
+	// Waits until an event is triggered by eventpoll for read operation.
+	// After returning, either the coroutine is ready to be executed
+	// according to the mode, or an error has occurred (e.g., deadline exceeded).
+	async fn WaitRead(mut *self)! {
+		self.Wait('r').await?
+	}
+
+	// Waits until an event is triggered by eventpoll for write operation.
+	// After returning, either the coroutine is ready to be executed
+	// according to the mode, or an error has occurred (e.g., deadline exceeded).
+	async fn WaitWrite(mut *self)! {
+		self.Wait('w').await?
+	}
+
+	fn Prepare(mut *self, mode: i32)! {
+		runtime::eventpollreset(self.pd, mode)?
+	}
+
+	fn PrepareRead(mut *self)! {
+		self.Prepare('r')?
+	}
+
+	fn PrepareWrite(mut *self)! {
+		self.Prepare('w')?
+	}
+}
