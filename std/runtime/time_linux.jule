@@ -2,7 +2,19 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/sys"
+
 const (
 	_CLOCK_REALTIME  = 0 // Identifier for system-wide realtime clock.
 	_CLOCK_MONOTONIC = 1 // Monotonic system-wide clock.
 )
+
+fn nanotime(): i64 {
+	mut ts := sys::Timespec{}
+	if unsafe { extern.clock_gettime(extern.clockid_t(_CLOCK_MONOTONIC), (*extern.timespec)(&ts)) } == -1 {
+		panic("runtime: nanotime failed")
+	}
+	ret i64(ts.Sec)*1e9 + i64(ts.Nsec)
+}
+
+fn timeinit() {}

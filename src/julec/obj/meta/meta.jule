@@ -32,19 +32,21 @@ struct StrBuilder {
 
 // Metadata for the runtime package.
 struct Runtime {
-	Mainm:      &sema::Var
-	NumCPU:     &sema::Var
-	Argc:       &sema::Var
-	Argv:       &sema::Var
-	Envp:       &sema::Var
-	GlobalRand: &sema::Var
-	Sched:      &sema::Var
-	Kq:         &sema::Var
-	Epfd:       &sema::Var
-	Iocphandle: &sema::Var
-	Qpcfreq:    &sema::Var
-	Asynctime:  &sema::Var
-	Blocking:   &sema::Var
+	Mainm:         &sema::Var
+	NumCPU:        &sema::Var
+	Argc:          &sema::Var
+	Argv:          &sema::Var
+	Envp:          &sema::Var
+	GlobalRand:    &sema::Var
+	Sched:         &sema::Var
+	Asynctime:     &sema::Var
+	Blocking:      &sema::Var
+	TimebaseNumer: &sema::Var // Darwin
+	TimebaseDenom: &sema::Var // Darwin
+	Kq:            &sema::Var // Darwin
+	Epfd:          &sema::Var // Linux
+	Iocphandle:    &sema::Var // Windows
+	Qpcfreq:       &sema::Var // Windows
 
 	Init:        &sema::FuncIns // Hard initializer function of runtime.
 	Schedule:    &sema::FuncIns // Scheduler function.
@@ -139,10 +141,12 @@ fn CollectRuntime(mut ir: &obj::IR): &Runtime {
 	meta.Sched = obj::RuntimeFindGlobal(p, "sched")
 	meta.Asynctime = obj::RuntimeFindGlobal(p, "asynctime")
 	meta.Blocking = obj::RuntimeFindGlobal(p, "blocking")
-	meta.Kq = p.FindVar("kq", false)                 // Darwin
-	meta.Epfd = p.FindVar("epfd", false)             // Linux
-	meta.Iocphandle = p.FindVar("iocphandle", false) // Windows
-	meta.Qpcfreq = p.FindVar("qpcfreq", false)       // Windows
+	meta.TimebaseNumer = p.FindVar("timebaseNumer", false) // Darwin
+	meta.TimebaseDenom = p.FindVar("timebaseDenom", false) // Darwin
+	meta.Kq = p.FindVar("kq", false)                       // Darwin
+	meta.Epfd = p.FindVar("epfd", false)                   // Linux
+	meta.Iocphandle = p.FindVar("iocphandle", false)       // Windows
+	meta.Qpcfreq = p.FindVar("qpcfreq", false)             // Windows
 
 	// Functions.
 	meta.Init = obj::RuntimeFindFunc(p, "__init").Instances[0]

@@ -2,7 +2,42 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+extern use "<mach/mach_time.h>"
+
+#typedef
+extern struct mach_timebase_info_data_t {
+	numer: u32
+	denom: u32
+}
+
+extern fn mach_timebase_info(mut &info: *extern.mach_timebase_info_data_t)
+extern fn mach_absolute_time(): u64
+
 const (
 	_CLOCK_REALTIME  = 0 // Identifier for system-wide realtime clock.
 	_CLOCK_MONOTONIC = 6 // Monotonic system-wide clock.
 )
+
+let mut timebaseNumer: u32 = 0
+let mut timebaseDenom: u32 = 0
+
+fn nanotime(): i64 {
+	// Note: Apple seems unconcerned about overflow here. See
+	// https://developer.apple.com/library/content/qa/qa1398/_index.html
+	// Note also, numer == denom == 1 is common.
+	mut t := extern.mach_absolute_time()
+	if timebaseNumer != 1 {
+		t *= u64(timebaseNumer)
+	}
+	if timebaseDenom != 1 {
+		t *= u64(timebaseDenom)
+	}
+	ret i64(t)
+}
+
+fn timeinit() {
+	let mut info: extern.mach_timebase_info_data_t
+	extern.mach_timebase_info(&info)
+	timebaseNumer = info.numer
+	timebaseDenom = info.denom
+}
