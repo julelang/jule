@@ -1,0 +1,28 @@
+// Copyright 2026 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+#build darwin
+
+use "std/runtime"
+use "std/sys"
+
+async fn maxListenerBacklog(): int {
+	let mut n: u32
+	match runtime::OS {
+	| "darwin" | "ios":
+		const KERN_IPC_SOMAXCONN = 128
+		mib := []i32([sys::CTL_KERN, KERN_IPC_SOMAXCONN]) // kern.ipc.somaxconn
+		sys::Sysctl(mib, uintptr(&n), 4, 0, 0) else { ret sys::SOMAXCONN }
+	}
+	if n == 0 {
+		ret sys::SOMAXCONN
+	}
+	// FreeBSD stores the backlog in a u16, as does Linux.
+	// Assume the other BSDs do too. Truncate number to avoid wrapping.
+	// See Go's issue 5030.
+	if n > 1<<16-1 {
+		n = 1<<16 - 1
+	}
+	ret int(n)
+}

@@ -1,0 +1,51 @@
+// Copyright 2026 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/conv"
+use "std/internal/sys/linux"
+use "std/sys"
+
+// Linux stores the backlog as:
+//
+//	- u16 in kernel version < 4.1,
+//	- u32 in kernel version >= 4.1
+//
+// Truncate number to avoid wrapping.
+//
+// See Go's issue 5030 and 41470.
+fn maxAckBacklog(mut n: int): int {
+	major, minor := linux::KernelVersion()
+	mut size := 16
+	if major > 4 || (major == 4 && minor >= 1) {
+		size = 32
+	}
+
+	let max: uint = 1<<size - 1
+	if uint(n) > max {
+		n = int(max)
+	}
+	ret n
+}
+
+async fn maxListenerBacklog(): int {
+	mut fd, mut ok := open("/proc/sys/net/core/somaxconn")
+	if !ok {
+		ret sys::SOMAXCONN
+	}
+	//defer fd.close()
+	l, ok := fd.readLine().await
+	if !ok {
+		ret sys::SOMAXCONN
+	}
+	f := getFields(l)
+	n, _, ok := conv::Dtoi(f[0])
+	if n == 0 || !ok {
+		ret sys::SOMAXCONN
+	}
+
+	if n > 1<<16-1 {
+		ret maxAckBacklog(n)
+	}
+	ret n
+}

@@ -16,6 +16,13 @@ fn socket(domain: int, typ: int, proto: int)!: poll::NetHandle {
 	ret sys::WSASocket(domain, typ, proto, nil, 0, windows::WSA_FLAG_OVERLAPPED|windows::WSA_FLAG_NO_HANDLE_INHERIT)?
 }
 
+async fn maxListenerBacklog(): int {
+	// When the socket backlog is SOMAXCONN, Windows will set the backlog to
+	// "a reasonable maximum value".
+	// See: https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-listen
+	ret sys::SOMAXCONN
+}
+
 fn handleprepare(handle: poll::NetHandle)! {
 	// On Windows, overlapped mode is non-blocking and async.
 	// Created sockets use WSA_FLAG_NO_HANDLE_INHERIT,
