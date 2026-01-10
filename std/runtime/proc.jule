@@ -52,6 +52,7 @@
 // Since it is stack-oriented, it must be handled carefully.
 // Otherwise, a stale coroutine copy may be used and cause critical issues.
 
+use "std/internal/runtime"
 use "std/internal/runtime/atomic"
 
 extern fn __jule_retireDrain()
@@ -236,8 +237,8 @@ fn pidlegetSpinning(): &p {
 	ret pp
 }
 
-// Tries to add one more P to execute G's.
-// Called when a G is made runnable (newproc, ready).
+// Tries to add one more P to execute C's.
+// Called when a C is made runnable (newproc, ready).
 fn wakep() {
 	// Be conservative about spinning threads,
 	// only start one if none exist already.
@@ -256,7 +257,7 @@ fn wakep() {
 	}
 	sched.mu.unlock()
 
-	startm(pp)
+	startm(pp, true, false)
 }
 
 // Try get a batch of C's from the global runnable queue.
@@ -394,6 +395,70 @@ fn runqputbatch(mut pp: &p, mut &batch: *[prunqsize]c, batchHead: u32, mut bsize
 	}
 }
 
+// Adds each runnable C on the batch to some run queue.
+// If there is no current P, they are added to the global queue,
+// and up to npidle M's are started to run them. Otherwise,
+// for each idle P, this adds a C to the global queue and starts an M.
+// Any remaining C's are added to the current P's local run queue.
+// This may temporarily acquire sched.lock.
+#disable nilptr boundary
+fn injectclist(mut &batch: *[prunqsize]c, batchStart: u32, bsize: u32) {
+	if batchStart >= bsize {
+		ret
+	}
+	startIdle := fn(n: u32) {
+		mut i := u32(0)
+		for i < n; i++ {
+			sched.mu.lock()
+
+			mut pp := pidlegetSpinning()
+			if pp == nil {
+				sched.mu.unlock()
+				break
+			}
+
+			startm(pp, false, true)
+			sched.mu.unlock()
+		}
+	}
+
+	mut m := gett()
+	if m == nil || m.pp == nil {
+		sched.mu.lock()
+		mut i := batchStart
+		for i < bsize; i++ {
+			sched.runq.push(&(*batch)[i])
+		}
+		sched.mu.unlock()
+		startIdle(bsize)
+		ret
+	}
+
+	npidle := u32(atomic::Load(&sched.npidle, atomic::Relaxed))
+	mut n := u32(0)
+	mut i := batchStart
+	for n < npidle && i < bsize {
+		n++
+		i++
+	}
+	if n > 0 {
+		sched.mu.lock()
+		i = u32(0)
+		for i < n; i++ {
+			sched.runq.push(&(*batch)[batchStart+i])
+		}
+		sched.mu.unlock()
+		startIdle(n)
+	}
+
+	if n < bsize {
+		runqputbatch(m.pp, batch, batchStart+n, bsize)
+	}
+
+	wakep()
+	ret
+}
+
 // Gets a coroutine from local runnable queue and writes to cp.
 // Executed only by the owner P.
 #disable nilptr boundary
@@ -512,18 +577,22 @@ fn stealWork(mut pp: &p, mut &cp: *c): bool {
 // following a strict priority order:
 //
 // The function guarantees that at most one coroutine is returned via
-// `polled`; any additional runnable coroutines are enqueued back into
+// `coro`; any additional runnable coroutines are enqueued back into
 // appropriate run queues.
 //
-// Invariants:
-//	- eventpoll() never returns more entries than a local run queue can hold.
-//	- Queue corruption is considered a fatal runtime error.
+// We use `runqputbatch` instead of `injectclist` for eventpoll results.
 //
-// The `poll` flag is a scheduler hint used to amortize eventpoll costs
-// under high I/O traffic.
+// Using `injectclist` would push these coroutines onto the global run queue,
+// requiring sched.lock and increasing contention under high connection
+// counts (e.g. many concurrent network wakeups).
 //
-// Assumes that the calling thread is counted as spinning.
-// It will exit the spinning state before return.
+// runqputbatch places the goroutines directly onto the local run queue of
+// the current P, preserving cache locality and avoiding global scheduler
+// contention. This improves throughput for event-driven workloads without
+// violating scheduler invariants.
+//
+// Sysmon and other scheduler systems intentionally will use the
+// `injectclist`, as they operate without a P and must ensure global progress.
 #disable nilptr boundary
 fn findRunnable(): (coro: c, ok: bool) {
 	mut m := gett()
@@ -756,18 +825,13 @@ Sched:
 
 // Start point of a M.
 // When a M is first started, it starts from here.
-// This function called by the trampoline, with P.
-// The pp is a pointer to a P.
+// This function called by the trampoline, with M.
+// The mp is a pointer to the M.
 #disable nilptr
 #export "__jule_schedthread"
-fn schedthread(mut pp: *unsafe) {
+fn schedthread(mut mp: *unsafe) {
 	// Set thread-local data before scheduling.
-	mut m := newThread(roleM)
-	m.spinning = true
-	// We use pp like reference-counted smart pointer.
-	// But this is actually not, however there is no risk about GC.
-	// Because all Ps are stored on the scheduler's allp list.
-	m.pp = unsafe { (&p)((*p)(pp)) }
+	mut m := unsafe { (&thread)((*thread)(mp)) }
 	sett(m)
 
 	schedule(true)
@@ -865,6 +929,17 @@ fn schedinit() {
 	mut i := i32(0)
 	for i < maxprocs; i++ {
 		mut pp := new(p)
+		unsafe {
+			// Must be in non-GC memory because can be referenced
+			// from any runtime system during program lifetime.
+			// Remove RC pointer and disable GC for allocation.
+			// Allocated Ps are never will be deallocated.
+			// Some tools like Valgrind may detect as memory leak,
+			// but this was done on purpose.
+			mut pptr := (*runtime::Smartptr[thread])(&pp)
+			_RCFree(pptr.Ref)
+			pptr.Ref = nil
+		}
 		sched.allp[i] = pp
 		if i == 0 {
 			// Set P of the main program thread.
@@ -903,14 +978,8 @@ fn sysmon() {
 				let mut toRun: [prunqsize]c
 				bn := eventpoll(0, &toRun)
 				if bn > 0 {
-					sched.mu.lock()
-					mut i := u32(0)
-					for i < bn; i++ {
-						sched.runq.push(&toRun[i])
-					}
-					sched.mu.unlock()
+					injectclist(&toRun, 0, bn)
 					eventpollAdjustWaiters(-i32(bn))
-					wakep()
 				}
 			}
 		}
@@ -919,22 +988,46 @@ fn sysmon() {
 
 // Schedules some M to run the P (creates an M if necessary).
 // If P==nil, the behavior is undefined. P is always should be a valid pointer.
-// All started Ms is spinning by default.
+// If spinning is set, the caller has incremented nmspinning and must provide a
+// P. startm will set m.spinning of the newly started M.
+//
+// Argument lockheld indicates whether the caller already acquired the
+// scheduler lock. Callers holding the lock when making the call must pass
+// true. The lock might be temporarily dropped, but will be reacquired before
+// returning.
 #disable nilptr
-fn startm(mut pp: &p) {
-	sched.mu.lock()
+fn startm(mut pp: &p, spinning: bool, lockheld: bool) {
+	if !lockheld {
+		sched.mu.lock()
+	}
 	sched.nm++
 	mut m := mget()
-	sched.mu.unlock()
+	if !lockheld {
+		sched.mu.unlock()
+	}
 	if m == nil {
-		ok := unsafe { threadSpawn((*unsafe)(uintptr(extern.__jule_trampoline_schedthread)), (*p)(pp)) }
+		m = newThread(roleM)
+		m.pp = pp
+		m.spinning = spinning
+		unsafe {
+			// Must be in non-GC memory because can be referenced
+			// from any runtime system during program lifetime.
+			// Remove RC pointer and disable GC for allocation.
+			// Allocated threads are never will be deallocated.
+			// Some tools like Valgrind may detect as memory leak,
+			// but this was done on purpose.
+			mut mptr := (*runtime::Smartptr[thread])(&m)
+			_RCFree(mptr.Ref)
+			mptr.Ref = nil
+		}
+		ok := unsafe { threadSpawn((*unsafe)(uintptr(extern.__jule_trampoline_schedthread)), (*thread)(m)) }
 		if !ok {
 			panic("runtime: M creation failed")
 		}
 		ret
 	}
 	m.pp = pp
-	m.spinning = true
+	m.spinning = spinning
 	m.parker.unpark()
 }
 
