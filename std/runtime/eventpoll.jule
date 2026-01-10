@@ -170,6 +170,22 @@ impl polldesc {
 			self.mu.unlock()
 			ret
 		}
+		// Assign to a timer heap, if needed.
+		if self.theap == nil {
+			// This function may be invoked by a non-M thread,
+			// such as blocking thread pool worker thread.
+			// We need a timer-heap, so panic.
+			mut m := gett()
+			if m == nil || m.pp == nil {
+				panic("runtime: deadline initialized by a non-coroutine")
+			}
+			self.theap = unsafe { (&timerheap)(&m.pp.timers) } // Will never be deallocated.
+			self.theap.mu.lock()
+			self.theap.push(self.rt) // No lock needed for timer.
+			self.theap.push(self.wt) // No lock needed for timer.
+			self.theap.mu.unlock()
+		}
+
 		rd0, wd0 := self.rd, self.wd
 		combo0 := rd0 > 0 && rd0 == wd0
 		if d > 0 {
@@ -547,9 +563,15 @@ fn eventpollWriteDeadline(arg: uintptr, seq: uintptr) {
 // Returns a polldesc for the fd.
 #disable nilptr
 fn eventpollnew(fd: u64)!: &polldesc {
-	mut m := gett()
-	mut pp := m.pp
-
+	// Timers are ready for use and are preallocated.
+	// However, we avoid immediately inserting them into a timerheap.
+	// If a situation arises where a timer is required for a polldesc
+	// (currently only deadlines), the relevant function (such as
+	// `polldesc.setDeadline`) will insert it into a timerheap if needed.
+	// This is a form of lazy initialization, but it is performance-critical.
+	// It provides a significant performance gain in high-traffic scenarios
+	// where polldescs must be created very frequently. It also eliminates
+	// the allocation cost for polldescs that never use timers.
 	mut pd := pollcache.alloc()
 	pd.mu.lock()
 
@@ -573,11 +595,6 @@ fn eventpollnew(fd: u64)!: &polldesc {
 	atomic::Store(&pd.wcp, pdNil, atomic::Release)
 	pd.wd = 0
 	pd.publishInfo()
-	pd.theap = unsafe { (&timerheap)(&pp.timers) } // Will never be deallocated.
-	pd.theap.mu.lock()
-	pd.theap.push(pd.rt) // No lock needed for timer.
-	pd.theap.push(pd.wt) // No lock needed for timer.
-	pd.theap.mu.unlock()
 	pd.mu.unlock()
 
 	eventpollopen(fd, &(*pd)) else {
@@ -652,14 +669,16 @@ impl pollcachepool {
 
 		pd.publishInfo()
 
-		pd.theap.mu.lock()
-		pd.rt.mu.lock()
-		pd.theap.remove(pd.rt)
-		pd.rt.mu.unlock()
-		pd.wt.mu.lock()
-		pd.theap.remove(pd.wt)
-		pd.wt.mu.unlock()
-		pd.theap.mu.unlock()
+		if pd.theap != nil {
+			pd.theap.mu.lock()
+			pd.rt.mu.lock()
+			pd.theap.remove(pd.rt)
+			pd.rt.mu.unlock()
+			pd.wt.mu.lock()
+			pd.theap.remove(pd.wt)
+			pd.wt.mu.unlock()
+			pd.theap.mu.unlock()
+		}
 		pd.theap = nil
 
 		pd.mu.unlock()
