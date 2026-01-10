@@ -107,11 +107,9 @@ impl polldescq {
 //	            io notification or timeout/close changes the state to pdReady or pdNil respectively
 //	            and unparks the coroutine.
 //	pdNil - none of the above.
-const (
-	pdNil:   uintptr = 0
-	pdReady: uintptr = 1
-	pdWait:  uintptr = 2
-)
+let mut pdNil = unsafe { (*c)(nil) }
+let mut pdReady = unsafe { (*c)(0x1) }
+let mut pdWait = unsafe { (*c)(0x2) }
 
 // Represents a pollable file descriptor and its runtime state.
 // It encapsulates coroutine coordination, lifetime management, deadlines,
@@ -148,8 +146,8 @@ struct polldesc {
 	atomicInfo: u32
 
 	// Accessed atomically and hold C pointers.
-	rcp: uintptr // pdReady, pdWait, C waiting for read or pdNil
-	wcp: uintptr // pdReady, pdWait, C waiting for write or pdNil
+	rcp: *c // pdReady, pdWait, C waiting for read or pdNil
+	wcp: *c // pdReady, pdWait, C waiting for write or pdNil
 
 	mu:      mutex // Protects the following fields.
 	closing: bool
@@ -349,7 +347,7 @@ fn eventpollcheckerr(mut pd: &polldesc, mode: i32): eventpollError {
 
 struct eventpollIOData {
 	c:    *c
-	pdcp: *uintptr
+	pdcp: **c
 }
 
 // Returns true if IO is ready, or false if timed out or closed
