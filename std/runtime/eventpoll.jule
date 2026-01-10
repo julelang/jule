@@ -399,7 +399,7 @@ async fn eventpollblock(mut pd: &polldesc, mode: i32, waitio: bool): bool {
 		mut mc := m.c
 		mut iod := eventpollIOData{c: &mc, pdcp: pdcp}
 		tg := taggedPointerPack(&iod, mutexunlockIOWait)
-		park2(&mc, tg, reasonNA).await
+		park2(&mc, tg, reasonIOWait).await
 	}
 	// Be careful to not lose concurrent pdReady notification.
 	old := atomic::Swap(pdcp, pdNil, atomic::AcqRel)
@@ -482,6 +482,7 @@ fn eventpollunblock(mut &pd: *polldesc, mode: i32, ioready: bool, mut &cp: *c, m
 					*delta++
 				}
 				*cp = unsafe { *(*c)(old) }
+				ready(cp)
 			}
 			ret
 		}

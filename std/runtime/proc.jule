@@ -868,10 +868,17 @@ async fn park2(mut &cp: *c, mu: taggedPointer, mut reason: u32) {
 	runtimepark(cp, u64(mu)).await
 }
 
+// Makes cp ready to be runnable.
+// Like unpark, but it will not enqueue cp.
+#disable nilptr
+fn ready(mut &cp: *c) {
+	cp.state &= ^reasonMask
+}
+
 // Makes cp runnable.
 #disable nilptr
 fn unpark(mut &cp: *c) {
-	cp.state &= ^reasonMask
+	ready(cp)
 	mut m := gett()
 	runqput(m.pp, cp, true)
 	wakep()
