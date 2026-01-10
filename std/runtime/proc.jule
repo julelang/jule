@@ -302,6 +302,7 @@ fn runqput(mut pp: &p, mut &cp: *c, next: bool): (overflow: bool) {
 		sched.mu.lock()
 		sched.runq.push(cp)
 		sched.mu.unlock()
+		wakep()
 		ret true
 	}
 
@@ -568,8 +569,6 @@ top:
 		// eventpoll guarantees len(toRun) <= local run queue capacity.
 		let mut toRun: [prunqsize]c
 		bn := eventpoll(0, &toRun) // Use 0-delay to perform a non-blocking poll.
-		now := nanotime()
-		atomic::Store(&sched.lastpoll, now, atomic::Release)
 		// If any coroutines are ready, return the first and enqueue the rest.
 		// Timers possibly expired here will be handled in a later iteration.
 		if bn > 0 {
@@ -693,24 +692,15 @@ fn schedule(mut spinning: bool) {
 	mut m := gett()
 Sched:
 	m.pp.schedtick = 0
-	const MaxSpin = 4
-	mut tried := 0
 	for {
 		// Poll a coroutine to run.
 		mut c, ok := findRunnable()
 		// findRunnable failed to find a runnable coroutine.
 		if !ok {
-			// There are coroutines polling for I/O or waiting for a blocking job,
-			// and there is no M looking for eventpoll.
-			if atomic::Load(&sched.lastpoll, atomic::Acquire) != pollCheckIn &&
-				(sched.ncpolling() > 0 || sched.ncblocking() > 0) {
-				continue
-			}
-			// No coroutine to run, no timer, no eventpoll.
-			// Under high contention, new coroutines may be available since last poll.
-			// Try again if reasonable.
-			if tried < MaxSpin && sched.ncrunning() > 0 {
-				tried++
+			// There are coroutines polling for I/O and
+			// there is no M looking for eventpoll.
+			if sched.ncpolling() > 0 &&
+				atomic::Load(&sched.lastpoll, atomic::Acquire) != pollCheckIn {
 				continue
 			}
 			// There are timers in this worker, clean them.
@@ -733,7 +723,6 @@ Sched:
 			}
 			break
 		}
-
 		// This thread is going to run a coroutine and is not spinning anymore,
 		// so if it was marked as spinning we need to reset it now and potentially
 		// start a new spinning M.
@@ -741,7 +730,7 @@ Sched:
 			resetspinning()
 		}
 
-		tried = 0
+		// We will resume a coroutine, increase scheduler tick.
 		m.pp.schedtick++
 
 		m.c = c
@@ -901,6 +890,7 @@ fn sysmon() {
 	for {
 		// Sleep for the next period.
 		threadsleep(_Millisecond * 10)
+		now := nanotime()
 		// eventpoll if not polled for more than 10ms and
 		// there is a coroutine waiting for eventpoll.
 		// If eventpoll is not triggered, all coroutines may accumulate in
@@ -908,11 +898,10 @@ fn sysmon() {
 		// The eventpoll must be checked regularly.
 		if sched.ncpolling() > 0 {
 			lastpoll := atomic::Load(&sched.lastpoll, atomic::Acquire)
-			if lastpoll >= 0 && nanotime()-lastpoll > _Millisecond*10 {
+			if lastpoll >= 0 && now-lastpoll > _Millisecond*10 {
+				atomic::CompareAndSwap(&sched.lastpoll, lastpoll, now, atomic::AcqRel, atomic::Relaxed)
 				let mut toRun: [prunqsize]c
 				bn := eventpoll(0, &toRun)
-				now := nanotime()
-				atomic::Store(&sched.lastpoll, now, atomic::Release)
 				if bn > 0 {
 					sched.mu.lock()
 					mut i := u32(0)
@@ -921,6 +910,7 @@ fn sysmon() {
 					}
 					sched.mu.unlock()
 					eventpollAdjustWaiters(-i32(bn))
+					wakep()
 				}
 			}
 		}
@@ -948,18 +938,32 @@ fn startm(mut pp: &p) {
 	m.parker.unpark()
 }
 
+fn checkdead() {
+	// There is still working M.
+	if sched.nm > 0 {
+		ret
+	}
+	// Some coroutines are polling for event.
+	// sysmon will wake a P.
+	if sched.ncpolling() > 0 {
+		ret
+	}
+	// Some coroutines working some blocking tasks.
+	// When task complete, program can continue to run.
+	if sched.ncblocking() > 0 {
+		ret
+	}
+	panic("runtime: all coroutines are asleep - deadlock!")
+}
+
 // Stops execution of the M until new work is available.
 // Returns with acquired P.
 #disable nilptr
 fn stopm(mut m: &thread) {
 	sched.mu.lock()
 	sched.nm--
-	if sched.nm <= 0 {
-		panic("runtime: all coroutines are asleep - deadlock!")
-	}
-	if m.pp != nil {
-		pidleput(m.pp)
-	}
+	checkdead()
+	pidleput(m.pp)
 	mput(m)
 	sched.mu.unlock()
 	m.parker.park()
