@@ -92,17 +92,22 @@ impl FD {
 				}
 				error(error)
 			}
-			if n > max-nn {
-				// This can reportedly happen when using
-				// some VPN software. Go's issue #61060.
-				// If we don't check this we will panic
-				// with slice bounds out of range.
-				// Use a more informative panic.
-				panic("invalid return from write: got " + conv::Itoa(n) + " from a write of " + conv::Itoa(max-nn))
+			if nn > 0 {
+				if nn > max-n {
+					// This can reportedly happen when using
+					// some VPN software. Go's issue #61060.
+					// If we don't check this we will panic
+					// with slice bounds out of range.
+					// Use a more informative panic.
+					panic("invalid return from write: got " + conv::Itoa(n) + " from a write of " + conv::Itoa(max-nn))
+				}
+				n += nn
 			}
-			n += nn
 			if n == len(buf) {
 				ret
+			}
+			if n == 0 {
+				error(io::ErrUnexpectedEOF)
 			}
 		}
 	}
@@ -128,17 +133,22 @@ impl FD {
 			}
 			part := buf[n:max]
 			nn := ignoringEINTRIO2(sys::Write, int(self.File), part)?
-			if n > max-nn {
-				// This can reportedly happen when using
-				// some VPN software. Go's issue #61060.
-				// If we don't check this we will panic
-				// with slice bounds out of range.
-				// Use a more informative panic.
-				panic("invalid return from write: got " + conv::Itoa(n) + " from a write of " + conv::Itoa(max-nn))
+			if nn > 0 {
+				if nn > max-n {
+					// This can reportedly happen when using
+					// some VPN software. Go's issue #61060.
+					// If we don't check this we will panic
+					// with slice bounds out of range.
+					// Use a more informative panic.
+					panic("invalid return from write: got " + conv::Itoa(n) + " from a write of " + conv::Itoa(max-nn))
+				}
+				n += nn
 			}
-			n += nn
 			if n == len(buf) {
 				ret
+			}
+			if n == 0 {
+				error(io::ErrUnexpectedEOF)
 			}
 		}
 	}
