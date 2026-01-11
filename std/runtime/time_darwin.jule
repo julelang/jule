@@ -2,42 +2,26 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-extern use "<mach/mach_time.h>"
-
-#typedef
-extern struct mach_timebase_info_data_t {
-	numer: u32
-	denom: u32
-}
-
-extern fn mach_timebase_info(mut &info: *extern.mach_timebase_info_data_t)
-extern fn mach_absolute_time(): u64
+use "std/sys"
 
 const (
 	_CLOCK_REALTIME  = 0 // Identifier for system-wide realtime clock.
 	_CLOCK_MONOTONIC = 6 // Monotonic system-wide clock.
 )
 
-let mut timebaseNumer: u32 = 0
-let mut timebaseDenom: u32 = 0
-
 fn nanotime(): i64 {
-	// Note: Apple seems unconcerned about overflow here. See
-	// https://developer.apple.com/library/content/qa/qa1398/_index.html
-	// Note also, numer == denom == 1 is common.
-	mut t := extern.mach_absolute_time()
-	if timebaseNumer != 1 {
-		t *= u64(timebaseNumer)
+	// Do not use `mach_absolute_time`, because Apple recommends `clock_gettime`.
+	// See: https://developer.apple.com/documentation/driverkit/mach_absolute_time
+	//
+	// Furthermore, the `clock_gettime` API is also
+	// faster than the `mach_absolute_time` API significantly.
+	// Since `nanotime` is widely used by the scheduler and scheduler-integrated
+	// primitives, such as [sync::Mutex], this is critical for performance.
+	mut ts := sys::Timespec{}
+	if unsafe { extern.clock_gettime(extern.clockid_t(_CLOCK_MONOTONIC), (*extern.timespec)(&ts)) } == -1 {
+		panic("runtime: nanotime failed")
 	}
-	if timebaseDenom != 1 {
-		t *= u64(timebaseDenom)
-	}
-	ret i64(t)
+	ret i64(ts.Sec)*1e9 + i64(ts.Nsec)
 }
 
-fn timeinit() {
-	let mut info: extern.mach_timebase_info_data_t
-	extern.mach_timebase_info(&info)
-	timebaseNumer = info.numer
-	timebaseDenom = info.denom
-}
+fn timeinit() {}
