@@ -239,7 +239,7 @@ impl ObjectCoder {
 		self.coSpawnObj.WriteByte('\n')!
 
 		// Declare function.
-		self.coSpawnObj.WriteStr("__jule_DetachTask ")!
+		self.coSpawnObj.WriteStr("__jule_Coroutine ")!
 		self.coSpawnObj.WriteStr(coSpawnPrefix + coSpawnMethodSuffix)!
 		self.coSpawnObj.WriteStr(is)!
 		const argData = "__jule_argdata"
@@ -260,7 +260,7 @@ impl ObjectCoder {
 
 		// call the function
 		self.coSpawnObj.WriteByte(indentKind)!
-		self.coSpawnObj.WriteStr("co_await ")!
+		self.coSpawnObj.WriteStr("__jule_AsyncAwait ")!
 		self.coSpawnObj.WriteStr(argData)!
 		self.coSpawnObj.WriteStr("->")!
 		self.coSpawnObj.WriteStr(coSpawnArgDataFunc)!
@@ -286,7 +286,7 @@ impl ObjectCoder {
 		self.coSpawnObj.WriteByte(indentKind)!
 
 		// final return
-		self.coSpawnObj.WriteStr("co_return")!
+		self.coSpawnObj.WriteStr("__jule_AsyncRet")!
 		if f.Decl.IsVoid() {
 			self.coSpawnObj.WriteStr(";\n")!
 		} else {
@@ -986,9 +986,9 @@ impl ObjectCoder {
 		}
 		if f.Decl.Async {
 			if f.Decl.IsVoid() && !f.Decl.Exceptional {
-				buf.WriteStr("__jule_VoidTask")!
+				buf.WriteStr("__jule_VoidAsync")!
 			} else {
-				buf.WriteStr("__jule_Task<")!
+				buf.WriteStr("__jule_Async<")!
 				self.tc.funcInsResult(buf, f)
 				buf.WriteByte('>')!
 			}
@@ -1267,9 +1267,9 @@ impl ObjectCoder {
 				self.indent()
 				if m.Async {
 					if !m.IsVoid() || m.Exceptional {
-						self.write("co_return ")
+						self.write("__jule_AsyncRet ")
 					}
-					self.write("co_await ")
+					self.write("__jule_AsyncAwait ")
 				} else if m.Exceptional || !m.IsVoid() {
 					self.write("return ")
 				}
@@ -1614,14 +1614,14 @@ impl ObjectCoder {
 		if !env::Test {
 			// Write the fake main function.
 			if asyncRuntime {
-				self.write("__jule_DetachTask ")
+				self.write("__jule_Coroutine ")
 			} else {
 				self.write("void ")
 			}
 			self.write("__jule_fake_main(void) {\n")
 			self.indent()
 			if asyncRuntime {
-				self.write("co_await ")
+				self.write("__jule_AsyncAwait ")
 			}
 			identCoder.func(&self.Buf, meta::Program.EntryPoint)
 			self.write("(")

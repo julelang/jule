@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-// Jule Coroutine Runtime C++ Core
+// Jule Async Runtime C++ Core
 //
 // This header defines the *entire* low-level coroutine abstraction used by
 // the Jule runtime and compiler backend.
@@ -34,8 +34,8 @@
 // - Stack depth stays bounded.
 // - You get explicit control to "yield to scheduler" naturally (queue boundary).
 
-#ifndef __JULE_COROUTINE_HPP
-#define __JULE_COROUTINE_HPP
+#ifndef __JULE_ASYNC_HPP
+#define __JULE_ASYNC_HPP
 
 #include <coroutine>
 #include <exception>
@@ -43,6 +43,12 @@
 #include <type_traits>
 #include <utility>
 #include <cstddef>
+
+#include "types.hpp"
+#include "ptr.hpp"
+
+#define __jule_AsyncRet co_return  // Equivalent to `ret` in async functions.
+#define __jule_AsyncAwait co_await // Equivalent to `await` in async functions.
 
 #if defined(_MSC_VER)
 // Required for _ReadWriteBarrier intrinsic.
@@ -217,7 +223,7 @@ static inline void __jule_trampolineRun(void) noexcept
             h.resume();
         }
 
-        // Keep destruction pressure under control for detached tasks.
+        // Keep destruction pressure under control for coroutines.
         __jule_retireDrain();
     }
 }
@@ -246,7 +252,7 @@ struct __jule_Park
 };
 
 template <typename T>
-class __jule_Task
+class __jule_Async
 {
 public:
     struct promise_type
@@ -261,9 +267,9 @@ public:
         __jule_TrampNode self_node{};
         __jule_TrampNode cont_node{};
 
-        __jule_Task<T> get_return_object(void) noexcept
+        __jule_Async<T> get_return_object(void) noexcept
         {
-            return __jule_Task<T>{std::coroutine_handle<promise_type>::from_promise(*this)};
+            return __jule_Async<T>{std::coroutine_handle<promise_type>::from_promise(*this)};
         }
 
         // Coroutine does not start executing immediately.
@@ -306,15 +312,15 @@ public:
     using HandleType = std::coroutine_handle<promise_type>;
     HandleType handle{};
 
-    __jule_Task() = default;
-    explicit __jule_Task(HandleType h) noexcept : handle(h) {}
-    __jule_Task(__jule_Task &&o) noexcept : handle(std::exchange(o.handle, {})) {}
+    __jule_Async() = default;
+    explicit __jule_Async(HandleType h) noexcept : handle(h) {}
+    __jule_Async(__jule_Async &&o) noexcept : handle(std::exchange(o.handle, {})) {}
 
-    __jule_Task(const __jule_Task &) = delete;
-    __jule_Task &operator=(__jule_Task &&) = delete;
-    __jule_Task &operator=(const __jule_Task &) = delete;
+    __jule_Async(const __jule_Async &) = delete;
+    __jule_Async &operator=(__jule_Async &&) = delete;
+    __jule_Async &operator=(const __jule_Async &) = delete;
 
-    ~__jule_Task() = default;
+    ~__jule_Async() = default;
 
     // Awaiting a task:
     // - installs continuation
@@ -365,7 +371,7 @@ public:
     }
 };
 
-class __jule_VoidTask
+class __jule_VoidAsync
 {
 public:
     struct promise_type
@@ -376,9 +382,9 @@ public:
         __jule_TrampNode self_node{};
         __jule_TrampNode cont_node{};
 
-        __jule_VoidTask get_return_object(void) noexcept
+        __jule_VoidAsync get_return_object(void) noexcept
         {
-            return __jule_VoidTask{std::coroutine_handle<promise_type>::from_promise(*this)};
+            return __jule_VoidAsync{std::coroutine_handle<promise_type>::from_promise(*this)};
         }
 
         std::suspend_always initial_suspend(void) noexcept { return {}; }
@@ -409,15 +415,15 @@ public:
     using HandleType = std::coroutine_handle<promise_type>;
     HandleType handle{};
 
-    __jule_VoidTask() = default;
-    explicit __jule_VoidTask(HandleType h) noexcept : handle(h) {}
-    __jule_VoidTask(__jule_VoidTask &&o) noexcept : handle(std::exchange(o.handle, {})) {}
+    __jule_VoidAsync() = default;
+    explicit __jule_VoidAsync(HandleType h) noexcept : handle(h) {}
+    __jule_VoidAsync(__jule_VoidAsync &&o) noexcept : handle(std::exchange(o.handle, {})) {}
 
-    __jule_VoidTask(const __jule_VoidTask &) = delete;
-    __jule_VoidTask &operator=(__jule_VoidTask &&) = delete;
-    __jule_VoidTask &operator=(const __jule_VoidTask &) = delete;
+    __jule_VoidAsync(const __jule_VoidAsync &) = delete;
+    __jule_VoidAsync &operator=(__jule_VoidAsync &&) = delete;
+    __jule_VoidAsync &operator=(const __jule_VoidAsync &) = delete;
 
-    ~__jule_VoidTask() = default;
+    ~__jule_VoidAsync() = default;
 
     auto operator co_await() && noexcept
     {
@@ -458,7 +464,7 @@ public:
     }
 };
 
-class __jule_DetachTask
+class __jule_Coroutine
 {
 public:
     struct promise_type
@@ -466,9 +472,9 @@ public:
         // Embedded retire node, no allocation.
         __jule_RetireNode retire_node;
 
-        __jule_DetachTask get_return_object(void) noexcept
+        __jule_Coroutine get_return_object(void) noexcept
         {
-            return __jule_DetachTask{std::coroutine_handle<promise_type>::from_promise(*this)};
+            return __jule_Coroutine{std::coroutine_handle<promise_type>::from_promise(*this)};
         }
 
         std::suspend_always initial_suspend(void) noexcept { return {}; }
@@ -496,17 +502,17 @@ public:
     using HandleType = std::coroutine_handle<promise_type>;
     HandleType handle{};
 
-    __jule_DetachTask() = default;
-    explicit __jule_DetachTask(HandleType h) noexcept : handle(h) {}
+    __jule_Coroutine() = default;
+    explicit __jule_Coroutine(HandleType h) noexcept : handle(h) {}
 
-    __jule_DetachTask(__jule_DetachTask &&o) noexcept
+    __jule_Coroutine(__jule_Coroutine &&o) noexcept
         : handle(std::exchange(o.handle, {})) {}
 
-    __jule_DetachTask(const __jule_DetachTask &) = delete;
-    __jule_DetachTask &operator=(__jule_DetachTask &&) = delete;
-    __jule_DetachTask &operator=(const __jule_DetachTask &) = delete;
+    __jule_Coroutine(const __jule_Coroutine &) = delete;
+    __jule_Coroutine &operator=(__jule_Coroutine &&) = delete;
+    __jule_Coroutine &operator=(const __jule_Coroutine &) = delete;
 
-    ~__jule_DetachTask() = default;
+    ~__jule_Coroutine() = default;
 };
 
-#endif // __JULE_COROUTINE_HPP
+#endif // __JULE_ASYNC_HPP

@@ -17,6 +17,7 @@ CONFIGURATION DEFINES
 #define __JULE_HPP
 
 #include "runtime.hpp"
+#include "async.hpp"
 #include "impl_flag.hpp"
 #include "any.hpp"
 #include "array.hpp"
