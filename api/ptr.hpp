@@ -5,6 +5,8 @@
 #ifndef __JULE_PTR_HPP
 #define __JULE_PTR_HPP
 
+#include <cstring>
+
 #include "runtime.hpp"
 #include "types.hpp"
 #include "error.hpp"
