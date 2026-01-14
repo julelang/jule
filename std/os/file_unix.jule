@@ -29,7 +29,28 @@ fn newFile(fd: int, mut flags: int, nonBlocking: bool)!: &File {
 		ZeroReadIsEOF: true,
 	}
 
-	mut pollable := nonBlocking || flags&poll::File == poll::File || flags&poll::Pipe == poll::Pipe
+	// For eventpoll, being merely pollable is not sufficient.
+	// The program must be running on an async runtime.
+	//
+	// If eventpoll is initialized for this file descriptor while using
+	// sync runtime, the behavior is undefined. This is because eventpoll
+	// is part of the async runtime system and is never initialized under
+	// sync runtime.
+	//
+	// Since async functions cannot be accessed via Safe Jule on sync runtime,
+	// this is generally safe. However, this function is a shared implementation
+	// used by both sync and async APIs.
+	//
+	// If we were to treat this file descriptor as pollable here, it could
+	// introduce async-style non-blocking behavior on sync runtime.
+	// [poll::FD] itself does not initialize eventpoll when running on
+	// sync runtime, so there is nothing to handle on that side.
+	//
+	// Therefore, the correct behavior must be enforced explicitly here.
+	// If we handle pollable status here correctly, the following algorithm
+	// will not try to make it pollable on sync runtime.
+	mut pollable := runtime::asynctime &&
+		(nonBlocking || flags&poll::File == poll::File || flags&poll::Pipe == poll::Pipe)
 
 	// Things like regular files and FIFOs in kqueue on *BSD/Darwin
 	// may not work properly (or accurately according to its manual).
