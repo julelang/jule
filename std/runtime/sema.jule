@@ -484,8 +484,9 @@ fn notifyListAdd(mut &l: *notifyList): u32 {
 // notifyListAdd was called, it returns immediately. Otherwise, it blocks.
 #disable nilptr
 async fn notifyListWait(mut &l: *notifyList, t: u32) {
-	// Return right away if this ticket has already been notified.
 	l.lock.lock()
+
+	// Return right away if this ticket has already been notified.
 	if less(t, l.notify) {
 		l.lock.unlock()
 		ret
@@ -526,7 +527,7 @@ fn notifyListNotifyOne(mut &l: *notifyList) {
 	}
 
 	// Update the next notify ticket number.
-	atomic::Add(&l.notify, t+1, atomic::Release)
+	atomic::Store(&l.notify, t+1, atomic::Release)
 
 	// Try to find the p that needs to be notified.
 	// If it hasn't made it to the list yet we won't find it,
