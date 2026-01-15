@@ -39,6 +39,16 @@ const (
 // While some systems, such as Linux, allow non-blocking behavior for pipes,
 // regular file I/O is generally blocking and any asynchronous behavior is
 // platform-specific and not guaranteed.
+//
+// If the program is running on async runtime, the file descriptor will
+// exhibit non-blocking behavior whenever possible. If `Async` is reported as
+// true for an fd, it must be used with the async API. Using non-blocking file
+// descriptors with the sync API is undefined and may result in
+// `EAGAIN` errors being propagated.
+//
+// A file descriptor is only guaranteed to exhibit blocking behavior when the
+// program is running on sync runtime. The async runtime always prefers
+// non-blocking behavior whenever possible.
 struct File {
 	fd: &poll::FD
 }
@@ -185,6 +195,14 @@ fn WriteFileSync(path: str, data: []byte, perm: FileMode)! {
 }
 
 impl File {
+	// Reports whether treating the file descriptor as async is the correct
+	// approach. If the fd has the potential to exhibit non-blocking behavior,
+	// it should be handled with async API. Behavior in sync API is undefined.
+	// However, this is not a definitive guarantee that the fd is non-blocking.
+	fn ShouldAsync(*self): bool {
+		ret self.fd.ShouldAsync()
+	}
+
 	// Writes bytes to handle and returns written byte count.
 	// The number of bytes written can never exceed the length of the buf.
 	async fn Write(mut *self, buf: []byte)!: (n: int) {
