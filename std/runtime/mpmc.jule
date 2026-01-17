@@ -15,24 +15,16 @@ struct mpmcCell[T] {
 	val: T
 }
 
-// Padded counters to reduce false sharing between hot fields.
-struct paddedU64 {
-	v: u64
-	_: [cpu::CacheLinePadSize - 8]byte
-}
-
 // Bounded, lock-free MPMC ring buffer.
 // Primarily designed for channels.
 // Implementation based on the Dmitry Vyukov's MPMC queue.
 struct mpmcQueue[T] {
-	cap:     u64
-	capmask: u64
-	closed:  u32
-	buf:     []mpmcCell[T]
-
-	// Hot cursors on separate cache lines.
-	enqueuePos: paddedU64
-	dequeuePos: paddedU64
+	cap:        u64
+	capmask:    u64
+	closed:     u32
+	buf:        []mpmcCell[T]
+	enqueuePos: u64
+	dequeuePos: u64
 }
 
 impl mpmcQueue {
@@ -57,7 +49,7 @@ impl mpmcQueue {
 	#disable boundary nilptr
 	fn enqueue(mut *self, mut &val: *T): (ok: bool, closed: bool) {
 		for {
-			pos := atomic::Load(&self.enqueuePos.v, atomic::Relaxed)
+			pos := atomic::Load(&self.enqueuePos, atomic::Relaxed)
 			mut &c := unsafe { &(*(&self.buf[pos&self.capmask])) }
 			seq := atomic::Load(&c.seq, atomic::Acquire)
 			dif := i64(seq - pos)
@@ -65,7 +57,7 @@ impl mpmcQueue {
 			if dif == 0 {
 				// Try to claim slot
 				newPos := pos + 1
-				if atomic::CompareAndSwapWeak(&self.enqueuePos.v, pos, newPos, atomic::AcqRel, atomic::Relaxed) {
+				if atomic::CompareAndSwapWeak(&self.enqueuePos, pos, newPos, atomic::AcqRel, atomic::Relaxed) {
 					// Slot is ours — now check closed
 					if closed {
 						// Roll back publication by marking slot empty again
@@ -82,7 +74,7 @@ impl mpmcQueue {
 
 			if dif < 0 {
 				// Slot not ready — MAY be full, confirm via cursors
-				deq := atomic::Load(&self.dequeuePos.v, atomic::Acquire)
+				deq := atomic::Load(&self.dequeuePos, atomic::Acquire)
 				if pos-deq >= self.cap {
 					ret false, false // FULL
 				}
@@ -104,14 +96,14 @@ impl mpmcQueue {
 			// do not immediately return even if isclosed is true
 			// we have to consume all queued data even if it is closed
 			closed = atomic::Load(&self.closed, atomic::Relaxed) != 0
-			pos := atomic::Load(&self.dequeuePos.v, atomic::Relaxed)
+			pos := atomic::Load(&self.dequeuePos, atomic::Relaxed)
 			mut &c := unsafe { &(*(&self.buf[pos&self.capmask])) }
 			seq := atomic::Load(&c.seq, atomic::Acquire)
 			dif := i64(seq - (pos + 1))
 
 			if dif == 0 {
 				// slot is FULL for this consumer position: try to claim it
-				if atomic::CompareAndSwapWeak(&self.dequeuePos.v, pos, pos+1, atomic::AcqRel, atomic::Relaxed) {
+				if atomic::CompareAndSwapWeak(&self.dequeuePos, pos, pos+1, atomic::AcqRel, atomic::Relaxed) {
 					// exclusive access to this slot
 					*val = c.val
 					// help GC: clear the slot's value
