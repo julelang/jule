@@ -15,7 +15,7 @@
 #include "str.hpp"
 #include "slice.hpp"
 
-// Anonymous function / closure wrapper of JuleC.
+// Anonymous function / closure wrapper of julec.
 template <typename Ret, typename... Args>
 struct __jule_Fn
 {

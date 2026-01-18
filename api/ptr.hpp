@@ -11,7 +11,7 @@
 #include "types.hpp"
 #include "error.hpp"
 
-// Wrapper structure for raw pointer of JuleC.
+// Wrapper structure for raw pointer of julec.
 // This structure is the used by Jule references for reference-counting
 // and memory management.
 template <typename T>

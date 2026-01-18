@@ -17,5 +17,5 @@ if exist ..\..\bin\julec_dev.exe (
   ..\..\bin\julec_dev.exe %*
 ) else (
   echo -----------------------------------------------------------------------
-  echo An unexpected error occurred while compiling JuleC. Check errors above.
+  echo An unexpected error occurred while compiling julec. Check errors above.
 )

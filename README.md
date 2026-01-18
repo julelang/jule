@@ -54,7 +54,7 @@ Jule has a bootstrapped compiler, so you'll need to have a working one first.
 There are two options to do this: obtain a binary from the [releases](https://github.com/julelang/jule/releases) or use the [official IR](https://github.com/julelang/julec-ir).
 However, it is recommended to use IR as it is always up to date and ensures [master](https://github.com/julelang/jule/tree/master) branch compatibility.
 
-If you already have a compiler, you can use build scripts designed for developers to compile JuleC.
+If you already have a compiler, you can use build scripts designed for developers to compile julec.
 Remember, these are meant for developers, not for production use. They compile the compiler for debugging new source code.
 
 - Learn about: [compile from IR](https://manual.jule.dev/getting-started/installation/compiling-from-source/compile-from-ir)

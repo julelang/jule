@@ -1,7 +1,7 @@
 # `std/jule`
 
 This package contains tools such as lexer, parser, semantic analyzer for Jule.\
-It is also used by the official reference compiler JuleC and is developed in parallel.
+It is also used by the official reference compiler julec and is developed in parallel.
 
 ## Packages
 

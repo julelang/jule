@@ -1,17 +1,17 @@
 # Source Directory
 
-This directory includes source codes of JuleC. <br>
+This directory includes source codes of julec. <br>
 It is recommended to have your terminal in this directory to have a good development experience.
 
-JuleC is designed to be in the `bin` directory. \
+julec is designed to be in the `bin` directory. \
 That is, the ready-to-use compiler will be in the `bin` directory located in the home directory. \
 That's why paths are adjusted accordingly.
 
-# Introduction to JuleC
+# Introduction to julec
 
 > Some important parts of the reference compiler are publicly available in the standard library. See [`std/jule`](https://github.com/julelang/jule/tree/master/std/jule) library.
 
-JuleC has a structure that handles processes step by step. \
+julec has a structure that handles processes step by step. \
 The working principle of the compiler roughly consists of the steps described below.
 
 After obtaining the source code, the first step is to perform lexical analysis.
@@ -59,7 +59,7 @@ These optimizations are optimizations that are independent of the target system,
 ### 5. Back-End
 
 Stages such as generating machine code, generating C++ code are included here. \
-Actually, JuleC just generates C++ code for now.
+Actually, julec just generates C++ code for now.
 
 ## Developer Reference
 

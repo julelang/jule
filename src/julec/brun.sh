@@ -14,5 +14,5 @@ if [ $? -eq 0 ]; then
   ../../bin/julec_dev $@
 else
   echo "-----------------------------------------------------------------------"
-  echo "An unexpected error occurred while compiling JuleC. Check errors above."
+  echo "An unexpected error occurred while compiling julec. Check errors above."
 fi
