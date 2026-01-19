@@ -4,11 +4,15 @@
 
 #build linux
 
+use "std/runtime"
 use "std/sys"
 
 impl FD {
 	// Wraps sys::Fsync.
-	fn Fsync(mut *self)! {
+	async fn Fsync(mut *self)! {
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
 		self.incref()?
 		defer { self.decref() else {} }
 		fd := int(self.File)

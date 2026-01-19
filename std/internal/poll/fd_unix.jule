@@ -69,6 +69,9 @@ impl FD {
 		if self.Flags&File != File && self.Flags&Pipe != Pipe && self.Flags&Console != Console && self.Flags&Socket != Socket && self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Write")
 		}
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
 		self.writeLock().await?
 		defer { self.writeUnlock() }
 		if len(buf) == 0 {
@@ -159,6 +162,9 @@ impl FD {
 		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
 		}
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
 		self.writeLock().await?
 		defer { self.writeUnlock() }
 		if len(buf) == 0 {
@@ -218,6 +224,9 @@ impl FD {
 		if self.Flags&File != File && self.Flags&Pipe != Pipe && self.Flags&Console != Console && self.Flags&Socket != Socket && self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Read")
 		}
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
 		self.readLock().await?
 		defer { self.readUnlock() }
 		if len(buf) == 0 {
@@ -276,6 +285,9 @@ impl FD {
 		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
 		}
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
 		self.readLock().await?
 		defer { self.readUnlock() }
 		if len(buf) == 0 {
@@ -329,13 +341,19 @@ impl FD {
 	// whence: 0 (Seek.Set) means, relative to the whence of the file, 1 (Seek.Cur)
 	// means relative to the current offset, and 2 (Seek.End) means relative to end.
 	async fn Seek(mut *self, offset: i64, whence: int)!: (pos: i64) {
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
 		self.incref()?
 		defer { self.decref() else {} }
 		ret sys::Seek(int(self.File), offset, whence)?
 	}
 
 	// Wraps sys::Ftruncate.
-	fn Ftruncate(mut *self, size: i64)! {
+	async fn Ftruncate(mut *self, size: i64)! {
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
 		self.incref()?
 		defer { self.decref() else {} }
 		fd := int(self.File)
@@ -344,6 +362,10 @@ impl FD {
 
 	// Wraps the accept network call.
 	async fn Accept(mut *self, addr: uintptr, mut &addrlen: *sys::Socklen)!: NetHandle {
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
+
 		self.readLock().await?
 		defer { self.readUnlock() }
 
@@ -400,6 +422,10 @@ impl FD {
 
 	// Closes file descriptor.
 	async fn Close(mut *self)! {
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
+
 		if !self.fdmu.increfAndClose() {
 			errClosing(self.isFile())?
 		}

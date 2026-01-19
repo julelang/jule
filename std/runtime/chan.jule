@@ -79,6 +79,9 @@ impl pchan {
 	// Blocks until success.
 	#disable nilptr
 	async fn send(mut *self, mut data: T) {
+		if adjustbudget() {
+			yield().await
+		}
 		for {
 			if self.cap > 0 {
 				// Fast-path: enqueue data using the lock-free MPMC queue.
@@ -253,6 +256,9 @@ impl pchan {
 	// it reports whether data dequeued and received successfully.
 	#disable nilptr
 	async fn recv(mut *self, mut &ok: *bool): (data: T) {
+		if adjustbudget() {
+			yield().await
+		}
 		for {
 			if self.cap > 0 {
 				// Fast-path: dequeue data using the lock-free MPMC queue.

@@ -14,7 +14,7 @@ use "std/runtime"
 //
 // A Cond must not be copied after first use.
 struct Cond {
-	// Held while observing or changing the condition
+	// Held while observing or changing the condition.
 	l: Locker
 
 	mut notify: runtime::notifyList
@@ -28,6 +28,7 @@ impl Cond {
 
 	// Locks the locker.
 	async fn Lock(*self) {
+		// The Locker must ensure fairness.
 		self.l.Lock().await
 	}
 
@@ -55,6 +56,7 @@ impl Cond {
 		t := runtime::notifyListAdd(&self.notify)
 		self.l.Unlock()
 		runtime::notifyListWait(&self.notify, t).await
+		// The Locker must ensure fairness.
 		self.l.Lock().await
 	}
 

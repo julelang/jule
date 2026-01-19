@@ -96,6 +96,10 @@ impl FD {
 	// Writes bytes to the file descriptor and returns written byte count.
 	// The number of bytes written can never exceed the length of the buf.
 	async fn Write(mut *self, buf: []byte)!: (n: int) {
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
+
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte write, return immediately
 			// without trying to write.
@@ -174,6 +178,9 @@ impl FD {
 	async fn WriteV(mut *self, buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
 		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for WriteV")
+		}
+		if runtime::adjustbudget() {
+			runtime::yield().await
 		}
 		if len(buf) == 0 {
 			// handle zero-byte payload
@@ -274,6 +281,9 @@ impl FD {
 	// the buffer will not cause an overflow. Offset will be shifted
 	// by the number of bytes read.
 	async fn Read(mut *self, mut buf: []byte)!: (n: int) {
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
 		if self.Flags&File == File {
 			self.readWriteLock().await?
 			defer { self.readWriteUnlock() }
@@ -339,6 +349,9 @@ impl FD {
 	async fn ReadV(mut *self, mut buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
 		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
+		}
+		if runtime::adjustbudget() {
+			runtime::yield().await
 		}
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte read, return immediately
@@ -491,6 +504,10 @@ impl FD {
 	// Handles accepting a socket. The sysSocket parameter is used
 	// to allocate the net socket.
 	async fn Accept(mut *self, sysSocket: fn()!: sys::Handle, sockaddr: uintptr, &addrsize: *sys::Socklen)!: NetHandle {
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
+
 		self.readLock().await?
 		defer { self.readUnlock() }
 
@@ -531,14 +548,20 @@ impl FD {
 	}
 
 	// Imitates the POSIX ftruncate function.
-	fn Ftruncate(mut *self, size: i64)! {
+	async fn Ftruncate(mut *self, size: i64)! {
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
 		self.incref()?
 		defer { self.decref() else {} }
 		sys::Ftruncate(sys::Handle(self.File), size)?
 	}
 
 	// Wraps sys::FlushFileBuffers.
-	fn Fsync(mut *self)! {
+	async fn Fsync(mut *self)! {
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
 		self.incref()?
 		defer { self.decref() else {} }
 		sys::FlushFileBuffers(sys::Handle(self.File))?
@@ -578,6 +601,9 @@ impl FD {
 
 	// Closes file descriptor.
 	async fn Close(mut *self)! {
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
 		if !self.fdmu.increfAndClose() {
 			errClosing(self.isFile())?
 		}

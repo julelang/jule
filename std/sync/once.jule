@@ -41,7 +41,7 @@ use "std/sync/atomic"
 // Once is an object that will perform exactly one action.
 // A Once must not be copied after first use.
 struct Once {
-	// done indicates whether the action has been performed.
+	// Indicates whether the action has been performed.
 	// It is first in the struct because it is used in the hot path.
 	// The hot path is inlined at every call site.
 	// Placing done first allows more compact instructions on some architectures (amd64/i386),
@@ -90,7 +90,6 @@ impl Once {
 		// waiting for the first's call to f to complete.
 		// This is why the slow path falls back to a mutex, and why
 		// the self.done.Store must be delayed until after f returns.
-
 		if self.done.Load(atomic::Acquire) == 0 {
 			// Outlined slow-path to allow inlining of the fast-path.
 			self.doSlow(f)
@@ -110,7 +109,7 @@ impl Once {
 // AsyncOnce is an object that will perform exactly one action.
 // An AsyncOnce must not be copied after first use.
 struct AsyncOnce {
-	// done indicates whether the action has been performed.
+	// Indicates whether the action has been performed.
 	// It is first in the struct because it is used in the hot path.
 	// The hot path is inlined at every call site.
 	// Placing done first allows more compact instructions on some architectures (amd64/i386),
@@ -159,7 +158,6 @@ impl AsyncOnce {
 		// waiting for the first's call to f to complete.
 		// This is why the slow path falls back to a mutex, and why
 		// the self.done.Store must be delayed until after f returns.
-
 		if self.done.Load(atomic::Acquire) == 0 {
 			// Outlined slow-path to allow inlining of the fast-path.
 			self.doSlow(f).await
@@ -167,6 +165,7 @@ impl AsyncOnce {
 	}
 
 	async fn doSlow(*self, f: async fn()) {
+		// Mutex will adjust the budget.
 		self.m.Lock().await
 		if self.done.Load(atomic::Acquire) == 0 {
 			f().await

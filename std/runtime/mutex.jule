@@ -257,6 +257,7 @@ const (
 	mutexunlockSelect
 	mutexunlockJobAdd
 	mutexunlockIOWait
+	mutexunlockYield
 )
 
 // Unlocks mutex mu, if it is not zero.
@@ -284,6 +285,10 @@ fn mutexunlock(mu: u64): bool {
 			eventpollAdjustWaiters(1)
 		}
 		ret r
+	| mutexunlockYield:
+		mut m := gett()
+		runqput(m.pp, &m.c, false)
+		ret true
 	}
 
 	// Ordinary address.

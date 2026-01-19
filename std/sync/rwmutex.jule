@@ -43,6 +43,9 @@ impl RWMutex {
 	// call excludes new readers from acquiring the lock. See the
 	// documentation on the [RWMutex] type.
 	async fn RLock(*self) {
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
 		if self.readerCount.Add(1, atomic::AcqRel) < 0 {
 			// A writer is pending, wait for it.
 			runtime::semacquire(&self.readerSem, false, runtime::reasonMutex).await
@@ -94,6 +97,7 @@ impl RWMutex {
 	// Lock blocks until the lock is available.
 	async fn Lock(*self) {
 		// First, resolve competition with other writers.
+		// Mutex will adjust the budget.
 		self.w.Lock().await
 		// Announce to readers there is a pending writer.
 		r := self.readerCount.Add(-rwmutexMaxReaders, atomic::AcqRel) + rwmutexMaxReaders

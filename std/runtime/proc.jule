@@ -69,6 +69,10 @@ const (
 	// Must be power of two.
 	prunqsize = 256
 
+	// The default budget of a C.
+	// See [adjustbudget] and [p.budget] for more details.
+	pbudget = 128
+
 	// Indicates that an M is currently performing an eventpoll check.
 	pollCheckIn = -1
 )
@@ -92,10 +96,57 @@ struct p {
 	// Incremented on every scheduler call.
 	schedtick: u32
 
+	// Represents the scheduling quantum for the current C.
+	// It is used to prevent Cs from monopolizing the execution M (starvation).
+	//
+	// Each time a C performs a productive or potentially blocking operation
+	// (e.g., I/O, Mutex acquisition, channel communication), the budget is decremented.
+	// When the budget reaches zero, the C is considered to have exhausted its
+	// time slice and must yield execution back to the scheduler.
+	// The scheduler resets this value when the C is re-scheduled for a new turn.
+	budget: u32
+
 	// Local timers of the P.
 	timers: timerheap
 
 	link: &p // Link to the next P.
+}
+
+// Attempts to decrement the current C's budget if possible and reports that
+// yielding is not required (returns false). If the budget is already zero,
+// it reports that yielding is required (returns true).
+//
+// Concurrency integrations that may cause starvation/fairness issues should use
+// this function and integrate with the budget system.
+//
+// Typically, if adjustbudget reports that yielding is required, a yield call
+// should be performed. In most cases this is lighter than using Yield,
+// because yield pushes the current C to the tail of the current P's local queue,
+// whereas Yield pushes it to the global queue. In most scenarios, yield is
+// a sufficient solution.
+//
+// The following pattern is usually enough to integrate the budget system:
+//
+//	if adjustbudget() {
+//		yield().await
+//	}
+//
+// This integration is most commonly performed before the algorithm that
+// requires it starts executing. For example, right before initiating an I/O
+// read operation. This prevents a runaway read from being issued when the
+// budget is already zero.
+//
+// Additionally, operations like I/O reads may block on eventpoll when no data
+// is available, and when they are resumed, budgets will be refreshed. By
+// checking the budget at the beginning of the algorithm, potential issues such
+// as consuming a refreshed budget after unblocking are avoided proactively.
+fn adjustbudget(): bool {
+	mut m := gett()
+	if m.pp.budget == 0 {
+		ret true
+	}
+	m.pp.budget--
+	ret false
 }
 
 // Scheduler is the global scheduling environment for the entire Jule program.
@@ -802,8 +853,14 @@ Sched:
 		// We will resume a coroutine, increase scheduler tick.
 		m.pp.schedtick++
 
+		// Refresh the budget for the new C.
+		m.pp.budget = pbudget
+
+		// Assign C to M.
 		m.c = c
 		m.c.state |= coroRunning
+
+		// Run C.
 		sched.enterrun()
 		resume(&m.c)
 		trampolinerun()
@@ -917,6 +974,15 @@ async fn Yield() {
 	sched.mu.lock()
 	sched.runq.pushq(coroq)
 	park(&coroq.c, uintptr(&sched.mu), reasonNA).await
+}
+
+// Like Yield, but puts the current C on the runq of
+// the current P instead of the globrunq.
+#disable nilptr
+async fn yield() {
+	mut m := gett()
+	tg := taggedPointer(mutexunlockYield)
+	park2(&m.c, tg, reasonNA).await
 }
 
 #disable nilptr boundary

@@ -6,6 +6,9 @@ use "std/runtime"
 use "std/sync/atomic"
 
 // Represents an object that can be locked and unlocked.
+// The Lock function will adjust the scheduling budget when
+// Jule synchronization primitives used, such as Mutex or RWMutex.
+// Custom implementations are responsible to ensure fairness.
 trait Locker {
 	async fn Lock(*self)
 	fn Unlock(*self)
@@ -70,6 +73,9 @@ impl Mutex {
 	// If the lock is already in use, the calling coroutine
 	// blocks until the mutex is available.
 	async fn Lock(*self) {
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
 		// Fast path: grab unlocked mutex.
 		if atomic::CompareAndSwap(&self.state, 0, mutexLocked, atomic::Acquire, atomic::Relaxed) {
 			ret

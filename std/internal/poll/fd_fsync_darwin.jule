@@ -2,13 +2,18 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/runtime"
 use "std/sys"
 
 impl FD {
 	// Invokes SYS_FCNTL with SYS_FULLFSYNC because
 	// on OS X, SYS_FSYNC doesn't fully flush contents to disk.
 	// See the man page for fsync on OS X.
-	fn Fsync(mut *self)! {
+	async fn Fsync(mut *self)! {
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
+
 		self.incref()?
 		defer { self.decref() else {} }
 
