@@ -2042,29 +2042,16 @@ impl exprCoder {
 		self.oc.write(fmt::Sprintf(m.Code, args...))
 	}
 
-	fn chanRecv(mut &self, mut m: &sema::ChanRecv, ok: fn(), block: bool) {
+	fn chanRecv(mut &self, mut m: &sema::ChanRecv, ok: fn()) {
 		ch := m.Expr.Type.Chan()
 		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Value)
 		const Static = false
-		let mut f: &sema::FuncIns
-		if block {
-			f = ins.FindMethod("recv", Static).Instances[0]
-		} else {
-			f = ins.FindMethod("tryRecv", Static).Instances[0]
-		}
-		if block {
-			self.oc.write("__jule_AsyncAwait ")
-		}
+		mut f := ins.FindMethod("recv", Static).Instances[0]
+		self.oc.write("__jule_AsyncAwait ")
 		identCoder.funcIns(&self.oc.Buf, f)
 		self.oc.write("((")
 		self.possibleRefExpr(m.Expr.Model)
-		self.oc.write(")")
-		if block {
-			self.oc.write(".must_ok(\"")
-			self.oc.locInfo(m.Token)
-			self.oc.write("\")")
-		}
-		self.oc.write(".alloc, ")
+		self.oc.write(").alloc, ")
 		if ok != nil {
 			// Write the reference expression to pass |ok| parameter.
 			ok()
@@ -2076,29 +2063,16 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
-	fn chanSend(mut &self, mut m: &sema::ChanSend, block: bool) {
+	fn chanSend(mut &self, mut m: &sema::ChanSend) {
 		c := m.Chan.Type.Chan()
 		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, c.Value)
 		const Static = false
-		let mut f: &sema::FuncIns
-		if block {
-			f = ins.FindMethod("send", Static).Instances[0]
-		} else {
-			f = ins.FindMethod("trySend", Static).Instances[0]
-		}
-		if block {
-			self.oc.write("__jule_AsyncAwait ")
-		}
+		mut f := ins.FindMethod("send", Static).Instances[0]
+		self.oc.write("__jule_AsyncAwait ")
 		identCoder.funcIns(&self.oc.Buf, f)
 		self.oc.write("((")
 		self.possibleRefExpr(m.Chan.Model)
-		self.oc.write(")")
-		if block {
-			self.oc.write(".must_ok(\"")
-			self.oc.locInfo(m.Token)
-			self.oc.write("\")")
-		}
-		self.oc.write(".alloc, ")
+		self.oc.write(").alloc, ")
 		self.possibleRefExpr(m.Data.Model)
 		self.oc.write(")")
 	}
@@ -2346,9 +2320,9 @@ impl exprCoder {
 		| &sema::BackendEmitExpr:
 			self.backendEmit(m.(&sema::BackendEmitExpr))
 		| &sema::ChanRecv:
-			self.chanRecv(m.(&sema::ChanRecv), nil, true)
+			self.chanRecv(m.(&sema::ChanRecv), nil)
 		| &sema::ChanSend:
-			self.chanSend(m.(&sema::ChanSend), true)
+			self.chanSend(m.(&sema::ChanSend))
 		| &sema::BuiltinCloseCallExpr:
 			self.closeCall(m.(&sema::BuiltinCloseCallExpr))
 		| &sema::TypeAssertionExpr:
