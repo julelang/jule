@@ -10,6 +10,7 @@ This repository is the main source tree of Jule. \
 It contains the reference compiler, API, and the standard library.
 
 [Website](https://jule.dev) |
+[The Mission](https://manual.jule.dev/the-mission) |
 [Manual](https://manual.jule.dev) |
 [Future of Jule](https://jule.dev/future-of-jule) |
 [Contributing](https://jule.dev/contribute) |
@@ -36,6 +37,18 @@ It contains the reference compiler, API, and the standard library.
 > Some changes may be unstable or affected by compiler or API issues.
 > If you encounter any problems, please report them through the [Jule Issue Tracker](https://github.com/julelang/jule/issues).
 > You can also join the [Discord community](https://discord.gg/XNSUUDuGGQ) to discuss the language, get help, or contribute to its development.
+
+## Why
+
+We love the simplicity and developer experience of Go.
+
+We love the efficiency and performance of C.
+
+We recognize and respect the safety goals addressed by Rust, but we believe that safety should not require constantly fighting the compiler.
+
+We want a language that delivers the productivity of Go while achieving the performance characteristics of C. A language that is safe by default, yet flexible enough to stay out of your way when you need full control.
+
+Most importantly, we refuse to abandon existing C and C++ codebases or rewrite thousands of lines of proven code just to adopt a new language. We want more than temporary bridges or fragile workarounds. We want interoperability to be a first-class, intentional part of the language design.
 
 ## Community
 
