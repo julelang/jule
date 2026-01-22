@@ -614,25 +614,26 @@ impl dynamicTypeAnnotation {
 	}
 
 	fn annotateConstraintName(mut *self, mut k: &Type): bool {
+		if k.Tuple() != nil {
+			self.e.pushErr(self.errorToken, "tuple type @ cannot be type inferred", k.Str())
+			ret false
+		}
 		mut name := self.c.Data.(&ast::NameExpr)
-		mut s := k.Struct()
 		for i, g in self.f.Decl.Generics {
-			if g.Name == name.Name {
-				mut fg := self.f.Generics[i]
-				if fg != nil {
-					ret false
-				}
-				p := k.Ptr()
-				if p != nil && p.IsUnsafe() {
-					self.e.pushErr(self.errorToken, "unsafe pointer (*unsafe) type cannot be type inferred")
-					ret false
-				}
-				self.pushGeneric(k, i)
-				ret true
-			}
-			if s == nil {
+			if g.Name != name.Name {
 				continue
 			}
+			mut fg := self.f.Generics[i]
+			if fg != nil {
+				ret false
+			}
+			p := k.Ptr()
+			if p != nil && p.IsUnsafe() {
+				self.e.pushErr(self.errorToken, "unsafe pointer (*unsafe) type cannot be type inferred")
+				ret false
+			}
+			self.pushGeneric(k, i)
+			ret true
 		}
 		ret false
 	}
