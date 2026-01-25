@@ -7,7 +7,7 @@
 struct timer {
 	mu:    mutex
 	theap: &timerheap                     // A fake smart-pointer to the owner timerheap.
-	f:     fn(arg: uintptr, seq: uintptr) // A function will be invoked when timer fired.
+	ifunc: fn(arg: uintptr, seq: uintptr) // A runtime-provided function will be invoked when timer fired.
 	arg:   uintptr                        // Any argument provided by the runtime for f.
 	seq:   uintptr                        // Any sequence value provided by the runtime for f.
 	when:  i64                            // Timer wakes up at when. If <=0, should not fire.
@@ -18,21 +18,21 @@ struct timer {
 impl timer {
 	// Returns new timer.
 	#disable nilptr
-	fn new(when: i64, f: fn(arg: uintptr, seq: uintptr), arg: uintptr, seq: uintptr): &timer {
+	fn new(when: i64, ifunc: fn(arg: uintptr, seq: uintptr), arg: uintptr, seq: uintptr): &timer {
 		mut t := new(timer)
-		t.modify(when, f, arg, seq)
+		t.modify(when, ifunc, arg, seq)
 		ret t
 	}
 
 	// Modifies an existing timer.
 	// Reports whether the timer was modified before it was run.
 	#disable nilptr
-	fn modify(mut *self, when: i64, f: fn(arg: uintptr, seq: uintptr), arg: uintptr, seq: uintptr) {
+	fn modify(mut *self, when: i64, ifunc: fn(arg: uintptr, seq: uintptr), arg: uintptr, seq: uintptr) {
 		self.mu.lock()
 		self.when = when
 		self.arg = arg
 		self.seq = seq
-		self.f = f
+		self.ifunc = ifunc
 		if self.theap != nil && self.index != -1 {
 			self.theap.mu.lock()
 			self.theap.siftdown(self.index)
@@ -46,26 +46,20 @@ impl timer {
 	#disable nilptr
 	fn stop(mut *self) {
 		self.mu.lock()
-		self.f = nil
+		self.ifunc = nil
 		self.when = 0
 		self.mu.unlock()
 	}
 
-	// Fires the timer.
-	// Must be a functionial timer, if timer.f is nil, behavior is undefined.
-	// The timer and timerheap lock must be held.
+	// Fires the timer, which is runtime timer associated with a raw function.
 	#disable nilptr
 	fn unlockAndFire(mut *self) {
 		arg := self.arg
 		seq := self.seq
-		f := self.f
-		self.f = nil
-		self.when = 0
-		if self.theap != nil && self.index != -1 {
-			self.theap.siftup(self.index)
-		}
+		func := self.ifunc
+		self.ifunc = nil
 		self.mu.unlock()
-		f(arg, seq)
+		func(arg, seq)
 	}
 }
 
@@ -189,6 +183,65 @@ impl timerheap {
 		self.data[i], self.data[j] = self.data[j], self.data[i]
 		self.data[i].index = i
 		self.data[j].index = j
+	}
+
+	// Checks the timer, pops and returns it if it should fire.
+	// If there is no timer ready to fire, pollUntil indicates the delay
+	// until the next possible firing time.
+	// Safe for concurrent use by multiple coroutines.
+	// The returned timer's lock will be acquired.
+	#disable nilptr
+	fn check(mut *self): (t: &timer, pollUntil: i64) {
+		mut timerPeekOffs := 0
+		self.mu.lock()
+		for {
+			t = self.peek(timerPeekOffs)
+			if t == nil {
+				break
+			}
+			t.mu.lock()
+			// This timer cannot be fired.
+			if t.when <= 0 {
+				t.mu.unlock()
+				timerPeekOffs++
+				continue
+			}
+			break
+		}
+		if t == nil { // No suitable timer.
+			self.mu.unlock()
+			ret nil, -1
+		}
+		now := nanotime()
+		// It's not the right time yet.
+		if t.when > now {
+			// Compute delay until the next timer fires.
+			pollUntil = t.when - now
+			t.mu.unlock()
+			self.mu.unlock()
+			t = nil
+			if pollUntil <= 0 {
+				panic("runtime: inconsistent timer state")
+			}
+			ret
+		}
+		// Timer should be fired.
+		// Remove this timer from the heap.
+		// But do not remove if the timer is an runtime internal timer
+		// associated with a raw function to be invoked when timer fired.
+		// Internal timers can only be removed by the timer owner.
+		// Just clear "when" value and adjust timerheap for them.
+		if t.ifunc != nil {
+			self.remove(t)
+		} else {
+			t.when = 0
+			if t.index != -1 {
+				self.siftup(t.index)
+			}
+		}
+		self.mu.unlock()
+		pollUntil = 0
+		ret
 	}
 }
 

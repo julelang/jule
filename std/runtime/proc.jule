@@ -727,72 +727,32 @@ top:
 
 	// No runnable coroutine found yet.
 	// Determine how long we can block based on timers and deadlines.
-	// The default is -1, which is blocks indefinitely.
-	mut delay := i64(-1)
-	mut now := nanotime()
-
-	// P's local timers.
-	//
-	// Expired timers immediately make their coroutines runnable.
-	// The first such coroutine is returned; others are enqueued.
-	mut n := 0
-	mut timerPeekOffs := 0
-	pp.timers.mu.lock()
-	if pp.timers.peek(timerPeekOffs) != nil {
-		ok = false
-		for n < prunqsize {
-			mut t := pp.timers.peek(timerPeekOffs)
-			if t == nil {
-				break
-			}
-			t.mu.lock()
-			if t.when > now {
-				// Compute delay until the next timer fires.
-				delay = t.when - now
-				if delay <= 0 {
-					panic("runtime: inconsistent timer state")
-				}
-				t.mu.unlock()
-				break
-			}
-			// We cannot fire this timer.
-			if t.when <= 0 {
-				t.mu.unlock()
-				timerPeekOffs++
-				continue
-			}
-			if t.f == nil {
-				mut &tc := unsafe { &(*(*c)(t.arg)) }
-				pp.timers.pop() // Remove this timer from the heap.
-				t.mu.unlock()
-				// Function is nil, this should be a sleep timer.
-				if n == 0 {
-					coro = *tc
-					ok = true
-				} else {
-					runqput(pp, tc, false)
-					n++
-				}
-			} else {
-				t.unlockAndFire()
-				timerPeekOffs++
-			}
-			n++
+	// If pollUntil is -1, eventpoll will block indefinitely.
+	mut timer, pollUntil := pp.timers.check()
+	if timer != nil {
+		if timer.ifunc != nil {
+			// This timer is an runtime internal timer associated with
+			// a raw function to be invoked when timer fired.
+			// Invoke the function and try again to find a runnable coroutine.
+			timer.unlockAndFire()
+			goto top
+		} else {
+			// The timer associated with a coroutine,
+			// let the scheduler handle this.
+			mut &tc := unsafe { &(*(*c)(timer.arg)) }
+			timer.mu.unlock()
+			coro = *tc
+			ok = true
+			ret
 		}
 	}
-	pp.timers.mu.unlock()
-	// If we already found a runnable coroutine from timers, return immediately
-	// without entering eventpoll.
-	if ok {
-		ret coro, true
-	}
 
-	// Final step: poll eventpoll.
-	if delay != -1 || sched.ncpolling() > 0 && atomic::Swap(&sched.lastpoll, pollCheckIn, atomic::AcqRel) != pollCheckIn {
+	// Final step: eventpoll.
+	if pollUntil != -1 || sched.ncpolling() > 0 && atomic::Swap(&sched.lastpoll, pollCheckIn, atomic::AcqRel) != pollCheckIn {
 		// eventpoll guarantees len(toRun) <= local run queue capacity.
 		let mut toRun: [prunqsize]c
-		bn := eventpoll(delay, &toRun)
-		now = nanotime()
+		bn := eventpoll(pollUntil, &toRun)
+		now := nanotime()
 		atomic::Store(&sched.lastpoll, now, atomic::Release)
 		if bn > 0 {
 			coro = toRun[0]
