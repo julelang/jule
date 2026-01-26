@@ -596,15 +596,16 @@ fn runqsteal(mut pp: &p, mut pp2: &p, mut &cp: *c): bool {
 	ret true
 }
 
-// Tries to steal a batch of coroutines for pp.
+// Tries to steal a batch of coroutines or a timer for pp.
 // Writes one of the stolen coroutines to cp.
 // Reports false if failed, otherwise true.
-fn stealWork(mut pp: &p, mut &cp: *c): bool {
+fn stealWork(mut pp: &p, mut &cp: *c): (stealC: bool, stealTimer: bool) {
 	const StealTries = 4
 	mut n := 0
 	pcount := COMAXPROCS()
 	startIdx := int(rand() % u64(pcount))
 	for n < StealTries; n++ {
+		stealTimers := n == StealTries-1
 		mut i := 0
 		mut idx := startIdx
 		for i < pcount; i, idx = i+1, (idx+1)%pcount {
@@ -612,13 +613,20 @@ fn stealWork(mut pp: &p, mut &cp: *c): bool {
 			if pp == pp2 {
 				continue
 			}
+			if stealTimers {
+				mut timer, _ := pp2.timers.check()
+				if timer != nil {
+					pp.timers.cache = timer
+					ret false, true
+				}
+			}
 			ok := runqsteal(pp, pp2, cp)
 			if ok {
-				ret true
+				ret true, false
 			}
 		}
 	}
-	ret false
+	ret false, false
 }
 
 // Selects a runnable coroutine for execution.
@@ -707,9 +715,25 @@ top:
 		if !m.spinning {
 			becomeSpinning(m)
 		}
-		ok = stealWork(pp, &coro)
-		if ok {
+		stealC, stealTimer := stealWork(pp, &coro)
+		if stealC {
 			ret coro, true
+		}
+		if stealTimer {
+			mut timer := pp.timers.cache
+			pp.timers.cache = nil
+			match fire(timer, &coro) {
+			| fireInternalTimer:
+				// This was an internal timer,
+				// try again to find a runnable coroutine.
+				goto top
+			| fireCTimer:
+				// The timer associated with a coroutine,
+				// let the scheduler handle this.
+				ret coro, true
+			|:
+				panic("unreachable")
+			}
 		}
 	}
 
@@ -718,32 +742,29 @@ top:
 		goto top
 	}
 
-	if m.spinning {
-		m.spinning = false
-		if atomic::Add(&sched.nmspinning, -1, atomic::Relaxed) < 0 {
-			panic("findrunnable: negative nmspinning")
-		}
-	}
-
 	// No runnable coroutine found yet.
 	// Determine how long we can block based on timers and deadlines.
 	// If pollUntil is -1, eventpoll will block indefinitely.
 	mut timer, pollUntil := pp.timers.check()
 	if timer != nil {
-		if timer.ifunc != nil {
-			// This timer is an runtime internal timer associated with
-			// a raw function to be invoked when timer fired.
-			// Invoke the function and try again to find a runnable coroutine.
-			timer.unlockAndFire()
+		match fire(timer, &coro) {
+		| fireInternalTimer:
+			// This was an internal timer,
+			// try again to find a runnable coroutine.
 			goto top
-		} else {
+		| fireCTimer:
 			// The timer associated with a coroutine,
 			// let the scheduler handle this.
-			mut &tc := unsafe { &(*(*c)(timer.arg)) }
-			timer.mu.unlock()
-			coro = *tc
-			ok = true
-			ret
+			ret coro, true
+		|:
+			panic("unreachable")
+		}
+	}
+
+	if m.spinning {
+		m.spinning = false
+		if atomic::Add(&sched.nmspinning, -1, atomic::Relaxed) < 0 {
+			panic("findrunnable: negative nmspinning")
 		}
 	}
 
@@ -852,6 +873,35 @@ fn schedthread(mut mp: *unsafe) {
 	sett(m)
 
 	schedule()
+}
+
+// Result flags of [fire].
+const (
+	fireInternalTimer = 1 << iota // Internal timer.
+	fireCTimer                    // Coroutine-associated timer.
+)
+
+// Fires the timer t.
+// If t is an internal timer, it invokes its routine immediately and
+// returns fireInternalTimer. In this case, cp is not used.
+//
+// Otherwise, t is either a user timer or a coroutine-wrapped internal timer.
+// Such timers are associated with a coroutine; the coroutine state is written
+// to cp and fireCTimer is returned. The timer will then be fired when the
+// scheduler executes the coroutine referenced by cp.
+fn fire(mut t: &timer, mut &cp: *c): int {
+	if t.ifunc != nil {
+		// This timer is an runtime internal timer associated with
+		// a raw function to be invoked when timer fired.
+		t.unlockAndFire()
+		ret fireInternalTimer
+	} else {
+		// The timer associated with a coroutine,
+		// let the scheduler handle this.
+		*cp = unsafe { *(*c)(t.arg) }
+		t.mu.unlock()
+		ret fireCTimer
+	}
 }
 
 // A hint function for the compiler.

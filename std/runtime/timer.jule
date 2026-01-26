@@ -65,7 +65,15 @@ impl timer {
 
 // A min-heap ordered by [timer.when].
 struct timerheap {
-	mu:   mutex
+	// A cached timer, it is used for stealing.
+	// Lock-free, because it is used by the owner P only.
+	cache: &timer
+
+	// Protects the following fields.
+	mu: mutex
+
+	// All timers of the heap.
+	// Timers are min-heap ordered.
 	data: []&timer
 }
 
@@ -245,6 +253,24 @@ impl timerheap {
 	}
 }
 
+// Compares two "when" timestamps w1 and w2 and returns their ordering.
+//
+// The comparison treats non-positive values (<= 0) as special cases,
+// typically representing "unset", "inactive", or "no scheduled time".
+//
+// Ordering rules:
+//	- If both w1 and w2 are <= 0, they are considered equal.
+//	- If w1 <= 0 and w2 > 0, w1 is considered greater (returns +1).
+//	- If w1 > 0 and w2 <= 0, w1 is considered smaller (returns -1).
+//	- If both are > 0, they are compared numerically:
+//		- returns -1 if w1 < w2
+//		- returns +1 if w1 > w2
+//		- returns  0 if w1 == w2
+//
+// Return values follow the conventional comparison contract:
+//	-1 if w1 < w2
+//	0 if w1 == w2
+//	+1 if w1 > w2
 fn cmpwhen(w1: i64, w2: i64): int {
 	if w1 <= 0 {
 		if w2 > 0 {
