@@ -340,6 +340,22 @@ fn globrunqget(mut pp: &p, max: i32, mut &cp: *c): bool {
 	ret true
 }
 
+// runqempty reports whether pp has no Cs on its local run queue.
+// It never returns true spuriously.
+fn runqempty(pp: &p): bool {
+	// We must guard against races between concurrent runqput/runqget
+	// operations. Observing head == tail is only valid if tail is stable.
+	for {
+		head := atomic::Load(&pp.runqhead, atomic::Acquire)
+		tail := atomic::Load(&pp.runqtail, atomic::Acquire)
+
+		// Re-read tail to ensure it has not changed while reading head.
+		if tail == atomic::Load(&pp.runqtail, atomic::Acquire) {
+			ret head == tail
+		}
+	}
+}
+
 // Tries to put cp on the local runnable queue.
 // If next is false, it adds cp to the tail of the runnable queue if runnext is used.
 // If next is true, runqput puts cp in the pp.runnext slot.
@@ -599,6 +615,7 @@ fn runqsteal(mut pp: &p, mut pp2: &p, mut &cp: *c): bool {
 // Tries to steal a batch of coroutines or a timer for pp.
 // Writes one of the stolen coroutines to cp.
 // Reports false if failed, otherwise true.
+#disable nilptr boundary
 fn stealWork(mut pp: &p, mut &cp: *c): (stealC: bool, stealTimer: bool) {
 	const StealTries = 4
 	mut n := 0
@@ -629,6 +646,30 @@ fn stealWork(mut pp: &p, mut &cp: *c): (stealC: bool, stealTimer: bool) {
 	ret false, false
 }
 
+// Check all Ps for a runnable C to steal.
+//
+// On entry we have no P. If a C is available to steal and a P is available,
+// the P is returned which the caller should acquire and attempt to steal the
+// work to.
+#disable nilptr
+fn checkRunqsNoP(): &p {
+	for _, pp2 in sched.allp {
+		if !runqempty(pp2) {
+			sched.mu.lock()
+			mut pp := pidlegetSpinning()
+			if pp == nil {
+				// Can't get a P, don't bother checking remaining Ps.
+				sched.mu.unlock()
+				ret nil
+			}
+			sched.mu.unlock()
+			ret pp
+		}
+	}
+	// No work available.
+	ret nil
+}
+
 // Selects a runnable coroutine for execution.
 //
 // This function is one of the core components of the coroutine scheduler.
@@ -645,19 +686,25 @@ fn stealWork(mut pp: &p, mut &cp: *c): (stealC: bool, stealTimer: bool) {
 // requiring sched.lock and increasing contention under high connection
 // counts (e.g. many concurrent network wakeups).
 //
-// runqputbatch places the goroutines directly onto the local run queue of
+// runqputbatch places the coroutines directly onto the local run queue of
 // the current P, preserving cache locality and avoiding global scheduler
 // contention. This improves throughput for event-driven workloads without
 // violating scheduler invariants.
 //
 // Sysmon and other scheduler systems intentionally will use the
 // `injectclist`, as they operate without a P and must ensure global progress.
+//
+// It never returns without a runnable coroutine.
 #disable nilptr boundary
-fn findRunnable(): (coro: c, ok: bool) {
+fn findRunnable(): (coro: c) {
+	let mut ok: bool
 	mut m := gett()
+
+	// Place the "top" label here because P may change if M is detached from its current P.
+	// To ensure we observe the most recent P paired with M, we must reload it.
+top:
 	mut pp := m.pp
 
-top:
 	// Check the global runnable queue once in a while to ensure fairness.
 	// Otherwise two coroutines can completely occupy the local runqueue
 	// by constantly respawning each other.
@@ -666,14 +713,14 @@ top:
 		ok = globrunqget(pp, 1, &coro)
 		sched.mu.unlock()
 		if ok {
-			ret coro, true
+			ret
 		}
 	}
 
 	// Local runnable queue.
 	ok = runqget(pp, &coro)
 	if ok {
-		ret coro, true
+		ret
 	}
 
 	// Local queue empty: attempt to fetch a batch from the global run queue.
@@ -685,7 +732,7 @@ top:
 		ok = globrunqget(pp, 0, &coro)
 		sched.mu.unlock()
 		if ok {
-			ret coro, true
+			ret
 		}
 	}
 
@@ -703,7 +750,7 @@ top:
 			coro = toRun[0]
 			runqputbatch(pp, &toRun, 1, bn)
 			eventpollAdjustWaiters(-i32(bn))
-			ret coro, true
+			ret
 		}
 	}
 
@@ -717,7 +764,7 @@ top:
 		}
 		stealC, stealTimer := stealWork(pp, &coro)
 		if stealC {
-			ret coro, true
+			ret
 		}
 		if stealTimer {
 			mut timer := pp.timers.cache
@@ -730,16 +777,11 @@ top:
 			| fireCTimer:
 				// The timer associated with a coroutine,
 				// let the scheduler handle this.
-				ret coro, true
+				ret
 			|:
 				panic("unreachable")
 			}
 		}
-	}
-
-	if !m.spinning && atomic::Load(&sched.needspinning, atomic::Acquire) == 1 {
-		becomeSpinning(m)
-		goto top
 	}
 
 	// No runnable coroutine found yet.
@@ -755,16 +797,94 @@ top:
 		| fireCTimer:
 			// The timer associated with a coroutine,
 			// let the scheduler handle this.
-			ret coro, true
+			ret
 		|:
 			panic("unreachable")
 		}
 	}
 
+	// Return P.
+	sched.mu.lock()
+	// Check the global runq last time.
+	if sched.runq.len > 0 {
+		ok = globrunqget(pp, 0, &coro)
+		if ok {
+			sched.mu.unlock()
+			ret
+		}
+	}
+	if !m.spinning && atomic::Load(&sched.needspinning, atomic::Acquire) == 1 {
+		// See "Delicate dance" comment below.
+		becomeSpinning(m)
+		sched.mu.unlock()
+		goto top
+	}
+	pidleput(m.pp)
+	m.pp = nil
+	sched.mu.unlock()
+
+	// Delicate dance: thread transitions from spinning to non-spinning
+	// state, potentially concurrently with submission of new work. We must
+	// drop nmspinning first and then check all sources again.
+	// If we do it the other way around, another thread can submit work
+	// after we've checked all sources but before we drop nmspinning;
+	// as a result nobody will unpark a thread to run the work.
+	//
+	// If we discover new work below, we need to restore m.spinning as a
+	// signal for resetspinning to unpark a new worker thread (because
+	// there can be more than one starving coroutine).
+	//
+	// However, if after discovering new work we also observe no idle Ps
+	// (either here or in resetspinning), we have a problem. We may be
+	// racing with a non-spinning M in the block above, having found no
+	// work and preparing to release its P and park. Allowing that P to go
+	// idle will result in loss of work conservation (idle P while there is
+	// runnable work). This could result in complete deadlock in the
+	// unlikely event that we discover new work (from netpoll) right as we
+	// are racing with _all_ other Ps going idle.
+	//
+	// We use sched.needspinning to synchronize with non-spinning Ms going
+	// idle. If needspinning is set when they are about to drop their P,
+	// they abort the drop and instead become a new spinning M on our
+	// behalf. If we are not racing and the system is truly fully loaded
+	// then no spinning threads are required, and the next thread to
+	// naturally become spinning will clear the flag.
+	wasSpinning := m.spinning
 	if m.spinning {
 		m.spinning = false
 		if atomic::Add(&sched.nmspinning, -1, atomic::Relaxed) < 0 {
 			panic("findrunnable: negative nmspinning")
+		}
+
+		// Note the for correctness, only the last M transitioning from
+		// spinning to non-spinning must perform these rechecks to
+		// ensure no missed work. However, the runtime has some cases
+		// of transient increments of nmspinning that are decremented
+		// without going through this path, so we must be conservative
+		// and perform the check on all spinning Ms.
+		//
+		// See Go's issue: https://go.dev/issue/43997.
+
+		// Check global and P runqueues again.
+
+		sched.mu.lock()
+		if sched.runq.len > 0 {
+			mut pp2 := pidlegetSpinning()
+			if pp2 != nil {
+				globrunqget(pp2, 0, &coro)
+				sched.mu.unlock()
+				m.pp = pp2
+				becomeSpinning(m)
+				ret
+			}
+		}
+		sched.mu.unlock()
+
+		mut pp2 := checkRunqsNoP()
+		if pp2 != nil {
+			m.pp = pp2
+			becomeSpinning(m)
+			goto top
 		}
 	}
 
@@ -775,15 +895,31 @@ top:
 		bn := eventpoll(pollUntil, &toRun)
 		now := nanotime()
 		atomic::Store(&sched.lastpoll, now, atomic::Release)
-		if bn > 0 {
-			coro = toRun[0]
-			runqputbatch(pp, &toRun, 1, bn)
-			eventpollAdjustWaiters(-i32(bn))
-			ret coro, true
+		sched.mu.lock()
+		mut pp2 := pidleget()
+		sched.mu.unlock()
+		m.pp = pp2
+		if m.pp == nil {
+			if bn > 0 {
+				injectclist(&toRun, 0, bn)
+				eventpollAdjustWaiters(-i32(bn))
+			}
+		} else {
+			if bn > 0 {
+				coro = toRun[0]
+				runqputbatch(pp, &toRun, 1, bn)
+				eventpollAdjustWaiters(-i32(bn))
+				ret
+			}
+			if wasSpinning {
+				becomeSpinning(m)
+			}
+			goto top
 		}
 	}
 
-	ret coro, false
+	stopm(m)
+	goto top
 }
 
 // A coroutine scheduler routine.
@@ -791,39 +927,11 @@ top:
 #disable nilptr
 fn schedule() {
 	mut m := gett()
-Sched:
-	m.pp.schedtick = 0
 	for {
-		// Poll a coroutine to run.
-		mut c, ok := findRunnable()
-		// findRunnable failed to find a runnable coroutine.
-		if !ok {
-			// There are coroutines polling for I/O and
-			// there is no M looking for eventpoll.
-			if sched.ncpolling() > 0 &&
-				atomic::Load(&sched.lastpoll, atomic::Acquire) != pollCheckIn {
-				continue
-			}
-			// There are timers in this worker, clean them.
-			// Normally, eventpoll returns a timer if exist.
-			// Somehow, a spurious wakeup occurred.
-			m.pp.timers.mu.lock()
-			ntimers := m.pp.timers.len()
-			m.pp.timers.mu.unlock()
-			if ntimers > 0 {
-				continue
-			}
-			// We tried enough.
-			// Nothing to do, break the loop.
-			// Park the M.
-			if m.spinning {
-				m.spinning = false
-				if atomic::Add(&sched.nmspinning, -1, atomic::Relaxed) < 0 {
-					panic("findrunnable: negative nmspinning")
-				}
-			}
-			break
-		}
+		// Poll a C to run and assign it to M.
+		m.c = findRunnable()
+		m.c.state |= coroRunning
+
 		// This thread is going to run a coroutine and is not spinning anymore,
 		// so if it was marked as spinning we need to reset it now and potentially
 		// start a new spinning M.
@@ -836,10 +944,6 @@ Sched:
 
 		// Refresh the budget for the new C.
 		m.pp.budget = pbudget
-
-		// Assign C to M.
-		m.c = c
-		m.c.state |= coroRunning
 
 		// Run C.
 		sched.enterrun()
@@ -857,8 +961,6 @@ Sched:
 			close(&m.c)
 		}
 	}
-	stopm(m)
-	goto Sched
 }
 
 // Start point of a M.
@@ -1139,7 +1241,9 @@ fn stopm(mut m: &thread) {
 	sched.mu.lock()
 	sched.nm--
 	checkdead()
-	pidleput(m.pp)
+	if m.pp != nil {
+		panic("runtime: stopm with a P")
+	}
 	mput(m)
 	sched.mu.unlock()
 	m.parker.park()
