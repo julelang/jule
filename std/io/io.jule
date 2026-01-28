@@ -426,7 +426,13 @@ async fn ReadAll(mut r: Reader)!: []byte {
 	// Invariant: finalSize = sum(len(c) for c in chunks)
 	let mut finalSize: int
 	for {
-		n := r.Read(b[len(b):cap(b)]).await else { break }
+		n := r.Read(b[len(b):cap(b)]).await else {
+			// If any data was read, ignore the error and return the data.
+			if len(chunks) > 0 || len(b) > 0 {
+				break
+			}
+			error(error)
+		}
 		if n == EOF {
 			break
 		}
@@ -439,6 +445,8 @@ async fn ReadAll(mut r: Reader)!: []byte {
 			next += next / 2
 		}
 	}
+	// On error this condition must be true: len(chunks) > 0 || len(b) > 0
+	// On EOF, len(chunks) and len(b) may be zero.
 	if len(chunks) == 0 {
 		ret b
 	}
