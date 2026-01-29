@@ -25,8 +25,8 @@
 //		It behaves similarly to a typical thread.
 //
 //	M (Machine)
-//		A real operating system thread.
-//		It is responsible for executing a coroutine.
+//		A real operating system thread, aka worker thread.
+//		It is responsible for executing a coroutine, timer and other works.
 //		Only as many M instances may be created as permitted by COMAXPROCS.
 //
 //	P (Processor)
@@ -44,6 +44,69 @@
 // When a parked coroutine is woken up, it must be enqueued into the runnable
 // coroutine queue. The scheduler decides when it will actually execute.
 //
+// WORKER THREAD PARKING/UNPARKING
+//
+// We need to balance between keeping enough running worker threads to utilize
+// available hardware parallelism and parking excessive running worker threads
+// to conserve CPU resources and power. This is not simple for two reasons:
+// (1) scheduler state is intentionally distributed (in particular, per-P work
+// queues), so it is not possible to compute global predicates on fast paths;
+// (2) for optimal thread management we would need to know the future (don't park
+// a worker thread when a new coroutine will be readied in near future).
+//
+// The current approach applies to three primary sources of potential work:
+// readying a coroutine and new/modified-earlier timers.
+// See below for additional details.
+//
+// We unpark an additional thread when we submit work if (this is wakep()):
+// 1. There is an idle P, and
+// 2. There are no "spinning" worker threads.
+//
+// A worker thread is considered spinning if it is out of local work and did
+// not find work in the global run queue or eventpoller; the spinning state is
+// denoted in m.spinning and in sched.nmspinning. Threads unparked this way are
+// also considered spinning; we don't do coroutine handoff so such threads are
+// out of work initially. Spinning threads spin on looking for work in per-P
+// run queues and timer heaps or from the GC before parking. If a spinning
+// thread finds work it takes itself out of the spinning state and proceeds to
+// execution. If it does not find work it takes itself out of the spinning
+// state and then parks.
+//
+// If there is at least one spinning thread (sched.nmspinning>1), we don't
+// unpark new threads when submitting work. To compensate for that, if the last
+// spinning thread finds work and stops spinning, it must unpark a new spinning
+// thread. This approach smooths out unjustified spikes of thread unparking,
+// but at the same time guarantees eventual maximal CPU parallelism
+// utilization.
+//
+// The main implementation complication is that we need to be very careful
+// during spinning->non-spinning thread transition. This transition can race
+// with submission of new work, and either one part or another needs to unpark
+// another worker thread. If they both fail to do that, we can end up with
+// semi-persistent CPU underutilization.
+//
+// The general pattern for submission is:
+// 1. Submit work to the local or global run queue, or timer heap.
+// 2. #StoreLoad-style memory barrier.
+// 3. Check sched.nmspinning.
+//
+// The general pattern for spinning->non-spinning transition is:
+// 1. Decrement nmspinning.
+// 2. #StoreLoad-style memory barrier.
+// 3. Check all per-P work queues for new work.
+//
+// Note that all this complexity does not apply to global run queue as we are
+// not sloppy about thread unparking when submitting to global queue. Also see
+// comments for nmspinning manipulation.
+//
+// How these different sources of work behave varies, though it doesn't affect
+// the synchronization approach:
+// * Ready coroutine: this is an obvious source of work; the coroutine is
+//   immediately ready and must run on some thread eventually.
+// * New/modified-earlier timer: The current timer implementation uses eventpoll
+//   in a thread with no work available to wait for the soonest timer.
+//   If there is no thread waiting, we want a new spinning thread to go wait.
+//
 // STACK-ORIENTED COROUTINE HANDLING
 //
 // Jule runtime prioritizes avoiding heap allocations for coroutines.
@@ -51,6 +114,60 @@
 // it can be copied or passed around via references/pointers.
 // Since it is stack-oriented, it must be handled carefully.
 // Otherwise, a stale coroutine copy may be used and cause critical issues.
+//
+// SYSCALLS/BLOCKING OPERATIONS
+//
+// Syscalls that cannot be scheduled by the scheduler (for example, blocking
+// read/write operations or waiting for a process) and other blocking tasks
+// block/occupy the worker thread (M) executing them. The scheduler cannot
+// detect this situation, and therefore assumes that the worker thread is still
+// executing work, so no new M is spawned to replace it. This can lead to a loss
+// of parallelism.
+//
+// The scheduler or the standard library does not explicitly try to prevent
+// this and instead delegates the responsibility to the developer. The scheduler
+// always assumes that coroutines are schedulable. This follows a "force correct
+// usage" philosophy rather than a "save everything" philosophy. Blocking tasks
+// must be handled by the developer outside of the scheduler.
+//
+// Go addresses this at the scheduler level. To solve this, when a worker thread
+// is blocked (for example, in a syscall), it releases its P, allowing the
+// scheduler to pair the released P with another M and continue executing ready
+// work. While this solves the lost worker thread problem, it can lead to a
+// significant increase in thread creation. In such cases, an approach similar
+// to "one thread per blocking task" is not sufficiently efficient or
+// performant.
+//
+// The Jule runtime does not attempt to automatically tolerate blocking tasks,
+// but it does not completely ignore them either. A runtime-managed blocking task
+// pool is provided for developers. This pool creates a reasonable number of
+// worker threads and distributes all blocking tasks among them. Developers are
+// expected to intentionally manage blocking tasks using this pool.
+// The implementation is located at: `runtime/blocking.jule`
+//
+// THREAD SYNCHRONIZATION
+//
+// Various mechanisms are used together to synchronize threads. For example,
+// eventpoll uses operating-system–specific facilities such as kqueue, epoll,
+// or IOCP in the background. This ensures that the thread does not consume CPU
+// while waiting in eventpoll, and it is also used to wait for the possible timer.
+//
+// In cases that require thread park/unpark, a `parker` is used. The parker
+// relies on synchronization primitives such as futex, depending
+// on the underlying operating system.
+//
+// CREDITS
+//
+// The overall structure and several scheduling concepts of this scheduler are
+// heavily inspired by the Go runtime scheduler. In particular, the C:M:P model,
+// work distribution strategy, and worker thread parking/unparking logic follow
+// the same high-level design philosophy.
+//
+// This is NOT a reimplementation of Go's scheduler, nor a line-by-line port.
+// The implementation is purpose-built for the Jule runtime, adapted to its
+// coroutine model, ABI, and constraints.
+//
+// See Go's runtime scheduler at the source code: `runtime/proc.go`
 
 use "std/internal/runtime"
 use "std/internal/runtime/atomic"
@@ -279,7 +396,8 @@ fn pidleget(): &p {
 fn pidlegetSpinning(): &p {
 	mut pp := pidleget()
 	if pp == nil {
-		// We found work that we cannot take, we must synchronize with non-spinning
+		// See "Delicate dance" comment in findRunnable. We found work
+		// that we cannot take, we must synchronize with non-spinning
 		// Ms that may be preparing to drop their P.
 		atomic::Store(&sched.needspinning, 1, atomic::Release)
 		ret nil
@@ -522,8 +640,20 @@ fn injectclist(mut &batch: *[prunqsize]c, batchStart: u32, bsize: u32) {
 		runqputbatch(m.pp, batch, batchStart+n, bsize)
 	}
 
+	// Some P's might have become idle after we loaded `sched.npidle`
+	// but before any coroutines were added to the queue, which could
+	// lead to idle P's when there is work available in the global queue.
+	// That could potentially last until other coroutines become ready
+	// to run. That said, we need to find a way to hedge
+	//
+	// Calling wakep() here is the best bet, it will do nothing in the
+	// common case (no racing on `sched.npidle`), while it could wake one
+	// more P to execute C's, which might end up with >1 P's: the first one
+	// wakes another P and so forth until there is no more work, but this
+	// ought to be an extremely rare case.
+	//
+	// Also see "Worker thread parking/unparking" comment at the top of the file for details.
 	wakep()
-	ret
 }
 
 // Gets a coroutine from local runnable queue and writes to cp.
@@ -849,11 +979,13 @@ top:
 	// behalf. If we are not racing and the system is truly fully loaded
 	// then no spinning threads are required, and the next thread to
 	// naturally become spinning will clear the flag.
+	//
+	// Also see "Worker thread parking/unparking" comment at the top of the file.
 	wasSpinning := m.spinning
 	if m.spinning {
 		m.spinning = false
 		if atomic::Add(&sched.nmspinning, -1, atomic::Relaxed) < 0 {
-			panic("findrunnable: negative nmspinning")
+			panic("findRunnable: negative nmspinning")
 		}
 
 		// Note the for correctness, only the last M transitioning from
@@ -1286,9 +1418,10 @@ fn resetspinning() {
 	m.spinning = false
 	nmspinning := atomic::Add(&sched.nmspinning, -1, atomic::Release)
 	if nmspinning < 0 {
-		panic("findrunnable: negative nmspinning")
+		panic("findRunnable: negative nmspinning")
 	}
 	// M wakeup policy is deliberately somewhat conservative, so check if we
-	// need to wakeup another P here.
+	// need to wakeup another P here. See "Worker thread parking/unparking"
+	// comment at the top of the file for details.
 	wakep()
 }
