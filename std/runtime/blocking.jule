@@ -16,7 +16,8 @@ struct blockingenv {
 	maxWorkers: i32 // Constant once initialized.
 
 	mu:    mutex
-	jobs:  &blockingJob
+	head:  &blockingJob
+	tail:  &blockingJob
 	nw:    i32     // Count of the created worker threads.
 	widle: &thread // Parkers of the idle workers waiting for work.
 }
@@ -26,10 +27,10 @@ impl blockingenv {
 	#disable nilptr boundary
 	fn getjob(mut *self, mut &job: *blockingJob): (ok: bool) {
 		self.mu.lock()
-		if self.jobs != nil {
-			*job = *self.jobs
+		if self.head != nil {
+			*job = *self.head
+			self.head = self.head.link
 			job.link = nil
-			self.jobs = self.jobs.link
 			ok = true
 		}
 		self.mu.unlock()
@@ -91,7 +92,7 @@ fn blockingWorker() {
 			}
 			blocking.mu.lock()
 			// A job is enqueued, try again.
-			if blocking.jobs != nil {
+			if blocking.head != nil {
 				blocking.mu.unlock()
 				continue
 			}
@@ -112,7 +113,7 @@ fn blockingWorker() {
 
 fn blockinginit() {
 	blocking = blockingenv{}
-	blocking.maxWorkers = 1 //i32(NumCPU())
+	blocking.maxWorkers = i32(NumCPU())
 }
 
 // Executes the given job on the blocking thread pool,
@@ -131,12 +132,14 @@ async fn Blocking(job: fn()) {
 	mut m := gett()
 	mc := m.c
 	mut bj := blockingJob{job: job, cp: unsafe { (&c)(&mc) }}
+	mut bjp := unsafe { (&blockingJob)(&bj) }
 	blocking.mu.lock()
-	if blocking.jobs == nil {
-		blocking.jobs = unsafe { (&blockingJob)(&bj) }
+	if blocking.head == nil {
+		blocking.head = bjp
+		blocking.tail = blocking.head
 	} else {
-		bj.link = blocking.jobs
-		blocking.jobs = unsafe { (&blockingJob)(&bj) }
+		blocking.tail.link = bjp
+		blocking.tail = bjp
 	}
 	// We use the tagged pointer to call `blocking.wakeworker` after adding
 	// a new job to the queue. It is done by mutex-unlock algorithm.
