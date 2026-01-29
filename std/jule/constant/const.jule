@@ -17,11 +17,15 @@ fn NewInt(i: big::Int): &Const { ret &Const{data: i} }
 
 // Returns new constant value instance from 64-bit signed integer.
 // Value will have big-integer precision.
-fn NewI64(x: i64): &Const { ret &Const{data: big::Int.FromI64(x)} }
+fn NewI64(x: i64): &Const { ret &Const{data: big::Int.New(x)} }
 
 // Returns new constant value instance from 64-bit unsigned integer.
 // Value will have big-integer precision.
-fn NewU64(x: u64): &Const { ret &Const{data: big::Int.FromU64(x)} }
+fn NewU64(x: u64): &Const {
+	let mut i: big::Int
+	i.SetU64(x)
+	ret &Const{data: i}
+}
 
 // Returns new constant value instance from boolean.
 fn NewBool(x: bool): &Const { ret &Const{data: x} }
@@ -158,10 +162,14 @@ impl Const {
 	fn SetInt(mut *self, x: big::Int) { self.data = x }
 
 	// Sets constant value from 64-bit signed integer.
-	fn SetI64(mut *self, x: i64) { self.data = big::Int.FromI64(x) }
+	fn SetI64(mut *self, x: i64) { self.data = big::Int.New(x) }
 
 	// Sets constant value from 64-bit unsigned integer.
-	fn SetU64(mut *self, x: u64) { self.data = big::Int.FromU64(x) }
+	fn SetU64(mut *self, x: u64) {
+		let mut i: big::Int
+		i.SetU64(x)
+		self.data = i
+	}
 
 	// Sets constant value from boolean.
 	fn SetBool(mut *self, x: bool) { self.data = x }
@@ -264,14 +272,15 @@ impl Const {
 		| self.IsStr():
 			ret x.IsStr() && self.ReadStr() == x.ReadStr()
 		| self.IsInt():
-			i := self.data.(big::Int)
+			a := self.data.(big::Int)
 			if x.IsInt() {
-				ret i.Cmp(x.data.(big::Int)) == 0
+				b := x.data.(big::Int)
+				ret a.Cmp(&b) == 0
 			}
-			if i.Sign() == -1 {
-				ret i.I64() == x.AsI64()
+			if a.Sign() == -1 {
+				ret a.I64() == x.AsI64()
 			}
-			ret i.U64() == x.AsU64()
+			ret a.U64() == x.AsU64()
 		| self.IsF64():
 			ret self.ReadF64() == x.AsF64()
 		| self.IsCmplx128():
@@ -294,14 +303,15 @@ impl Const {
 		| self.IsStr():
 			ret x.IsStr() && self.ReadStr() < x.ReadStr()
 		| self.IsInt():
-			i := self.data.(big::Int)
+			a := self.data.(big::Int)
 			if x.IsInt() {
-				ret i.Cmp(x.data.(big::Int)) == -1
+				b := x.data.(big::Int)
+				ret a.Cmp(&b) == -1
 			}
-			if i.Sign() == -1 {
-				ret i.I64() < x.AsI64()
+			if a.Sign() == -1 {
+				ret a.I64() < x.AsI64()
 			}
-			ret i.U64() < x.AsU64()
+			ret a.U64() < x.AsU64()
 		| self.IsF64():
 			ret self.ReadF64() < x.AsF64()
 		|:
@@ -322,14 +332,15 @@ impl Const {
 		| self.IsStr():
 			ret x.IsStr() && self.ReadStr() <= x.ReadStr()
 		| self.IsInt():
-			i := self.data.(big::Int)
+			a := self.data.(big::Int)
 			if x.IsInt() {
-				ret i.Cmp(x.data.(big::Int)) <= 0
+				b := x.data.(big::Int)
+				ret a.Cmp(&b) <= 0
 			}
-			if i.Sign() == -1 {
-				ret i.I64() <= x.AsI64()
+			if a.Sign() == -1 {
+				ret a.I64() <= x.AsI64()
 			}
-			ret i.U64() <= x.AsU64()
+			ret a.U64() <= x.AsU64()
 		| self.IsF64():
 			ret self.ReadF64() <= x.AsF64()
 		|:
@@ -350,14 +361,15 @@ impl Const {
 		| self.IsStr():
 			ret x.IsStr() && self.ReadStr() > x.ReadStr()
 		| self.IsInt():
-			i := self.data.(big::Int)
+			a := self.data.(big::Int)
 			if x.IsInt() {
-				ret i.Cmp(x.data.(big::Int)) > 0
+				b := x.data.(big::Int)
+				ret a.Cmp(&b) > 0
 			}
-			if i.Sign() == -1 {
-				ret i.I64() > x.AsI64()
+			if a.Sign() == -1 {
+				ret a.I64() > x.AsI64()
 			}
-			ret i.U64() > x.AsU64()
+			ret a.U64() > x.AsU64()
 		| self.IsF64():
 			ret self.ReadF64() > x.AsF64()
 		|:
@@ -378,14 +390,15 @@ impl Const {
 		| self.IsStr():
 			ret x.IsStr() && self.ReadStr() >= x.ReadStr()
 		| self.IsInt():
-			i := self.data.(big::Int)
+			a := self.data.(big::Int)
 			if x.IsInt() {
-				ret i.Cmp(x.data.(big::Int)) >= 0
+				b := x.data.(big::Int)
+				ret a.Cmp(&b) >= 0
 			}
-			if i.Sign() == -1 {
-				ret i.I64() >= x.AsI64()
+			if a.Sign() == -1 {
+				ret a.I64() >= x.AsI64()
 			}
-			ret i.U64() >= x.AsU64()
+			ret a.U64() >= x.AsU64()
 		| self.IsF64():
 			ret self.ReadF64() >= x.AsF64()
 		|:
@@ -409,12 +422,15 @@ impl Const {
 		| self.IsF64():
 			self.SetF64(self.ReadF64() + x.AsF64())
 		| self.IsInt():
-			i := self.data.(big::Int)
+			a := self.data.(big::Int)
 			if x.IsInt() {
-				self.SetInt(i.Add(x.data.(big::Int)))
+				b := x.data.(big::Int)
+				let mut r: big::Int
+				r.Add(&a, &b)
+				self.SetInt(r)
 			} else {
 				// If x is not integer, it should be float.
-				if i.Sign() == -1 {
+				if a.Sign() == -1 {
 					self.SetF64(self.AsF64() + x.AsF64())
 				} else {
 					self.SetF64(self.AsF64() + x.AsF64())
@@ -437,12 +453,15 @@ impl Const {
 			b := x.AsCmplx128()
 			self.SetCmplx128(a - b)
 		| self.IsInt():
-			i := self.data.(big::Int)
+			a := self.data.(big::Int)
 			if x.IsInt() {
-				self.SetInt(i.Sub(x.data.(big::Int)))
+				b := x.data.(big::Int)
+				let mut r: big::Int
+				r.Sub(&a, &b)
+				self.SetInt(r)
 			} else {
 				// If x is not integer, it should be float.
-				if i.Sign() == -1 {
+				if a.Sign() == -1 {
 					self.SetF64(self.AsF64() - x.AsF64())
 				} else {
 					self.SetF64(self.AsF64() - x.AsF64())
@@ -465,12 +484,15 @@ impl Const {
 			b := x.AsCmplx128()
 			self.SetCmplx128(a * b)
 		| self.IsInt():
-			i := self.data.(big::Int)
+			a := self.data.(big::Int)
 			if x.IsInt() {
-				self.SetInt(i.Mul(x.data.(big::Int)))
+				b := x.data.(big::Int)
+				let mut r: big::Int
+				r.Mul(&a, &b)
+				self.SetInt(r)
 			} else {
 				// If x is not integer, it should be float.
-				if i.Sign() == -1 {
+				if a.Sign() == -1 {
 					self.SetF64(self.AsF64() * x.AsF64())
 				} else {
 					self.SetF64(self.AsF64() * x.AsF64())
@@ -504,17 +526,19 @@ impl Const {
 			}
 			self.SetCmplx128(a / b)
 		| self.IsInt():
-			i := self.data.(big::Int)
+			a := self.data.(big::Int)
 			if x.IsInt() {
-				j := x.data.(big::Int)
-				if j.Cmp(big::Int{}) == 0 {
+				b := x.data.(big::Int)
+				if b.BitLen() == 0 { // b == 0
 					ret false
 				}
-				r, _ := i.QuoRem(j)
+				let mut tmp: big::Int
+				let mut r: big::Int
+				r.QuoRem(&a, &b, &tmp)
 				self.SetInt(r)
 			} else {
 				// If x is not integer, it should be float.
-				if i.Sign() == -1 {
+				if a.Sign() == -1 {
 					self.SetF64(self.AsF64() / x.AsF64())
 				} else {
 					self.SetF64(self.AsF64() / x.AsF64())
@@ -538,7 +562,9 @@ impl Const {
 		if !ok {
 			ret false
 		}
-		_, r := i.QuoRem(xi)
+		let mut tmp: big::Int
+		let mut r: big::Int
+		tmp.QuoRem(&i, &xi, &r)
 		self.SetInt(r)
 		ret true
 	}
@@ -554,7 +580,9 @@ impl Const {
 		if !ok {
 			ret false
 		}
-		self.SetInt(i.And(xi))
+		let mut r: big::Int
+		r.And(&i, &xi)
+		self.SetInt(r)
 		ret true
 	}
 
@@ -569,7 +597,9 @@ impl Const {
 		if !ok {
 			ret false
 		}
-		self.SetInt(i.Or(xi))
+		let mut r: big::Int
+		r.Or(&i, &xi)
+		self.SetInt(r)
 		ret true
 	}
 
@@ -584,7 +614,9 @@ impl Const {
 		if !ok {
 			ret false
 		}
-		self.SetInt(i.Xor(xi))
+		let mut r: big::Int
+		r.Xor(&i, &xi)
+		self.SetInt(r)
 		ret true
 	}
 
@@ -599,7 +631,9 @@ impl Const {
 		if !ok {
 			ret false
 		}
-		self.SetInt(i.Lsh(uint(xi.U64())))
+		let mut r: big::Int
+		r.Lsh(&i, uint(xi.U64()))
+		self.SetInt(r)
 		ret true
 	}
 
@@ -614,7 +648,9 @@ impl Const {
 		if !ok {
 			ret false
 		}
-		self.SetInt(i.Rsh(uint(xi.U64())))
+		let mut r: big::Int
+		r.Rsh(&i, uint(xi.U64()))
+		self.SetInt(r)
 		ret true
 	}
 

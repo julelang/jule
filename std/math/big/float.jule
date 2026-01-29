@@ -85,34 +85,33 @@ struct float {
 }
 
 impl float {
-	// Returns [Float] with the (possibly rounded) value of x.
-	// If the precision is 0, it is changed to 53 (and rounding will have
-	// no effect). SetF64 panics with if x is a NaN.
-	fn FromF64(x: f64, prec: u32): (f: float) {
-		f.prec = prec
-		if f.prec == 0 {
-			f.prec = 53
+	// Sets self to the (possibly rounded) value of x.
+	// If self's precision is 0, it is changed to 53 (and rounding will have
+	// no effect). SetF64 panics with [ErrNaN] if x is a NaN.
+	fn FromF64(mut *self, x: f64) {
+		if self.prec == 0 {
+			self.prec = 53
 		}
 		if math::IsNaN(x) {
 			panic("std/math/big: Float.FromF64(NaN)")
 		}
-		f.acc = Exact
-		f.neg = math::Signbit(x) // handle -0, -Inf correctly
+		self.acc = Exact
+		self.neg = math::Signbit(x) // handle -0, -Inf correctly
 		if x == 0 {
-			f.form = zero
+			self.form = zero
 			ret
 		}
 		if math::IsInf(x, 0) {
-			f.form = inf
+			self.form = inf
 			ret
 		}
 		// normalized x != 0
-		f.form = finite
+		self.form = finite
 		fmant, exp := math::Frexp(x) // get normalized mantissa
-		setWU64(&f.mant, 1<<63|math::F64bits(fmant)<<11)
-		f.exp = i32(exp) // always fits
-		if f.prec < 53 {
-			f.round(0)
+		setWU64(&self.mant, 1<<63|math::F64bits(fmant)<<11)
+		self.exp = i32(exp) // always fits
+		if self.prec < 53 {
+			self.round(0)
 		}
 		ret
 	}
@@ -167,13 +166,13 @@ impl float {
 		self.round(sbit)
 	}
 
-	// Rounds z(self) according to z.mode to z.prec bits and sets z.acc accordingly.
+	// Rounds self according to self.mode to self.prec bits and sets self.acc accordingly.
 	// sbit must be 0 or 1 and summarizes any "sticky bit" information one might
-	// have before calling round. z's mantissa must be normalized (with the msb set)
+	// have before calling round. self's mantissa must be normalized (with the msb set)
 	// or empty.
 	//
 	// CAUTION: The rounding modes [ToNegativeInf], [ToPositiveInf] are affected by the
-	// sign of z. For correct rounding, the sign of z must be set correctly before
+	// sign of self. For correct rounding, the sign of self must be set correctly before
 	// calling round.
 	fn round(mut *self, mut sbit: uint) {
 		if debugFloat {
@@ -284,42 +283,38 @@ impl float {
 		}
 	}
 
-	// Returns [Float] with the (possibly rounded) value |x(self)| (the absolute value of x).
-	fn Abs(*self): float {
-		let mut z: float
-		z.Set(*self)
-		z.neg = false
-		ret z
+	// Sets self to the (possibly rounded) value |x| (the absolute value of x).
+	fn Abs(mut *self, &x: *float) {
+		self.Set(x)
+		self.neg = false
 	}
 
-	// Returns [Float] with the (possibly rounded) value of x(self) with its sign negated.
-	fn Neg(*self): float {
-		let mut z: float
-		z.Set(*self)
-		z.neg = !z.neg
-		ret z
+	// Sets self to the (possibly rounded) value of x with its sign negated.
+	fn Neg(mut *self, &x: *float) {
+		self.Set(x)
+		self.neg = !self.neg
 	}
 
-	// Returns the mantissa precision of x(self) in bits.
-	// The result may be 0 for |x| == 0 and |x| == Inf.
+	// Returns the mantissa precision of self in bits.
+	// The result may be 0 for |self| == 0 and |self| == Inf.
 	fn Prec(*self): uint {
 		ret uint(self.prec)
 	}
 
-	// Returns the rounding mode of x(self).
+	// Returns the rounding mode of self.
 	fn Mode(*self): roundingMode {
 		ret self.mode
 	}
 
-	// Returns the accuracy of x(self) produced by the most recent
+	// Returns the accuracy of self produced by the most recent
 	// operation, unless explicitly documented otherwise by that
 	// operation.
 	fn Acc(*self): Accuracy {
 		ret self.acc
 	}
 
-	// Sets z(self)'s precision to prec and returns the (possibly) rounded
-	// value of z. Rounding occurs according to z's rounding mode if the mantissa
+	// Sets self's precision to prec.
+	// Rounding occurs according to self's rounding mode if the mantissa
 	// cannot be represented in prec bits without loss of precision.
 	// SetPrec(0) maps all finite values to ±0; infinite values remain unchanged.
 	// If prec > [MaxPrec], it is set to [MaxPrec].
@@ -349,17 +344,17 @@ impl float {
 		ret
 	}
 
-	// Sets z(self)'s rounding mode to mode.
-	// z remains unchanged otherwise.
-	// z.SetMode(z.Mode()) is a cheap way to set z's accuracy to [Exact].
+	// Sets self's rounding mode to mode.
+	// self remains unchanged otherwise.
+	// self.SetMode(self.Mode()) is a cheap way to set self's accuracy to [Exact].
 	fn SetMode(mut *self, mode: roundingMode) {
 		self.mode = mode
 		self.acc = Exact
 	}
 
-	// Returns the minimum precision required to represent x(self) exactly
-	// (i.e., the smallest prec before x.SetPrec(prec) would start rounding x).
-	// The result is 0 for |x| == 0 and |x| == Inf.
+	// Returns the minimum precision required to represent self exactly
+	// (i.e., the smallest prec before self.SetPrec(prec) would start rounding self).
+	// The result is 0 for |self| == 0 and |self| == Inf.
 	fn MinPrec(*self): uint {
 		if self.form != finite {
 			ret 0
@@ -367,10 +362,10 @@ impl float {
 		ret uint(len(self.mant))*_W - trailingZeroBitsW(self.mant)
 	}
 
-	// Returns of x(self):
-	//   - -1 if x < 0;
-	//   - 0 if x is ±0;
-	//   - +1 if x > 0.
+	// Returns of self:
+	//	- -1 if self < 0;
+	//	- 0 if self is ±0;
+	//	- +1 if self > 0.
 	fn Sign(*self): int {
 		if debugFloat {
 			self.validate()
@@ -384,54 +379,13 @@ impl float {
 		ret 1
 	}
 
-	// Returns -1, 0, or +1, depending on whether
-	// |x(self)| < |y|, |x| == |y|, or |x| > |y|.
-	// x and y must have a non-empty mantissa and valid exponent.
-	fn ucmp(*self, y: float): int {
-		if debugFloat {
-			validateBinaryOperands(*self, y)
-		}
-
-		match {
-		| self.exp < y.exp:
-			ret -1
-		| self.exp > y.exp:
-			ret +1
-		}
-		// self.exp == y.exp
-
-		// compare mantissas
-		mut i := len(self.mant)
-		mut j := len(y.mant)
-		for i > 0 || j > 0 {
-			let mut xm: Word
-			let mut ym: Word
-			if i > 0 {
-				i--
-				xm = self.mant[i]
-			}
-			if j > 0 {
-				j--
-				ym = y.mant[j]
-			}
-			match {
-			| xm < ym:
-				ret -1
-			| xm > ym:
-				ret +1
-			}
-		}
-
-		ret 0
-	}
-
-	// Classifies x(self) and returns:
+	// Classifies self and returns:
 	//
-	//	-2 if -Inf == x
-	//	-1 if -Inf < x < 0
-	//	 0 if x == 0 (signed or unsigned)
-	//	+1 if 0 < x < +Inf
-	//	+2 if x == +Inf
+	//	-2 if -Inf == self
+	//	-1 if -Inf < self < 0
+	//	 0 if self == 0 (signed or unsigned)
+	//	+1 if 0 < self < +Inf
+	//	+2 if self == +Inf
 	fn ord(*self): int {
 		let mut m: int
 		match self.form {
@@ -448,41 +402,10 @@ impl float {
 		ret m
 	}
 
-	// Compares x(self) and y and returns:
-	//   - -1 if x < y;
-	//   - 0 if x == y (incl. -0 == 0, -Inf == -Inf, and +Inf == +Inf);
-	//   - +1 if x > y.
-	fn Cmp(*self, y: float): int {
-		if debugFloat {
-			self.validate()
-			y.validate()
-		}
-
-		mx := self.ord()
-		my := y.ord()
-		match {
-		| mx < my:
-			ret -1
-		| mx > my:
-			ret +1
-		}
-		// mx == my
-
-		// only if |mx| == 1 we have to compare the mantissae
-		match mx {
-		| -1:
-			ret y.ucmp(*self)
-		| +1:
-			ret self.ucmp(y)
-		}
-
-		ret 0
-	}
-
-	// Sets z(self) to the (possibly rounded) value of x.
-	// If z's precision is 0, it is changed to the larger of x.BitLen()
+	// Sets self to the (possibly rounded) value of x.
+	// If self's precision is 0, it is changed to the larger of x.BitLen()
 	// or 64 (and rounding will have no effect).
-	fn SetInt(mut *self, x: Int) {
+	fn SetInt(mut *self, &x: *Int) {
 		// TODO: can be more efficient if self.prec > 0
 		// but small compared to the size of x, or if there
 		// are many trailing 0's.
@@ -505,13 +428,13 @@ impl float {
 		self.setExpAndRound(i64(bits), 0)
 	}
 
-	// Sets z(self) to the (possibly rounded) value of x.
-	// If z's precision is 0, it is changed to the precision of x
-	// before setting z (and rounding will have no effect).
-	// Rounding is performed according to z's precision and rounding
-	// mode; and z's accuracy reports the result error relative to the
+	// Sets self to the (possibly rounded) value of x.
+	// If self's precision is 0, it is changed to the precision of x
+	// before setting self (and rounding will have no effect).
+	// Rounding is performed according to self's precision and rounding
+	// mode; and self's accuracy reports the result error relative to the
 	// exact (not rounded) result.
-	fn Set(mut *self, x: float) {
+	fn Set(mut *self, &x: *float) {
 		if debugFloat {
 			x.validate()
 		}
@@ -594,7 +517,7 @@ impl float {
 			// round
 			let mut r: float
 			r.prec = u32(p)
-			r.Set(*self)
+			r.Set(self)
 			e = r.exp - 1
 
 			// Rounding may have caused r to overflow to ±Inf
@@ -714,7 +637,7 @@ impl float {
 			// round
 			let mut r: float
 			r.prec = u32(p)
-			r.Set(*self)
+			r.Set(self)
 			e = r.exp - 1
 
 			// Rounding may have caused r to overflow to ±Inf
@@ -768,6 +691,78 @@ impl float {
 
 		panic("unreachable")
 	}
+}
+
+// Returns -1, 0, or +1, depending on whether
+// |x| < |y|, |x| == |y|, or |x| > |y|.
+// x and y must have a non-empty mantissa and valid exponent.
+fn ucmp(&x: *float, &y: *float): int {
+	if debugFloat {
+		validateBinaryOperands(x, y)
+	}
+
+	match {
+	| x.exp < y.exp:
+		ret -1
+	| x.exp > y.exp:
+		ret +1
+	}
+	// x.exp == y.exp
+
+	// compare mantissas
+	mut i := len(x.mant)
+	mut j := len(y.mant)
+	for i > 0 || j > 0 {
+		let mut xm: Word
+		let mut ym: Word
+		if i > 0 {
+			i--
+			xm = x.mant[i]
+		}
+		if j > 0 {
+			j--
+			ym = y.mant[j]
+		}
+		match {
+		| xm < ym:
+			ret -1
+		| xm > ym:
+			ret +1
+		}
+	}
+
+	ret 0
+}
+
+// Compares x and y and returns:
+//	- -1 if x < y;
+//	- 0 if x == y (incl. -0 == 0, -Inf == -Inf, and +Inf == +Inf);
+//	- +1 if x > y.
+fn CmpFloat(&x: *float, &y: *float): int {
+	if debugFloat {
+		x.validate()
+		y.validate()
+	}
+
+	mx := x.ord()
+	my := y.ord()
+	match {
+	| mx < my:
+		ret -1
+	| mx > my:
+		ret +1
+	}
+	// mx == my
+
+	// only if |mx| == 1 we have to compare the mantissae
+	match mx {
+	| -1:
+		ret ucmp(y, x)
+	| +1:
+		ret ucmp(x, y)
+	}
+
+	ret 0
 }
 
 // Normalizes mantissa m by shifting it to the left
@@ -834,7 +829,7 @@ fn msb64(x: []Word): u64 {
 	panic("unreachable")
 }
 
-fn validateBinaryOperands(x: float, y: float) {
+fn validateBinaryOperands(&x: *float, &y: *float) {
 	if !debugFloat {
 		// avoid performance bugs
 		panic("validateBinaryOperands called but debugFloat is not set")

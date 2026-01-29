@@ -50,9 +50,11 @@ fn testGCD(t: &testing::T) {
 	for (_, mut c) in gcdTests {
 		a := Int{abs: c.x}
 		b := Int{abs: c.y}
-		z := a.GCD(nil, nil, b)
-		if z.Cmp(Int{abs: c.z}) != 0 {
-			t.Errorf("a.GCD(z, _, _, {})\n\ta = {}\n\tgot z = {}; want {}", b.abs, a.abs, z, c.z)
+		let mut z: Int
+		z.GCD(nil, nil, &a, &b)
+		expected := Int{abs: c.z}
+		if CmpInt(&z, &expected) != 0 {
+			t.Errorf("z.GCD(nil, nil, {})\n\ta = {}\n\tgot z = {}; want {}", b.abs, a.abs, z, c.z)
 		}
 	}
 }
@@ -168,7 +170,8 @@ fn cutSpace(mut r: rune): rune {
 fn testProbablyPrime(t: &testing::T) {
 	const nreps = 20
 	for i, s in primes {
-		p, _ := Int.Parse(s, 10)
+		let mut p: Int
+		p.SetStr(s, 10)
 		if !p.ProbablyPrime(nreps) || nreps != 1 && !p.ProbablyPrime(1) || !p.ProbablyPrime(0) {
 			t.Errorf("{} prime found to be non-prime ({})", i, s)
 		}
@@ -176,7 +179,8 @@ fn testProbablyPrime(t: &testing::T) {
 
 	for (i, mut s) in composites {
 		s = strings::Map(cutSpace, s)
-		c, _ := Int.Parse(s, 10)
+		let mut c: Int
+		c.SetStr(s, 10)
 		if c.ProbablyPrime(nreps) || nreps != 1 && c.ProbablyPrime(1) || c.ProbablyPrime(0) {
 			t.Errorf("{} composite found to be prime ({})", i, s)
 		}
@@ -214,7 +218,9 @@ let binomialCases: []binomialCase = [
 #test
 fn testBinomial(t: &testing::T) {
 	for _, test in binomialCases {
-		prod := Int.Binomial(test.n, test.k).Str()
+		let mut z: Int
+		z.Binomial(test.n, test.k)
+		prod := z.Str()
 		if prod != test.want {
 			t.Errorf("Binomial({}, {}) = {}; want {}", test.n, test.k, prod, test.want)
 		}

@@ -395,7 +395,7 @@ impl strScan {
 //
 // Returns ConvError in integer form.
 // err = -1 if no error occurred.
-fn scanW(mut &r: *strScan, base: int, mut fracOk: bool): (res: []Word, b: int, count: int, ok: bool) {
+fn scanW(mut z: []Word, mut &r: *strScan, base: int, mut fracOk: bool): ([]Word, b: int, count: int, ok: bool) {
 	ok = true
 	// reject invalid bases
 	baseOk := base == 0 ||
@@ -500,7 +500,7 @@ fn scanW(mut &r: *strScan, base: int, mut fracOk: bool): (res: []Word, b: int, c
 
 			// if di is "full", add it to the result
 			if i == n {
-				mulAddWW(&res, res, bn, di)
+				mulAddWW(&z, z, bn, di)
 				di = 0
 				i = 0
 			}
@@ -517,28 +517,28 @@ fn scanW(mut &r: *strScan, base: int, mut fracOk: bool): (res: []Word, b: int, c
 		if prefix == '0' {
 			// there was only the octal prefix 0 (possibly followed by separators and digits > 7);
 			// interpret as decimal 0
-			ret res[:0], 10, 1, ok
+			ret z[:0], 10, 1, ok
 		}
 		ok = false // fall through; result will be 0
 	}
 
 	// add remaining digits to result
 	if i > 0 {
-		mulAddWW(&res, res, pow(b1, i), di)
+		mulAddWW(&z, z, pow(b1, i), di)
 	}
-	res = normW(res)
+	z = normW(z)
 
 	// adjust count for fraction, if any
 	if dp >= 0 {
 		// 0 <= dp <= count
 		count = dp - count
 	}
-	ret
+	ret z, b, count, ok
 }
 
 fn fromStrW(s: str): []Word {
 	mut r := strScan.new(s)
-	mut x, _, _, ok := scanW(&r, 0, false)
+	mut x, _, _, ok := scanW(nil, &r, 0, false)
 	if !ok {
 		panic("std/math/big: fromStrW failed")
 	}

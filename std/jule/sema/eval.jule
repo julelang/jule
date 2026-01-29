@@ -314,7 +314,8 @@ impl eval {
 		}
 
 		mut v := new(Value)
-		i, _ := big::Int.Parse(l.Value, 0)
+		let mut i: big::Int
+		i.SetStr(l.Value, 0)
 		if i.BitLen() > bitLimit {
 			self.pushErr(l.Token, "untyped value @ overflows integer type", l.Value)
 			ret nil
@@ -3612,7 +3613,9 @@ impl unaryEval {
 			| self.v.Constant.IsInt():
 				i := self.v.Constant.ReadInt()
 				if self.v.untyped {
-					self.v.Constant.SetInt(i.Neg())
+					let mut r: big::Int
+					r.Neg(&i)
+					self.v.Constant.SetInt(r)
 				} else {
 					kind := self.v.Type.Prim().Kind
 					sz := types::BitSizeOf(kind)
@@ -3764,7 +3767,9 @@ impl unaryEval {
 			// If value is untyped and constant have not any kind, set as untyped.
 			// Otherwise set by type of value.
 			if self.v.untyped && self.v.Constant.Kind == "" {
-				self.v.Constant.SetInt(i.Not())
+				let mut r: big::Int
+				r.Not(&i)
+				self.v.Constant.SetInt(r)
 			} else {
 				kind := self.v.Type.Prim().Kind
 				sz := types::BitSizeOf(kind)
