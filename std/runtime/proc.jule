@@ -749,7 +749,7 @@ fn runqsteal(mut pp: &p, mut pp2: &p, mut &cp: *c): bool {
 fn stealWork(mut pp: &p, mut &cp: *c): (stealC: bool, stealTimer: bool) {
 	const StealTries = 4
 	mut n := 0
-	pcount := COMAXPROCS()
+	pcount := len(sched.allp)
 	startIdx := int(rand() % u64(pcount))
 	for n < StealTries; n++ {
 		stealTimers := n == StealTries-1
@@ -798,6 +798,27 @@ fn checkRunqsNoP(): &p {
 	}
 	// No work available.
 	ret nil
+}
+
+// Check all Ps for a timer expiring sooner than pollUntil.
+//
+// Returns updated pollUntil value.
+fn checkTimersNoP(mut pollUntil: i64): i64 {
+	if pollUntil == 0 { // Zero delay, return immediately.
+		ret pollUntil
+	}
+	for (_, mut pp2) in sched.allp {
+		w := pp2.timers.wakeTime()
+		if w >= 0 && (pollUntil == -1 || w < pollUntil) {
+			pollUntil = w
+			// Zero is the the shortest possible delay.
+			// Break iteration, no extra lookup needed.
+			if pollUntil == 0 {
+				break
+			}
+		}
+	}
+	ret pollUntil
 }
 
 // Selects a runnable coroutine for execution.
@@ -917,7 +938,7 @@ top:
 	// No runnable coroutine found yet.
 	// Determine how long we can block based on timers and deadlines.
 	// If pollUntil is -1, eventpoll will block indefinitely.
-	mut timer, pollUntil := pp.timers.check()
+	mut timer, mut pollUntil := pp.timers.check()
 	if timer != nil {
 		match fire(timer, &coro) {
 		| fireInternalTimer:
@@ -1018,6 +1039,10 @@ top:
 			becomeSpinning(m)
 			goto top
 		}
+
+		// Finally, check for timer creation or expiry concurrently with
+		// transitioning from spinning to non-spinning.
+		pollUntil = checkTimersNoP(pollUntil)
 	}
 
 	// Final step: eventpoll.
@@ -1350,6 +1375,9 @@ fn startm(mut pp: &p, spinning: bool, lockheld: bool) {
 
 fn checkdead() {
 	// There is still working M.
+	// This "nm" may be counted for an eventpoll, but this is fine.
+	// Because eventpoll is only used if there is an coroutine polling for an event or timer.
+	// So all counted threads are actually running or looks for possible work.
 	if sched.nm > 0 {
 		ret
 	}

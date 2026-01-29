@@ -94,13 +94,14 @@ impl timerheap {
 	}
 
 	// Inserts a timer into the heap.
-	// Timer lock must be held.
 	#disable nilptr
 	fn push(mut *self, mut t: &timer) {
+		t.mu.lock()
 		t.theap = unsafe { (&timerheap)(self) }
 		t.index = len(self.data)
 		self.data = append(self.data, t)
 		self.siftup(t.index)
+		t.mu.unlock()
 	}
 
 	// Removes and returns the earliest timer.
@@ -249,6 +250,48 @@ impl timerheap {
 		}
 		self.mu.unlock()
 		pollUntil = 0
+		ret
+	}
+
+	// Similar to check(), but does not remove the timer even if it is ready to fire.
+	// Use this to peek at the earliest timer in the heap without consuming it.
+	#disable nilptr
+	fn wakeTime(mut *self): (pollUntil: i64) {
+		// TODO: if it makes sense, make this lock-free.
+		mut timerPeekOffs := 0
+		self.mu.lock()
+		let mut t: &timer
+		for {
+			t = self.peek(timerPeekOffs)
+			if t == nil {
+				break
+			}
+			t.mu.lock()
+			// This timer cannot be fired.
+			if t.when <= 0 {
+				t.mu.unlock()
+				timerPeekOffs++
+				continue
+			}
+			break
+		}
+		if t == nil { // No suitable timer.
+			self.mu.unlock()
+			ret -1
+		}
+		now := nanotime()
+		// It's not the right time yet.
+		if t.when > now {
+			// Compute delay until the next timer fires.
+			pollUntil = t.when - now
+			if pollUntil <= 0 {
+				panic("runtime: inconsistent timer state")
+			}
+		} else {
+			pollUntil = 0
+		}
+		t.mu.unlock()
+		self.mu.unlock()
 		ret
 	}
 }
