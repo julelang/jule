@@ -1217,8 +1217,9 @@ async fn sleep(dur: sleepDuration) {
 	mut c := m.c
 	when := nanotime() + dur
 	mut t := timer.new(when, nil, uintptr(&c), 0)
+	m.pp.timers.mu.lock()
 	m.pp.timers.push(t)
-	park(&c, 0, reasonSleep).await
+	park(&c, uintptr(&m.pp.timers.mu), reasonSleep).await
 }
 
 // Destroys all retired coroutine frames for the current worker thread.
