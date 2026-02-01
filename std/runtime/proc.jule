@@ -178,8 +178,13 @@ extern fn __jule_trampolineRun()
 // Calls schedthread with P.
 extern let __jule_trampoline_schedthread: *unsafe
 
+// The value of the COMAXPROCS.
+// Compiler will set it to zero for default value, which is initialized by runtime.
+// Otherwise, this is initialized by the compiler to a custom value before runtime initialized.
+let mut comaxprocs: i32 = 0
+
 // Returns the maximum number of CPUs that can be executing simultaneously.
-fn COMAXPROCS(): int { ret numcpu }
+fn COMAXPROCS(): int { ret int(comaxprocs) }
 
 const (
 	// The maximum count of the runnable coroutine queue of a P.
@@ -909,7 +914,7 @@ top:
 	//
 	// Stealing is limited to a small fixed number of attempts to
 	// avoid excessive contention and cache thrashing.
-	if m.spinning || 2*atomic::Load(&sched.nmspinning, atomic::Relaxed) < i32(COMAXPROCS())-atomic::Load(&sched.npidle, atomic::Relaxed) {
+	if m.spinning || 2*atomic::Load(&sched.nmspinning, atomic::Relaxed) < comaxprocs-atomic::Load(&sched.npidle, atomic::Relaxed) {
 		if !m.spinning {
 			becomeSpinning(m)
 		}
@@ -1255,6 +1260,13 @@ async fn yield() {
 	park2(&m.c, tg, reasonNA).await
 }
 
+fn asynctimeinit() {
+	// Initialize the comaxprocs variable.
+	if comaxprocs == 0 {
+		comaxprocs = i32(numcpu)
+	}
+}
+
 #disable nilptr boundary
 fn schedinit() {
 	// Initialize the global scheduler instance.
@@ -1266,7 +1278,7 @@ fn schedinit() {
 	// Because we are in the program initialize state, no concurrency risk.
 
 	// Initialize Ps.
-	maxprocs := i32(COMAXPROCS())
+	maxprocs := comaxprocs
 	sched.allp = make([]&p, maxprocs)
 	sched.npidle = maxprocs - sched.nm
 	mut i := i32(0)
@@ -1327,6 +1339,11 @@ fn sysmon() {
 			}
 		}
 	}
+}
+
+fn sysmoninit() {
+	// Start the sysmon thread.
+	unsafe { threadSpawn((*unsafe)(uintptr(sysmon)), nil) }
 }
 
 // Schedules some M to run the P (creates an M if necessary).

@@ -24,6 +24,7 @@ use "std/strings"
 let mut OutDir = "dist"
 let mut OutName = "ir.cpp"
 let mut Out = ""
+let mut COMAXPROCS = "default"
 
 let targets = map[str][]str{
 	"windows": ["amd64", "arm64", "i386"],
@@ -433,6 +434,24 @@ fn checkOptFlag(opt: str) {
 	}
 }
 
+fn checkCOMAXPROCS() {
+	if COMAXPROCS == "default" {
+		env::COMAXPROCS = 0
+		ret
+	}
+	n := conv::ParseUint(COMAXPROCS, 10, 64) else {
+		handle::Throw("--COMAXPROCS: value is not a valid number: " + COMAXPROCS)
+		ret // Avoid error.
+	}
+	if n < 1 {
+		handle::Throw("--COMAXPROCS: invalid value: " + COMAXPROCS)
+	}
+	if n > u64(i32.Max) {
+		handle::Throw("--COMAXPROCS: value is too large: " + COMAXPROCS)
+	}
+	env::COMAXPROCS = i32(n)
+}
+
 fn checkCppStdFlag() {
 	match env::CppStd {
 	| "cpp20":
@@ -448,6 +467,7 @@ fn checkFlags(args: []str): []str {
 
 	mut fs := flag::FlagSet.New()
 
+	fs.AddVar[str](unsafe { (&str)(&COMAXPROCS) }, "COMAXPROCS", 0, "Maximum number of Ps that can execute coroutines")
 	fs.AddVar[str](unsafe { (&str)(&opt) }, "opt", 0, "Optimization level")
 	fs.AddVar[str](unsafe { (&str)(&target) }, "target", 0, "Target system")
 	fs.AddVar[str](unsafe { (&str)(&Out) }, "out", 'o', "Output identifier")
@@ -488,6 +508,7 @@ fn checkFlags(args: []str): []str {
 	checkCppStdFlag()
 	checkTargetFlag(target)
 	checkOptFlag(opt)
+	checkCOMAXPROCS()
 
 	ret content
 }
