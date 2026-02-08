@@ -167,27 +167,6 @@ struct __jule_TrampNode
 
 inline thread_local __jule_TrampNode *__jule_trampHead = nullptr;
 
-// Enqueue a coroutine handle into trampoline run list.
-// Precondition: h is either empty or a valid handle.
-// Empty handles are ignored.
-static inline void __jule_trampolineEnqueue(__jule_cHandle h) noexcept
-{
-    if (!h)
-        return;
-
-    // Node is stored on the native stack of the enqueuer if we were to allocate it
-    // here, which would be invalid after return. So we must store nodes somewhere
-    // persistent.
-    //
-    // We keep it allocation-free by storing a node inside the coroutine promise
-    // for tasks that need to enqueue themselves/continuations.
-    //
-    // Therefore: do NOT call this directly unless you have a persistent node.
-    //
-    // Use __jule_trampolineEnqueueNode() below.
-    std::terminate();
-}
-
 // Enqueue using a persistent node (embedded in a promise or other stable storage).
 static inline void __jule_trampolineEnqueueNode(__jule_TrampNode &n, __jule_cHandle h) noexcept
 {
