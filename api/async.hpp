@@ -45,7 +45,6 @@
 #include <cstddef>
 
 #include "types.hpp"
-#include "ptr.hpp"
 
 #define __jule_AsyncRet co_return  // Equivalent to `ret` in async functions.
 #define __jule_AsyncAwait co_await // Equivalent to `await` in async functions.
@@ -80,7 +79,11 @@ class __jule_thread;
 
 // Each OS thread executing Jule code has a TLS pointer to its associated
 // runtime thread object.
-inline thread_local __jule_Ptr<__jule_thread> __jule_ct;
+//
+// Historically, this field was a smart pointer.
+// However, due to a toolchain bug in Windows, it's supposed to be a trivial type.
+// See: https://github.com/mstorsjo/llvm-mingw/issues/541
+inline thread_local __jule_thread *__jule_ct = nullptr;
 
 // Non-templated coroutine handle used by the runtime.
 // The runtime never needs promise-type information.
