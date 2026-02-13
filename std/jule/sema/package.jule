@@ -6,6 +6,7 @@ use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/log"
 use "std/jule/mod"
+use "std/jule/resource"
 use "std/jule/token"
 use "std/os/filepath"
 use "std/strings"
@@ -35,11 +36,13 @@ trait Importer {
 	// Path is the directory path of package to import.
 	// Should return abstract syntax tree of package files.
 	// Logs accepts as error.
-	// Updated module to package's module if exist when updateMod is true.
+	// Updates module to package's module if exist when updateMod is true.
 	fn ImportPackage(mut *self, path: str, updateMod: bool): ([]&ast::AST, []log::Log)
 
 	// Invoked after the package is imported.
-	// Sets module identitity of imported package to current module.
+	// Sets module identitity of the imported package to current module.
+	// If the current module is not registered, for example,
+	// updated by the ImportPackage it will be registered.
 	fn Imported(mut *self, mut &ImportInfo)
 
 	// Returns all imported packages.
@@ -47,6 +50,17 @@ trait Importer {
 	// Packages should be ordered by FIFO; starting with the first deepest
 	// imported package, and ending with the last imported package.
 	fn AllPackages(mut *self): []&ImportInfo
+
+	// Returns File by path.
+	// This function accepted as returns already included file.
+	// If returns not-nil value, will be used instead of IncludeFile if possible.
+	fn GetFile(mut *self, path: str): resource::File
+
+	// Includes the file by path, returns nil if failed.
+	fn IncludeFile(mut *self, path: str): resource::File
+
+	// Invoked after the file is included.
+	fn IncludedFile(mut *self, mut file: resource::File)
 }
 
 fn findVarFileInPackage(mut files: []&SymTab, v: &Var): &SymTab {

@@ -10,11 +10,13 @@ use "std/jule/directive"
 use "std/jule/log"
 use "std/jule/mod"
 use "std/jule/parser"
+use "std/jule/resource"
 use "std/jule/sema"
 use "std/jule/token"
 use "std/os"
 use "std/os/filepath"
 use "std/strings"
+use "std/unsafe"
 
 // Read buffer by file path.
 fn readBuff(path: str): []byte {
@@ -35,12 +37,26 @@ fn flatCompilerErr(text: str): log::Log {
 	}
 }
 
+struct file {
+	path:     str
+	mut data: []byte
+}
+
+impl resource::File for file {
+	fn Path(*self): str { ret self.path }
+
+	fn Bytes(*self): []byte { ret self.data }
+
+	fn Text(*self): str { ret unsafe::StrFromBytes(self.data) }
+}
+
 // Default importer for the reference Jule compiler.
 struct importer {
-	mods: []&mod::Mod
-	mod:  &mod::Mod
-	pkgs: []&sema::ImportInfo
-	vars: []str
+	mod:   &mod::Mod
+	mods:  []&mod::Mod
+	pkgs:  []&sema::ImportInfo
+	vars:  []str
+	files: map[str]resource::File
 }
 
 impl sema::Importer for importer {
@@ -159,6 +175,20 @@ impl sema::Importer for importer {
 	fn AllPackages(mut *self): []&sema::ImportInfo {
 		ret self.pkgs
 	}
+
+	fn GetFile(mut *self, path: str): resource::File {
+		mut file, _ := self.files[path]
+		ret file
+	}
+
+	fn IncludeFile(mut *self, path: str): resource::File {
+		mut data := os::ReadFileSync(path) else { ret nil }
+		ret &file{path: path, data: data}
+	}
+
+	fn IncludedFile(mut *self, mut file: resource::File) {
+		self.files[file.Path()] = file
+	}
 }
 
 impl importer {
@@ -187,6 +217,7 @@ impl importer {
 // Returns new default Jule package importer by the compile information.
 fn New(info: CompileInfo): sema::Importer {
 	mut imp := new(importer)
+	imp.files = make(map[str]resource::File)
 	imp.mods = [build::ModStdlib()]
 	initVars(&imp.vars, info)
 	ret imp

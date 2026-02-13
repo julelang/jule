@@ -15,6 +15,7 @@ It is also used by the official reference compiler julec and is developed in par
 - [`log`](./log): Elementary package for logs.
 - [`mod`](./mod): Module file parsing and module handling.
 - [`parser`](./parser): Parser. Makes syntax analysis, builds AST.
+- [`resources`](./resources): API for compile-time resources.
 - [`sema`](./sema): Semantic analyzer and HIR (High-Level Intermediate Representation) components.
 - [`token`](./token): Lexical analyzer. Segments Jule source code into tokens.
 - [`types`](./types): Elementary package for types.

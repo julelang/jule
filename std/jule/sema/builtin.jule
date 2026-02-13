@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/conv"
 use "std/fmt"
 use "std/internal/jule/mod"
 use "std/jule/ast"
 use "std/jule/constant"
 use "std/jule/log"
 use "std/jule/types"
+use "std/os/filepath"
 
 // Type alias for built-in function callers.
 //
@@ -1290,6 +1292,71 @@ fn builtinCallerStdComptimeTypeAlias(mut e: &eval, mut fc: &ast::CallExpr, _: &V
 	ret buildVoidValue()
 }
 
+fn builtinCallerStdComptimeIncludeBytes(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
+	if len(fc.Args) > 1 {
+		e.pushErr(fc.Token, "passed more argument than expected to IncludeBytes")
+		e.pushSuggestion("call like; IncludeBytes(Path)")
+		ret nil
+	}
+	if len(fc.Args) == 0 {
+		e.pushErr(fc.Token, "identifier and type is missing for IncludeBytes")
+		e.pushSuggestion("call like; IncludeBytes(Path)")
+		ret nil
+	}
+	mut v := e.eval(fc.Args[0], evalDefault)
+	if v == nil {
+		ret nil
+	}
+	if !v.IsConst() || !v.Constant.IsStr() {
+		e.pushErr(fc.Args[0].Token, "expression must be constant and string")
+		ret nil
+	}
+	mut path := v.Constant.ReadStr()
+	if len(path) == 0 {
+		e.pushErr(fc.Args[0].Token, "empty path for IncludeBytes")
+		ret nil
+	}
+	if !filepath::IsAbs(path) {
+		packagefile := e.s.getCurrentFile()
+		packagedir := filepath::Dir(packagefile.File.Path)
+		path = filepath::Join(packagedir, path)
+		path = filepath::Abs(path) else {
+			e.pushErr(fc.Args[0].Token, "path handling failed: "+fmt::Sprint(error))
+			ret nil
+		}
+	}
+	mut file := e.s.importer.GetFile(path)
+	if file == nil {
+		file = e.s.importer.IncludeFile(path)
+		if file == nil {
+			e.pushErr(fc.Args[0].Token, "IncludeBytes cannot read file: "+conv::Quote(path))
+			ret nil
+		}
+		e.s.importer.IncludedFile(file)
+	}
+	data := file.Bytes()
+	mut bytes := &SliceExpr{
+		ElemType: primU8,
+		Elems: make([]&Value, 0, len(data)),
+	}
+	for _, b in data {
+		mut bc := constant::NewU64(u64(b))
+		bytes.Elems = append(bytes.Elems, &Value{
+			Type: &Type{Kind: primU8},
+			Constant: bc,
+			Model: bc,
+		})
+	}
+	ret &Value{
+		Type: &Type{
+			Kind: &Slice{
+				Value: primU8,
+			},
+		},
+		Model: bytes,
+	}
+}
+
 fn builtinCallerStdMemSizeOf(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	mut result := &Value{
 		Type: primUint,
@@ -1367,7 +1434,7 @@ fn builtinCallerStdIntegEmit(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value
 	}
 
 	if !argVal.IsConst() || !argVal.Constant.IsStr() {
-		e.pushErr(fc.Args[0].Token, "expression must be constant")
+		e.pushErr(fc.Args[0].Token, "expression must be constant and string")
 		ret nil
 	}
 
@@ -1496,6 +1563,7 @@ fn init() {
 	builtinFuncsStdComptime["File"] = &FuncIns{caller: builtinCallerStdComptimeFile}
 	builtinFuncsStdComptime["Files"] = &FuncIns{caller: builtinCallerStdComptimeFiles}
 	builtinFuncsStdComptime["TypeAlias"] = &FuncIns{caller: builtinCallerStdComptimeTypeAlias}
+	builtinFuncsStdComptime["IncludeBytes"] = &FuncIns{caller: builtinCallerStdComptimeIncludeBytes}
 
 	// Initialize built-in functions of the "std/integ" package.
 	builtinFuncsStdInteg["Emit"] = &FuncIns{
