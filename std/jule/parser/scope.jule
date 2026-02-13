@@ -1009,7 +1009,20 @@ impl scopeParser {
 			info.setter = token
 			if i+1 >= len(tokens) {
 				info.r = nil
-				info.ok = token::IsPostfix(info.setter.ID)
+				// Expression is missing.
+				// If the setter token is a postfix operator, accept it.
+				if token::IsPostfix(info.setter.ID) {
+					info.ok = true
+					break
+				}
+				// The setter token is not a postfix operator.
+				// Probably the following statement is the expression.
+				// We must try to handle next statement as expression.
+				if self.isLastSt() {
+					self.pushErr(info.setter, "expected expression")
+					break
+				}
+				info.r = self.next().tokens
 				break
 			}
 			info.r = tokens[i+1:]
