@@ -1191,12 +1191,28 @@ impl scopeParser {
 			self.pushErr(token, "invalid syntax")
 			ret nil, false
 		} else if i+1 < len(tokens) {
+			// Expression is in the same statement,
+			// following the assignment operator.
 			assign.Op = tokens[i]
 			if assign.Op.ID != token::ASSIGN {
 				self.pushErr(assign.Op, "assignment operation @ requires single-valued expressions", assign.Op.Kind)
 			}
 			i++
 			mut exprTokens := tokens[i:]
+			assign.Y = self.p.buildExpr(exprTokens)
+		} else {
+			// The assignment operator exist, but expression is not.
+			// Probably the following statement is the expression.
+			// We must try to handle next statement as expression.
+			assign.Op = tokens[i]
+			if assign.Op.ID != token::ASSIGN {
+				self.pushErr(assign.Op, "assignment operation @ requires single-valued expressions", assign.Op.Kind)
+			}
+			if self.isLastSt() {
+				self.pushErr(assign.Op, "expected expression")
+				ret nil, false
+			}
+			mut exprTokens := self.next().tokens
 			assign.Y = self.p.buildExpr(exprTokens)
 		}
 
