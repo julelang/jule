@@ -1357,6 +1357,58 @@ fn builtinCallerStdComptimeIncludeBytes(mut e: &eval, mut fc: &ast::CallExpr, _:
 	}
 }
 
+fn builtinCallerStdComptimeIncludeStr(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
+	if len(fc.Args) > 1 {
+		e.pushErr(fc.Token, "passed more argument than expected to IncludeStr")
+		e.pushSuggestion("call like; IncludeStr(Path)")
+		ret nil
+	}
+	if len(fc.Args) == 0 {
+		e.pushErr(fc.Token, "identifier and type is missing for IncludeStr")
+		e.pushSuggestion("call like; IncludeStr(Path)")
+		ret nil
+	}
+	mut v := e.eval(fc.Args[0], evalDefault)
+	if v == nil {
+		ret nil
+	}
+	if !v.IsConst() || !v.Constant.IsStr() {
+		e.pushErr(fc.Args[0].Token, "expression must be constant and string")
+		ret nil
+	}
+	mut path := v.Constant.ReadStr()
+	if len(path) == 0 {
+		e.pushErr(fc.Args[0].Token, "empty path for IncludeStr")
+		ret nil
+	}
+	if !filepath::IsAbs(path) {
+		packagefile := e.s.getCurrentFile()
+		packagedir := filepath::Dir(packagefile.File.Path)
+		path = filepath::Join(packagedir, path)
+		path = filepath::Abs(path) else {
+			e.pushErr(fc.Args[0].Token, "path handling failed: "+fmt::Sprint(error))
+			ret nil
+		}
+	}
+	mut file := e.s.importer.GetFile(path)
+	if file == nil {
+		file = e.s.importer.IncludeFile(path)
+		if file == nil {
+			e.pushErr(fc.Args[0].Token, "IncludeStr cannot read file: "+conv::Quote(path))
+			ret nil
+		}
+		e.s.importer.IncludedFile(file)
+	}
+	data := file.Text()
+	mut cs := constant::NewStr(data)
+	ret &Value{
+		Type: primStr,
+		Constant: cs,
+		Model: cs,
+		untyped: true,
+	}
+}
+
 fn builtinCallerStdMemSizeOf(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	mut result := &Value{
 		Type: primUint,
@@ -1564,6 +1616,7 @@ fn init() {
 	builtinFuncsStdComptime["Files"] = &FuncIns{caller: builtinCallerStdComptimeFiles}
 	builtinFuncsStdComptime["TypeAlias"] = &FuncIns{caller: builtinCallerStdComptimeTypeAlias}
 	builtinFuncsStdComptime["IncludeBytes"] = &FuncIns{caller: builtinCallerStdComptimeIncludeBytes}
+	builtinFuncsStdComptime["IncludeStr"] = &FuncIns{caller: builtinCallerStdComptimeIncludeStr}
 
 	// Initialize built-in functions of the "std/integ" package.
 	builtinFuncsStdInteg["Emit"] = &FuncIns{
