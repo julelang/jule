@@ -12,6 +12,7 @@ use "std/jule/directive"
 use "std/jule/sema"
 use "std/jule/token"
 use "std/jule/types"
+use "std/runtime"
 use "std/strings"
 use "std/unsafe"
 
@@ -21,7 +22,6 @@ const (
 	resultName       = "__jule_func_result"
 	assignResultName = "__jule_assign_result"
 	resultArgName    = "__jule_result_arg"
-	deferStackName   = "__jule_deferStack"
 )
 
 let assignArgName = "__jule_assign_arg"
@@ -44,13 +44,46 @@ struct chanCase {
 
 struct scopeCoder {
 	oc: &ObjectCoder
+
+	deferredScopes: []&sema::Scope
+
+	// Masks memory addresses with a specific value.
+	// In this way, identical code blocks can be duplicated.
+	// This is particularly useful for defer scopes,
+	// because defer scopes may be written multiple times within the same function block.
+	// To prevent scopes from redefining the same addresses and to avoid conflicts,
+	// they use this value in the address mapping.
+	// As a result, the risk of collision is eliminated.
+	addrmap: map[uintptr]uintptr
 }
 
 impl scopeCoder {
 	fn new(mut oc: &ObjectCoder): &scopeCoder {
 		ret &scopeCoder{
 			oc: oc,
+			addrmap: make(map[uintptr]uintptr, 256),
 		}
+	}
+
+	// Registers addr to addrmap and returns the corresponding addrmap value.
+	fn registerAddrmap(mut &self, addr: uintptr): uintptr {
+		self.addrmap[addr]++
+		addrmap := self.addrmap[addr]
+		if addrmap == 0 {
+			panic("project is too large for the current architecture: " + runtime::Arch)
+		}
+		ret addrmap
+	}
+
+	// Returns the corresponding addrmap value by addr.
+	fn getAddrmap(mut &self, addr: uintptr): uintptr {
+		mut addrmap := self.addrmap[addr]
+		// addrmap is zero, this addr is not mapped yet.
+		// But it should be in the future, so handle it with 1.
+		if addrmap == 0 {
+			addrmap = 1
+		}
+		ret addrmap
 	}
 
 	fn rangeChanIter(mut &self, mut it: &sema::RangeIter) {
@@ -69,7 +102,8 @@ impl scopeCoder {
 		}
 		self.oc.write(";\n")
 		mut sb := strings::Builder{}
-		identCoder.iterNext(&sb, uintptr(it))
+		addrmap := self.registerAddrmap(uintptr(it))
+		identCoder.iterNext(&sb, uintptr(it), addrmap)
 		next := sb.Str()
 		self.oc.write(next)
 		self.oc.write(":;\n")
@@ -116,7 +150,7 @@ impl scopeCoder {
 
 		// Close scope.
 		self.oc.indent()
-		identCoder.iterEnd(&self.oc.Buf, uintptr(it))
+		identCoder.iterEnd(&self.oc.Buf, uintptr(it), addrmap)
 		self.oc.write(":;\n")
 		self.oc.doneIndent()
 		self.oc.indent()
@@ -165,10 +199,11 @@ impl scopeCoder {
 
 	fn rangeIndexIter(mut &self, mut it: &sema::RangeIter) {
 		mut sb := strings::Builder{}
-		identCoder.iterBegin(&sb, uintptr(it))
+		addrmap := self.registerAddrmap(uintptr(it))
+		identCoder.iterBegin(&sb, uintptr(it), addrmap)
 		begin := sb.Str()
 		sb.Clear()
-		identCoder.iterNext(&sb, uintptr(it))
+		identCoder.iterNext(&sb, uintptr(it), addrmap)
 		next := sb.Str()
 
 		mut ref := false
@@ -183,6 +218,17 @@ impl scopeCoder {
 			})
 			self.oc.write("\n")
 			self.oc.indent()
+		}
+		// The index of the varPrefix, generated for the optimzied output of the KeyB.
+		// If the variable did not generated, value is -1.
+		mut optimizedVarPrefixForKeyB := -1
+		defer {
+			if optimizedVarPrefixForKeyB != -1 {
+				// Remove the prefix for optimized output for the KeyB.
+				self.oc.ec.varPrefixes = append(
+					self.oc.ec.varPrefixes[:optimizedVarPrefixForKeyB],
+					self.oc.ec.varPrefixes[optimizedVarPrefixForKeyB+1:]...)
+			}
 		}
 		if it.KeyB != nil {
 			// Save the original type of the variable, then restore it.
@@ -204,7 +250,7 @@ impl scopeCoder {
 				identCoder.var(&keyBIdent, it.KeyB)
 				keyBIdent.WriteByte(')')!
 				name := keyBIdent.Str()
-				i := len(self.oc.ec.varPrefixes)
+				optimizedVarPrefixForKeyB = len(self.oc.ec.varPrefixes)
 				self.oc.ec.varPrefixes = append(self.oc.ec.varPrefixes, fn|v| {
 					if v == it.KeyB {
 						self.oc.write(name)
@@ -212,10 +258,6 @@ impl scopeCoder {
 					}
 					ret false
 				})
-				defer {
-					// Remove the prefix for optimized output for the KeyB.
-					self.oc.ec.varPrefixes = append(self.oc.ec.varPrefixes[:i], self.oc.ec.varPrefixes[i+1:]...)
-				}
 			}
 			self.oc.varInitExpr(it.KeyB, fn|| {
 				unsafe {
@@ -253,7 +295,7 @@ impl scopeCoder {
 		self.oc.write("}\n")
 
 		self.oc.indent()
-		identCoder.iterEnd(&self.oc.Buf, uintptr(it))
+		identCoder.iterEnd(&self.oc.Buf, uintptr(it), addrmap)
 		self.oc.write(":;\n")
 
 		// Close scope.
@@ -264,10 +306,11 @@ impl scopeCoder {
 
 	fn rangeHashmapIter(mut &self, mut it: &sema::RangeIter) {
 		mut sb := strings::Builder{}
-		identCoder.iterBegin(&sb, uintptr(it))
+		addrmap := self.registerAddrmap(uintptr(it))
+		identCoder.iterBegin(&sb, uintptr(it), addrmap)
 		begin := sb.Str()
 		sb.Clear()
-		identCoder.iterNext(&sb, uintptr(it))
+		identCoder.iterNext(&sb, uintptr(it), addrmap)
 		next := sb.Str()
 
 		mut _map := it.Expr.Type.Map()
@@ -336,7 +379,7 @@ impl scopeCoder {
 		self.oc.write("}\n")
 
 		self.oc.indent()
-		identCoder.iterEnd(&self.oc.Buf, uintptr(it))
+		identCoder.iterEnd(&self.oc.Buf, uintptr(it), addrmap)
 		self.oc.write(":;\n")
 
 		// Close scope.
@@ -347,10 +390,11 @@ impl scopeCoder {
 
 	fn strRuneIter(mut &self, mut it: opt::StrRuneIter, utf8: bool) {
 		mut sb := strings::Builder{}
-		identCoder.iterBegin(&sb, uintptr(it.Base))
+		addrmap := self.registerAddrmap(uintptr(it.Base))
+		identCoder.iterBegin(&sb, uintptr(it.Base), addrmap)
 		begin := sb.Str()
 		sb.Clear()
-		identCoder.iterNext(&sb, uintptr(it.Base))
+		identCoder.iterNext(&sb, uintptr(it.Base), addrmap)
 		next := sb.Str()
 
 		self.oc.write("{\n")
@@ -446,7 +490,7 @@ impl scopeCoder {
 		self.oc.write("}\n")
 
 		self.oc.indent()
-		identCoder.iterEnd(&self.oc.Buf, uintptr(it.Base))
+		identCoder.iterEnd(&self.oc.Buf, uintptr(it.Base), addrmap)
 		self.oc.write(":;\n")
 
 		// Close scope.
@@ -456,6 +500,8 @@ impl scopeCoder {
 	}
 
 	fn conditional(mut &self, mut c: &sema::Conditional) {
+		addrmap := self.registerAddrmap(uintptr(c))
+
 		self.oc.write("{\n")
 		self.oc.addIndent()
 		self.oc.indent()
@@ -480,7 +526,7 @@ impl scopeCoder {
 			self.oc.write("\n")
 			self.oc.indent()
 			self.oc.write("goto ")
-			identCoder.matchEnd(&self.oc.Buf, uintptr(c))
+			identCoder.matchEnd(&self.oc.Buf, uintptr(c), addrmap)
 			self.oc.write(";\n")
 			self.oc.doneIndent()
 			self.oc.indent()
@@ -495,7 +541,7 @@ impl scopeCoder {
 			self.oc.write("\n")
 		}
 		self.oc.indent()
-		identCoder.matchEnd(&self.oc.Buf, uintptr(c))
+		identCoder.matchEnd(&self.oc.Buf, uintptr(c), addrmap)
 		self.oc.write(":;\n")
 		self.oc.doneIndent()
 		self.oc.indent()
@@ -514,25 +560,28 @@ impl scopeCoder {
 			self.oc.indent()
 		}
 
+		addrmap := self.registerAddrmap(uintptr(it))
+
 		self.scope(it.Scope)
 		self.oc.doneIndent()
 		self.oc.write("\n")
 		self.oc.indent()
-		identCoder.iterNext(&self.oc.Buf, uintptr(it))
+		identCoder.iterNext(&self.oc.Buf, uintptr(it), addrmap)
 		self.oc.write(":;\n")
 		self.oc.indent()
 		self.oc.write("}\n")
 		self.oc.indent()
-		identCoder.iterEnd(&self.oc.Buf, uintptr(it))
+		identCoder.iterEnd(&self.oc.Buf, uintptr(it), addrmap)
 		self.oc.write(":;")
 	}
 
 	fn whileIter(mut &self, mut it: &sema::WhileIter) {
 		mut sb := strings::Builder{}
-		identCoder.iterBegin(&sb, uintptr(it))
+		addrmap := self.registerAddrmap(uintptr(it))
+		identCoder.iterBegin(&sb, uintptr(it), addrmap)
 		begin := sb.Str()
 		sb.Clear()
-		identCoder.iterNext(&sb, uintptr(it))
+		identCoder.iterNext(&sb, uintptr(it), addrmap)
 		next := sb.Str()
 		itaddr := conv::FormatUint(u64(uintptr(it)), 16)
 
@@ -591,7 +640,7 @@ impl scopeCoder {
 		}
 		self.oc.indent()
 
-		identCoder.iterEnd(&self.oc.Buf, uintptr(it))
+		identCoder.iterEnd(&self.oc.Buf, uintptr(it), addrmap)
 		self.oc.write(":;\n")
 
 		// Close scope.
@@ -617,12 +666,16 @@ impl scopeCoder {
 	}
 
 	fn continueStmt(mut &self, c: &sema::Continue) {
+		mut childIndex := unsafe { (*(*&sema::Scope)(c.It)).ChildIndex }
+		childIndex++
+		self.emitDefersByLevel(childIndex, false)
 		self.oc.write("goto ")
-		identCoder.iterNext(&self.oc.Buf, c.It)
+		identCoder.iterNext(&self.oc.Buf, c.It, self.getAddrmap(c.It))
 	}
 
 	fn label(mut &self, l: &sema::Label) {
-		identCoder.label(&self.oc.Buf, uintptr(l))
+		addrmap := self.registerAddrmap(uintptr(l))
+		identCoder.label(&self.oc.Buf, uintptr(l), addrmap)
 		self.oc.write(":")
 
 		// For async runtime, we need to add a compiler barrier here.
@@ -633,8 +686,15 @@ impl scopeCoder {
 	}
 
 	fn gotoStmt(mut &self, gt: &sema::Goto) {
+		// Emits deferred scopes, if jumps to a parent scope.
+		mut childIndex := unsafe { (*sema::Label)(gt.Label).Scope.ChildIndex }
+		if gt.Scope.ChildIndex > childIndex {
+			childIndex += 2
+			self.emitDefersByLevel(childIndex, false)
+		}
+
 		self.oc.write("goto ")
-		identCoder.label(&self.oc.Buf, uintptr(gt.Label))
+		identCoder.label(&self.oc.Buf, uintptr(gt.Label), self.getAddrmap(uintptr(gt.Label)))
 	}
 
 	fn tryMapSet(mut &self, mut m: compExpr): (ok: bool) {
@@ -1166,7 +1226,7 @@ impl scopeCoder {
 
 		self.oc.write("{\n")
 		self.oc.indent()
-		identCoder.caseBegin(&self.oc.Buf, uintptr(c))
+		identCoder.caseBegin(&self.oc.Buf, uintptr(c), self.registerAddrmap(uintptr(c)))
 		self.oc.write(":;\n")
 		if len(c.Scope.Stmts) > 0 {
 			self.oc.indent()
@@ -1190,6 +1250,8 @@ impl scopeCoder {
 		self.oc.write("{\n")
 		self.oc.addIndent()
 		self.oc.indent()
+
+		addrmap := self.registerAddrmap(uintptr(m))
 
 		mut l := sema::OperandExpr{}
 
@@ -1233,7 +1295,7 @@ impl scopeCoder {
 
 		self.oc.write("\n")
 		self.oc.indent()
-		identCoder.matchEnd(&self.oc.Buf, uintptr(m))
+		identCoder.matchEnd(&self.oc.Buf, uintptr(m), addrmap)
 		self.oc.write(":;")
 		self.oc.write("\n")
 
@@ -1257,6 +1319,8 @@ impl scopeCoder {
 			ret
 		}
 		block := slct.Default == nil
+
+		addrmap := self.registerAddrmap(uintptr(slct))
 
 		// Single case. No need for complex handling.
 		if block && len(slct.Cases) == 1 {
@@ -1286,7 +1350,7 @@ impl scopeCoder {
 			self.oc.doneIndent()
 			self.oc.write("\n")
 			self.oc.indent()
-			identCoder.matchEnd(&self.oc.Buf, uintptr(slct))
+			identCoder.matchEnd(&self.oc.Buf, uintptr(slct), addrmap)
 			self.oc.write(":;")
 			self.oc.write("\n")
 			self.oc.indent()
@@ -1559,7 +1623,7 @@ impl scopeCoder {
 		self.oc.indent()
 		self.oc.write("}\n")
 		self.oc.indent()
-		identCoder.matchEnd(&self.oc.Buf, uintptr(slct))
+		identCoder.matchEnd(&self.oc.Buf, uintptr(slct), addrmap)
 		self.oc.write(":;")
 		self.oc.write("\n")
 		self.oc.doneIndent()
@@ -1568,19 +1632,36 @@ impl scopeCoder {
 	}
 
 	fn fallStmt(mut &self, f: &sema::Fall) {
+		mut case := unsafe { (&sema::Case)((*sema::Case)(f.DestCase)) }
+		self.emitDefersByLevel(case.Scope.ChildIndex+1, false)
 		self.oc.write("goto ")
-		identCoder.caseBegin(&self.oc.Buf, f.DestCase)
+		identCoder.caseBegin(&self.oc.Buf, f.DestCase, self.getAddrmap(f.DestCase))
 	}
 
 	fn breakStmt(mut &self, b: &sema::Break) {
+		mut childIndex := -1
+		match {
+		| b.It != 0:
+			childIndex = unsafe { (*(*&sema::Scope)(b.It)).ChildIndex }
+			childIndex++
+		| b.Match != 0:
+			childIndex = unsafe { (*(*&sema::Scope)(b.Match)).ChildIndex }
+			childIndex += 2
+		| b.Select != 0:
+			childIndex = unsafe { (*(*&sema::Scope)(b.Select)).ChildIndex }
+			childIndex += 2
+		|:
+			panic("unreachable")
+		}
+		self.emitDefersByLevel(childIndex, false)
 		self.oc.write("goto ")
 		match {
 		| b.It != 0:
-			identCoder.iterEnd(&self.oc.Buf, b.It)
+			identCoder.iterEnd(&self.oc.Buf, b.It, self.getAddrmap(b.It))
 		| b.Match != 0:
-			identCoder.matchEnd(&self.oc.Buf, b.Match)
+			identCoder.matchEnd(&self.oc.Buf, b.Match, self.getAddrmap(b.Match))
 		| b.Select != 0:
-			identCoder.matchEnd(&self.oc.Buf, b.Select)
+			identCoder.matchEnd(&self.oc.Buf, b.Select, self.getAddrmap(b.Select))
 		|:
 			panic("unreachable")
 		}
@@ -1693,7 +1774,8 @@ impl scopeCoder {
 		mut fc := isExceptionalResult(r.Expr) // Exceptional functions should be handled with setResult.
 		if r.Func.Decl.IsVoid() {
 			if hasDefer {
-				self.oc.write(deferStackName + ".call();\n")
+				self.emitDefers(0, false)
+				self.oc.write("\n")
 				self.oc.indent()
 			}
 			if r.Func.Decl.Exceptional {
@@ -1717,9 +1799,11 @@ impl scopeCoder {
 				self.oc.write("result.result = ")
 				self.oc.ec.possibleRefExpr(r.Expr)
 				self.oc.write(";\n")
-				self.oc.indent()
 				if hasDefer {
-					self.oc.write(deferStackName + ".call();\n")
+					self.emitDefers(0, false)
+					self.oc.write("\n")
+					self.oc.indent()
+				} else {
 					self.oc.indent()
 				}
 				self.oc.write(returnKw(r.Func))
@@ -1741,8 +1825,8 @@ impl scopeCoder {
 				self.oc.ec.possibleRefExpr(r.Expr)
 				if hasDefer {
 					self.oc.write(";\n")
-					self.oc.indent()
-					self.oc.write(deferStackName + ".call();\n")
+					self.emitDefers(0, false)
+					self.oc.write("\n")
 					self.oc.indent()
 					self.oc.write(returnKw(r.Func))
 					self.oc.write(" __result;\n")
@@ -1778,10 +1862,11 @@ impl scopeCoder {
 		if r.Expr != nil {
 			self.setResult(r)
 		}
-		// We can call defer stack here if exist.
-		// All result arguments evaluated and stored.
+
+		// Emit deferred scopes, if any.
 		if hasDefer {
-			self.oc.write(deferStackName + ".call();\n")
+			self.emitDefers(0, false)
+			self.oc.write("\n")
 			self.oc.indent()
 		}
 		if r.Func.Decl.Exceptional {
@@ -1852,7 +1937,9 @@ impl scopeCoder {
 		}
 		self.oc.write(" __result = ")
 		self.oc.ec.pureFuncCall(m.Expr)
-		self.oc.write("; " + deferStackName + ".call(); ")
+		self.oc.write(";\n")
+		self.emitDefers(0, false)
+		self.oc.indent()
 		self.oc.write(returnKw(m.Func))
 		self.oc.write(" __result;")
 	}
@@ -1869,16 +1956,7 @@ impl scopeCoder {
 			self.var(st.(&sema::Var))
 		| &sema::Value:
 			mut v := st.(&sema::Value)
-			// Catch anonymous functions created by defer scope.
-			// Push them to defer stack.
-			f, _ := v.Model.(&sema::AnonFuncExpr)
-			if f != nil && f.Func.Scope != nil && f.Func.Scope.Deferred {
-				self.oc.write(deferStackName + ".push(")
-				self.oc.ec.model(v.Model)
-				self.oc.write(")")
-			} else {
-				self.oc.ec.model(v.Model)
-			}
+			self.oc.ec.model(v.Model)
 		| &sema::Conditional:
 			self.conditional(st.(&sema::Conditional))
 		| &sema::InfIter:
@@ -1933,14 +2011,149 @@ impl scopeCoder {
 		}
 	}
 
-	// Generates C++ code of scope.
-	fn scope(mut &self, mut s: &sema::Scope) {
-		self.oc.addIndent()
-		self.oc.write("{\n")
+	// Emits the deferred scope ds.
+	fn emitDefer(mut &self, mut ds: &sema::Scope) {
+		self.__scope(ds, false)
+	}
+
+	// Emits memorized deferred scopes.
+	// The nds is the count of the deferred scopes before handling a new scope.
+	// Emits new deferred scopes since nds.
+	// If remove is true, removes the emitted deferred scopes.
+	fn emitDefers(mut &self, nds: int, remove: bool) {
+		mut diff := len(self.deferredScopes) - nds
+		if diff <= 0 {
+			ret
+		}
+		mut i := len(self.deferredScopes) - 1
+		for diff > 0; diff, i = diff-1, i-1 {
+			mut ds := self.deferredScopes[i]
+			self.emitDefer(ds)
+		}
+		if remove {
+			self.deferredScopes = self.deferredScopes[:nds]
+		}
+	}
+
+	// Emits memorized deferred scopes.
+	// The childIndex is the destination scope's index.
+	// Emits deferred scopes to childIndex's scope, including it.
+	// If remove is true, removes the emitted deferred scopes.
+	//
+	// To emit the deferred scopes within a particular scope,
+	// the `ChildIndex+1` relation is generally required.
+	// This is because deferred scopes that share the same `ChildIndex` may
+	// otherwise be captured.
+	//
+	//	Scheme on pseudo AST
+	//		╭────────────────────────────╮
+	//		│ fn example() {             │ > ChildIndex=0
+	//		│     mut x := 0             │
+	//		│     for {                  │ > ChildIndex=1
+	//		│         defer { x++ }      │ > ChildIndex=2
+	//		│         {                  │ > ChildIndex=2
+	//		│             defer { x++ }  │ > ChildIndex=3
+	//		│             break          │
+	//		│         }                  │
+	//		│     }                      │
+	//		│ }                          │
+	//		╰────────────────────────────╯
+	//
+	//		In the example above, if you directly use the `ChildIndex` value of
+	//		that scope-i.e., `ChildIndex=2`-to emit the deferred scopes of the
+	//		anonymous scope inside the iteration, this will successfully emit the
+	//		deferred scope with `ChildIndex=3`. However, since the defer scope
+	//		defined in the main body of the iteration also has `ChildIndex=2`,
+	//		it will also tend to be emitted. Using `ChildIndex+1` here results in
+	//		`ChildIndex=3` and guarantees that only the deferred scopes inside the
+	//		anonymous scope are emitted.
+	fn emitDefersByLevel(mut &self, childIndex: int, remove: bool) {
+		mut i := len(self.deferredScopes) - 1
+		for i >= 0; i-- {
+			mut ds := self.deferredScopes[i]
+			if childIndex <= ds.ChildIndex {
+				self.emitDefer(ds)
+			} else {
+				break
+			}
+		}
+		if remove {
+			self.deferredScopes = self.deferredScopes[:i+1]
+		}
+	}
+
+	// Generates C++ code of a scope.
+	// But this is a pure generation routine.
+	// If scope is a deferred scope, it will not memorize it.
+	// Generates the code for the scope s, anyway.
+	fn __scope(mut &self, mut s: &sema::Scope, stmt: bool) {
+		nds := len(self.deferredScopes)
+
+		if !stmt {
+			self.oc.addIndent()
+			self.oc.write("{\n")
+		}
 		self.scopeStmts(s)
-		self.oc.doneIndent()
-		self.oc.indent()
-		self.oc.write("}")
+
+		// If we have new deferred scopes, emit them.
+		// Because they are placed in this scope.
+		// But if the scope is an error handle scope, do not emit deferred scopes.
+		// The error handler codegen is responsible for this.
+		if s.Traits&sema::ST_ERROR_HANDLER == 0 {
+			// An `nds`-based detection is used here.
+			// If a ChildIndex-based detection were used,
+			// an incorrect emit could occur.
+			// This is because ChildIndex-based detection operates as `ChildIndex <=`.
+			// As a result, deferred scopes located in outer scopes may capture
+			// scopes that are actually in more inner levels.
+			//
+			// Scheme on pseudo AST
+			//	╭────────────────────────────╮
+			//	│ fn example() {             │ > ChildIndex=0
+			//	│     mut x := 0             │
+			//	│     for {                  │ > ChildIndex=1
+			//	│         defer { x++ }      │ > ChildIndex=2
+			//	│         {                  │ > ChildIndex=2
+			//	│             defer { x++ }  │ > ChildIndex=3
+			//	│             break          │
+			//	│         }                  │
+			//	│     }                      │
+			//	│ }                          │
+			//	╰────────────────────────────╯
+			//
+			//		In the situation above, when the `break` statement exits the
+			//		loop, both deferred scopes must be emitted.
+			//		However, while emitting the deferred scope defined in the
+			//		loop body with `ChildIndex=2`, it also tends to re-emit the
+			//		scope with `ChildIndex=3` due to the condition.
+			self.emitDefers(nds, true)
+		}
+
+		if !stmt {
+			self.oc.doneIndent()
+			self.oc.indent()
+			self.oc.write("}")
+		}
+	}
+
+	// Generates C++ code of a scope.
+	// If the scope s is a deferred scope, memorizes it.
+	fn scope(mut &self, mut s: &sema::Scope) {
+		self.scope2(s, false)
+	}
+
+	// Generates C++ code of a scope.
+	// If the scope s is a deferred scope, memorizes it.
+	// If stmt is true, emits statements without placing braces.
+	fn scope2(mut &self, mut s: &sema::Scope, stmt: bool) {
+		// Scope is deferred.
+		// Memorize it for deferred handling.
+		if s.Deferred {
+			self.deferredScopes = append(self.deferredScopes, s)
+			ret
+		}
+
+		self.__scope(s, stmt)
 	}
 
 	fn commonFuncScope(mut &self, mut f: &sema::FuncIns, raw: bool) {
@@ -1973,10 +2186,13 @@ impl scopeCoder {
 				self.oc.write(";\n")
 			}
 		}
-		if f.Decl.HasDefer {
-			self.oc.indent()
-			self.oc.write("__jule_DeferStack " + deferStackName + ";\n")
-		}
+
+		mut oldDeferredScopes := self.deferredScopes
+		self.deferredScopes = nil
+		defer { self.deferredScopes = oldDeferredScopes }
+
+		nds := len(self.deferredScopes)
+
 		self.scopeStmts(f.Scope)
 
 		// Before executing final steps, checks whether the scope has final statement
@@ -2000,10 +2216,10 @@ impl scopeCoder {
 			}
 		}
 
-		if f.Decl.HasDefer {
-			self.oc.indent()
-			self.oc.write(deferStackName + ".call();\n")
-		}
+		// If we have new deferred scopes, emit them.
+		// Because they are placed in this scope.
+		self.emitDefers(nds, true)
+
 		if !raw && f.Decl.IsVoid() {
 			if f.Decl.Exceptional {
 				// Just for void exceptionals.
@@ -2091,6 +2307,9 @@ impl scopeCoder {
 		self.oc.doneIndent()
 		self.oc.indent()
 		self.oc.write("}")
+
+		// Clear keys for efficiency.
+		delete(self.addrmap)
 	}
 }
 

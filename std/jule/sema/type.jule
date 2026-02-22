@@ -1542,13 +1542,7 @@ impl typeChecker {
 		}
 	}
 
-	fn buildSptr(mut *self, mut decl: &ast::UnaryExpr): &Sptr {
-		if self.referencer != nil {
-			oself := self.referencer.oself
-			self.referencer.oself = true
-			defer { self.referencer.oself = oself }
-		}
-
+	fn __buildSptr(mut *self, mut decl: &ast::UnaryExpr): &Sptr {
 		self.pushTA(taMutable)
 
 		disableTA := self.disableTA
@@ -1559,13 +1553,18 @@ impl typeChecker {
 		ret self.buildSptrFromType(valueTyp)
 	}
 
-	fn buildChan(mut *self, mut decl: &ast::ChanType): &Chan {
+	fn buildSptr(mut *self, mut decl: &ast::UnaryExpr): &Sptr {
 		if self.referencer != nil {
 			oself := self.referencer.oself
 			self.referencer.oself = true
-			defer { self.referencer.oself = oself }
+			mut typ := self.__buildSptr(decl)
+			self.referencer.oself = oself
+			ret typ
 		}
+		ret self.__buildSptr(decl)
+	}
 
+	fn __buildChan(mut *self, mut decl: &ast::ChanType): &Chan {
 		// Do not disable mutability analysis.
 		// Element type of channel is directly affects the mutability of channel.
 		disableTA := self.disableTA
@@ -1587,6 +1586,17 @@ impl typeChecker {
 		}
 	}
 
+	fn buildChan(mut *self, mut decl: &ast::ChanType): &Chan {
+		if self.referencer != nil {
+			oself := self.referencer.oself
+			self.referencer.oself = true
+			mut typ := self.__buildChan(decl)
+			self.referencer.oself = oself
+			ret typ
+		}
+		ret self.__buildChan(decl)
+	}
+
 	fn buildPtrFromType(mut *self, mut valueTyp: &Type): &Ptr {
 		// Check special cases.
 		match {
@@ -1602,13 +1612,7 @@ impl typeChecker {
 		}
 	}
 
-	fn buildPtr(mut *self, mut decl: &ast::UnaryExpr): &Ptr {
-		if self.referencer != nil {
-			oself := self.referencer.oself
-			self.referencer.oself = true
-			defer { self.referencer.oself = oself }
-		}
-
+	fn __buildPtr(mut *self, mut decl: &ast::UnaryExpr): &Ptr {
 		self.pushTA(taMutable)
 
 		disableTA := self.disableTA
@@ -1627,13 +1631,18 @@ impl typeChecker {
 		}
 	}
 
-	fn buildSlice(mut *self, mut decl: &ast::SliceType): &Slice {
+	fn buildPtr(mut *self, mut decl: &ast::UnaryExpr): &Ptr {
 		if self.referencer != nil {
 			oself := self.referencer.oself
 			self.referencer.oself = true
-			defer { self.referencer.oself = oself }
+			mut typ := self.__buildPtr(decl)
+			self.referencer.oself = oself
+			ret typ
 		}
+		ret self.__buildPtr(decl)
+	}
 
+	fn __buildSlice(mut *self, mut decl: &ast::SliceType): &Slice {
 		self.pushTA(taNotComparable | taMutable)
 
 		disableTA := self.disableTA
@@ -1654,6 +1663,17 @@ impl typeChecker {
 		ret &Slice{
 			Value: valueTyp,
 		}
+	}
+
+	fn buildSlice(mut *self, mut decl: &ast::SliceType): &Slice {
+		if self.referencer != nil {
+			oself := self.referencer.oself
+			self.referencer.oself = true
+			mut typ := self.__buildSlice(decl)
+			self.referencer.oself = oself
+			ret typ
+		}
+		ret self.__buildSlice(decl)
 	}
 
 	fn buildArray(mut *self, mut decl: &ast::ArrayType): &Array {
@@ -1713,15 +1733,7 @@ impl typeChecker {
 		}
 	}
 
-	fn buildMap(mut *self, mut decl: &ast::MapType): &Map {
-		self.pushTA(taNotComparable)
-
-		// Do not disable mutability analysis.
-		// Key and Value type of map is directly affects the mutability of map.
-		disableTA := self.disableTA
-		self.disableTA |= taNotComparable
-		defer { self.disableTA = disableTA }
-
+	fn __buildMap(mut *self, mut decl: &ast::MapType): &Map {
 		// Evaluate key type like no cycle risk, do not log errors about it.
 		// We have to do this for checking correct map type dependencies,
 		// cycle types are prevents valid map key types. So, catch them but
@@ -1729,11 +1741,7 @@ impl typeChecker {
 		cycleErr := self.cycleErr
 		self.cycleErr &= ^cycleErrFail
 		self.cycleErr |= cycleErrDisable
-		if self.referencer != nil {
-			oself := self.referencer.oself
-			self.referencer.oself = true
-			defer { self.referencer.oself = oself }
-		}
+
 		mut keyTyp := self.checkDecl(decl.Key)
 		if keyTyp == nil {
 			self.cycleErr = cycleErr
@@ -1770,6 +1778,25 @@ impl typeChecker {
 		}
 	}
 
+	fn buildMap(mut *self, mut decl: &ast::MapType): &Map {
+		self.pushTA(taNotComparable)
+
+		// Do not disable mutability analysis.
+		// Key and Value type of map is directly affects the mutability of map.
+		disableTA := self.disableTA
+		self.disableTA |= taNotComparable
+		defer { self.disableTA = disableTA }
+
+		if self.referencer != nil {
+			oself := self.referencer.oself
+			self.referencer.oself = true
+			mut typ := self.__buildMap(decl)
+			self.referencer.oself = oself
+			ret typ
+		}
+		ret self.__buildMap(decl)
+	}
+
 	fn buildTuple(mut *self, mut decl: &ast::TupleExpr): &Tuple {
 		mut types := make([]&Type, 0, len(decl.X))
 		for (_, mut t) in decl.X {
@@ -1801,13 +1828,7 @@ impl typeChecker {
 		ret true
 	}
 
-	fn buildFunc(mut *self, mut decl: &ast::Func): &FuncIns {
-		if self.referencer != nil {
-			oself := self.referencer.oself
-			self.referencer.oself = true
-			defer { self.referencer.oself = oself }
-		}
-
+	fn __buildFunc(mut *self, mut decl: &ast::Func): &FuncIns {
 		self.pushTA(taNotComparable)
 
 		disableTA := self.disableTA
@@ -1838,6 +1859,17 @@ impl typeChecker {
 		}
 
 		ret ins
+	}
+
+	fn buildFunc(mut *self, mut decl: &ast::Func): &FuncIns {
+		if self.referencer != nil {
+			oself := self.referencer.oself
+			self.referencer.oself = true
+			mut typ := self.__buildFunc(decl)
+			self.referencer.oself = oself
+			ret typ
+		}
+		ret self.__buildFunc(decl)
 	}
 
 	fn buildNamespace(mut *self, mut ns: &ast::NamespaceExpr): Kind {

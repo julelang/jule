@@ -64,6 +64,9 @@ const (
 	// This passed when scope owner is exactly and infinite iteration,
 	// or while-next iteration with no condition.
 	ST_INFINITE: ScopeTrait = 1 << iota
+
+	// Scope is an error handling scope.
+	ST_ERROR_HANDLER
 )
 
 // Scope.
@@ -705,19 +708,8 @@ impl scopeChecker {
 	}
 
 	fn checkAnonScope(mut &self, mut tree: &ast::ScopeTree) {
-		// Scope is deferred. Handle as anonymous function, it may be a closure.
-		// See: https://manual.jule.dev/introduction/scopes#deferred-scopes
 		if tree.Deferred {
 			self.getRoot().owner.Decl.HasDefer = true
-			mut f := &ast::Func{
-				Scope: tree,
-				Name: jule::Anon,
-				Result: new(ast::RetType),
-			}
-			mut e := self.s.eval(self)
-			mut v := e.evalAnonFunc(f)
-			self.scope.Stmts = append(self.scope.Stmts, v)
-			ret
 		}
 		mut s := self.checkChild(tree)
 		self.scope.Stmts = append(self.scope.Stmts, s)
@@ -2517,7 +2509,7 @@ impl scopeChecker {
 		} else {
 			// Condition is;
 			//	gt.Scope != nil label.node.Scope &&
-			//	gt.Scope.ChildIndex <= label.node.Scope.ChildIndex
+			//	gt.Scope.ChildIndex < label.node.Scope.ChildIndex
 			//
 			// Label owned by a more deepter child scope than goto's scope or equal.
 			// But scopes are not equal, so equal case does not works.

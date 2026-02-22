@@ -1007,16 +1007,17 @@ impl sema {
 	// Calls algo in the function's native environment.
 	// Errors will be handled.
 	// Returns result of algo.
-	fn basicFuncEnvironment(mut &self, mut f: &FuncIns, algo: fn(mut sema: &sema): bool): bool {
+	fn basicFuncEnvironment(mut &self, mut f: &FuncIns, algo: fn(mut sema: &sema): bool): (ok: bool) {
 		f.fillEnviron(false)
 
 		if f.env.file != nil {
 			mut old := f.env.sema.getCurrentFile()
-			defer { f.env.sema.setCurrentFile(old) }
 			f.env.sema.setCurrentFile(f.env.file)
+			ok = algo(f.env.sema)
+			f.env.sema.setCurrentFile(old)
+		} else {
+			ok = algo(f.env.sema)
 		}
-
-		ok := algo(f.env.sema)
 
 		if f.env.sema != self {
 			self.errors = append(self.errors, f.env.sema.errors...)
@@ -1035,16 +1036,17 @@ impl sema {
 	// Calls algo in the struct's native environment.
 	// Errors will be handled.
 	// Returns result of algo.
-	fn basicStructEnvironment(mut &self, mut s: &StructIns, algo: fn(mut sema: &sema): bool): bool {
+	fn basicStructEnvironment(mut &self, mut s: &StructIns, algo: fn(mut sema: &sema): bool): (ok: bool) {
 		s.fillEnviron()
 
 		if s.env.file != nil {
 			mut old := s.env.sema.getCurrentFile()
-			defer { s.env.sema.setCurrentFile(old) }
 			s.env.sema.setCurrentFile(s.env.file)
+			ok = algo(s.env.sema)
+			s.env.sema.setCurrentFile(old)
+		} else {
+			ok = algo(s.env.sema)
 		}
-
-		ok := algo(s.env.sema)
 
 		if s.env.sema != self {
 			self.errors = append(self.errors, s.env.sema.errors...)
@@ -1226,9 +1228,7 @@ impl sema {
 
 	fn checkTypeAliasDeclKind(mut &self, mut ta: &TypeAlias, mut generics: []&TypeAlias, mut prev: &referencer, mut l: Lookup): (ok: bool) {
 		mut old := self.file
-		defer {
-			self.setCurrentFile(old)
-		}
+		defer { self.setCurrentFile(old) }
 		if ta.Token != nil {
 			mut file := findFile(self.files, ta.Token.File)
 			if file != nil {
@@ -1242,13 +1242,15 @@ impl sema {
 		}
 		if prev != nil {
 			prev.next = referencer
-			defer { prev.next = nil }
 		}
 		referencer.tains = ta.Strict
 		ok = self.checkTypeSymWithRefers(ta.TypeSym, l, generics, referencer)
 		if ok && ta.TypeSym.Type.Array() != nil && ta.TypeSym.Type.Array().Auto {
 			self.pushErr(ta.TypeSym.Decl.Token, "auto-sized arrays are not allowed as value type")
 			ok = false
+		}
+		if prev != nil {
+			prev.next = nil
 		}
 		ret
 	}
@@ -1330,9 +1332,7 @@ impl sema {
 
 	fn checkTypeEnumItemType(mut &self, mut e: &TypeEnum, mut item: &TypeEnumItem): (ok: bool) {
 		mut old := self.file
-		defer {
-			self.setCurrentFile(old)
-		}
+		defer { self.setCurrentFile(old) }
 		if e.Token != nil {
 			mut file := findFile(self.files, e.Token.File)
 			if file != nil {
@@ -2376,7 +2376,9 @@ impl sema {
 		allowIota := len(v.Group) > 0
 		if allowIota {
 			eval.varIota = buildIota(i64(v.GroupIndex))
-			defer {
+		}
+		defer {
+			if allowIota {
 				v.Iota = v.Iota || eval.varIota.Used
 			}
 		}
@@ -2539,55 +2541,66 @@ impl sema {
 		}
 		if prev != nil {
 			prev.next = tc.referencer
-			defer { prev.next = nil }
+		}
+		defer {
+			if prev != nil {
+				prev.next = nil
+			}
+		}
+
+		algo := fn(): (ok: bool) {
+			if len(s.Generics) > 0 {
+				mut cc := self.constraintChecker()
+				cc.et = errorToken
+				cc.si = s
+				cc.genericsA = tc.useGenerics
+				cc.uniq = true
+				if !cc.check() {
+					ret
+				}
+			}
+
+			ok = true
+			s.Comparable = !s.Decl.Extern
+			for (_, mut f) in s.Fields {
+				// Set instance for referencer if field declaration is not mutable.
+				// But field declared as mutable, do not set.
+				// It basically for the `!f.Decl.Mutable && f.Type.Mutable()` condition.
+				if !f.Decl.Mutable {
+					tc.referencer.tains = true
+				} else {
+					tc.referencer.tains = false
+				}
+				mut kind := tc.checkDecl(f.Decl.TypeSym.Decl)
+				ok = kind != nil && ok
+				if kind == nil {
+					if self != s.env.sema && len(s.env.sema.errors) > 0 {
+						self.errors = append(self.errors, s.env.sema.errors...)
+						s.env.sema.errors = nil
+					}
+					continue
+				}
+				f.Type = kind
+
+				// We have to check mutable and comparable conditions again.
+				// Because type analysis is a simple precondition checker.
+				// For the actual type, we have to check.
+				// See developer reference (10.2.1).
+				s.Mutable = s.Mutable || (!f.Decl.Mutable && f.Type.Mutable())
+				s.Comparable = s.Comparable && f.Type.Comparable()
+			}
+			ret
 		}
 
 		if s.env.file != nil && self.file != s.env.file {
 			mut oldFile := self.file
-			defer { self.setCurrentFile(oldFile) }
 			self.setCurrentFile(s.env.file)
+			ok = algo()
+			self.setCurrentFile(oldFile)
+		} else {
+			ok = algo()
 		}
 
-		if len(s.Generics) > 0 {
-			mut cc := self.constraintChecker()
-			cc.et = errorToken
-			cc.si = s
-			cc.genericsA = tc.useGenerics
-			cc.uniq = true
-			if !cc.check() {
-				ret
-			}
-		}
-
-		ok = true
-		s.Comparable = !s.Decl.Extern
-		for (_, mut f) in s.Fields {
-			// Set instance for referencer if field declaration is not mutable.
-			// But field declared as mutable, do not set.
-			// It basically for the `!f.Decl.Mutable && f.Type.Mutable()` condition.
-			if !f.Decl.Mutable {
-				tc.referencer.tains = true
-			} else {
-				tc.referencer.tains = false
-			}
-			mut kind := tc.checkDecl(f.Decl.TypeSym.Decl)
-			ok = kind != nil && ok
-			if kind == nil {
-				if self != s.env.sema && len(s.env.sema.errors) > 0 {
-					self.errors = append(self.errors, s.env.sema.errors...)
-					s.env.sema.errors = nil
-				}
-				continue
-			}
-			f.Type = kind
-
-			// We have to check mutable and comparable conditions again.
-			// Because type analysis is a simple precondition checker.
-			// For the actual type, we have to check.
-			// See developer reference (10.2.1).
-			s.Mutable = s.Mutable || (!f.Decl.Mutable && f.Type.Mutable())
-			s.Comparable = s.Comparable && f.Type.Comparable()
-		}
 		ret
 	}
 
@@ -2758,15 +2771,17 @@ impl sema {
 
 		f.fillEnviron(true)
 
-		if f.env.file != nil {
-			mut old := f.Decl.sema.file
-			defer { f.Decl.sema.setCurrentFile(old) }
-			f.env.sema.setCurrentFile(f.env.file)
-		}
-
 		mut sc := newScopeChecker(f.env.sema, f)
 		sc.calledFrom = caller
-		self.checkFuncInsSc(f, sc)
+
+		if f.env.file != nil {
+			mut old := f.Decl.sema.file
+			f.env.sema.setCurrentFile(f.env.file)
+			self.checkFuncInsSc(f, sc)
+			f.Decl.sema.setCurrentFile(old)
+		} else {
+			self.checkFuncInsSc(f, sc)
+		}
 
 		if f.env.sema != self {
 			self.errors = append(self.errors, f.env.sema.errors...)

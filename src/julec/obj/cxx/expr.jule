@@ -390,6 +390,7 @@ impl exprCoder {
 		}
 
 		// guarantee integer wrap around if expressions is not a condition
+		mut wrap := false
 		match op {
 		| token::GTR | token::GEQ
 		| token::LSS | token::LEQ
@@ -397,13 +398,11 @@ impl exprCoder {
 			// No op.
 		|:
 			if lp != nil && types::IsInt(lp.Kind) {
+				wrap = true
 				buf.WriteByte('(')!
 				self.oc.tc.prim(buf, lp)
 				buf.WriteByte(')')!
 				buf.WriteByte('(')!
-				defer {
-					buf.WriteByte(')')!
-				}
 			}
 		}
 
@@ -414,6 +413,10 @@ impl exprCoder {
 		buf.WriteByte(' ')!
 		buf.WriteStr(r)!
 		buf.WriteByte(')')!
+
+		if wrap {
+			buf.WriteByte(')')!
+		}
 	}
 
 	fn _unsafeBinary(mut &self, mut &buf: *strings::Builder, mut l: sema::OperandExpr,
@@ -546,24 +549,29 @@ impl exprCoder {
 					identCoder.funcIns(&self.oc.Buf, meta::Program.Runtime.Cmplx64Neg)
 				}
 				self.oc.write("(")
-				defer {
-					self.oc.write(")")
-				}
+				self.possibleRefExpr(m.Expr.Model)
+				self.oc.write(")")
+			} else {
+				self.possibleRefExpr(m.Expr.Model)
 			}
-			self.possibleRefExpr(m.Expr.Model)
 			ret
+		}
+
+		mut wrap := false
+		defer {
+			if wrap {
+				self.oc.write(")")
+			}
 		}
 
 		// guarantee integer wrap around
 		match m.Op.ID {
 		| token::ADD | token::SUB | token::XOR:
 			if lp != nil && types::IsInt(lp.Kind) {
+				wrap = true
 				self.oc.write("(")
 				self.oc.tc.prim(&self.oc.Buf, lp)
 				self.oc.write(")(")
-				defer {
-					self.oc.write(")")
-				}
 			}
 		}
 
@@ -1160,18 +1168,22 @@ impl exprCoder {
 		self.oc.write("}")
 	}
 
-	fn writeUseExpr(mut &self, mut f: &sema::FuncIns, mut val: &sema::Value, mut dest: useExprMemory) {
+	fn writeUseExpr(mut &self, mut s: &sema::Scope, mut f: &sema::FuncIns, mut val: &sema::Value, mut dest: useExprMemory) {
+		mut childIndex := s.ChildIndex
+		childIndex++
 		if dest.Model != nil {
 			mut fc, ok := val.Model.(&sema::FuncCallExpr)
 			if ok && fc.Func.Decl != nil && fc.Func.Decl.Exceptional {
 				self.handleExceptionalCallWithData(fc, dest)
+				self.oc.sc.emitDefersByLevel(childIndex, true)
 				ret
 			}
 			// If value is not tuple, handle directly with the write method.
 			// This is required to handle += like assignment expressions.
 			if val.Type.Tuple() == nil {
 				dest.write(self, val.Model, val.Type)
-				self.oc.write(";")
+				self.oc.write(";\n")
+				self.oc.sc.emitDefersByLevel(childIndex, true)
 				ret
 			}
 			dest.write(self, nil, nil)
@@ -1179,7 +1191,8 @@ impl exprCoder {
 		}
 		if val.Type.Tuple() == nil {
 			self.possibleRefExpr(val.Model)
-			self.oc.write(";")
+			self.oc.write(";\n")
+			self.oc.sc.emitDefersByLevel(childIndex, true)
 			ret
 		}
 		mut tup := val.Model.(&sema::TupleExpr)
@@ -1194,7 +1207,8 @@ impl exprCoder {
 				self.oc.write(", ")
 			}
 		}
-		self.oc.write("};")
+		self.oc.write("};\n")
+		self.oc.sc.emitDefersByLevel(childIndex, true)
 	}
 
 	fn handleExceptionalCallWithData(mut &self, mut m: &sema::FuncCallExpr, mut dest: useExprMemory) {
@@ -1229,10 +1243,29 @@ impl exprCoder {
 		self.oc.indent()
 		if m.Except != nil {
 			if m.Func.Result == nil || dest.Model == nil {
+				mut stmt := m.Except.Stmts[len(m.Except.Stmts)-1]
 				self.oc.write("if (!")
 				self.oc.write(exceptName)
 				self.oc.write(".ok()) ")
-				self.oc.sc.scope(m.Except)
+				match type stmt {
+				| &sema::Use:
+					self.oc.write("{\n")
+					self.oc.addIndent()
+					m.Except.Stmts = m.Except.Stmts[:len(m.Except.Stmts)-1]
+					self.oc.indent()
+					self.oc.sc.scope2(m.Except, true)
+					self.oc.write("\n")
+					self.oc.indent()
+					mut v := stmt.(&sema::Use).Value
+					self.writeUseExpr(m.Except, m.Func, v, dest)
+					self.oc.doneIndent()
+					self.oc.write("\n")
+					self.oc.indent()
+					self.oc.write("}\n")
+				|:
+					self.oc.sc.scope(m.Except)
+					self.oc.sc.emitDefersByLevel(m.Except.ChildIndex+1, true)
+				}
 				self.oc.write("\n")
 			} else {
 				self.oc.write("if (")
@@ -1245,16 +1278,19 @@ impl exprCoder {
 				mut stmt := m.Except.Stmts[len(m.Except.Stmts)-1]
 				self.oc.write("{\n")
 				self.oc.addIndent()
+				self.oc.indent()
 				match type stmt {
 				| &sema::Use:
 					m.Except.Stmts = m.Except.Stmts[:len(m.Except.Stmts)-1]
-					self.oc.sc.scopeStmts(m.Except)
+					self.oc.sc.scope2(m.Except, true)
 					self.oc.write("\n")
 					self.oc.indent()
 					mut v := stmt.(&sema::Use).Value
-					self.writeUseExpr(m.Func, v, dest)
+					self.writeUseExpr(m.Except, m.Func, v, dest)
 				|:
-					self.oc.sc.scopeStmts(m.Except)
+					self.oc.sc.scope(m.Except)
+					self.oc.write("\n")
+					self.oc.sc.emitDefersByLevel(m.Except.ChildIndex+1, true)
 				}
 				self.oc.write("\n")
 				self.oc.doneIndent()
@@ -1688,53 +1724,116 @@ impl exprCoder {
 		if m.Func.Decl.IsVoid() {
 			mut v, _ := m.Err.Model.(&sema::Var)
 			if v != nil && v.Name == "error" {
-				self.oc.write(returnKw(m.Func))
-				self.oc.write(" __jule_VoidExceptional{.error=")
-				if hasDefer {
-					self.oc.write("({ auto __result = ")
+				if !hasDefer {
+					self.oc.write(returnKw(m.Func))
+					self.oc.write(" __jule_VoidExceptional{.error=std::move(")
+					// Handle error variable like ordinary variable.
+					// Because it may be captured, use captured variable handler.
+					self.var(v)
+					self.oc.write(")}")
+					ret
 				}
-				self.oc.write("std::move(")
+				self.oc.write("{\n")
+				self.oc.addIndent()
+				self.oc.indent()
+				self.oc.write(typeAny)
+				self.oc.write(" __result = std::move(")
 				// Handle error variable like ordinary variable.
 				// Because it may be captured, use captured variable handler.
 				self.var(v)
-				self.oc.write(")")
-				if hasDefer {
-					self.oc.write(";" + deferStackName + ".call(); __result; })")
-				}
+				self.oc.write(");\n")
+				self.oc.sc.emitDefers(0, false)
+				self.oc.write("\n")
+				self.oc.indent()
+				self.oc.write(returnKw(m.Func))
+				self.oc.write(" __jule_VoidExceptional{.error=std::move(__result)};\n")
+				self.oc.doneIndent()
+				self.oc.indent()
 				self.oc.write("}")
 				ret
 			}
+			if !hasDefer {
+				self.oc.write(returnKw(m.Func))
+				self.oc.write(" __jule_VoidExceptional{.error=")
+				self.possibleRefExpr(m.Err.Model)
+				self.oc.write("}")
+				ret
+			}
+			self.oc.write("{\n")
+			self.oc.addIndent()
+			self.oc.indent()
+			self.oc.write(typeAny)
+			self.oc.write(" __result = ")
+			self.possibleRefExpr(m.Err.Model)
+			self.oc.write(";\n")
+			self.oc.sc.emitDefers(0, false)
+			self.oc.indent()
 			self.oc.write(returnKw(m.Func))
-			self.oc.write(" __jule_VoidExceptional{.error=")
+			self.oc.write(" __jule_VoidExceptional{.error=std::move(__result)};\n")
+			self.oc.doneIndent()
+			self.oc.indent()
+			self.oc.write("}")
 		} else {
+			mut v, _ := m.Err.Model.(&sema::Var)
+			if v != nil && v.Name == "error" {
+				if !hasDefer {
+					self.oc.write(returnKw(m.Func))
+					self.oc.write(" __jule_Exceptional<")
+					self.oc.tc.rc.codeMut1(&self.oc.Buf, m.Func.Result)
+					self.oc.write(">{.error=std::move(")
+					// Handle error variable like ordinary variable.
+					// Because it may be captured, use captured variable handler.
+					self.var(v)
+					self.oc.write(")}")
+					ret
+				}
+				self.oc.write("{\n")
+				self.oc.addIndent()
+				self.oc.indent()
+				self.oc.write(typeAny)
+				self.oc.write(" __result = std::move(")
+				// Handle error variable like ordinary variable.
+				// Because it may be captured, use captured variable handler.
+				self.var(v)
+				self.oc.write(");\n")
+				self.oc.sc.emitDefers(0, false)
+				self.oc.write("\n")
+				self.oc.indent()
+				self.oc.write(returnKw(m.Func))
+				self.oc.write(" __jule_Exceptional<")
+				self.oc.tc.rc.codeMut1(&self.oc.Buf, m.Func.Result)
+				self.oc.write(">{.error=std::move(__result)};\n")
+				self.oc.doneIndent()
+				self.oc.indent()
+				self.oc.write("}")
+				ret
+			}
+			if !hasDefer {
+				self.oc.write(returnKw(m.Func))
+				self.oc.write(" __jule_Exceptional<")
+				self.oc.tc.rc.codeMut1(&self.oc.Buf, m.Func.Result)
+				self.oc.write(">{.error=")
+				self.possibleRefExpr(m.Err.Model)
+				self.oc.write("}")
+				ret
+			}
+			self.oc.write("{\n")
+			self.oc.addIndent()
+			self.oc.indent()
+			self.oc.write(typeAny)
+			self.oc.write(" __result = ")
+			self.possibleRefExpr(m.Err.Model)
+			self.oc.write(";\n")
+			self.oc.sc.emitDefers(0, false)
+			self.oc.indent()
 			self.oc.write(returnKw(m.Func))
 			self.oc.write(" __jule_Exceptional<")
 			self.oc.tc.rc.codeMut1(&self.oc.Buf, m.Func.Result)
-			mut v, _ := m.Err.Model.(&sema::Var)
-			if v != nil && v.Name == "error" {
-				self.oc.write(">{.error=")
-				if hasDefer {
-					self.oc.write("({ auto __result = ")
-				}
-				// Handle error variable like ordinary variable.
-				// Because it may be captured, use captured variable handler.
-				self.var(v)
-				if hasDefer {
-					self.oc.write(";" + deferStackName + ".call(); __result; })")
-				}
-				self.oc.write("}")
-				ret
-			}
-			self.oc.write(">{.error=")
+			self.oc.write(">{.error=std::move(__result)};\n")
+			self.oc.doneIndent()
+			self.oc.indent()
+			self.oc.write("}")
 		}
-		if hasDefer {
-			self.oc.write("({ auto __result = ")
-		}
-		self.possibleRefExpr(m.Err.Model)
-		if hasDefer {
-			self.oc.write(";" + deferStackName + ".call(); __result; })")
-		}
-		self.oc.write("}")
 	}
 
 	fn copyCall(mut &self, mut m: &sema::BuiltinCopyCallExpr) {

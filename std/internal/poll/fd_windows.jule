@@ -108,10 +108,15 @@ impl FD {
 
 		if self.Flags&File == File {
 			self.readWriteLock().await?
-			defer { self.readWriteUnlock() }
 		} else {
 			self.writeLock().await?
-			defer { self.writeUnlock() }
+		}
+		defer {
+			if self.Flags&File == File {
+				self.readWriteUnlock()
+			} else {
+				self.writeUnlock()
+			}
 		}
 
 		mut buf2 := unsafe { *(&buf) } // break immutability, do not mutable the content
@@ -286,10 +291,15 @@ impl FD {
 		}
 		if self.Flags&File == File {
 			self.readWriteLock().await?
-			defer { self.readWriteUnlock() }
 		} else {
 			self.readLock().await?
-			defer { self.readUnlock() }
+		}
+		defer {
+			if self.Flags&File == File {
+				self.readWriteUnlock()
+			} else {
+				self.readUnlock()
+			}
 		}
 
 		if len(buf) > maxRW {

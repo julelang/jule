@@ -2162,6 +2162,7 @@ impl eval {
 			csc.result = &result{func: f, mutable: self.target.mutable}
 		}
 		ch = sc.getChild()
+		ch.Traits |= ST_ERROR_HANDLER
 		fc.Exception.Parent = sc.tree
 		csc.table.Vars = append(csc.table.Vars, buildErrorVar(ch, fc))
 		sc.checkChildSsc(fc.Exception, ch, csc)
@@ -3262,7 +3263,9 @@ impl eval {
 			if prim == nil || !types::IsNum(prim.Str()) {
 				mut prefix := self.prefix
 				self.prefix = nil
-				defer { self.prefix = prefix }
+				mut v := bs.eval(op)
+				self.prefix = prefix
+				ret v
 			}
 		}
 		ret bs.eval(op)
@@ -5079,12 +5082,15 @@ impl binaryEval {
 			ret nil
 		}
 
-		if !l.untyped {
+		let mut r: &Value
+		if l.untyped {
+			r = self.e.evalExpr1(op.Y, evalDefault)
+		} else {
 			mut prefix := self.e.prefix
 			self.e.prefix = l.Type
-			defer { self.e.prefix = prefix }
+			r = self.e.evalExpr1(op.Y, evalDefault)
+			self.e.prefix = prefix
 		}
-		mut r := self.e.evalExpr1(op.Y, evalDefault)
 		if r == nil || r.Type == nil {
 			ret nil
 		}
