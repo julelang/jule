@@ -71,7 +71,7 @@ impl ReferenceStack {
 // Directive pass.
 struct Pass {
 	Token: &token::Token
-	Text:  str
+	Args:  []str
 }
 
 fn buildType(mut t: &ast::Expr): &TypeSym {
@@ -687,21 +687,20 @@ impl symBuilder {
 			self.pushErr(d.Tag, "missing expression")
 			self.pushSuggestion(`use like; #pass "-arg"`)
 			ret
-		} else if len(d.Args) > 1 {
-			arg := d.Args[1]
-			self.pushErr(arg, `passed more argument than expected to directive #pass`)
-			self.pushSuggestion(`use like; #pass "-arg"`)
 		}
 
-		arg := d.Args[0]
-		if arg.ID != token::STR || arg.Kind[0] != '"' {
-			self.pushErr(arg, "invalid syntax")
-			ret
+		mut args := make([]str, len(d.Args))
+		for i, arg in d.Args {
+			if arg.ID != token::STR || arg.Kind[0] != '"' {
+				self.pushErr(arg, "invalid syntax")
+				ret
+			}
+			args[i] = arg.Kind[1 : len(arg.Kind)-1] // Remove literal quotes.
 		}
 
 		self.table.Passes = append(self.table.Passes, Pass{
 			Token: d.Tag,
-			Text: arg.Kind[1 : len(arg.Kind)-1],
+			Args: args,
 		})
 	}
 

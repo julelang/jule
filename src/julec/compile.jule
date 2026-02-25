@@ -19,6 +19,7 @@ use "std/jule/types"
 use "std/os"
 use "std/os/filepath"
 use "std/runtime"
+use "std/slices"
 use "std/strings"
 
 let mut OutDir = "dist"
@@ -331,11 +332,24 @@ fn genCompileCmd(sourcePath: str, mut ir: &obj::IR): (compiler: str, args: []str
 
 	args = append(args, sourcePath)
 
-	// Push passes.
+	// Collect and push passes.
 	ir.CollectPasses()
-	args = append(args, ir.Passes...)
+	for _, pass in ir.Passes {
+		args = pushPassArguments(args, pass)
+	}
 
 	ret
+}
+
+fn pushPassArguments(mut args: []str, pass: []str): []str {
+	args = slices::Grow(args, len(pass))
+	for _, arg in pass {
+		if len(strings::Trim(arg, " ")) == 0 {
+			continue
+		}
+		args = append(args, arg)
+	}
+	ret args
 }
 
 fn getCompilePath(): str {

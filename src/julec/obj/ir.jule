@@ -13,7 +13,7 @@ use "std/slices"
 // Intermediate representation of the code for compiler.
 struct IR {
 	Root:    str               // Directory of the root package.
-	Passes:  []str             // All unique pass directives.
+	Passes:  [][]str           // All unique pass directives.
 	Runtime: &sema::ImportInfo // ImportInfo instance of the "std/runtime" package.
 	Ordered: OrderedDefines    //  Ordered defines, nil by default. Initialized by the Order method.
 
@@ -176,19 +176,16 @@ impl IR {
 }
 
 // Package-based implementation of the [IR.CollectPasses].
-fn pushPasses(mut p: &sema::Package, mut &passes: *[]str) {
+fn pushPasses(mut p: &sema::Package, mut &passes: *[][]str) {
 	for (_, mut f) in p.Files {
-	push:
-		for _, pass in f.Passes {
-			if pass.Text == "" {
-				continue
-			}
+	Iter:
+		for (_, mut pass) in f.Passes {
 			for _, cpass in *passes {
-				if cpass == pass.Text {
-					continue push
+				if slices::Equal(cpass, pass.Args) {
+					continue Iter
 				}
 			}
-			*passes = append(*passes, pass.Text)
+			*passes = append(*passes, pass.Args)
 		}
 	}
 }
