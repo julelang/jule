@@ -5,6 +5,7 @@
 #ifndef __JULE_STD_INTEG_C_HPP
 #define __JULE_STD_INTEG_C_HPP
 
+typedef const char __jule_const_char;
 typedef signed char __jule_signed_char;
 typedef unsigned char __jule_unsigned_char;
 typedef unsigned short __jule_unsigned_short;
