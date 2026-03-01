@@ -4,6 +4,7 @@
 
 use "julec/env"
 use "julec/handle"
+use "julec/julespec"
 use "julec/obj"
 use "julec/obj/cxx"
 use "julec/obj/meta"
@@ -26,6 +27,7 @@ let mut OutDir = "dist"
 let mut OutName = "ir.cpp"
 let mut Out = ""
 let mut COMAXPROCS = "default"
+let mut RawTags = ""
 
 let targets = map[str][]str{
 	"windows": ["amd64", "arm64", "i386"],
@@ -466,6 +468,22 @@ fn checkCOMAXPROCS() {
 	env::COMAXPROCS = i32(n)
 }
 
+fn checkTags() {
+	if len(RawTags) == 0 {
+		env::Tags = nil
+		ret
+	}
+	tags := strings::Split(RawTags, " ")
+	env::Tags = make([]str, 0, len(tags))
+	for _, tag in tags {
+		if !julespec::IsName(tag) {
+			handle::Throw("--tags: invalid tag: " + conv::Quote(tag))
+			continue
+		}
+		env::Tags = append(env::Tags, tag)
+	}
+}
+
 fn checkCppStdFlag() {
 	match env::CppStd {
 	| "cpp20":
@@ -490,6 +508,7 @@ fn checkFlags(args: []str): []str {
 	fs.AddVar[str](unsafe { (&str)(&env::Compiler) }, "compiler", 0, "Backend compiler")
 	fs.AddVar[str](unsafe { (&str)(&env::CompilerPath) }, "compiler-path", 0, "Path of backend compiler")
 	fs.AddVar[bool](unsafe { (&bool)(&env::Production) }, "production", 'p', "Compile for production")
+	fs.AddVar[str](unsafe { (&str)(&RawTags) }, "tags", 0, "Compile tags")
 	fs.AddVar[bool](unsafe { (&bool)(&env::RC) }, "disable-rc", 0, "Disable reference counting")
 	fs.AddVar[bool](unsafe { (&bool)(&env::Safety) }, "disable-safety", 0, "Disable safety")
 	fs.AddVar[str](unsafe { (&str)(&env::CppStd) }, "cppstd", 0, "C++ standard")
@@ -523,6 +542,7 @@ fn checkFlags(args: []str): []str {
 	checkTargetFlag(target)
 	checkOptFlag(opt)
 	checkCOMAXPROCS()
+	checkTags()
 
 	ret content
 }

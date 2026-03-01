@@ -55,7 +55,7 @@ struct importer {
 	mod:   &mod::Mod
 	mods:  []&mod::Mod
 	pkgs:  []&sema::ImportInfo
-	vars:  []str
+	tags:  []str
 	files: map[str]resource::File
 }
 
@@ -200,7 +200,7 @@ impl importer {
 			}
 			mut de := directiveEval{
 				d: td,
-				vars: self.vars,
+				tags: self.tags,
 			}
 			result := de.eval()
 			if len(de.logs) > 0 {
@@ -215,10 +215,11 @@ impl importer {
 }
 
 // Returns new default Jule package importer by the compile information.
-fn New(info: CompileInfo): sema::Importer {
+fn New(mut info: CompileInfo): sema::Importer {
 	mut imp := new(importer)
+	imp.tags = info.Tags
 	imp.files = make(map[str]resource::File)
 	imp.mods = [build::ModStdlib()]
-	initVars(&imp.vars, info)
+	initTags(&imp.tags, info)
 	ret imp
 }

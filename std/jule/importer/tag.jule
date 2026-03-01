@@ -1,0 +1,98 @@
+// Copyright 2023 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/jule/build"
+use "std/jule/dist"
+
+// Standard back-end compilers.
+enum Compiler: str {
+	Clang: "clang",
+	GCC: "gcc",
+}
+
+// Supported C++ standards.
+enum CppStd: str {
+	Cpp20: "cpp20",
+}
+
+// Compile information.
+struct CompileInfo {
+	// Production compilation.
+	Prod: bool
+
+	// Test compilation.
+	Test: bool
+
+	// Back-end compiler to use.
+	Compiler: Compiler
+
+	// C++ standard to use.
+	CppStd: CppStd
+
+	// Tags passed.
+	Tags: []str
+}
+
+// Set operating system tags by native operating system.
+fn setOSTags(mut &tags: *[]str) {
+	*tags = append(*tags, build::OS)
+	if dist::IsUnix(build::OS) && findTag(*tags, "unix") == -1 {
+		*tags = append(*tags, "unix")
+	}
+}
+
+// Set architecture tags by native architecture.
+fn setArchTags(mut &tags: *[]str) {
+	*tags = append(*tags, build::Arch)
+	if dist::Is64bit(build::Arch) && findTag(*tags, "x64") == -1 {
+		*tags = append(*tags, "x64")
+	}
+	if dist::Is32bit(build::Arch) && findTag(*tags, "x32") == -1 {
+		*tags = append(*tags, "x32")
+	}
+}
+
+// Initialize directive eval tags by compile info.
+fn initTags(mut &tags: *[]str, info: CompileInfo) {
+	setOSTags(tags)
+	setArchTags(tags)
+
+	if info.Prod && findTag(*tags, "production") == -1 {
+		*tags = append(*tags, "production")
+	}
+
+	if info.Test && findTag(*tags, "test") == -1 {
+		*tags = append(*tags, "test")
+	}
+
+	match info.Compiler {
+	| Clang:
+		if findTag(*tags, "clang") == -1 {
+			*tags = append(*tags, "clang")
+		}
+	| GCC:
+		if findTag(*tags, "gcc") == -1 {
+			*tags = append(*tags, "gcc")
+		}
+	}
+
+	match info.CppStd {
+	| Cpp20:
+		if findTag(*tags, "cpp") == -1 {
+			*tags = append(*tags, "cpp20")
+		}
+	}
+}
+
+fn findTag(tags: []str, name: str): int {
+	if name == "" {
+		ret -1
+	}
+	for i, tag in tags {
+		if tag == name {
+			ret i
+		}
+	}
+	ret -1
+}
