@@ -35,30 +35,27 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ====================================================
 
-// Maximum valid Unicode code point.
-const MaxRune = '\U0010FFFF'
-
-// Represents invalid code points.
-const ReplacementChar = '\uFFFD'
-
-// Maximum ASCII value.
-const MaxASCII = '\u007F'
-
-// Maximum Latin-1 value.
-const MaxLatin1 = '\u00FF'
+const (
+	MaxRune         = '\U0010FFFF' // Maximum valid Unicode code point.
+	ReplacementChar = '\uFFFD'     // Represents invalid code points.
+	MaxASCII        = '\u007F'     // Maximum ASCII value.
+	MaxLatin1       = '\u00FF'     // Maximum Latin-1 value.
+)
 
 // Indices into the delta arrays inside CaseRanges for case mapping.
 const (
-	UpperCase = 0
-	LowerCase = 1
-	TitleCase = 2
-	MaxCase   = 3
+	UpperCase = iota
+	LowerCase
+	TitleCase
+	MaxCase
 )
 
-// If the Delta field of a CaseRange is UpperLower, it means
+// If the Delta field of a [CaseRange] is UpperLower, it means
 // this CaseRange represents a sequence of the form (say)
-// Upper Lower Upper Lower.
-const upperLower = MaxRune + 1 // (Cannot be a valid delta.)
+// [Upper] [Lower] [Upper] [Lower].
+const (
+	UpperLower = MaxRune + 1 // (Cannot be a valid delta.)
+)
 
 // The maximum size table for linear search for non-Latin1 rune.
 // Derived by running 'go test -calibrate'.
@@ -66,6 +63,10 @@ const linearMax = 18
 
 // to make the CaseRanges text shorter
 type d: [MaxCase]rune
+
+// Represents language-specific case mappings such as Turkish.
+// Methods of SpecialCase customize (by overriding) the standard mappings.
+type SpecialCase: []CaseRange
 
 // CASE_ORBIT is defined in tables.jule as []FoldPair. Right now all the
 // entries fit in uint16, so use uint16. If that changes, compilation
@@ -187,6 +188,17 @@ fn ToLower(mut r: rune): rune {
 		ret r
 	}
 	ret To(LowerCase, r)
+}
+
+// Maps the rune to title case.
+fn ToTitle(mut r: rune): rune {
+	if r <= MaxASCII {
+		if 'a' <= r && r <= 'z' { // title case is upper case for ASCII
+			r -= 'a' - 'A'
+		}
+		ret r
+	}
+	ret To(TitleCase, r)
 }
 
 // Reports whether r is in the sorted slice of 16-bit ranges.
@@ -321,6 +333,14 @@ fn IsLower(r: rune): bool {
 	ret isExcludingLatin(Lower, r)
 }
 
+// Reports whether the rune is a title case letter.
+fn IsTitle(r: rune): bool {
+	if r <= MaxLatin1 {
+		ret false
+	}
+	ret isExcludingLatin(Title, r)
+}
+
 // Converts r to case using CaseRange cr.
 fn convertCase(case: int, r: rune, cr: &CaseRange): rune {
 	delta := cr.Delta[case]
@@ -415,4 +435,33 @@ fn SimpleFold(r: rune): rune {
 		ret convertCase(UpperCase, r, cr)
 	}
 	ret r
+}
+
+impl SpecialCase {
+	// Maps the rune to upper case giving priority to the special mapping.
+	fn ToUpper(*self, r: rune): rune {
+		mut r1, hadMapping := to(UpperCase, r, []CaseRange(*self))
+		if r1 == r && !hadMapping {
+			r1 = ToUpper(r)
+		}
+		ret r1
+	}
+
+	// Maps the rune to title case giving priority to the special mapping.
+	fn ToTitle(*self, r: rune): rune {
+		mut r1, hadMapping := to(TitleCase, r, []CaseRange(*self))
+		if r1 == r && !hadMapping {
+			r1 = ToTitle(r)
+		}
+		ret r1
+	}
+
+	// Maps the rune to lower case giving priority to the special mapping.
+	fn ToLower(*self, r: rune): rune {
+		mut r1, hadMapping := to(LowerCase, r, []CaseRange(*self))
+		if r1 == r && !hadMapping {
+			r1 = ToLower(r)
+		}
+		ret r1
+	}
 }
