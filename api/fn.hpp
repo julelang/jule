@@ -13,7 +13,6 @@
 #include "error.hpp"
 #include "ptr.hpp"
 #include "str.hpp"
-#include "slice.hpp"
 
 // Anonymous function / closure wrapper of julec.
 template <typename Ret, typename... Args>
@@ -116,30 +115,6 @@ public:
     inline operator __jule_Uintptr(void) const noexcept
     {
         return (__jule_Uintptr)(this->f);
-    }
-};
-
-struct __jule_DeferStack
-{
-    __jule_Slice<__jule_Fn<void>> stack;
-
-    void push(__jule_Fn<void> func) noexcept
-    {
-        this->stack.push(func);
-    }
-
-    void call(void) noexcept
-    {
-        if (this->stack.len() == 0)
-        {
-            return;
-        }
-        auto it = this->stack.end() - 1;
-        const auto begin = this->stack.begin();
-        for (; it >= begin; it--)
-        {
-            (*it)();
-        }
     }
 };
 
