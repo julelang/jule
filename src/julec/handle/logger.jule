@@ -35,11 +35,18 @@ impl Logger {
 		}
 		if len(l.Line) != 0 {
 			// For correct handling, trim leading and trailing space bytes.
-			// Also replace tabs with spaces for deterministic size.
-			mut line := strings::Trim(l.Line, "\r\n\v\b\t ")
+			const Spaces = "\r\n\v\b\t "
+			// Trim spaces of left first to know how many bytes were trimmed.
+			// Because we need to shift the l.Column that much to point to the correct position.
+			mut line := strings::TrimLeft(l.Line, Spaces)
+			// Handle the difference after trim.
+			trimmed := len(l.Line) - len(line)
+			// Trim for right.
+			line = strings::TrimRight(line, Spaces)
+			// Size of tabs may vary across platforms/editors/IDEs.
+			// Replace tabs with spaces for deterministic size.
 			line = strings::ReplaceAll(line, "\t", " ")
 
-			mut offset := len(l.Line) - len(line) + 1
 			print("\n  ")
 			row := conv::Itoa(l.Row)
 			print(row)
@@ -47,8 +54,8 @@ impl Logger {
 			print(line)
 			print("\n  ")
 			print(strings::Repeat(" ", len(row)))
-			print(" | ")
-			print(strings::Repeat(" ", l.Column-offset))
+			print(" |")
+			print(strings::Repeat(" ", l.Column-trimmed))
 			print("^")
 			if len(l.Suggestion) != 0 {
 				print("\n  ")
