@@ -1021,6 +1021,7 @@ impl exprCoder {
 	}
 
 	fn pureFuncCall(mut &self, mut m: &sema::FuncCallExpr) {
+		nilptr := self.oc.mode&_OBJC_DISABLE_NILPTR != 0
 		wrapped := self.isWrapped(m)
 		if m.Await {
 			self.oc.write("__jule_AsyncAwait ")
@@ -1064,7 +1065,7 @@ impl exprCoder {
 					| &sema::Sptr:
 						// Ignore dereferencing, use data directly to call [ptr] method.
 						safe := self.writeReceiver(ssie.Expr.Model)
-						if safe {
+						if safe && !nilptr {
 							self.oc.write(".must_ok(\"")
 							self.oc.locInfo(m.Token)
 							self.oc.write("\").alloc")
