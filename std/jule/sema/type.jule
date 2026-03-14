@@ -849,11 +849,11 @@ impl typeChecker {
 			|:
 				panic("unreachable")
 			}
-			if self.disableTA&taNotComparable != taNotComparable {
-				s.Comparable = s.Comparable && tags&taNotComparable != taNotComparable
+			if self.disableTA&taNotComparable == 0 {
+				s.Comparable = s.Comparable && tags&taNotComparable == 0
 			}
-			if self.disableTA&taMutable != taMutable {
-				s.Mutable = s.Mutable || tags&taMutable == taMutable
+			if self.disableTA&taMutable == 0 {
+				s.Mutable = s.Mutable || tags&taMutable != 0
 			}
 		}
 	}
@@ -987,7 +987,7 @@ impl typeChecker {
 	}
 
 	fn checkIllegalCycles(mut *self, name: &token::Token, mut decl: any): (ok: bool) {
-		ret self.isIllegalCycleSafe(name, decl, self.cycleErr&cycleErrDisable != cycleErrDisable)
+		ret self.isIllegalCycleSafe(name, decl, self.cycleErr&cycleErrDisable == 0)
 	}
 
 	fn isIllegalCycleSafe(mut *self, name: &token::Token, mut decl: any, err: bool): (ok: bool) {
@@ -1064,7 +1064,7 @@ impl typeChecker {
 
 		{
 			ok := self.checkIllegalCycles(decl, ta)
-			if !ok && self.cycleErr&cycleErrDisable != cycleErrDisable {
+			if !ok && self.cycleErr&cycleErrDisable == 0 {
 				ret nil
 			}
 		}
@@ -1081,7 +1081,7 @@ impl typeChecker {
 			}
 		}
 
-		if ta.Strict && self.s.step&stepImplsImplemented == stepImplsImplemented {
+		if ta.Strict && self.s.step&stepImplsImplemented != 0 {
 			// Check strict type structure if impl statements are implemented.
 			// But do not check if source type is nil, it means type type alias is still checking.
 			mut s := ta.TypeSym.Type.SoftStruct()
@@ -1168,7 +1168,7 @@ impl typeChecker {
 		// The deferred analysis is mandatory for this kind of generic defines,
 		// because this package analysis will not check them, so we have to collect
 		// them for deferred check analysis.
-		gstructs := self.s.meta.flags&semametaGstruct == semametaGstruct
+		gstructs := self.s.meta.flags&semametaGstruct != 0
 		if self.s != ins.Decl.sema && len(ins.Decl.Generics) > 0 {
 			self.s.meta.flags |= semametaGstruct
 		}
@@ -1400,7 +1400,7 @@ impl typeChecker {
 				self.pushTA(taMutable)
 			}
 			ok := self.checkIllegalCycles(errToken, s)
-			if !ok && self.cycleErr&cycleErrDisable != cycleErrDisable {
+			if !ok && self.cycleErr&cycleErrDisable == 0 {
 				ret nil
 			}
 		}
@@ -1476,7 +1476,7 @@ impl typeChecker {
 				mut st := g.TypeSym.Type.Struct()
 				if st != nil {
 					ok := self.checkIllegalCycles(decl, st)
-					if !ok && self.cycleErr&cycleErrDisable != cycleErrDisable {
+					if !ok && self.cycleErr&cycleErrDisable == 0 {
 						ret nil
 					}
 				}
@@ -1576,12 +1576,12 @@ impl typeChecker {
 			ret nil
 		}
 		self.pushRuntimeImpl("pchan", decl.Value.Token, valueTyp)
-		if self.disableTA&taMutable != taMutable && valueTyp.Mutable() {
+		if self.disableTA&taMutable == 0 && valueTyp.Mutable() {
 			self.pushTA(taMutable)
 		}
 		ret &Chan{
-			Recv: decl.Dir&ast::RECV == ast::RECV,
-			Send: decl.Dir&ast::SEND == ast::SEND,
+			Recv: decl.Dir&ast::RECV != 0,
+			Send: decl.Dir&ast::SEND != 0,
 			Value: valueTyp,
 		}
 	}
@@ -1719,10 +1719,10 @@ impl typeChecker {
 			ret nil
 		}
 
-		if self.disableTA&taNotComparable != taNotComparable && !valueTyp.Comparable() {
+		if self.disableTA&taNotComparable == 0 && !valueTyp.Comparable() {
 			self.pushTA(taNotComparable)
 		}
-		if self.disableTA&taMutable != taMutable && valueTyp.Mutable() {
+		if self.disableTA&taMutable == 0 && valueTyp.Mutable() {
 			self.pushTA(taMutable)
 		}
 
@@ -1750,7 +1750,7 @@ impl typeChecker {
 		// Check whether key type is valid.
 		// It should be comparable, if cycle analysis failed, we have cycles,
 		// so we have a map type (this type, actually), so it is not comparable.
-		if self.cycleErr&cycleErrFail == cycleErrFail || !keyTyp.Comparable() {
+		if self.cycleErr&cycleErrFail != 0 || !keyTyp.Comparable() {
 			self.cycleErr = cycleErr
 			self.s.pushErr(decl.Key.Token, "type @ does not match constraint of Key: @", keyTyp.Str(), constraintComparable)
 			ret nil
@@ -1768,7 +1768,7 @@ impl typeChecker {
 
 		self.pushRuntimeImpl("hmap", decl.Key.Token, keyTyp, valueTyp)
 
-		if self.disableTA&taMutable != taMutable && (keyTyp.Mutable() || valueTyp.Mutable()) {
+		if self.disableTA&taMutable == 0 && (keyTyp.Mutable() || valueTyp.Mutable()) {
 			self.pushTA(taMutable)
 		}
 

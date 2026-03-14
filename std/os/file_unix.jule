@@ -50,7 +50,7 @@ fn newFile(fd: int, mut flags: int, nonBlocking: bool)!: &File {
 	// If we handle pollable status here correctly, the following algorithm
 	// will not try to make it pollable on sync runtime.
 	mut pollable := runtime::asynctime &&
-		(nonBlocking || flags&poll::File == poll::File || flags&poll::Pipe == poll::Pipe)
+		(nonBlocking || flags&(poll::File|poll::Pipe) != 0)
 
 	// Things like regular files and FIFOs in kqueue on *BSD/Darwin
 	// may not work properly (or accurately according to its manual).
@@ -60,7 +60,7 @@ fn newFile(fd: int, mut flags: int, nonBlocking: bool)!: &File {
 	// If the fd was passed to us via any path other than OpenFile,
 	// we assume those callers know what they were doing, so we won't
 	// perform this check and allow it to be added to the kqueue.
-	if flags&poll::File == poll::File {
+	if flags&poll::File != 0 {
 		// Use comptime match here, because only matched systems have
 		// this syscalls, not all UNIX-like.
 		const match runtime::OS {

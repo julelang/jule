@@ -127,8 +127,7 @@ impl Scanner {
 
 	// Reports whether scanner has reached EOF.
 	fn EOF(*self): bool {
-		ret self.state&scanDone == scanDone ||
-			self.state&scanEOF == scanEOF
+		ret self.state&(scanDone|scanEOF) != 0
 	}
 
 	// Advances the [Scanner] to the next token, which will then be
@@ -140,17 +139,17 @@ impl Scanner {
 	// tokens without advancing the input. This is a common error mode for
 	// scanners.
 	async fn Scan(mut *self)!: bool {
-		if self.state&scanDone == scanDone {
+		if self.state&scanDone != 0 {
 			ret false
 		}
 		self.state |= scanUsed
 		// Loop until we have a token.
 		for {
 			// See if we can get a token with what we already have.
-			if self.end > self.start || self.state&scanEOF == scanEOF {
+			if self.end > self.start || self.state&scanEOF != 0 {
 				advance, mut token := self.split(
 					self.buf[self.start:self.end],
-					self.state&scanEOF == scanEOF) else {
+					self.state&scanEOF != 0) else {
 					match type error {
 					| FinalToken:
 						self.tok = []byte(error.(FinalToken))
@@ -182,7 +181,7 @@ impl Scanner {
 					}
 					ret true
 				}
-				if self.state&scanEOF == scanEOF {
+				if self.state&scanEOF != 0 {
 					// We have EOF state and the split function will not return
 					// token for this case, guaranteed for the false return.
 					ret false
@@ -240,7 +239,7 @@ impl Scanner {
 	//
 	// Panics if it is called after scanning has started.
 	fn Split(mut *self, split: SplitFunc) {
-		if self.state&scanUsed == scanUsed {
+		if self.state&scanUsed != 0 {
 			panic("std/bufio: Scanner.Split: called after Scan")
 		}
 		self.split = split
@@ -256,7 +255,7 @@ impl Scanner {
 	//
 	// Panics if it is called after scanning has started.
 	fn Buffer(mut *self, mut buf: []byte, max: int) {
-		if self.state&scanUsed == scanUsed {
+		if self.state&scanUsed != 0 {
 			panic("std/bufio: Scanner.Buffer: called after Scan")
 		}
 		self.buf = buf[0:cap(buf)]

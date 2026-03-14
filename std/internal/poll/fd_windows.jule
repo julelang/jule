@@ -63,7 +63,7 @@ impl FD {
 	fn Init(mut &self, pollable: bool)! {
 		// Disable SIO_UDP_CONNRESET behavior.
 		// http://support.microsoft.com/kb/263823
-		if self.Flags&SocketNoConn == SocketNoConn {
+		if self.Flags&SocketNoConn != 0 {
 			r := u32(0)
 			flag := u32(0)
 			size := u32(mem::SizeOf(flag))
@@ -106,13 +106,13 @@ impl FD {
 			ret 0
 		}
 
-		if self.Flags&File == File {
+		if self.Flags&File != 0 {
 			self.readWriteLock().await?
 		} else {
 			self.writeLock().await?
 		}
 		defer {
-			if self.Flags&File == File {
+			if self.Flags&File != 0 {
 				self.readWriteUnlock()
 			} else {
 				self.writeUnlock()
@@ -127,11 +127,11 @@ impl FD {
 			}
 			mut nn := 0
 			match {
-			| self.Flags&Console == Console:
+			| self.Flags&Console != 0:
 				nn = self.writeConsole(b)?
-			| self.Flags&File == File | self.Flags&Pipe == Pipe:
+			| self.Flags&(File|Pipe) != 0:
 				nn = self.writeFile(b)?
-			| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
+			| self.Flags&(Socket|SocketNoConn) != 0:
 				mut &o := &self.wop
 				o.InitBuf(b)
 				nn = execIO(o, fn|mut o| {
@@ -163,11 +163,11 @@ impl FD {
 			}
 			mut nn := 0
 			match {
-			| self.Flags&Console == Console:
+			| self.Flags&Console != 0:
 				nn = self.writeConsole(b)?
-			| self.Flags&File == File | self.Flags&Pipe == Pipe:
+			| self.Flags&(File|Pipe) != 0:
 				nn = self.writeFile(b)?
-			| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
+			| self.Flags&(Socket|SocketNoConn) != 0:
 				panic("unsupported")
 			|:
 				panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Write")
@@ -181,7 +181,7 @@ impl FD {
 	// Like Write, but wraps sendto syscall.
 	// General for V4 and V6. Unsafe variant.
 	async fn WriteV(mut *self, buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
-		if self.Flags&SocketNoConn != SocketNoConn {
+		if self.Flags&SocketNoConn == 0 {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for WriteV")
 		}
 		if runtime::adjustbudget() {
@@ -229,7 +229,7 @@ impl FD {
 	// Returns -1 if error occurred.
 	fn writeFile(mut *self, mut buf: []byte)!: (n: int) {
 		ret sys::WriteFile(sys::Handle(self.File), buf) else {
-			if self.Flags&Pipe == Pipe && error == sys::ERROR_OPERATION_ABORTED {
+			if self.Flags&Pipe != 0 && error == sys::ERROR_OPERATION_ABORTED {
 				// Close uses CancelIoEx to interrupt concurrent I/O for pipes.
 				// If the fd is a pipe and the Write was interrupted by CancelIoEx,
 				// we assume it is interrupted by Close.
@@ -289,13 +289,13 @@ impl FD {
 		if runtime::adjustbudget() {
 			runtime::yield().await
 		}
-		if self.Flags&File == File {
+		if self.Flags&File != 0 {
 			self.readWriteLock().await?
 		} else {
 			self.readLock().await?
 		}
 		defer {
-			if self.Flags&File == File {
+			if self.Flags&File != 0 {
 				self.readWriteUnlock()
 			} else {
 				self.readUnlock()
@@ -307,11 +307,11 @@ impl FD {
 		}
 
 		match {
-		| self.Flags&Console == Console:
+		| self.Flags&Console != 0:
 			n = self.readConsole(buf)?
-		| self.Flags&File == File | self.Flags&Pipe == Pipe:
+		| self.Flags&(File|Pipe) != 0:
 			n = self.readFile(buf)?
-		| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
+		| self.Flags&(Socket|SocketNoConn) != 0:
 			mut &o := &self.rop
 			o.InitBuf(buf)
 			n = execIO(o, fn|o| {
@@ -341,11 +341,11 @@ impl FD {
 		}
 
 		match {
-		| self.Flags&Console == Console:
+		| self.Flags&Console != 0:
 			n = self.readConsole(buf)?
-		| self.Flags&File == File | self.Flags&Pipe == Pipe:
+		| self.Flags&(File|Pipe) != 0:
 			n = self.readFile(buf)?
-		| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
+		| self.Flags&(Socket|SocketNoConn) != 0:
 			panic("unsupported")
 		|:
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Read")
@@ -357,7 +357,7 @@ impl FD {
 	// Like Read, but wraps recvfrom syscall.
 	// General for V4 and V6. Unsafe variant.
 	async fn ReadV(mut *self, mut buf: []byte, addr: uintptr, addrLen: sys::Socklen)!: (n: int) {
-		if self.Flags&SocketNoConn != SocketNoConn {
+		if self.Flags&SocketNoConn == 0 {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
 		}
 		if runtime::adjustbudget() {
@@ -403,7 +403,7 @@ impl FD {
 				// Work around ERROR_BROKEN_PIPE is returned on reading EOF from stdin.
 				ret 0
 			}
-			if self.Flags&Pipe == Pipe && error == sys::ERROR_OPERATION_ABORTED {
+			if self.Flags&Pipe != 0 && error == sys::ERROR_OPERATION_ABORTED {
 				// Close uses CancelIoEx to interrupt concurrent I/O for pipes.
 				// If the fd is a pipe and the Read was interrupted by CancelIoEx,
 				// we assume it is interrupted by Close.
@@ -549,7 +549,7 @@ impl FD {
 	// whence: 0 (Seek.Set) means, relative to the whence of the file, 1 (Seek.Cur)
 	// means relative to the current offset, and 2 (Seek.End) means relative to end.
 	async fn Seek(mut *self, offset: i64, whence: int)!: (newoffset: i64) {
-		if self.Flags&Pipe == Pipe {
+		if self.Flags&Pipe != 0 {
 			error(sys::ESPIPE)
 		}
 		self.incref()?
@@ -587,9 +587,9 @@ impl FD {
 		}
 
 		match {
-		| self.Flags&File == File | self.Flags&Pipe == Pipe | self.Flags&Pipe == Pipe | self.Flags&Console == Console:
+		| self.Flags&(File|Pipe|Console) != 0:
 			sys::CloseHandle(sys::Handle(self.File))?
-		| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
+		| self.Flags&(Socket|SocketNoConn) != 0:
 			sys::CloseSocket(NetHandle(self.File))?
 		|:
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Close")
@@ -600,9 +600,9 @@ impl FD {
 	// Closes file descriptor.
 	fn CloseSync(mut *self)! {
 		match {
-		| self.Flags&File == File | self.Flags&Pipe == Pipe | self.Flags&Pipe == Pipe | self.Flags&Console == Console:
+		| self.Flags&(File|Pipe|Console) != 0:
 			sys::CloseHandle(sys::Handle(self.File))?
-		| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
+		| self.Flags&(Socket|SocketNoConn) != 0:
 			sys::CloseSocket(NetHandle(self.File))?
 		|:
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Close")
@@ -617,7 +617,7 @@ impl FD {
 		if !self.fdmu.increfAndClose() {
 			errClosing(self.isFile())?
 		}
-		if self.Flags&Pipe == Pipe {
+		if self.Flags&Pipe != 0 {
 			sys::CancelIoEx(sys::Handle(self.File), nil) else {}
 		}
 		// Unblock pending reader and writer.

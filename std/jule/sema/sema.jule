@@ -3097,7 +3097,7 @@ impl missingRetChecker {
 		// If label is already checked, return the memoized data.
 		mut r, ok := self.labels[laddr]
 		if ok {
-			ret r&_LMEMO_TRUE == _LMEMO_TRUE
+			ret r&_LMEMO_TRUE != 0
 		}
 		// Temporarily memoize the label to avoid infinite recursion.
 		// Also this data used to catch in-check state:
@@ -3105,7 +3105,7 @@ impl missingRetChecker {
 		// Check rest of the statements following label.
 		// With `l.Index+1` skip the current label statement.
 		i := l.Index + 1
-		if l.Scope.Traits&ST_INFINITE == ST_INFINITE {
+		if l.Scope.Traits&ST_INFINITE != 0 {
 			ok = self.checkInfinite(l.Scope.Owner, l.Scope, i)
 		} else {
 			ok = self.checkScope(l.Scope, i)
@@ -3157,7 +3157,7 @@ impl missingRetChecker {
 			//	│ Bar:             │   we have to remember branch's report at this point
 			//	│ }                │
 			//	╰──────────────────╯
-			if g.Label.Scope.Traits&ST_INFINITE == ST_INFINITE {
+			if g.Label.Scope.Traits&ST_INFINITE != 0 {
 				ok = self.checkInfinite(g.Label.Scope.Owner, g.Label.Scope, g.Label.Index)
 			} else {
 				ok = self.checkScope(g.Label.Scope, g.Label.Index)
@@ -3197,7 +3197,7 @@ impl missingRetChecker {
 					// Start checking parent scope from the following
 					// statements of the current child scope.
 					i := ls.StmtIndex + 1
-					if ps.Traits&ST_INFINITE == ST_INFINITE {
+					if ps.Traits&ST_INFINITE != 0 {
 						ok = self.checkInfinite(ps.Owner, ps, i)
 					} else {
 						ok = self.checkScope(ps, i)
@@ -3216,9 +3216,9 @@ impl missingRetChecker {
 				}
 				panic("unreachable")
 			}
-		} else if r&_LMEMO_CHECKING != _LMEMO_CHECKING {
+		} else if r&_LMEMO_CHECKING == 0 {
 			// Label is already memoized, report the result.
-			ret r&_LMEMO_TRUE == _LMEMO_TRUE
+			ret r&_LMEMO_TRUE != 0
 		}
 		// Jumping into scope is not allowed.
 		// So goto jumps in the same scope or one of to parent scopes.
@@ -3499,7 +3499,7 @@ impl missingRetChecker {
 				// If this iteration will not be breaked, then report true.
 				// Because following statements will not be executed,
 				// so function will not be ended.
-				if wn.Scope.Traits&ST_INFINITE == ST_INFINITE {
+				if wn.Scope.Traits&ST_INFINITE != 0 {
 					if self.checkInfinite(wn.Scope.Owner, wn.Scope, 0) {
 						ret true
 					}
