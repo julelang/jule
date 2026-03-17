@@ -1562,10 +1562,15 @@ impl exprCoder {
 	}
 
 	fn slicing(mut &self, mut m: &sema::SlicingExpr) {
+		boundarycheck := self.oc.mode&_OBJC_DISABLE_BOUNDARY == 0
 		self.possibleRefExpr(m.Expr.Model)
-		self.oc.write(".safe_slice(\"")
-		self.oc.locInfo(m.Token)
-		self.oc.write("\", ")
+		if boundarycheck {
+			self.oc.write(".safe_slice(\"")
+			self.oc.locInfo(m.Token)
+			self.oc.write("\", ")
+		} else {
+			self.oc.write(".slice(")
+		}
 		self.possibleRefExpr(m.Left)
 		if m.Right != nil {
 			self.oc.write(", ")
