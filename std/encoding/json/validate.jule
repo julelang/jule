@@ -2,31 +2,15 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-// Reports whether data is a valid JSON.
+// Reports whether data is a valid JSON encoding.
 fn Valid(data: []byte): bool {
-	decoder := jsonDecoder{}
-	decoder.data.SetData(data)
-	decoder.skipSpace()
-	if decoder.eof() {
-		ret false
-	}
-	mut lit := false
-	for {
-		// scanValidValue will not check literal sequences.
-		// So "10 10" or similar expressions may be result as true.
-		// We have handle them. Special case is:
-		// if the current and previous value is a literal, not valid.
-		if lit {
+	let mut scan: scanner
+	scan.init()
+	scan.reset()
+	for _, c in data {
+		scan.bytes++
+		if scan.step(&scan, c) == scanError {
 			ret false
-		}
-		decoder.scanValidValue() else { ret false }
-		if !decoder.eof() {
-			b := decoder.data.Get(decoder.i)
-			lit = b != '[' && b != '{'
-		}
-		decoder.skipSpace()
-		if decoder.eof() {
-			break
 		}
 	}
 	ret true

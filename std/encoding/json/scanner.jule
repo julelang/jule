@@ -1,0 +1,625 @@
+// Copyright 2026 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// The Jule code is a modified version of the original Go code from
+// https://github.com/golang/go/blob/go1.25.0/src/encoding/json/scanner.go and came with this notice.
+//
+// ====================================================
+// Copyright (c) 2009 The Go Authors. All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// ====================================================
+
+// JSON value parser state machine.
+// Just about at the limit of what is reasonable to write by hand.
+// Some parts are a bit tedious, but overall it nicely factors out the
+// otherwise common code from the multiple scanning functions
+// in this package.
+
+use "std/conv"
+use "std/errors"
+use "std/io"
+
+// This limits the max nesting depth to prevent stack overflow.
+// This is permitted by https://tools.ietf.org/html/rfc7159#section-9
+const maxNestingDepth = 256
+
+// These values are returned by the state transition functions
+// assigned to scanner.state and the method scanner.eof.
+// They give details about the current state of the scan that
+// callers might be interested to know about.
+// It is okay to ignore the return value of any particular
+// call to scanner.state: if one call returns scanError,
+// every subsequent call will return scanError too.
+const (
+	// Continue.
+	scanContinue     = iota // uninteresting byte
+	scanBeginLiteral        // end implied by next result != scanContinue
+	scanBeginObject         // begin object
+	scanObjectKey           // just finished object key (string)
+	scanObjectValue         // just finished non-last object value
+	scanEndObject           // end object (implies scanObjectValue if possible)
+	scanBeginArray          // begin array
+	scanArrayValue          // just finished array value
+	scanEndArray            // end array (implies scanArrayValue if possible)
+	scanSkipSpace           // space byte; can skip; known to be last "continue" result
+
+	// Stop.
+	scanEnd   // top-level value ended *before* this byte; known to be first "stop" result
+	scanError // hit an error, scanner.err.
+)
+
+// These values are stored in the parseState stack.
+// They give the current state of a composite value
+// being scanned. If the parser is inside a nested value
+// the parseState describes the nested state, outermost at entry 0.
+const (
+	parseObjectKey   = iota // parsing object key (before colon)
+	parseObjectValue        // parsing object value (after colon)
+	parseArrayValue         // parsing array value
+)
+
+// A scanner is a JSON scanning state machine.
+// Callers call scan.reset and then pass bytes in one at a time
+// by calling scan.step(&scan, c) for each byte.
+// The return value, referred to as an opcode, tells the
+// caller about significant parsing events like beginning
+// and ending literals, objects, and arrays, so that the
+// caller can follow along if it wishes.
+// The return value scanEnd indicates that a single top-level
+// JSON value has been completed, *before* the byte that
+// just got passed in. (The indication must be delayed in order
+// to recognize the end of numbers: is 123 a whole value or
+// the beginning of 12345e+6?).
+struct scanner {
+	// The step is a func to be called to execute the next transition.
+	step: fn(mut &_: *scanner, byte): int
+
+	// Reached end of top-level value.
+	endTop: bool
+
+	// Stack of what we're in the middle of - array values, object keys, object values.
+	parseState: []int
+
+	// Error that happened, if any.
+	err: any
+
+	// total bytes consumed, updated by decoder.Decode (and deliberately
+	// not set to zero by scan.reset)
+	bytes: i64
+}
+
+impl scanner {
+	// Initializes a new scanner.
+	#disable nilptr
+	fn init(mut *self) {
+		// scanner.reset by design doesn't set bytes to zero.
+		self.bytes = 0
+		self.reset()
+	}
+
+	// Prepares the scanner for use.
+	// It must be called before calling step.
+	#disable nilptr boundary
+	fn reset(mut *self) {
+		self.step = stateBeginValue
+		self.parseState = self.parseState[0:0]
+		self.err = nil
+		self.endTop = false
+	}
+
+	// Tells the scanner that the end of input has been reached.
+	// It returns a scan status just as step does.
+	#disable nilptr
+	fn eof(mut *self): int {
+		if self.err != nil {
+			ret scanError
+		}
+		if self.endTop {
+			ret scanEnd
+		}
+		self.step(self, ' ')
+		if self.endTop {
+			ret scanEnd
+		}
+		if self.err == nil {
+			self.err = io::ErrUnexpectedEOF
+		}
+		ret scanError
+	}
+
+	// Records an error and switches to the error state.
+	#disable nilptr
+	fn onerror(mut *self, c: byte, context: str): int {
+		self.step = stateError
+		self.err = errors::New("json: invalid character " + quoteChar(c) + " " + context)
+		ret scanError
+	}
+
+	// Pushes a new parse state newParseState onto the parse stack.
+	// an error state is returned if maxNestingDepth was exceeded, otherwise successState is returned.
+	#disable nilptr
+	fn pushParseState(mut *self, c: byte, newParseState: int, successState: int): int {
+		self.parseState = append(self.parseState, newParseState)
+		if len(self.parseState) <= maxNestingDepth {
+			ret successState
+		}
+		ret self.onerror(c, "exceeded max depth")
+	}
+
+	// Pops a parse state (already obtained) off the stack
+	// and updates step accordingly.
+	#disable nilptr boundary
+	fn popParseState(mut *self) {
+		n := len(self.parseState) - 1
+		self.parseState = self.parseState[0:n]
+		if n == 0 {
+			self.step = stateEndTop
+			self.endTop = true
+		} else {
+			self.step = stateEndValue
+		}
+	}
+}
+
+// The state after reading `[`.
+#disable nilptr
+fn stateBeginValueOrEmpty(mut &s: *scanner, c: byte): int {
+	if isSpace(c) {
+		ret scanSkipSpace
+	}
+	if c == ']' {
+		ret stateEndValue(s, c)
+	}
+	ret stateBeginValue(s, c)
+}
+
+// The state at the beginning of the input.
+#disable nilptr
+fn stateBeginValue(mut &s: *scanner, c: byte): int {
+	if isSpace(c) {
+		ret scanSkipSpace
+	}
+	match c {
+	| '{':
+		s.step = stateBeginStringOrEmpty
+		ret s.pushParseState(c, parseObjectKey, scanBeginObject)
+	| '[':
+		s.step = stateBeginValueOrEmpty
+		ret s.pushParseState(c, parseArrayValue, scanBeginArray)
+	| '"':
+		s.step = stateInString
+		ret scanBeginLiteral
+	| '-':
+		s.step = stateNeg
+		ret scanBeginLiteral
+	| '0': // beginning of 0.123
+		s.step = state0
+		ret scanBeginLiteral
+	| 't': // beginning of true
+		s.step = stateT
+		ret scanBeginLiteral
+	| 'f': // beginning of false
+		s.step = stateF
+		ret scanBeginLiteral
+	| 'n': // beginning of null
+		s.step = stateN
+		ret scanBeginLiteral
+	}
+	if '1' <= c && c <= '9' { // beginning of 1234.5
+		s.step = state1
+		ret scanBeginLiteral
+	}
+	ret s.onerror(c, "looking for beginning of value")
+}
+
+// The state after reading `{`.
+#disable nilptr boundary
+fn stateBeginStringOrEmpty(mut &s: *scanner, c: byte): int {
+	if isSpace(c) {
+		ret scanSkipSpace
+	}
+	if c == '}' {
+		n := len(s.parseState)
+		s.parseState[n-1] = parseObjectValue
+		ret stateEndValue(s, c)
+	}
+	ret stateBeginString(s, c)
+}
+
+// The state after reading `{"key": value,`.
+#disable nilptr
+fn stateBeginString(mut &s: *scanner, c: byte): int {
+	if isSpace(c) {
+		ret scanSkipSpace
+	}
+	if c == '"' {
+		s.step = stateInString
+		ret scanBeginLiteral
+	}
+	ret s.onerror(c, "looking for beginning of object key string")
+}
+
+// The state after completing a value,
+// such as after reading `{}` or `true` or `["x"`.
+#disable nilptr boundary
+fn stateEndValue(mut &s: *scanner, c: byte): int {
+	n := len(s.parseState)
+	if n == 0 {
+		// Completed top-level before the current byte.
+		s.step = stateEndTop
+		s.endTop = true
+		ret stateEndTop(s, c)
+	}
+	if isSpace(c) {
+		s.step = stateEndValue
+		ret scanSkipSpace
+	}
+	ps := s.parseState[n-1]
+	match ps {
+	| parseObjectKey:
+		if c == ':' {
+			s.parseState[n-1] = parseObjectValue
+			s.step = stateBeginValue
+			ret scanObjectKey
+		}
+		ret s.onerror(c, "after object key")
+	| parseObjectValue:
+		if c == ',' {
+			s.parseState[n-1] = parseObjectKey
+			s.step = stateBeginString
+			ret scanObjectValue
+		}
+		if c == '}' {
+			s.popParseState()
+			ret scanEndObject
+		}
+		ret s.onerror(c, "after object key:value pair")
+	| parseArrayValue:
+		if c == ',' {
+			s.step = stateBeginValue
+			ret scanArrayValue
+		}
+		if c == ']' {
+			s.popParseState()
+			ret scanEndArray
+		}
+		ret s.onerror(c, "after array element")
+	}
+	ret s.onerror(c, "")
+}
+
+// The state after finishing the top-level value,
+// such as after reading `{}` or `[1,2,3]`.
+// Only space characters should be seen now.
+#disable nilptr
+fn stateEndTop(mut &s: *scanner, c: byte): int {
+	if !isSpace(c) {
+		// Complain about non-space byte on next call.
+		s.onerror(c, "after top-level value")
+	}
+	ret scanEnd
+}
+
+// The state after reading `"`.
+#disable nilptr
+fn stateInString(mut &s: *scanner, c: byte): int {
+	if c == '"' {
+		s.step = stateEndValue
+		ret scanContinue
+	}
+	if c == '\\' {
+		s.step = stateInStringEsc
+		ret scanContinue
+	}
+	if c < 0x20 {
+		ret s.onerror(c, "in string literal")
+	}
+	ret scanContinue
+}
+
+// The state after reading `"\` during a quoted string.
+#disable nilptr
+fn stateInStringEsc(mut &s: *scanner, c: byte): int {
+	match c {
+	| 'b' | 'f' | 'n' | 'r' | 't' | '\\' | '/' | '"':
+		s.step = stateInString
+		ret scanContinue
+	| 'u':
+		s.step = stateInStringEscU
+		ret scanContinue
+	}
+	ret s.onerror(c, "in string escape code")
+}
+
+// The state after reading `"\u` during a quoted string.
+#disable nilptr
+fn stateInStringEscU(mut &s: *scanner, c: byte): int {
+	if '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F' {
+		s.step = stateInStringEscU1
+		ret scanContinue
+	}
+	// numbers
+	ret s.onerror(c, "in \\u hexadecimal character escape")
+}
+
+// The state after reading `"\u1` during a quoted string.
+#disable nilptr
+fn stateInStringEscU1(mut &s: *scanner, c: byte): int {
+	if '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F' {
+		s.step = stateInStringEscU12
+		ret scanContinue
+	}
+	// numbers
+	ret s.onerror(c, "in \\u hexadecimal character escape")
+}
+
+// stateInStringEscU12 is the state after reading `"\u12` during a quoted string.
+#disable nilptr
+fn stateInStringEscU12(mut &s: *scanner, c: byte): int {
+	if '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F' {
+		s.step = stateInStringEscU123
+		ret scanContinue
+	}
+	// numbers
+	ret s.onerror(c, "in \\u hexadecimal character escape")
+}
+
+// The state after reading `"\u123` during a quoted string.
+#disable nilptr
+fn stateInStringEscU123(mut &s: *scanner, c: byte): int {
+	if '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F' {
+		s.step = stateInString
+		ret scanContinue
+	}
+	// numbers
+	ret s.onerror(c, "in \\u hexadecimal character escape")
+}
+
+// The state after reading `-` during a number.
+#disable nilptr
+fn stateNeg(mut &s: *scanner, c: byte): int {
+	if c == '0' {
+		s.step = state0
+		ret scanContinue
+	}
+	if '1' <= c && c <= '9' {
+		s.step = state1
+		ret scanContinue
+	}
+	ret s.onerror(c, "in numeric literal")
+}
+
+// The state after reading a non-zero integer during a number,
+// such as after reading `1` or `100` but not `0`.
+#disable nilptr
+fn state1(mut &s: *scanner, c: byte): int {
+	if '0' <= c && c <= '9' {
+		s.step = state1
+		ret scanContinue
+	}
+	ret state0(s, c)
+}
+
+// The state after reading `0` during a number.
+#disable nilptr
+fn state0(mut &s: *scanner, c: byte): int {
+	if c == '.' {
+		s.step = stateDot
+		ret scanContinue
+	}
+	if c == 'e' || c == 'E' {
+		s.step = stateE
+		ret scanContinue
+	}
+	ret stateEndValue(s, c)
+}
+
+// The state after reading the integer and decimal point in a number,
+// such as after reading `1.`.
+#disable nilptr
+fn stateDot(mut &s: *scanner, c: byte): int {
+	if '0' <= c && c <= '9' {
+		s.step = stateDot0
+		ret scanContinue
+	}
+	ret s.onerror(c, "after decimal point in numeric literal")
+}
+
+// The state after reading the integer, decimal point, and subsequent
+// digits of a number, such as after reading `3.14`.
+#disable nilptr
+fn stateDot0(mut &s: *scanner, c: byte): int {
+	if '0' <= c && c <= '9' {
+		ret scanContinue
+	}
+	if c == 'e' || c == 'E' {
+		s.step = stateE
+		ret scanContinue
+	}
+	ret stateEndValue(s, c)
+}
+
+// The state after reading the mantissa and e in a number,
+// such as after reading `314e` or `0.314e`.
+#disable nilptr
+fn stateE(mut &s: *scanner, c: byte): int {
+	if c == '+' || c == '-' {
+		s.step = stateESign
+		ret scanContinue
+	}
+	ret stateESign(s, c)
+}
+
+// The state after reading the mantissa, e, and sign in a number,
+// such as after reading `314e-` or `0.314e+`.
+#disable nilptr
+fn stateESign(mut &s: *scanner, c: byte): int {
+	if '0' <= c && c <= '9' {
+		s.step = stateE0
+		ret scanContinue
+	}
+	ret s.onerror(c, "in exponent of numeric literal")
+}
+
+// The state after reading the mantissa, e, optional sign,
+// and at least one digit of the exponent in a number,
+// such as after reading `314e-2` or `0.314e+1` or `3.14e0`.
+#disable nilptr
+fn stateE0(mut &s: *scanner, c: byte): int {
+	if '0' <= c && c <= '9' {
+		ret scanContinue
+	}
+	ret stateEndValue(s, c)
+}
+
+// The state after reading `t`.
+#disable nilptr
+fn stateT(mut &s: *scanner, c: byte): int {
+	if c == 'r' {
+		s.step = stateTr
+		ret scanContinue
+	}
+	ret s.onerror(c, "in literal true (expecting 'r')")
+}
+
+// The state after reading `tr`.
+#disable nilptr
+fn stateTr(mut &s: *scanner, c: byte): int {
+	if c == 'u' {
+		s.step = stateTru
+		ret scanContinue
+	}
+	ret s.onerror(c, "in literal true (expecting 'u')")
+}
+
+// The state after reading `tru`.
+#disable nilptr
+fn stateTru(mut &s: *scanner, c: byte): int {
+	if c == 'e' {
+		s.step = stateEndValue
+		ret scanContinue
+	}
+	ret s.onerror(c, "in literal true (expecting 'e')")
+}
+
+// The state after reading `f`.
+#disable nilptr
+fn stateF(mut &s: *scanner, c: byte): int {
+	if c == 'a' {
+		s.step = stateFa
+		ret scanContinue
+	}
+	ret s.onerror(c, "in literal false (expecting 'a')")
+}
+
+// The state after reading `fa`.
+#disable nilptr
+fn stateFa(mut &s: *scanner, c: byte): int {
+	if c == 'l' {
+		s.step = stateFal
+		ret scanContinue
+	}
+	ret s.onerror(c, "in literal false (expecting 'l')")
+}
+
+// The state after reading `fal`.
+#disable nilptr
+fn stateFal(mut &s: *scanner, c: byte): int {
+	if c == 's' {
+		s.step = stateFals
+		ret scanContinue
+	}
+	ret s.onerror(c, "in literal false (expecting 's')")
+}
+
+// The state after reading `fals`.
+#disable nilptr
+fn stateFals(mut &s: *scanner, c: byte): int {
+	if c == 'e' {
+		s.step = stateEndValue
+		ret scanContinue
+	}
+	ret s.onerror(c, "in literal false (expecting 'e')")
+}
+
+// The state after reading `n`.
+#disable nilptr
+fn stateN(mut &s: *scanner, c: byte): int {
+	if c == 'u' {
+		s.step = stateNu
+		ret scanContinue
+	}
+	ret s.onerror(c, "in literal null (expecting 'u')")
+}
+
+// The state after reading `nu`.
+#disable nilptr
+fn stateNu(mut &s: *scanner, c: byte): int {
+	if c == 'l' {
+		s.step = stateNul
+		ret scanContinue
+	}
+	ret s.onerror(c, "in literal null (expecting 'l')")
+}
+
+// The state after reading `nul`.
+#disable nilptr
+fn stateNul(mut &s: *scanner, c: byte): int {
+	if c == 'l' {
+		s.step = stateEndValue
+		ret scanContinue
+	}
+	ret s.onerror(c, "in literal null (expecting 'l')")
+}
+
+// The state after reaching a syntax error,
+// such as after reading `[1}` or `5.1.2`.
+#disable nilptr
+fn stateError(mut &s: *scanner, c: byte): int {
+	ret scanError
+}
+
+fn isSpace(c: byte): bool {
+	ret c <= ' ' && (c == ' ' || c == '\t' || c == '\r' || c == '\n')
+}
+
+// Formats c as a quoted character literal.
+fn quoteChar(c: byte): str {
+	// special cases - different from quoted strings
+	if c == '\'' {
+		ret `'\''`
+	}
+	if c == '"' {
+		ret `'"'`
+	}
+
+	// use quoted string with different quotation marks
+	s := conv::Quote(str(c))
+	ret "'" + s[1 : len(s)-1] + "'"
+}

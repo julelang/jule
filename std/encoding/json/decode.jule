@@ -13,19 +13,6 @@ use "std/unicode/utf16"
 use "std/unicode/utf8"
 use "std/unsafe"
 
-// This limits the max nesting depth to prevent stack overflow.
-// This is permitted by https://tools.ietf.org/html/rfc7159#section-9
-const maxNestingDepth = 256
-
-// These values are stored in the parse state stack.
-// They give the current state of a composite value
-// being scanned. If the parser is inside a nested value
-// the parse state describes the nested state, outermost at entry 0.
-const (
-	parseObject = 1 // parsing object key (before colon)
-	parseArray  = 2 // parsing array value
-)
-
 struct jsonDecoder {
 	data:  ubuf::Ubuf
 	mut i: int // Read offset for data.
@@ -35,6 +22,12 @@ struct jsonDecoder {
 }
 
 impl jsonDecoder {
+	fn init(*self, data: []byte) {
+		self.data.SetData(data)
+		self.i = 0
+		self.parseState = self.parseState[0:0]
+	}
+
 	fn eof(*self): bool {
 		ret self.i >= self.data.Len()
 	}
@@ -66,12 +59,12 @@ impl jsonDecoder {
 			match b {
 			| '{':
 				self.i++
-				self.pushParseState(parseObject)?
+				self.pushParseState(parseObjectValue)?
 			| '[':
-				self.pushParseState(parseArray)?
+				self.pushParseState(parseArrayValue)?
 				self.i++
 			| '}':
-				if colon || self.parseState[len(self.parseState)-1] != parseObject {
+				if colon || self.parseState[len(self.parseState)-1] != parseObjectValue {
 					error(errors::New("json: invalid character " + quoteChar(b) + " looking for beginning of value"))
 				}
 				self.popParseState()
@@ -81,7 +74,7 @@ impl jsonDecoder {
 					ret self.data.Slice2(i, self.i)
 				}
 			| ']':
-				if colon || self.parseState[len(self.parseState)-1] != parseArray {
+				if colon || self.parseState[len(self.parseState)-1] != parseArrayValue {
 					error(errors::New("json: invalid character " + quoteChar(b) + " looking for beginning of value"))
 				}
 				self.popParseState()
@@ -96,7 +89,7 @@ impl jsonDecoder {
 				}
 				self.i++
 				self.skipSpace()
-				if self.parseState[len(self.parseState)-1] == parseObject {
+				if self.parseState[len(self.parseState)-1] == parseObjectValue {
 					if self.eof() {
 						continue // Error will be handled by next iteration step.
 					}
@@ -129,7 +122,6 @@ impl jsonDecoder {
 			| '"' | 't' | 'f' | 'n':
 				self.scanValidLit()?
 				// Internal handling of literal sequences.
-				// See the checkScanValidLit.
 				j = self.i - 1
 				self.skipSpace()
 				if self.eof() {
@@ -137,7 +129,7 @@ impl jsonDecoder {
 				}
 				b2 := self.data.Get(self.i)
 				if b == '"' && b2 == ':' {
-					if self.parseState[len(self.parseState)-1] != parseObject {
+					if self.parseState[len(self.parseState)-1] != parseObjectValue {
 						error(errors::New("json: invalid character " + quoteChar(b2) + " used out of object value"))
 					}
 					j = self.i
@@ -245,7 +237,7 @@ impl jsonDecoder {
 			| comptime::Slice:
 				*a = (*a)[:0] // Keep capacity, but clear current elements.
 			}
-			self.pushParseState(parseArray)?
+			self.pushParseState(parseArrayValue)?
 			for {
 				// Look ahead for ] - can only happen on first iteration.
 				self.skipSpace()
@@ -330,7 +322,7 @@ impl jsonDecoder {
 			self.i++
 			ret
 		}
-		self.pushParseState(parseObject)?
+		self.pushParseState(parseObjectValue)?
 		// Consider string and dynamic JSON value types as quoted. Directly assign string as key.
 		const quoted = keyT.Kind() == comptime::Str || keyT == valueT || keyT == stringT
 		for {
@@ -421,7 +413,7 @@ impl jsonDecoder {
 			self.i++
 			ret
 		}
-		self.pushParseState(parseObject)?
+		self.pushParseState(parseObjectValue)?
 		cache := cachedFields[T]()
 		p := uintptr(t)
 		for {
@@ -493,27 +485,6 @@ impl jsonDecoder {
 			error(errors::New("json: invalid character " + quoteChar(b) + " after object key:value pair"))
 		}
 		self.popParseState()
-	}
-
-	// Check literal validity in quick way rather than using the Valid function.
-	// It should be used after the scanValidLit.
-	fn checkScanValidLit(*self)! {
-		lb := self.data.Get(self.i - 1)
-		self.skipSpace()
-		if self.eof() {
-			// No parse state, just literal is fine.
-			if len(self.parseState) == 0 {
-				ret
-			}
-			if self.parseState[len(self.parseState)] != parseObject {
-				error(errors::New("json: object is not ended"))
-			}
-			error(errors::New("json: array is not ended"))
-		}
-		b := self.data.Get(self.i)
-		if b != '[' && b != '{' {
-			error(errors::New("json: invalid character " + quoteChar(b) + " after " + quoteChar(lb)))
-		}
 	}
 
 	// Tries to use custom decoding method if exist for supported types.
@@ -827,15 +798,11 @@ fn Decode[T](data: []byte, mut &t: *T)! {
 		panic("std/encoding/json: destination type reference pointer is nil")
 	}
 	decoder := jsonDecoder{}
-	decoder.data.SetData(data)
+	decoder.init(data)
 	decoder.decode(t)?
 }
 
-fn isSpace(c: byte): bool {
-	ret c <= ' ' && (c == ' ' || c == '\t' || c == '\r' || c == '\n')
-}
-
-// getu4 decodes \uXXXX from the beginning of s, returning the hex value,
+// Decodes \uXXXX from the beginning of s, returning the hex value,
 // or it returns -1.
 fn getu4(s: []byte): rune {
 	if len(s) < 6 || s[0] != '\\' || s[1] != 'u' {
@@ -1209,19 +1176,4 @@ fn isValidLit(b: []byte): bool {
 	|:
 		ret false
 	}
-}
-
-// Formats c as a quoted character literal.
-fn quoteChar(c: byte): str {
-	// special cases - different from quoted strings
-	if c == '\'' {
-		ret `'\''`
-	}
-	if c == '"' {
-		ret `'"'`
-	}
-
-	// use quoted string with different quotation marks
-	s := conv::Quote(str(c))
-	ret "'" + s[1 : len(s)-1] + "'"
 }
