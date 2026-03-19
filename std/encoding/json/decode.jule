@@ -13,7 +13,10 @@ use "std/unicode/utf16"
 use "std/unicode/utf8"
 use "std/unsafe"
 
-struct jsonDecoder {
+// An internal JSON decoder specialized for a static buffer.
+// For streaming buffers, this decoder should be wrapped.
+// A decoder only decodes the buffer data.
+struct decoder {
 	data:  ubuf::Ubuf
 	mut i: int // Read offset for data.
 
@@ -21,7 +24,7 @@ struct jsonDecoder {
 	mut parseState: []int
 }
 
-impl jsonDecoder {
+impl decoder {
 	fn init(*self, data: []byte) {
 		self.data.SetData(data)
 		self.i = 0
@@ -797,9 +800,13 @@ fn Decode[T](data: []byte, mut &t: *T)! {
 	if t == nil {
 		panic("std/encoding/json: destination type reference pointer is nil")
 	}
-	decoder := jsonDecoder{}
-	decoder.init(data)
-	decoder.decode(t)?
+	d := decoder{}
+	d.init(data)
+	d.decode(t)?
+}
+
+fn typeDecoder[T](&d: *decoder, field: uintptr)! {
+	d.value(unsafe { &(*(*T)(field)) })?
 }
 
 // Decodes \uXXXX from the beginning of s, returning the hex value,

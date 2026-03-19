@@ -80,14 +80,22 @@ type encodeIndent = uint
 // For indentation, use Flag type logic.
 // See documentation of the [encodeFlagType].
 // See documentation of the Encode[T] for encoding details.
-struct jsonEncoder {
+//
+// For streaming encoding, this encoder should be wrapped.
+// An encoder only encodes to the internal buffer.
+struct encoder {
 	buf:        buffer // Common internal buffer to encode JSON.
 	indent:     str    // Indentation.
 	depth:      int    // Current depth.
 	escapeHTML: bool
 }
 
-impl jsonEncoder {
+impl encoder {
+	// Initializes encoder with default configuration.
+	fn init(mut *self) {
+		self.escapeHTML = true
+	}
+
 	fn encodeNil(mut *self) {
 		self.buf.writeStr("null")
 	}
@@ -461,13 +469,6 @@ impl jsonEncoder {
 	}
 }
 
-// Returns jsonEncoder with default configuration.
-fn encoder(): jsonEncoder {
-	ret jsonEncoder{
-		escapeHTML: true,
-	}
-}
-
 // Implements encoding of JSON as defined in RFC 7159.
 //
 // The algorithm is optimized for efficiency, performance and minimum runtime.
@@ -536,21 +537,23 @@ fn encoder(): jsonEncoder {
 // (having methods without implementing the trait is valid):
 //	JSONEncoder, TextEncoder
 fn Encode[T](t: T)!: []byte {
-	mut encoder := encoder()
-	encoder.encode[T, encodePlain](t)?
-	ret encoder.buf.bytes()
+	let mut e: encoder
+	e.init()
+	e.encode[T, encodePlain](t)?
+	ret e.buf.bytes()
 }
 
 // Same as Encode[T] function but enables indentation.
 fn EncodeIndent[T](t: T, indent: str)!: []byte {
-	mut encoder := encoder()
+	let mut e: encoder
+	e.init()
 	if indent == "" {
-		encoder.encode[T, encodePlain](t)?
+		e.encode[T, encodePlain](t)?
 	} else {
-		encoder.indent = indent
-		encoder.encode[T, encodeIndent](t)?
+		e.indent = indent
+		e.encode[T, encodeIndent](t)?
 	}
-	ret encoder.buf.bytes()
+	ret e.buf.bytes()
 }
 
 // Cache data for the structure field.
@@ -558,9 +561,9 @@ struct field {
 	offset:       uintptr
 	nameNonEsc:   str
 	nameEscHTML:  str
-	encodePlain:  fn(mut &encoder: *jsonEncoder, field: uintptr)!
-	encodeIndent: fn(mut &encoder: *jsonEncoder, field: uintptr)!
-	decode:       fn(&decoder: *jsonDecoder, field: uintptr)!
+	encodePlain:  fn(mut &e: *encoder, field: uintptr)!
+	encodeIndent: fn(mut &e: *encoder, field: uintptr)!
+	decode:       fn(&d: *decoder, field: uintptr)!
 }
 
 // Field cache data for structure types and associated RWMutex.
@@ -703,14 +706,10 @@ fn resolveKeyName[T](k: T): str {
 	panic("unexpected map key type")
 }
 
-fn typeEncoderPlain[T](mut &encoder: *jsonEncoder, field: uintptr)! {
-	encoder.encode[T, encodePlain](unsafe { *(*T)(field) })?
+fn typeEncoderPlain[T](mut &e: *encoder, field: uintptr)! {
+	e.encode[T, encodePlain](unsafe { *(*T)(field) })?
 }
 
-fn typeEncoderIndent[T](mut &encoder: *jsonEncoder, field: uintptr)! {
-	encoder.encode[T, encodeIndent](unsafe { *(*T)(field) })?
-}
-
-fn typeDecoder[T](&decoder: *jsonDecoder, field: uintptr)! {
-	decoder.value(unsafe { &(*(*T)(field)) })?
+fn typeEncoderIndent[T](mut &e: *encoder, field: uintptr)! {
+	e.encode[T, encodeIndent](unsafe { *(*T)(field) })?
 }
