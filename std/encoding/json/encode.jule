@@ -245,11 +245,13 @@ impl encoder {
 				self.buf.writeByte('\n')
 				self.buf.writeStr(strings::Repeat(self.indent, self.depth))
 			}
+			self.buf.writeByte('"')
 			if self.escapeHTML {
 				self.buf.writeStr(fieldCache.nameEscHTML)
 			} else {
 				self.buf.writeStr(fieldCache.nameNonEsc)
 			}
+			self.buf.writeStr("\":")
 			const match {
 			| useIndent:
 				self.buf.writeByte(' ')
@@ -607,14 +609,12 @@ fn cachedFields[T](): []&field {
 				fieldCache.offset = uintptr(&pv.FieldByIndex(i).Unwrap())
 
 				// Cache name for non-escape.
-				fieldCache.nameNonEsc = "\"" + name + "\":"
+				fieldCache.nameNonEsc = name
 
 				// Cache name for escape-HTML.
 				if isNeedHTMLEscape(unsafe::StrBytes(name)) {
 					mut buf := buffer{}
-					buf.writeByte('"')
 					appendHTMLEscape(&buf, unsafe::StrBytes(name))
-					buf.writeStr("\":")
 					fieldCache.nameEscHTML = unsafe::StrFromBytes(buf.bytes())
 				} else {
 					fieldCache.nameEscHTML = fieldCache.nameNonEsc
