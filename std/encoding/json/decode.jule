@@ -7,6 +7,7 @@ use "std/conv"
 use "std/encoding/base64"
 use "std/errors"
 use "std/internal/ubuf"
+use "std/runtime"
 use "std/strings"
 use "std/unicode"
 use "std/unicode/utf16"
@@ -154,11 +155,6 @@ impl decoder {
 	#disable nilptr boundary
 	fn array[T](*self, mut &a: *T)! {
 		const t = comptime::TypeOf(T)
-		comptime::TypeAlias(valueTyp, t.Value())
-		const match t.Kind() {
-		| comptime::Slice:
-			*a = (*a)[:0] // Keep capacity, but clear current elements.
-		}
 		mut i := 0
 		for {
 			// Look ahead for ] - can only happen on first iteration.
@@ -171,9 +167,14 @@ impl decoder {
 				}
 				self.value(&(*a)[i])?
 			| comptime::Slice:
-				let mut v: valueTyp
-				self.value(&v)?
-				*a = append(*a, v)
+				// Expand slice length, growing the slice if necessary.
+				// Use runtime implementation to grow properly like `append` calls.
+				n := cap(*a) - len(*a)
+				if n < 1 {
+					runtime::prememappend(a, 1)
+				}
+				*a = (*a)[:i+1]
+				self.value(unsafe { &(*(&(*a)[i])) })?
 			|:
 				panic("json: unimplemented type, this panic call should be unreachable")
 			}
@@ -190,6 +191,7 @@ impl decoder {
 			const match t.Kind() {
 			| comptime::Array:
 				// Assign to default value of array's zero remainder.
+				comptime::TypeAlias(valueTyp, t.Value())
 				let mut default: valueTyp
 				for i < len(*a); i++ {
 					(*a)[i] = default
