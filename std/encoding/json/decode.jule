@@ -205,6 +205,7 @@ impl decoder {
 		}
 	}
 
+	#disable nilptr boundary
 	fn objectMap[Map](*self, mut &m: *Map)! {
 		const mapT = comptime::TypeOf(Map)
 		comptime::TypeAlias(K, mapT.Key())
@@ -244,7 +245,7 @@ impl decoder {
 			// We use it to select beginning of literal.
 			start := self.readIndex()
 			self.rescanLiteral()?
-			keylit := self.data[start:self.readIndex()]
+			mut keylit := self.data[start:self.readIndex()]
 			// Read : before value.
 			if self.opcode == scanSkipSpace {
 				self.scanWhile(scanSkipSpace)?
@@ -261,7 +262,7 @@ impl decoder {
 				mut s := ""
 				ok := decodeStr(&s, keylit)
 				if !ok {
-					error(errors::New("json: invalid value for type " + keyT.Str() + ": " + str(keylit)))
+					error(errors::New("json: invalid value for type " + keyT.Str() + ": " + unsafe::BytesStr(keylit)))
 				}
 				if *m == nil {
 					*m = Map{} // create new map
@@ -276,7 +277,7 @@ impl decoder {
 				// Quoted non-string type, parse unquoted value by type to assign.
 				key := unquoteBytes(keylit)
 				if key == nil {
-					error(errors::New("json: invalid value for object key type" + keyT.Str() + ": " + str(keylit)))
+					error(errors::New("json: invalid value for object key type" + keyT.Str() + ": " + unsafe::BytesStr(keylit)))
 				}
 				let mut keyV: K
 				const match keyT.Kind() {
@@ -322,7 +323,7 @@ impl decoder {
 			self.rescanLiteral()?
 			keylit := unquoteBytes(self.data[start:self.readIndex()])
 			if keylit == nil {
-				error(errors::New("json: invalid value for DecodeText function:" + str(keylit)))
+				error(errors::New("json: invalid value for DecodeText function:" + unsafe::BytesStr(keylit)))
 			}
 			key := unsafe::StrFromBytes(keylit)
 			// Read : before value.
@@ -399,7 +400,7 @@ impl decoder {
 												self.rescanLiteral()?
 												lit := unquoteBytes(self.data[start:self.readIndex()])
 												if lit == nil {
-													error(errors::New("json: invalid value for DecodeText function:" + str(lit)))
+													error(errors::New("json: invalid value for DecodeText function:" + unsafe::BytesStr(lit)))
 												}
 												m.Unwrap()(lit)?
 												ret true
@@ -516,7 +517,7 @@ impl decoder {
 }
 
 #disable nilptr boundary
-fn decodeLiteral[T](data: []byte, mut &t: *T)! {
+fn decodeLiteral[T](mut data: []byte, mut &t: *T)! {
 	const tt = comptime::TypeOf(T)
 	match data[0] {
 	| '"': // String literal.
@@ -525,14 +526,14 @@ fn decodeLiteral[T](data: []byte, mut &t: *T)! {
 			mut s := ""
 			ok := decodeStr(&s, data)
 			if !ok {
-				error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(data)))
+				error(errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(data)))
 			}
 			*t = String(s)
 			ret
 		| tt.Kind() == comptime::Str:
 			ok := decodeStr(unsafe { &(*(*str)(t)) }, data)
 			if !ok {
-				error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(data)))
+				error(errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(data)))
 			}
 			ret
 		| tt.Kind() == comptime::Slice:
@@ -540,7 +541,7 @@ fn decodeLiteral[T](data: []byte, mut &t: *T)! {
 			| comptime::U8:
 				mut s2 := unquoteBytes(data)
 				if s2 == nil {
-					error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(data)))
+					error(errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(data)))
 				}
 				mut r := base64::Decode(s2)
 				*t = unsafe { *(*T)(&r) }
@@ -594,7 +595,7 @@ fn decodeLiteral[T](data: []byte, mut &t: *T)! {
 			decodeFloat(t, data)?
 			ret
 		|:
-			error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(data)))
+			error(errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(data)))
 		}
 	|:
 		panic("unreachable")
@@ -724,6 +725,9 @@ fn getu4(s: []byte): rune {
 // This function implements the JSON strings grammar.
 // See https://tools.ietf.org/html/rfc7159#section-7
 // and https://www.json.org/img/string.png
+//
+// We use "#disable boudary" with slices.
+// However, [ubuf::Ubuf] was ~25% faster on a 64-bit MacBook Pro.
 fn unquoteBytes(s: []byte): []byte {
 	ss := ubuf::Ubuf{}
 	ss.SetData(s)
@@ -756,12 +760,15 @@ fn unquoteBytes(s: []byte): []byte {
 		r += size
 	}
 	if r == ss.Len() {
+		// GC must be remain for the allocation.
+		// For memory efficiency, new allocation might be used as result or etc.
+		// Therefore avoid making allocation zero-reference and deallocation.
 		ret ss.GetData()
 	}
 
 	b := ubuf::Ubuf{}
 	b.SetData(make([]byte, ss.Len()+2*utf8::UTFMax))
-	mut w := copy(b.GetData(), ss.Slice3(r))
+	mut w := copy(b.Slice1(0), ss.Slice3(r))
 	for r < ss.Len() {
 		// Out of room? Can only happen if s is full of
 		// malformed UTF-8 and we're replacing each
@@ -844,41 +851,44 @@ fn unquoteBytes(s: []byte): []byte {
 	// GC must be remain for the allocation, do not use b.Slice3 to slice.
 	// For memory efficiency, new allocation might be used as result or etc.
 	// Therefore avoid making allocation zero-reference and deallocation.
-	ret b.GetData()[:w]
+	ret b.GetData()[0:w]
 }
 
+#disable nilptr
 fn decodeInt[T](mut &t: *T, lit: []byte)! {
 	// Use [unsafe::ByteStr] instead of casting.
 	// The byte buffer will not change, so it's safe and efficient.
 	const tt = comptime::TypeOf(T)
 	n := conv::ParseInt(unsafe::BytesStr(lit), 10, tt.Bits()) else {
-		error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
+		error(errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(lit)))
 	}
 	*t = (T)(n)
 }
 
+#disable nilptr
 fn decodeUInt[T](mut &t: *T, lit: []byte)! {
 	// Use [unsafe::ByteStr] instead of casting.
 	// The byte buffer will not change, so it's safe and efficient.
 	const tt = comptime::TypeOf(T)
 	n := conv::ParseUint(unsafe::BytesStr(lit), 10, tt.Bits()) else {
-		error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
+		error(errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(lit)))
 	}
 	*t = (T)(n)
 }
 
+#disable nilptr
 fn decodeFloat[T](mut &t: *T, lit: []byte)! {
 	// Use [unsafe::ByteStr] instead of casting.
 	// The byte buffer will not change, so it's safe and efficient.
 	const tt = comptime::TypeOf(T)
 	n := conv::ParseFloat(unsafe::BytesStr(lit), tt.Bits()) else {
-		error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
+		error(errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(lit)))
 	}
 	*t = (T)(n)
 }
 
 #disable nilptr boundary
-fn decodeStr(mut &s: *str, lit: []byte): (ok: bool) {
+fn decodeStr(mut &s: *str, mut lit: []byte): (ok: bool) {
 	mut s2 := unquoteBytes(lit)
 	if s2 == nil {
 		ret false
