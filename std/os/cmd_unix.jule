@@ -23,7 +23,7 @@ fn cmdsetenv(mut &envv: *[]str)! {
 	for j, env in *envv {
 		i := byteslite::IndexByteStr(env, '=')
 		if i == -1 {
-			error(sys::Errno(sys::EINVAL))
+			throw sys::Errno(sys::EINVAL)
 		}
 		if len(env)-i == 1 {
 			(*envv)[j] = env[:i] + "=\x00"
@@ -94,7 +94,7 @@ impl Cmd {
 			if n != 0 {
 				self.attrs.pid = invalidPid
 				code, _ := unsafe { conv::AtoiBp(&buf[0], n) }
-				error(sys::Errno(code))
+				throw sys::Errno(code)
 			}
 		}
 	}
@@ -102,7 +102,7 @@ impl Cmd {
 	fn kill(*self)! {
 		sys::Kill(self.attrs.pid, 1) else {
 			self.attrs.pid = invalidPid
-			error(error)
+			throw error
 		}
 		self.attrs.pid = invalidPid
 	}
@@ -123,19 +123,19 @@ fn findExecutable(file: str)! {
 	d := Stat(file)?
 	m := d.Mode()
 	if m.IsDir() {
-		error(sys::Errno(sys::EISDIR))
+		throw sys::Errno(sys::EISDIR)
 	}
 	unix::Eaccess(file, unix::X_OK) else {
 		// ENOSYS means Eaccess is not available or not implemented.
 		// EPERM can be returned by Linux containers employing seccomp.
 		// In both cases, fall back to checking the permission bits.
 		if error != sys::ENOSYS && error != sys::EPERM {
-			error(error)
+			throw error
 		}
 		if m&0111 != 0 {
 			ret
 		}
-		error(sys::Errno(sys::EACCES))
+		throw sys::Errno(sys::EACCES)
 	}
 }
 
@@ -146,7 +146,7 @@ fn findExecutable(file: str)! {
 fn lookPath(file: str)!: str {
 	if byteslite::IndexByteStr(file, '/') != -1 {
 		findExecutable(file) else {
-			error(&lookpathError{file, error})
+			throw &lookpathError{file, error}
 		}
 		ret file
 	}
@@ -159,11 +159,11 @@ fn lookPath(file: str)!: str {
 		path = filepathlite::Join(dir, file)
 		findExecutable(path) else { continue }
 		if !filepathlite::IsAbs(path) {
-			error(&lookpathError{file, errDot})
+			throw &lookpathError{file, errDot}
 		}
 		ret path
 	}
-	error(&lookpathError{file, errNotFound})
+	throw &lookpathError{file, errNotFound}
 }
 
 // This is a no-op on non-Windows platforms, since

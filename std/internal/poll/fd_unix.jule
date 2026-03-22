@@ -93,10 +93,10 @@ impl FD {
 					self.WaitWrite().await?
 					continue
 				}
-				error(error)
+				throw error
 			}
 			if nn == 0 {
-				error(io::ErrUnexpectedEOF)
+				throw io::ErrUnexpectedEOF
 			}
 			if nn > 0 {
 				if nn > max-n {
@@ -137,7 +137,7 @@ impl FD {
 			part := buf[n:max]
 			nn := ignoringEINTRIO2(sys::Write, int(self.File), part)?
 			if nn == 0 {
-				error(io::ErrUnexpectedEOF)
+				throw io::ErrUnexpectedEOF
 			}
 			if nn > 0 {
 				if nn > max-n {
@@ -184,7 +184,7 @@ impl FD {
 					self.WaitWrite().await?
 					continue
 				}
-				error(error)
+				throw error
 			}
 			ret len(buf)
 		}
@@ -206,7 +206,7 @@ impl FD {
 				if error == sys::EINTR {
 					continue
 				}
-				error(error)
+				throw error
 			}
 			ret len(buf)
 		}
@@ -246,7 +246,7 @@ impl FD {
 					self.WaitRead().await?
 					continue
 				}
-				error(error)
+				throw error
 			}
 			n = self.statEOF(n)
 			ret n
@@ -307,7 +307,7 @@ impl FD {
 					self.WaitRead().await?
 					continue
 				}
-				error(error)
+				throw error
 			}
 			n = self.statEOF(n)
 			ret n
@@ -330,7 +330,7 @@ impl FD {
 				if error == sys::EINTR {
 					continue
 				}
-				error(error)
+				throw error
 			}
 			n = self.statEOF(n)
 			ret n
@@ -388,12 +388,12 @@ impl FD {
 						continue
 					}
 				}
-				error(error)
+				throw error
 			}
 			sys::CloseOnExec(h)
 			sys::SetNonblock(h, true) else {
 				sys::Close(h) else {}
-				error(error)
+				throw error
 			}
 			ret h
 		}
@@ -445,7 +445,7 @@ impl FD {
 		semacquire(&self.csema).await
 
 		if err != nil {
-			error(err)
+			throw err
 		}
 	}
 }
@@ -455,7 +455,7 @@ fn ignoringEINTRIO(f: fn(fd: int, mut p: []byte)!: int, fd: int, mut p: []byte)!
 	for {
 		ret f(fd, p) else {
 			if error != sys::EINTR {
-				error(error)
+				throw error
 			}
 			continue
 		}
@@ -467,7 +467,7 @@ fn ignoringEINTRIO2(f: fn(fd: int, p: []byte)!: int, fd: int, p: []byte)!: int {
 	for {
 		ret f(fd, p) else {
 			if error != sys::EINTR {
-				error(error)
+				throw error
 			}
 			continue
 		}

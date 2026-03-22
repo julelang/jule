@@ -180,7 +180,7 @@ fn unescape(mut s: str, mode: int)!: str {
 				if len(s) > 3 {
 					s = s[:3]
 				}
-				error(EscapeError(s))
+				throw EscapeError(s)
 			}
 			// Per https://tools.ietf.org/html/rfc3986#page-21
 			// in the host component %-encoding can only be used
@@ -189,7 +189,7 @@ fn unescape(mut s: str, mode: int)!: str {
 			// introduces %25 being allowed to escape a percent sign
 			// in IPv6 scoped-address literals. Yay.
 			if mode == encodingHost && unhex(s[i+1]) < 8 && s[i:i+3] != "%25" {
-				error(EscapeError(s[i : i+3]))
+				throw EscapeError(s[i : i+3])
 			}
 			if mode == encodingZone {
 				// RFC 6874 says basically "anything goes" for zone identifiers
@@ -201,7 +201,7 @@ fn unescape(mut s: str, mode: int)!: str {
 				// But Windows puts spaces here! Yay.
 				v := unhex(s[i+1])<<4 | unhex(s[i+2])
 				if s[i:i+3] != "%25" && v != ' ' && shouldEscape(v, encodingHost) {
-					error(EscapeError(s[i : i+3]))
+					throw EscapeError(s[i : i+3])
 				}
 			}
 			i += 3
@@ -210,7 +210,7 @@ fn unescape(mut s: str, mode: int)!: str {
 			i++
 		|:
 			if (mode == encodingHost || mode == encodingZone) && s[i] < 0x80 && shouldEscape(s[i], mode) {
-				error(InvalidHostError(s[i : i+1]))
+				throw InvalidHostError(s[i : i+1])
 			}
 			i++
 		}
@@ -858,7 +858,7 @@ fn getScheme(rawURL: str)!: (scheme: str, path: str) {
 			}
 		| c == ':':
 			if i == 0 {
-				error(errors::New("missing protocol scheme"))
+				throw errors::New("missing protocol scheme")
 			}
 			ret rawURL[:i], rawURL[i+1:]
 		|:
@@ -935,11 +935,11 @@ fn parseHost(mut host: str)!: str {
 		// E.g., "[fe80::1]", "[fe80::1%25en0]", "[fe80::1]:80".
 		i := strings::LastIndex(host, "]")
 		if i < 0 {
-			error(errors::New("missing ']' in host"))
+			throw errors::New("missing ']' in host")
 		}
 		colonPort := host[i+1:]
 		if !validOptionalPort(colonPort) {
-			error(errors::New("invalid port " + colonPort + " after host"))
+			throw errors::New("invalid port " + colonPort + " after host")
 		}
 
 		// RFC 6874 defines that %25 (%-encoded percent) introduces
@@ -960,7 +960,7 @@ fn parseHost(mut host: str)!: str {
 		if i != -1 {
 			colonPort := host[i:]
 			if !validOptionalPort(colonPort) {
-				error(errors::New("invalid port " + colonPort + " after host"))
+				throw errors::New("invalid port " + colonPort + " after host")
 			}
 		}
 	}
@@ -978,7 +978,7 @@ fn parseAuthority(authority: str)!: (user: &UserInfo, host: str) {
 	host = parseHost(authority[i+1:])?
 	mut userinfo := authority[:i]
 	if !validUserinfo(userinfo) {
-		error(errors::New("invalid userinfo"))
+		throw errors::New("invalid userinfo")
 	}
 	if !strings::Contains(userinfo, ":") {
 		userinfo = unescape(userinfo, encodingUserPassword)?
@@ -1000,11 +1000,11 @@ fn parse(rawURL: str, viaRequest: bool)!: &URL {
 	mut rest := ""
 
 	if strContainsCTLByte(rawURL) {
-		error(errors::New("invalid control character in URL"))
+		throw errors::New("invalid control character in URL")
 	}
 
 	if rawURL == "" && viaRequest {
-		error(errors::New("empty url"))
+		throw errors::New("empty url")
 	}
 
 	mut url := new(URL)
@@ -1033,7 +1033,7 @@ fn parse(rawURL: str, viaRequest: bool)!: &URL {
 			ret url
 		}
 		if viaRequest {
-			error(errors::New("invalid URI for request"))
+			throw errors::New("invalid URI for request")
 		}
 
 		// Avoid confusion with malformed schemes, like cache_object:foo/bar.
@@ -1044,7 +1044,7 @@ fn parse(rawURL: str, viaRequest: bool)!: &URL {
 		segment, _, _ := strings::Cut(rest, "/")
 		if strings::Contains(segment, ":") {
 			// First path segment has colon. Not allowed in relative URL.
-			error(errors::New("first path segment in URL cannot contain colon"))
+			throw errors::New("first path segment in URL cannot contain colon")
 		}
 	}
 
@@ -1079,13 +1079,13 @@ fn Parse(rawURL: str)!: &URL {
 	// Cut off #frag
 	u, frag, _ := strings::Cut(rawURL, "#")
 	mut url := parse(u, false) else {
-		error(&Error{"parse", u, error})
+		throw &Error{"parse", u, error}
 	}
 	if frag == "" {
 		ret url
 	}
 	url.setFragment(frag) else {
-		error(&Error{"parse", rawURL, error})
+		throw &Error{"parse", rawURL, error}
 	}
 	ret url
 }
@@ -1097,7 +1097,7 @@ fn Parse(rawURL: str)!: &URL {
 // (Web browsers strip #fragment before sending the URL to a web server.)
 fn ParseRequestURI(rawURL: str)!: &URL {
 	ret parse(rawURL, true) else {
-		error(&Error{"parse", rawURL, error})
+		throw &Error{"parse", rawURL, error}
 	}
 }
 
@@ -1173,7 +1173,7 @@ fn parseQuery(mut m: Values, mut query: str)! {
 		mut key := ""
 		key, query, _ = strings::Cut(query, "&")
 		if strings::Contains(key, ";") {
-			error(errors::New("invalid semicolon separator in query"))
+			throw errors::New("invalid semicolon separator in query")
 		}
 		if key == "" {
 			continue

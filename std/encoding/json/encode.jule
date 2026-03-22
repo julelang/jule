@@ -128,7 +128,7 @@ impl encoder {
 	#disable nilptr
 	fn encodeFloat(mut *self, f: f64, bits: int)! {
 		if math::IsNaN(f) || math::IsInf(f, 0) {
-			error(&UnsupportedValueError{conv::FormatFloat(f, 'g', -1, bits)})
+			throw &UnsupportedValueError{conv::FormatFloat(f, 'g', -1, bits)}
 		}
 		mut fmt := byte('f')
 		abs := math::Abs(f)
@@ -301,7 +301,7 @@ impl encoder {
 		| comptime::U64:
 			break
 		|:
-			error(&UnsupportedTypeError{Type: tt.Str()})
+			throw &UnsupportedTypeError{Type: tt.Str()}
 		}
 		if t == nil {
 			self.buf.writeStr("{}")
@@ -412,7 +412,7 @@ impl encoder {
 							| m.Type().Decl().Exceptional() &&
 								m.Type().Result() == comptime::TypeOf([]byte):
 								bytes := m.Unwrap()() else {
-									error(&EncodeError{Type: tt.Str(), Err: error, sourceFunc: name})
+									throw &EncodeError{Type: tt.Str(), Err: error, sourceFunc: name}
 								}
 								const match name {
 								| "EncodeText":
@@ -466,7 +466,7 @@ impl encoder {
 		| comptime::Slice:
 			self.encodeSlice[T, Flag](t)?
 		|:
-			error(&UnsupportedTypeError{Type: tt.Str()})
+			throw &UnsupportedTypeError{Type: tt.Str()}
 		}
 	}
 
@@ -478,7 +478,7 @@ impl encoder {
 		const tt = comptime::TypeOf(T)
 		const match {
 		| tt.Extern():
-			error(&UnsupportedTypeError{Type: tt.Str()})
+			throw &UnsupportedTypeError{Type: tt.Str()}
 		|:
 			self.encodePlain[T, Flag](t)?
 		}

@@ -85,15 +85,15 @@ impl Cmd {
 		mut hStdout := sys::InvalidHandle
 		mut hStderr := sys::InvalidHandle
 		if unsafe { !sys::DuplicateHandle(proc, sys::Handle(stdin.fd.File), proc, &hStdin, 0, true, _DUPLICATE_SAME_ACCESS) } {
-			error(sys::GetLastErrno())
+			throw sys::GetLastErrno()
 		}
 		unsafe defer { sys::DuplicateHandle(proc, hStdin, 0, nil, 0, false, _DUPLICATE_CLOSE_SOURCE) }
 		if unsafe { !sys::DuplicateHandle(proc, sys::Handle(stdout.fd.File), proc, &hStdout, 0, true, _DUPLICATE_SAME_ACCESS) } {
-			error(sys::GetLastErrno())
+			throw sys::GetLastErrno()
 		}
 		unsafe defer { sys::DuplicateHandle(proc, hStdout, 0, nil, 0, false, _DUPLICATE_CLOSE_SOURCE) }
 		if unsafe { !sys::DuplicateHandle(proc, sys::Handle(stderr.fd.File), proc, &hStderr, 0, true, _DUPLICATE_SAME_ACCESS) } {
-			error(sys::GetLastErrno())
+			throw sys::GetLastErrno()
 		}
 		unsafe defer { sys::DuplicateHandle(proc, hStderr, 0, nil, 0, false, _DUPLICATE_CLOSE_SOURCE) }
 
@@ -116,7 +116,7 @@ impl Cmd {
 				extern.DWORD(flags), envp, (*c::Wchar)(dirp),
 				(*extern.STARTUPINFOW)(&si),
 				(*extern.PROCESS_INFORMATION)(&pi)) == 0 {
-				error(sys::GetLastErrno())
+				throw sys::GetLastErrno()
 			}
 		}
 		self.attrs.hProcess = pi.hProcess
@@ -129,7 +129,7 @@ impl Cmd {
 			self.attrs.hProcess = 0
 			ret
 		}
-		error(sys::GetLastErrno())
+		throw sys::GetLastErrno()
 	}
 
 	fn wait(*self)!: int {
@@ -230,7 +230,7 @@ fn createEnvBlock(env: []str)!: []u16 {
 	mut n := 0
 	for _, s in env {
 		if strings::IndexByte(s, 0) != -1 {
-			error(sys::EINVAL)
+			throw sys::EINVAL
 		}
 		n += len(s) + 1
 	}
@@ -249,7 +249,7 @@ fn createEnvBlock(env: []str)!: []u16 {
 fn chkStat(file: str)! {
 	d := Stat(file)?
 	if d.IsDir() {
-		error(sys::Errno(sys::ERROR_ACCESS_DENIED))
+		throw sys::Errno(sys::ERROR_ACCESS_DENIED)
 	}
 }
 
@@ -279,9 +279,9 @@ fn findExecutable(file: str, exts: []str)!: str {
 		ret f
 	}
 	if hasExt(file) {
-		error(sys::Errno(sys::ERROR_FILE_NOT_FOUND))
+		throw sys::Errno(sys::ERROR_FILE_NOT_FOUND)
 	}
-	error(errNotFound)
+	throw errNotFound
 }
 
 fn pathExt(): (exts: []str) {
@@ -348,7 +348,7 @@ fn lookPath(file: str)!: str {
 // Implements lookPath for the given PATHEXT list.
 fn _lookPath(file: str, exts: []str)!: str {
 	if strings::ContainsAny(file, `:\/`) {
-		ret findExecutable(file, exts) else { error(&lookpathError{file, error}) }
+		ret findExecutable(file, exts) else { throw &lookpathError{file, error} }
 	}
 
 	// On Windows, creating the NoDefaultCurrentDirectoryInExePath
@@ -389,19 +389,19 @@ fn _lookPath(file: str, exts: []str)!: str {
 			// out that the explicit one doesn't match.
 			dotfi := Lstat(dotf) else {
 				if dotErr != nil {
-					error(dotErr)
+					throw dotErr
 				}
 				ret dotf
 			}
 			fi := Lstat(f) else {
 				if dotErr != nil {
-					error(dotErr)
+					throw dotErr
 				}
 				ret dotf
 			}
 			if !dotfi.SameFile(fi) {
 				if dotErr != nil {
-					error(dotErr)
+					throw dotErr
 				}
 				ret dotf
 			}
@@ -421,7 +421,7 @@ fn _lookPath(file: str, exts: []str)!: str {
 	}
 
 	if dotErr != nil {
-		error(dotErr)
+		throw dotErr
 	}
-	error(&lookpathError{file, errNotFound})
+	throw &lookpathError{file, errNotFound}
 }

@@ -104,10 +104,10 @@ impl Cmd {
 	// The reader will not be closed automatically after [Cmd.Wait] sees the command exit.
 	fn Stdin(*self, mut r: &File)! {
 		if self.stdin != nil {
-			error(errors::New("std/os: Cmd.Stdin used when stdin already assigned"))
+			throw errors::New("std/os: Cmd.Stdin used when stdin already assigned")
 		}
 		if atomic::Load(&self.started, atomic::Acquire) == 1 {
-			error(errors::New("std/os: Cmd.Stdin after process started"))
+			throw errors::New("std/os: Cmd.Stdin after process started")
 		}
 		self.stdin = r
 	}
@@ -117,10 +117,10 @@ impl Cmd {
 	// The reader will not be closed automatically after [Cmd.Wait] sees the command exit.
 	fn Stdout(*self, mut w: &File)! {
 		if self.stdout != nil {
-			error(errors::New("std/os: Cmd.Stdout used when stdout already assigned"))
+			throw errors::New("std/os: Cmd.Stdout used when stdout already assigned")
 		}
 		if atomic::Load(&self.started, atomic::Acquire) == 1 {
-			error(errors::New("std/os: Cmd.Stdout after process started"))
+			throw errors::New("std/os: Cmd.Stdout after process started")
 		}
 		self.stdout = w
 	}
@@ -130,10 +130,10 @@ impl Cmd {
 	// The reader will not be closed automatically after [Cmd.Wait] sees the command exit.
 	fn Stderr(*self, mut w: &File)! {
 		if self.stderr != nil {
-			error(errors::New("std/os: Cmd.Stderr used when stderr already assigned"))
+			throw errors::New("std/os: Cmd.Stderr used when stderr already assigned")
 		}
 		if atomic::Load(&self.started, atomic::Acquire) == 1 {
-			error(errors::New("std/os: Cmd.Stderr after process started"))
+			throw errors::New("std/os: Cmd.Stderr after process started")
 		}
 		self.stderr = w
 	}
@@ -146,10 +146,10 @@ impl Cmd {
 	// is closed, the caller must close the pipe.
 	fn StdinPipe(*self)!: io::WriteCloser {
 		if self.stdin != nil {
-			error(errors::New("std/os: Cmd.StdinPipe used when stdin already assigned"))
+			throw errors::New("std/os: Cmd.StdinPipe used when stdin already assigned")
 		}
 		if atomic::Load(&self.started, atomic::Acquire) == 1 {
-			error(errors::New("std/os: Cmd.StdinPipe after process started"))
+			throw errors::New("std/os: Cmd.StdinPipe after process started")
 		}
 		mut r, mut w := Pipe()?
 		self.stdin = r
@@ -167,10 +167,10 @@ impl Cmd {
 	// For the same reason, it is incorrect to call [Cmd.Run] when using StdoutPipe.
 	fn StdoutPipe(*self)!: io::ReadCloser {
 		if self.stdout != nil {
-			error(errors::New("std/os: Cmd.StdoutPipe used when stdout already assigned"))
+			throw errors::New("std/os: Cmd.StdoutPipe used when stdout already assigned")
 		}
 		if atomic::Load(&self.started, atomic::Acquire) == 1 {
-			error(errors::New("std/os: Cmd.StdoutPipe after process started"))
+			throw errors::New("std/os: Cmd.StdoutPipe after process started")
 		}
 		mut r, mut w := Pipe()?
 		self.stdout = w
@@ -188,10 +188,10 @@ impl Cmd {
 	// For the same reason, it is incorrect to use [Cmd.Run] when using StderrPipe.
 	fn StderrPipe(*self)!: io::ReadCloser {
 		if self.stderr != nil {
-			error(errors::New("std/os: Cmd.StderrPipe used when stderr already assigned"))
+			throw errors::New("std/os: Cmd.StderrPipe used when stderr already assigned")
 		}
 		if atomic::Load(&self.started, atomic::Acquire) == 1 {
-			error(errors::New("std/os: Cmd.StderrPipe after process started"))
+			throw errors::New("std/os: Cmd.StderrPipe after process started")
 		}
 		mut r, mut w := Pipe()?
 		self.stderr = w
@@ -265,7 +265,7 @@ impl Cmd {
 		// to chdir into. We can make the error clearer this way.
 		if self.Dir != "" {
 			Stat(self.Dir) else {
-				error(errors::New("std/os: Cmd.Start: Dir is not empty and specified path is not exist: \"" + self.Dir + "\""))
+				throw errors::New("std/os: Cmd.Start: Dir is not empty and specified path is not exist: \"" + self.Dir + "\"")
 			}
 		}
 		stdin := self.childStdin()?
@@ -367,7 +367,7 @@ fn dedupEnvCase(caseInsensitive: bool, nulOK: bool, env: []str)!: []str {
 		// Reject NUL in environment variables to prevent security issues (See Go's #56284);
 		// except when !nulOK, which uses NUL as filepath::ListSeparator (See Go's #56544).
 		if !nulOK && strings::IndexByte(kv, 0) != -1 {
-			error(errors::New("std/os: environment variable contains NUL"))
+			throw errors::New("std/os: environment variable contains NUL")
 		}
 
 		mut i := strings::Index(kv, "=")

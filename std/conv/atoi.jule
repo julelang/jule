@@ -55,7 +55,7 @@ fn ParseUint(mut s: str, mut base: int, mut bitSize: int)!: u64 {
 	const fnParseUint = "ParseUint"
 
 	if s == "" {
-		error(syntaxError(fnParseUint, s))
+		throw syntaxError(fnParseUint, s)
 	}
 
 	base0 := base == 0
@@ -84,13 +84,13 @@ fn ParseUint(mut s: str, mut base: int, mut bitSize: int)!: u64 {
 			}
 		}
 	|:
-		error(baseError(fnParseUint, s0, base))
+		throw baseError(fnParseUint, s0, base)
 	}
 
 	if bitSize == 0 {
 		bitSize = IntSize
 	} else if bitSize < 0 || bitSize > 64 {
-		error(bitSizeError(fnParseUint, s0, bitSize))
+		throw bitSizeError(fnParseUint, s0, bitSize)
 	}
 
 	// Cutoff is the smallest number such that cutoff*base > maxUint64.
@@ -120,29 +120,29 @@ fn ParseUint(mut s: str, mut base: int, mut bitSize: int)!: u64 {
 		| 'a' <= lower(c) && lower(c) <= 'z':
 			d = lower(c) - 'a' + 10
 		|:
-			error(syntaxError(fnParseUint, s0))
+			throw syntaxError(fnParseUint, s0)
 		}
 
 		if d >= byte(base) {
-			error(syntaxError(fnParseUint, s0))
+			throw syntaxError(fnParseUint, s0)
 		}
 
 		if n >= cutoff {
 			// n*base overflows
-			error(rangeError(fnParseUint, s0))
+			throw rangeError(fnParseUint, s0)
 		}
 		n *= u64(base)
 
 		n1 := n + u64(d)
 		if n1 < n || n1 > maxVal {
 			// n+d overflows
-			error(rangeError(fnParseUint, s0))
+			throw rangeError(fnParseUint, s0)
 		}
 		n = n1
 	}
 
 	if underscores && !underscoreOK(s0) {
-		error(syntaxError(fnParseUint, s0))
+		throw syntaxError(fnParseUint, s0)
 	}
 
 	ret n
@@ -174,7 +174,7 @@ fn ParseInt(mut s: str, base: int, mut bitSize: int)!: i64 {
 	const fnParseInt = "ParseInt"
 
 	if s == "" {
-		error(syntaxError(fnParseInt, s))
+		throw syntaxError(fnParseInt, s)
 	}
 
 	// Pick off leading sign.
@@ -193,7 +193,7 @@ fn ParseInt(mut s: str, base: int, mut bitSize: int)!: i64 {
 		if nerr.Err != ErrRange {
 			nerr.Func = fnParseInt
 			nerr.Num = s0
-			error(error)
+			throw error
 		}
 		maxVal := u64(1)<<uint(bitSize) - 1
 		use maxVal
@@ -205,10 +205,10 @@ fn ParseInt(mut s: str, base: int, mut bitSize: int)!: i64 {
 
 	cutoff := u64(1 << uint(bitSize-1))
 	if !neg && un >= cutoff {
-		error(rangeError(fnParseInt, s0))
+		throw rangeError(fnParseInt, s0)
 	}
 	if neg && un > cutoff {
-		error(rangeError(fnParseInt, s0))
+		throw rangeError(fnParseInt, s0)
 	}
 	mut n := i64(un)
 	if neg {
@@ -229,7 +229,7 @@ fn Atoi(mut s: str)!: int {
 		if s[0] == '-' || s[0] == '+' {
 			s = s[1:]
 			if len(s) < 1 {
-				error(syntaxError(fnAtoi, s0))
+				throw syntaxError(fnAtoi, s0)
 			}
 		}
 
@@ -237,7 +237,7 @@ fn Atoi(mut s: str)!: int {
 		for (_, mut ch) in []byte(s) {
 			ch -= '0'
 			if ch > 9 {
-				error(syntaxError(fnAtoi, s0))
+				throw syntaxError(fnAtoi, s0)
 			}
 			n = n*10 + int(ch)
 		}
@@ -253,7 +253,7 @@ fn Atoi(mut s: str)!: int {
 		if ok {
 			nerr.Func = fnAtoi
 		}
-		error(error)
+		throw error
 	}
 	ret int(int64)
 }

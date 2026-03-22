@@ -388,11 +388,11 @@ async fn copyBuffer(mut dst: Writer, mut src: Reader, mut buf: []byte)!: (writte
 		if nr > 0 {
 			nw := dst.Write(buf[0:nr]).await?
 			if nw < 0 || nr < nw {
-				error(errInvalidWrite)
+				throw errInvalidWrite
 			}
 			written += i64(nw)
 			if nr != nw {
-				error(ErrShortWrite)
+				throw ErrShortWrite
 			}
 		}
 	}
@@ -431,7 +431,7 @@ async fn ReadAll(mut r: Reader)!: []byte {
 			if len(chunks) > 0 || len(b) > 0 {
 				break
 			}
-			error(error)
+			throw error
 		}
 		if n == EOF {
 			break
@@ -469,18 +469,18 @@ async fn ReadAll(mut r: Reader)!: []byte {
 // If r returns an error having read at least min bytes, the error is dropped.
 async fn ReadAtLeast(mut r: Reader, mut buf: []byte, min: int)!: (n: int) {
 	if len(buf) < min {
-		error(ErrShortBuffer)
+		throw ErrShortBuffer
 	}
 	for n < min {
 		rn := r.Read(buf[n:]).await else {
 			if n >= min {
 				ret n
 			}
-			error(error)
+			throw error
 		}
 		if rn == EOF {
 			if n > 0 {
-				error(ErrUnexpectedEOF)
+				throw ErrUnexpectedEOF
 			}
 			n = EOF
 			break

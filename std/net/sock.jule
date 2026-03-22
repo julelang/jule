@@ -20,7 +20,7 @@ async fn Listen(network: Network, addr: str)!: Listener {
 	| TCP | TCP4 | TCP6:
 		ret tcpBind(network, addr).await?
 	|:
-		error(&AddrError{Err: "invalid network: " + str(network)})
+		throw &AddrError{Err: "invalid network: " + str(network)}
 	}
 }
 
@@ -87,7 +87,7 @@ async fn DialTimeout(network: Network, addr: str, timeout: time::Duration)!: Con
 	| UDP | UDP4 | UDP6:
 		ret udpDial(network, addr).await?
 	|:
-		error(&AddrError{Err: "invalid network: " + str(network)})
+		throw &AddrError{Err: "invalid network: " + str(network)}
 	}
 }
 
@@ -147,7 +147,7 @@ async fn socket(remote: bool, sockaddr: uintptr, mut addr: addr, domain: int, ty
 	}
 	setDefaultSockopts(sock) else {
 		fd.Close().await else {}
-		error(error)
+		throw error
 	}
 	if remote {
 		// Initialize fd here because connect needs eventpoll for timeout.
@@ -155,27 +155,27 @@ async fn socket(remote: bool, sockaddr: uintptr, mut addr: addr, domain: int, ty
 		// It will be cleared before connect return.
 		fd.init() else {
 			fd.Close().await else {}
-			error(error)
+			throw error
 		}
 		fd.connect(sockv, sockaddr, sockaddrlen, timeout).await else {
 			fd.Close().await else {}
-			error(error)
+			throw error
 		}
 	} else {
 		sys::Bind(sock, sockaddr, sockaddrlen) else {
 			fd.Close().await else {}
-			error(error)
+			throw error
 		}
 		match typ {
 		| sys::SOCK_STREAM:
 			setDefaultListenerSockopts(sock) else {
 				fd.Close().await else {}
-				error(error)
+				throw error
 			}
 			backlog := listenerBacklog().await
 			sys::Listen(sock, backlog) else {
 				fd.Close().await else {}
-				error(error)
+				throw error
 			}
 		| sys::SOCK_DGRAM:
 			// No-op.
@@ -184,7 +184,7 @@ async fn socket(remote: bool, sockaddr: uintptr, mut addr: addr, domain: int, ty
 		}
 		fd.init() else {
 			fd.Close().await else {}
-			error(error)
+			throw error
 		}
 	}
 	ret fd

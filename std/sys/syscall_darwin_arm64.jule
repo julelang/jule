@@ -1624,7 +1624,7 @@ fn Exit(code: int) {
 fn Close(fd: int)! {
 	r := extern.close(fd)
 	if r < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
@@ -1637,7 +1637,7 @@ fn Read(fd: int, mut p: []byte)!: (n: int) {
 	}
 	n = unsafe { extern.read(fd, (*unsafe)(_p0), uint(len(p))) }
 	if n < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	ret
 }
@@ -1651,7 +1651,7 @@ fn Write(fd: int, p: []byte)!: (n: int) {
 	}
 	n = unsafe { extern.write(fd, (*unsafe)(_p0), uint(len(p))) }
 	if n < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	ret
 }
@@ -1659,7 +1659,7 @@ fn Write(fd: int, p: []byte)!: (n: int) {
 fn Seek(fd: int, offset: i64, whence: int)!: (newoffset: i64) {
 	newoffset = extern.lseek(fd, offset, whence)
 	if newoffset < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	ret
 }
@@ -1674,7 +1674,7 @@ fn unlinkat(dirfd: int, path: []byte, flags: int)! {
 	}
 	e := unsafe { extern.unlinkat(dirfd, (*c::Char)(_p0), flags) }
 	if e < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
@@ -1697,7 +1697,7 @@ fn mkdirat(dirfd: int, path: []byte, mode: u32)! {
 	}
 	e := unsafe { extern.mkdirat(dirfd, (*c::Char)(_p0), mode) }
 	if e < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
@@ -1715,7 +1715,7 @@ fn Openat(dirfd: int, path: str, mode: int, perm: u32)!: (fd: int) {
 	cpath := integ::BytesFromStr(path)
 	fd = unsafe { extern.openat(dirfd, (*c::Char)(&cpath[0]), mode, perm) }
 	if fd < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	ret
 }
@@ -1740,14 +1740,14 @@ fn Chdir(path: str)! {
 	cpath := integ::BytesFromStr(path)
 	e := unsafe { extern.chdir((*c::Char)(&cpath[0])) }
 	if e < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
 fn Fcntl(fd: int, cmd: int, arg: int)!: int {
 	valptr := extern.fcntl(fd, cmd, arg)
 	if valptr < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	ret valptr
 }
@@ -1756,7 +1756,7 @@ fn Fstatat(fd: int, path: str, mut &stat: *SysStat, flags: int)! {
 	cpath := integ::BytesFromStr(path)
 	e := unsafe { extern.fstatat(fd, (*c::Char)(&cpath[0]), (*extern.stat)(stat), flags) }
 	if e < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
@@ -1771,28 +1771,28 @@ fn Lstat(path: str, mut &stat: *SysStat)! {
 fn Fstat(fd: int, mut &stat: *SysStat)! {
 	e := extern.fstat(fd, unsafe { (*extern.stat)(stat) })
 	if e < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
 fn Ftruncate(fd: int, length: i64)! {
 	e := extern.ftruncate(fd, length)
 	if e < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
 fn Fsync(fd: int)! {
 	e := extern.fsync(fd)
 	if e < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
 fn Select(nfd: int, mut &r: *FdSet, mut &w: *FdSet, mut &e: *FdSet, mut &timeout: *Timeval)!: (n: int) {
 	n = unsafe { extern.select(nfd, (*extern.fd_set)(r), (*extern.fd_set)(w), (*extern.fd_set)(e), (*extern.timeval)(timeout)) }
 	if n < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	ret
 }
@@ -1800,7 +1800,7 @@ fn Select(nfd: int, mut &r: *FdSet, mut &w: *FdSet, mut &e: *FdSet, mut &timeout
 fn Socket(domain: int, typ: int, proto: int)!: (fd: int) {
 	fd = extern.socket(domain, typ, proto)
 	if fd < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	ret
 }
@@ -1808,28 +1808,28 @@ fn Socket(domain: int, typ: int, proto: int)!: (fd: int) {
 fn Bind(s: int, addr: uintptr, addrlen: Socklen)! {
 	e := unsafe { extern.bind(s, (*extern.sockaddr)(addr), uint(addrlen)) }
 	if e < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
 fn Connect(s: int, addr: uintptr, addrlen: Socklen)! {
 	e := unsafe { extern.connect(s, (*extern.sockaddr)(addr), uint(addrlen)) }
 	if e < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
 fn Listen(s: int, backlog: int)! {
 	e := extern.listen(s, backlog)
 	if e < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
 fn Accept(s: int, addr: uintptr, &addrlen: *Socklen)!: (fd: int) {
 	fd = unsafe { extern.accept(s, (*extern.sockaddr)(addr), (*u32)(addrlen)) }
 	if fd < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	ret
 }
@@ -1843,7 +1843,7 @@ fn Recvfrom(fd: int, mut p: []byte, flags: int, from: uintptr, fromlen: Socklen)
 	}
 	n = unsafe { extern.recvfrom(fd, (*unsafe)(_p0), uint(len(p)), flags, (*extern.sockaddr)(from), (*u32)(&fromlen)) }
 	if n < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	ret
 }
@@ -1857,28 +1857,28 @@ fn Sendto(s: int, buf: []byte, flags: int, to: uintptr, addrlen: Socklen)! {
 	}
 	e := unsafe { extern.sendto(s, (*unsafe)(_p0), uint(len(buf)), flags, (*extern.sockaddr)(to), u32(addrlen)) }
 	if e < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
 fn Getsockopt(s: int, level: int, name: int, val: uintptr, vallen: Socklen)! {
 	e := unsafe { extern.getsockopt(s, level, name, (*unsafe)(val), (*c::UnsignedInt)(&vallen)) }
 	if e < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
 fn Setsockopt(s: int, level: int, name: int, val: uintptr, vallen: Socklen)! {
 	e := unsafe { extern.setsockopt(s, level, name, (*unsafe)(val), uint(vallen)) }
 	if e < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
 fn Getsockname(fd: int, addr: uintptr, addrlen: Socklen)! {
 	e := unsafe { extern.getsockname(fd, (*extern.sockaddr)(addr), (*u32)(&addrlen)) }
 	if e < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
@@ -1887,7 +1887,7 @@ fn Getpeername(fd: int)!: RawSockaddrAny {
 	let len: Socklen = SizeofSockaddrAny
 	r := unsafe { extern.getpeername(fd, (*extern.sockaddr)(&rsa), (*u32)(&len)) }
 	if r < 0 {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	ret rsa
 }
@@ -1901,7 +1901,7 @@ fn Sysctl(name: []i32, oldp: uintptr, oldplen: uintptr, newp: uintptr, newplen: 
 	}
 	e := unsafe { extern.sysctl((*c::Int)(_p0), uint(len(name)), (*unsafe)(oldp), (*extern.size_t)(oldplen), (*unsafe)(newp), newplen) }
 	if e < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
@@ -1909,7 +1909,7 @@ fn Faccessat(dirfd: int, path: str, mode: u32, flags: int)! {
 	cpath := integ::BytesFromStr(path)
 	e := unsafe { extern.faccessat(dirfd, (*c::Char)(&cpath[0]), mode, flags) }
 	if e < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
@@ -1917,19 +1917,19 @@ fn Open(path: str, mode: int, perm: u32)!: (fd: int) {
 	cpath := integ::BytesFromStr(path)
 	fd = unsafe { extern.open((*c::Char)(&cpath[0]), mode, perm) }
 	if fd < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	ret
 }
 
 fn Pipe(mut p: []int)! {
 	if len(p) != 2 {
-		error(EINVAL)
+		throw EINVAL
 	}
 	let mut p2: [2]i32
 	unsafe {
 		if extern.pipe((*c::Int)(&p2[0])) == -1 {
-			error(GetLastErrno())
+			throw GetLastErrno()
 		}
 		p[0] = int(p2[0])
 		p[1] = int(p2[1])
@@ -1939,14 +1939,14 @@ fn Pipe(mut p: []int)! {
 fn SchedYield()! {
 	r := extern.sched_yield()
 	if r < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
 fn Fork()!: int {
 	r := extern.fork()
 	if r < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	ret int(r)
 }
@@ -1971,27 +1971,27 @@ fn Exec(file: str, args: []str, env: []str)! {
 	c_env := strSliceToCstrSlice(&env, &c_env2)
 	unsafe { extern.execve((*c::Char)(&c_file[0]), (**c::Char)(&c_args[0]), (**c::Char)(&c_env[0])) }
 	// If execve was successful, this statement would not be reached.
-	error(GetLastErrno())
+	throw GetLastErrno()
 }
 
 fn Kill(pid: int, sig: Signal)! {
 	r := extern.kill(pid, int(sig))
 	if r < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
 fn Waitpid(pid: int, mut &status: *i32, options: int)! {
 	r := unsafe { extern.waitpid(pid, (*c::Int)(status), options) }
 	if r < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
 fn Dup2(oldfd: int, newfd: int)! {
 	r := extern.dup2(oldfd, newfd)
 	if r < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
@@ -2005,7 +2005,7 @@ fn Readlinkat(dirfd: int, path: str, mut buf: []byte)!: (n: int) {
 	}
 	r := unsafe { extern.readlinkat(dirfd, (*c::Char)(&cpath[0]), (*c::Char)(_p0), len(buf)) }
 	if r < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	n = int(r)
 	ret
@@ -2021,7 +2021,7 @@ fn Readlink(path: str, mut buf: []byte)!: (n: int) {
 	}
 	r := unsafe { extern.readlink((*c::Char)(&cpath[0]), (*c::Char)(_p0), len(buf)) }
 	if r < _NO_ERROR {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	n = int(r)
 	ret

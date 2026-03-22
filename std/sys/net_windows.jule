@@ -62,7 +62,7 @@ fn WSASocket(domain: int, typ: int, proto: int, &protinfo: *WSAProtocolInfo, gro
 	r := Addrcall[*unsafe](uintptr(extern.WSASocketW), domain, typ, proto, protinfo, group, flags)
 	fd = Handle(r)
 	if fd == INVALID_SOCKET {
-		error(Errno(WSAGetLastError()))
+		throw Errno(WSAGetLastError())
 	}
 	ret
 }
@@ -70,63 +70,63 @@ fn WSASocket(domain: int, typ: int, proto: int, &protinfo: *WSAProtocolInfo, gro
 fn Bind(s: Handle, addr: uintptr, addrlen: Socklen)! {
 	r := unsafe { extern.bind(s, (*extern.sockaddr)(addr), addrlen) }
 	if r == SOCKET_ERROR {
-		error(Errno(WSAGetLastError()))
+		throw Errno(WSAGetLastError())
 	}
 }
 
 fn Connect(s: Handle, addr: uintptr, addrlen: Socklen)! {
 	r := unsafe { extern.connect(s, (*extern.sockaddr)(addr), addrlen) }
 	if r == SOCKET_ERROR {
-		error(Errno(WSAGetLastError()))
+		throw Errno(WSAGetLastError())
 	}
 }
 
 fn Listen(s: Handle, backlog: int)! {
 	r := extern.listen(s, backlog)
 	if r == SOCKET_ERROR {
-		error(Errno(WSAGetLastError()))
+		throw Errno(WSAGetLastError())
 	}
 }
 
 fn WSARecv(s: Handle, &bufs: *WSABuf, bufcnt: u32, mut recvd: *u32, flags: *u32, &overlapped: *Overlapped, croutine: *byte)! {
 	r := Addrcall[i32](uintptr(extern.WSARecv), s, bufs, bufcnt, recvd, flags, overlapped, croutine)
 	if r == SOCKET_ERROR {
-		error(Errno(WSAGetLastError()))
+		throw Errno(WSAGetLastError())
 	}
 }
 
 fn WSARecvFrom(s: Handle, &bufs: *WSABuf, bufcnt: u32, mut &recvd: *u32, &flags: *u32, &from: *RawSockaddrAny, &fromlen: *i32, &overlapped: *Overlapped, croutine: *byte)! {
 	r := Addrcall[i32](uintptr(extern.WSARecv), s, bufs, bufcnt, recvd, flags, from, fromlen, overlapped, croutine)
 	if r == SOCKET_ERROR {
-		error(Errno(WSAGetLastError()))
+		throw Errno(WSAGetLastError())
 	}
 }
 
 fn WSASend(s: Handle, &bufs: *WSABuf, bufcnt: u32, mut &sent: *u32, flags: u32, &overlapped: *Overlapped, &croutine: *byte)! {
 	r := Addrcall[i32](uintptr(extern.WSASend), s, bufs, bufcnt, sent, flags, overlapped, croutine)
 	if r == SOCKET_ERROR {
-		error(Errno(WSAGetLastError()))
+		throw Errno(WSAGetLastError())
 	}
 }
 
 fn WSASendto(s: Handle, &bufs: *WSABuf, bufcnt: u32, mut &sent: *u32, flags: u32, &to: *RawSockaddrAny, tolen: i32, &overlapped: *Overlapped, &croutine: *byte)! {
 	r := Addrcall[i32](uintptr(extern.WSASendTo), s, bufs, bufcnt, sent, flags, to, tolen, overlapped, croutine)
 	if r == SOCKET_ERROR {
-		error(Errno(WSAGetLastError()))
+		throw Errno(WSAGetLastError())
 	}
 }
 
 fn CloseSocket(s: Handle)! {
 	r := extern.closesocket(s)
 	if r == SOCKET_ERROR {
-		error(Errno(WSAGetLastError()))
+		throw Errno(WSAGetLastError())
 	}
 }
 
 fn WSAStartup(verReq: u16, mut &data: *WsaData)! {
 	r := unsafe { extern.WSAStartup(verReq, (*extern.WSADATA)(data)) }
 	if r != 0 {
-		error(Errno(WSAGetLastError()))
+		throw Errno(WSAGetLastError())
 	}
 }
 
@@ -142,14 +142,14 @@ fn Getsockopt(s: Handle, level: int, name: int, val: Handle, vallen: Socklen)! {
 	vallen2 := unsafe { c::Int(vallen) }
 	r := unsafe { extern.getsockopt(s, level, name, (*c::Char)(val), &vallen2) }
 	if r == SOCKET_ERROR {
-		error(Errno(WSAGetLastError()))
+		throw Errno(WSAGetLastError())
 	}
 }
 
 fn Setsockopt(s: Handle, level: int, name: int, val: uintptr, vallen: Socklen)! {
 	r := unsafe { extern.setsockopt(s, level, name, (*c::Char)(val), int(vallen)) }
 	if r == SOCKET_ERROR {
-		error(Errno(WSAGetLastError()))
+		throw Errno(WSAGetLastError())
 	}
 }
 
@@ -157,14 +157,14 @@ fn Getsockname(fd: Handle, addr: uintptr, addrlen: Socklen)! {
 	addrlen2 := unsafe { c::Int(addrlen) }
 	r := unsafe { extern.getsockname(fd, (*extern.sockaddr)(addr), &addrlen2) }
 	if r == SOCKET_ERROR {
-		error(Errno(WSAGetLastError()))
+		throw Errno(WSAGetLastError())
 	}
 }
 
 fn Select(nfd: int, mut &r: *FdSet, mut &w: *FdSet, mut &e: *FdSet, mut &timeout: *Timeval)!: (n: int) {
 	n = unsafe { extern.select(nfd, (*extern.fd_set)(r), (*extern.fd_set)(w), (*extern.fd_set)(e), (*extern.timeval)(timeout)) }
 	if n < 0 {
-		error(Errno(WSAGetLastError()))
+		throw Errno(WSAGetLastError())
 	}
 	ret
 }

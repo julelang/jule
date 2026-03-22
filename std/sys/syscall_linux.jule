@@ -3700,7 +3700,7 @@ fn Exit(code: int) {
 fn Close(fd: int)! {
 	_, e := syscall(SYS_CLOSE, uintptr(fd), 0, 0, 0, 0, 0)
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 }
 
@@ -3713,7 +3713,7 @@ fn Read(fd: int, mut p: []byte)!: (n: int) {
 	}
 	r, e := syscall(SYS_READ, uintptr(fd), _p0, uintptr(len(p)), 0, 0, 0)
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 	ret int(r)
 }
@@ -3727,7 +3727,7 @@ fn Write(fd: int, p: []byte)!: (n: int) {
 	}
 	r, e := syscall(SYS_WRITE, uintptr(fd), _p0, uintptr(len(p)), 0, 0, 0)
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 	ret int(r)
 }
@@ -3735,7 +3735,7 @@ fn Write(fd: int, p: []byte)!: (n: int) {
 fn Seek(fd: int, offset: i64, whence: int)!: (newoffset: i64) {
 	r, e := syscall(SYS_LSEEK, uintptr(fd), uintptr(offset), uintptr(whence), 0, 0, 0)
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 	ret i64(r)
 }
@@ -3750,7 +3750,7 @@ fn unlinkat(dirfd: int, path: []byte, flags: int)! {
 	}
 	_, e := syscall(SYS_UNLINKAT, uintptr(dirfd), _p0, uintptr(flags), 0, 0, 0)
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 }
 
@@ -3773,7 +3773,7 @@ fn mkdirat(dirfd: int, path: []byte, mode: u32)! {
 	}
 	_, e := syscall(SYS_MKDIRAT, uintptr(dirfd), _p0, uintptr(mode), 0, 0, 0)
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 }
 
@@ -3797,7 +3797,7 @@ fn Getcwd(mut buf: []byte)!: (n: int) {
 	r0, e := syscall(SYS_GETCWD, _p0, uintptr(len(buf)), 0, 0, 0, 0)
 	n = int(r0) - 1 // for NUL termination
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 	ret
 }
@@ -3806,7 +3806,7 @@ fn Chdir(path: str)! {
 	cpath := integ::BytesFromStr(path)
 	_, e := syscall(SYS_CHDIR, uintptr(&cpath[0]), 0, 0, 0, 0, 0)
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 }
 
@@ -3815,7 +3815,7 @@ let mut fcntl64syscall = uintptr(SYS_FCNTL)
 fn Fcntl(fd: int, cmd: int, arg: int)!: int {
 	valptr, e := syscall(fcntl64syscall, uintptr(fd), uintptr(cmd), uintptr(arg), 0, 0, 0)
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 	ret int(valptr)
 }
@@ -3823,7 +3823,7 @@ fn Fcntl(fd: int, cmd: int, arg: int)!: int {
 fn Fsync(fd: int)! {
 	_, e := syscall(SYS_FSYNC, uintptr(fd), 0, 0, 0, 0, 0)
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 }
 
@@ -3831,7 +3831,7 @@ fn pselect6(nfd: int, &r: *FdSet, &w: *FdSet, &e: *FdSet, &timeout: *Timespec, &
 	r0, e1 := syscall(SYS_PSELECT6, uintptr(nfd), uintptr(r), uintptr(w), uintptr(e), uintptr(timeout), uintptr(sigmask))
 	n = int(r0)
 	if e1 != _NO_ERROR {
-		error(e1)
+		throw e1
 	}
 	ret
 }
@@ -3841,7 +3841,7 @@ fn openat(dirfd: int, path: str, flags: int, mode: u32)!: (fd: int) {
 	r0, e1 := syscall(SYS_OPENAT, uintptr(dirfd), uintptr(&cpath[0]), uintptr(flags), uintptr(mode), 0, 0)
 	fd = int(r0)
 	if e1 != _NO_ERROR {
-		error(e1)
+		throw e1
 	}
 	ret
 }
@@ -3856,12 +3856,12 @@ fn Pipe(mut p: []int)! {
 
 fn Pipe2(mut p: []int, flags: int)! {
 	if len(p) != 2 {
-		error(EINVAL)
+		throw EINVAL
 	}
 	let x: [2]i32
 	_, e1 := syscall(SYS_PIPE2, uintptr(&x[0]), uintptr(flags), 0, 0, 0, 0)
 	if e1 != _NO_ERROR {
-		error(e1)
+		throw e1
 	}
 	p[0] = int(x[0])
 	p[1] = int(x[1])
@@ -3870,7 +3870,7 @@ fn Pipe2(mut p: []int, flags: int)! {
 fn Capget(hdr: CapUserHeader, mut &data: *CapUserData)! {
 	_, e1 := syscall(SYS_CAPGET, uintptr(&hdr), uintptr(data), 0, 0, 0, 0)
 	if e1 != _NO_ERROR {
-		error(e1)
+		throw e1
 	}
 }
 
@@ -3878,7 +3878,7 @@ fn faccessat(dirfd: int, path: str, mode: u32)! {
 	cpath := integ::BytesFromStr(path)
 	_, e1 := syscall(SYS_FACCESSAT, uintptr(dirfd), uintptr(&cpath[0]), uintptr(mode), 0, 0, 0)
 	if e1 != _NO_ERROR {
-		error(e1)
+		throw e1
 	}
 }
 
@@ -3886,7 +3886,7 @@ fn Faccessat2(dirfd: int, path: str, mode: u32, flags: int)! {
 	cpath := integ::BytesFromStr(path)
 	_, e1 := syscall(SYS_FACCESSAT2, uintptr(dirfd), uintptr(&cpath[0]), uintptr(mode), uintptr(flags), 0, 0)
 	if e1 != _NO_ERROR {
-		error(e1)
+		throw e1
 	}
 }
 
@@ -3898,7 +3898,7 @@ fn Getgroups()!: (gids: []int) {
 
 	// Sanity check group count. Max is 1<<16 on Linux.
 	if n < 0 || n > 1<<20 {
-		error(EINVAL)
+		throw EINVAL
 	}
 
 	mut a := make([]Gid, n)
@@ -3938,7 +3938,7 @@ fn Faccessat(dirfd: int, path: str, mut mode: u32, flags: int)! {
 
 	Faccessat2(dirfd, path, mode, flags) else {
 		if error != EPERM {
-			error(error)
+			throw error
 		}
 	}
 
@@ -3949,7 +3949,7 @@ fn Faccessat(dirfd: int, path: str, mut mode: u32, flags: int)! {
 	// like C faccessat, we do the same.
 
 	if flags&^(AT_SYMLINK_NOFOLLOW|AT_EACCESS) != 0 {
-		error(EINVAL)
+		throw EINVAL
 	}
 
 	let mut st: SysStat
@@ -3982,7 +3982,7 @@ fn Faccessat(dirfd: int, path: str, mut mode: u32, flags: int)! {
 			// Root can execute any file that anybody can execute.
 			ret
 		}
-		error(EACCES)
+		throw EACCES
 	}
 
 	let mut fmode: u32
@@ -4007,13 +4007,13 @@ fn Faccessat(dirfd: int, path: str, mut mode: u32, flags: int)! {
 		ret
 	}
 
-	error(EACCES)
+	throw EACCES
 }
 
 fn SchedYield()! {
 	_, e1 := syscall(SYS_SCHED_YIELD, 0, 0, 0, 0, 0, 0)
 	if e1 != _NO_ERROR {
-		error(e1)
+		throw e1
 	}
 }
 
@@ -4039,14 +4039,14 @@ fn Exec(file: str, args: []str, env: []str)! {
 	// If execve was successful, this statement would not be reached.
 	// But play safe and check there is error.
 	if e1 != _NO_ERROR {
-		error(e1)
+		throw e1
 	}
 }
 
 fn Kill(pid: int, sig: Signal)! {
 	_, e1 := syscall(SYS_KILL, uintptr(pid), uintptr(sig), 0, 0, 0, 0)
 	if e1 < _NO_ERROR {
-		error(e1)
+		throw e1
 	}
 }
 
@@ -4057,7 +4057,7 @@ fn Dup2(oldfd: int, newfd: int)! {
 fn Dup3(oldfd: int, newfd: int, flags: int)! {
 	_, e1 := syscall(SYS_DUP3, uintptr(oldfd), uintptr(newfd), uintptr(flags), 0, 0, 0)
 	if e1 != _NO_ERROR {
-		error(e1)
+		throw e1
 	}
 }
 
@@ -4072,7 +4072,7 @@ fn Readlinkat(dirfd: int, path: str, mut buf: []byte)!: (n: int) {
 	r0, e1 := syscall(SYS_READLINKAT, uintptr(dirfd), uintptr(&cpath[0]), uintptr(_p0), uintptr(len(buf)), 0, 0)
 	n = int(r0)
 	if e1 != _NO_ERROR {
-		error(e1)
+		throw e1
 	}
 	ret
 }

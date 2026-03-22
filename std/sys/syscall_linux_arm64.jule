@@ -570,7 +570,7 @@ fn Fstatat(fd: int, path: str, mut &stat: *SysStat, flags: int)! {
 	cpath := integ::BytesFromStr(path)
 	_, e := syscall(SYS_FSTATAT, uintptr(fd), uintptr(&cpath[0]), uintptr(stat), uintptr(flags), 0, 0)
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 }
 
@@ -585,7 +585,7 @@ fn Lstat(path: str, mut &stat: *SysStat)! {
 fn Ftruncate(fd: int, length: i64)! {
 	_, e := syscall(SYS_FTRUNCATE, uintptr(fd), uintptr(length), 0, 0, 0, 0)
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 }
 
@@ -598,7 +598,7 @@ fn Socket(domain: int, typ: int, proto: int)!: (fd: int) {
 	r0, e := syscall(SYS_SOCKET, uintptr(domain), uintptr(typ), uintptr(proto), 0, 0, 0)
 	fd = int(r0)
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 	ret
 }
@@ -606,21 +606,21 @@ fn Socket(domain: int, typ: int, proto: int)!: (fd: int) {
 fn Bind(s: int, addr: uintptr, addrlen: Socklen)! {
 	_, e := syscall(SYS_BIND, uintptr(s), addr, uintptr(addrlen), 0, 0, 0)
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 }
 
 fn Connect(s: int, addr: uintptr, addrlen: Socklen)! {
 	_, e := syscall(SYS_CONNECT, uintptr(s), uintptr(addr), uintptr(addrlen), 0, 0, 0)
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 }
 
 fn Listen(s: int, backlog: int)! {
 	_, e := syscall(SYS_LISTEN, uintptr(s), uintptr(backlog), 0, 0, 0, 0)
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 }
 
@@ -628,7 +628,7 @@ fn Accept(s: int, addr: uintptr, &addrLen: *Socklen)!: (fd: int) {
 	r0, e := syscall(SYS_ACCEPT4, uintptr(s), addr, uintptr(addrLen), 0, 0, 0)
 	fd = int(r0)
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 	ret
 }
@@ -643,7 +643,7 @@ fn Recvfrom(fd: int, mut p: []byte, flags: int, from: uintptr, fromLen: Socklen)
 	r0, e1 := syscall(SYS_RECVFROM, uintptr(fd), _p0, uintptr(len(p)), uintptr(flags), from, uintptr(&fromLen))
 	n = int(r0)
 	if e1 != _NO_ERROR {
-		error(e1)
+		throw e1
 	}
 	ret
 }
@@ -657,28 +657,28 @@ fn Sendto(s: int, buf: []byte, flags: int, to: uintptr, addrlen: Socklen)! {
 	}
 	_, e1 := syscall(SYS_SENDTO, uintptr(s), _p0, uintptr(len(buf)), uintptr(flags), to, uintptr(addrlen))
 	if e1 != _NO_ERROR {
-		error(e1)
+		throw e1
 	}
 }
 
 fn Getsockopt(s: int, level: int, name: int, val: uintptr, vallen: Socklen)! {
 	_, e := syscall(SYS_GETSOCKOPT, uintptr(s), uintptr(level), uintptr(name), val, uintptr(&vallen), 0)
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 }
 
 fn Setsockopt(s: int, level: int, name: int, val: uintptr, vallen: Socklen)! {
 	_, e := syscall(SYS_SETSOCKOPT, uintptr(s), uintptr(level), uintptr(name), val, uintptr(vallen), 0)
 	if e != _NO_ERROR {
-		error(e)
+		throw e
 	}
 }
 
 fn Getsockname(fd: int, addr: uintptr, addrlen: Socklen)! {
 	_, e1 := syscall(SYS_GETSOCKNAME, uintptr(fd), addr, uintptr(&addrlen), 0, 0, 0)
 	if e1 != _NO_ERROR {
-		error(e1)
+		throw e1
 	}
 }
 
@@ -687,7 +687,7 @@ fn Getpeername(fd: int)!: RawSockaddrAny {
 	let len: Socklen = SizeofSockaddrAny
 	_, e1 := syscall(SYS_GETPEERNAME, uintptr(fd), uintptr(&rsa), uintptr(&len), 0, 0, 0)
 	if e1 != _NO_ERROR {
-		error(e1)
+		throw e1
 	}
 	ret rsa
 }
@@ -720,7 +720,7 @@ fn getgroups(n: int, list: uintptr)!: (nn: int) {
 	r0, e1 := syscall(SYS_GETGROUPS, uintptr(n), list, 0, 0, 0, 0)
 	nn = int(r0)
 	if e1 != 0 {
-		error(e1)
+		throw e1
 	}
 	ret
 }
@@ -728,7 +728,7 @@ fn getgroups(n: int, list: uintptr)!: (nn: int) {
 fn Uname(mut &buf: *Utsname)! {
 	_, e1 := syscall(SYS_UNAME, uintptr(buf), 0, 0, 0, 0, 0)
 	if e1 != 0 {
-		error(e1)
+		throw e1
 	}
 	ret
 }

@@ -285,7 +285,7 @@ impl Reader {
 		if self.Comma == self.Comment ||
 			!validDelim(self.Comma) ||
 			(self.Comment != 0 && !validDelim(self.Comment)) {
-			error(errInvalidDelim)
+			throw errInvalidDelim
 		}
 
 		// Read line (automatically skipping past empty lines and any comments).
@@ -338,12 +338,12 @@ impl Reader {
 				if !self.LazyQuotes {
 					j := bytes::IndexByte(field, '"')
 					if j >= 0 {
-						error(&ParseError{
+						throw &ParseError{
 							StartLine: recLine,
 							Line: self.numLine,
 							Column: pos.col + j,
 							Err: ErrBareQuote,
-						})
+						}
 						break parseField
 					}
 				}
@@ -392,12 +392,12 @@ impl Reader {
 							self.recordBuffer = append(self.recordBuffer, '"')
 						|:
 							// `"*` sequence (invalid non-escaped quote).
-							error(&ParseError{
+							throw &ParseError{
 								StartLine: recLine,
 								Line: self.numLine,
 								Column: pos.col - QuoteLen,
 								Err: ErrQuote,
-							})
+							}
 							break parseField
 						}
 					} else if len(line) > 0 {
@@ -412,12 +412,12 @@ impl Reader {
 					} else {
 						// Abrupt end of file (EOF or error).
 						if !self.LazyQuotes {
-							error(&ParseError{
+							throw &ParseError{
 								StartLine: recLine,
 								Line: pos.line,
 								Column: pos.col,
 								Err: ErrQuote,
-							})
+							}
 							break parseField
 						}
 						self.fieldIndexes = append(self.fieldIndexes, len(self.recordBuffer))
@@ -445,12 +445,12 @@ impl Reader {
 		// Check or update the expected fields per record.
 		if self.FieldsPerRecord > 0 {
 			if len(dst) != self.FieldsPerRecord {
-				error(&ParseError{
+				throw &ParseError{
 					StartLine: recLine,
 					Line: recLine,
 					Column: 1,
 					Err: ErrFieldCount,
-				})
+				}
 			}
 		} else if self.FieldsPerRecord == 0 {
 			self.FieldsPerRecord = len(dst)

@@ -102,7 +102,7 @@ impl TCPConn {
 	// sent as soon as possible after a Write.
 	fn SetNoDelay(mut *self, noDelay: bool)! {
 		if self.fd == nil {
-			error(sys::EINVAL)
+			throw sys::EINVAL
 		}
 		setNoDelay(self.fd, noDelay)?
 	}
@@ -150,20 +150,20 @@ async fn tcpDial(network: Network, addr: str, mut timeout: time::Duration)!: &TC
 			mut sockaddr := sys::RawSockaddrInet6{}
 			fd = socketipv6(true, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, timeout).await?
 		|:
-			error(&AddrError{Err: "invalid network: " + str(network)})
+			throw &AddrError{Err: "invalid network: " + str(network)}
 		}
 	} else {
 		mut ipv4 := tcpAddr.IP.To4()
 		if ipv4.Empty() {
 			if network == Network.TCP4 {
-				error(&AddrError{Err: "expected IPv4 address but found IPv6", Addr: addr})
+				throw &AddrError{Err: "expected IPv4 address but found IPv6", Addr: addr}
 			}
 			v6 = true
 			mut sockaddr := sys::RawSockaddrInet6{}
 			fd = socketipv6(true, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, timeout).await?
 		} else {
 			if network == Network.TCP6 {
-				error(&AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr})
+				throw &AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr}
 			}
 			tcpAddr.IP = ipv4
 			mut sockaddr := sys::RawSockaddrInet4{}

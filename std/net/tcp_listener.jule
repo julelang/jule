@@ -79,20 +79,20 @@ async fn tcpBind(network: Network, addr: str)!: &TCPListener {
 			mut sockaddr := sys::RawSockaddrInet6{}
 			fd = socketipv6(false, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, 0).await?
 		|:
-			error(&AddrError{Err: "invalid network: " + str(network)})
+			throw &AddrError{Err: "invalid network: " + str(network)}
 		}
 	} else {
 		mut ipv4 := tcpAddr.IP.To4()
 		if ipv4.Empty() {
 			if network == Network.TCP4 {
-				error(&AddrError{Err: "expected IPv4 address but found IPv6", Addr: addr})
+				throw &AddrError{Err: "expected IPv4 address but found IPv6", Addr: addr}
 			}
 			ipv = 6
 			mut sockaddr := sys::RawSockaddrInet6{}
 			fd = socketipv6(false, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, 0).await?
 		} else {
 			if network == Network.TCP6 {
-				error(&AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr})
+				throw &AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr}
 			}
 			ipv = 4
 			tcpAddr.IP = ipv4

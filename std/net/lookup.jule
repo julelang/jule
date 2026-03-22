@@ -75,7 +75,7 @@ struct dnsQuestion {
 fn encodeDomainName(mut &buf: *[]byte, mut domain: str)! {
 	handleLabel := fn(mut &buf: *[]byte, label: str)! {
 		if len(label) > 63 {
-			error(errors::New("label too long"))
+			throw errors::New("label too long")
 		}
 		*buf = append(*buf, byte(len(label)))
 		*buf = append(*buf, label...)
@@ -142,7 +142,7 @@ fn parseName(msg: []byte, mut offset: int)!: (str, int) {
 
 	for {
 		if offset >= len(msg) {
-			error(errors::New("offset out of range"))
+			throw errors::New("offset out of range")
 		}
 		b := msg[offset]
 		if b == 0 {
@@ -152,7 +152,7 @@ fn parseName(msg: []byte, mut offset: int)!: (str, int) {
 
 		if b&0xC0 == 0xC0 {
 			if offset+1 >= len(msg) {
-				error(errors::New("pointer out of range"))
+				throw errors::New("pointer out of range")
 			}
 			ptr := int(binary::BigEndian.DecodeU16(msg[offset:offset+bigEndianU16Size]) & 0x3FFF)
 			if !jumped {
@@ -166,7 +166,7 @@ fn parseName(msg: []byte, mut offset: int)!: (str, int) {
 		length := int(b)
 		offset++
 		if offset+length > len(msg) {
-			error(errors::New("label out of range"))
+			throw errors::New("label out of range")
 		}
 
 		labels = append(labels, str(msg[offset:offset+length]))
@@ -518,7 +518,7 @@ async fn juleLookupIP(net: Network, host: str)!: []IPAddr {
 		conn.Close().await else {}
 	}
 
-	error(errors::New("resolution failed for " + host))
+	throw errors::New("resolution failed for " + host)
 }
 
 // Looks up host using the local resolver and particular network.
@@ -526,7 +526,7 @@ async fn juleLookupIP(net: Network, host: str)!: []IPAddr {
 async fn lookupIPAddr(net: Network, host: str)!: []IPAddr {
 	// Make sure that no matter what we do later, host=="" is rejected.
 	if host == "" {
-		error(newDNSError("no such host", host, ""))
+		throw newDNSError("no such host", host, "")
 	}
 
 	// If parseAddr can parse host, it is a literal.
@@ -560,7 +560,7 @@ fn juleLookupPortMap(network: Network, service: str)!: (port: int) {
 	| UDP | UDP4 | UDP6:
 		ret lookupPortMapWithNetwork(Network.UDP, Network.UDP, service)?
 	|:
-		error(&DNSError{Err: "unknown network", Name: networkToStr(network) + "/" + service})
+		throw &DNSError{Err: "unknown network", Name: networkToStr(network) + "/" + service}
 	}
 }
 
@@ -574,9 +574,9 @@ fn lookupPortMapWithNetwork(network: Network, errNetwork: str, service: str)!: (
 		if ok && n == len(service) {
 			ret port
 		}
-		error(newDNSError("unknown port", errNetwork+"/"+service, ""))
+		throw newDNSError("unknown port", errNetwork+"/"+service, "")
 	}
-	error(&DNSError{Err: "unknown network", Name: errNetwork + "/" + service})
+	throw &DNSError{Err: "unknown network", Name: errNetwork + "/" + service}
 }
 
 async fn lookupPort(net: Network, service: str)!: (port: int) {
@@ -586,12 +586,12 @@ async fn lookupPort(net: Network, service: str)!: (port: int) {
 		| TCP | TCP4 | TCP6 | UDP | UDP4 | UDP6 | IP:
 			break // no-op
 		|:
-			error(&AddrError{Err: "unknown network", Addr: net})
+			throw &AddrError{Err: "unknown network", Addr: net}
 		}
 		port = _lookupPort(net, service).await?
 	}
 	if 0 > port || port > 65535 {
-		error(&AddrError{Err: "invalid port", Addr: service})
+		throw &AddrError{Err: "invalid port", Addr: service}
 	}
 	ret port
 }
@@ -616,6 +616,6 @@ async fn LookupIP(mut network: Network, address: str)!: []&IPAddr {
 		mut addrs := resolveInternetAddrList(network, address).await?
 		ret addrs.forResolveAll(network)
 	|:
-		error(&AddrError{Err: "invalid network: " + str(network)})
+		throw &AddrError{Err: "invalid network: " + str(network)}
 	}
 }

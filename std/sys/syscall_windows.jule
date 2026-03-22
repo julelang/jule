@@ -144,7 +144,7 @@ fn GetStdHandle(stdh: uintptr): Handle { ret Handle(extern.GetStdHandle(stdh)) }
 fn CloseHandle(stdh: Handle)! {
 	r := unsafe { extern.CloseHandle(unsafe { (*unsafe)(stdh) }) }
 	if !r {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
@@ -152,7 +152,7 @@ fn CloseHandle(stdh: Handle)! {
 fn SetEndOfFile(h: Handle)! {
 	r := unsafe { extern.SetEndOfFile(extern.HANDLE(h)) }
 	if !r {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
@@ -165,7 +165,7 @@ unsafe fn CreatePipe(mut r: *Handle, mut w: *Handle, attrs: *SecurityAttributes,
 fn FlushFileBuffers(h: Handle)! {
 	r := unsafe { extern.FlushFileBuffers(extern.HANDLE(h)) }
 	if !r {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
@@ -202,7 +202,7 @@ fn ReadFile(h: Handle, buf: []byte)!: int {
 	mut read := u32(0)
 	ok := unsafe { extern.ReadFile(extern.HANDLE(h), &buf[0], extern.DWORD(len(buf)), (*extern.DWORD)(&read), nil) }
 	if !ok {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	ret int(read)
 }
@@ -213,7 +213,7 @@ fn WriteFile(h: Handle, buf: []byte)!: int {
 	mut written := u32(0)
 	ok := unsafe { extern.WriteFile(extern.HANDLE(h), &buf[0], extern.DWORD(len(buf)), (*extern.DWORD)(&written), nil) }
 	if !ok {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	ret int(written)
 }
@@ -267,7 +267,7 @@ unsafe fn WriteConsole(handle: Handle, buffer: *u16, toWrite: u32,
 	ok := extern.WriteConsoleW(extern.HANDLE(handle), (*unsafe)(buffer),
 		extern.DWORD(toWrite), (*extern.DWORD)(written), reserved)
 	if !ok {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
@@ -277,7 +277,7 @@ unsafe fn ReadConsole(handle: Handle, mut buffer: *u16, toRead: u32, mut &read: 
 	r := extern.ReadConsoleW(extern.HANDLE(handle), (*unsafe)(buffer),
 		extern.DWORD(toRead), (*extern.DWORD)(read), nil)
 	if !r {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
@@ -345,7 +345,7 @@ unsafe fn DuplicateHandle(hSourceProcessHandle: Handle, hSourceHandle: Handle,
 fn setFilePointerEx(handle: Handle, distToMove: i64, mut &newFilePointer: *i64, whence: u32)! {
 	ok := unsafe { extern.SetFilePointerEx(extern.HANDLE(handle), *(*extern.LARGE_INTEGER)(&distToMove), (*extern.LARGE_INTEGER)(newFilePointer), extern.DWORD(whence)) }
 	if !ok {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
@@ -381,7 +381,7 @@ fn Pipe()!: (r: Handle, w: Handle) {
 	makeInheritSa(&sa)
 	ok := unsafe { CreatePipe(&p[0], &p[1], &sa, 0) }
 	if !ok {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	r = p[0]
 	w = p[1]
@@ -390,7 +390,7 @@ fn Pipe()!: (r: Handle, w: Handle) {
 
 fn Open(path: str, flag: int, perm: u32)!: Handle {
 	if path == "" {
-		error(Errno(ERROR_FILE_NOT_FOUND))
+		throw Errno(ERROR_FILE_NOT_FOUND)
 	}
 	utf16Path := integ::UTF16FromStr(path)
 	let mut access: u32
@@ -458,14 +458,14 @@ fn Open(path: str, flag: int, perm: u32)!: Handle {
 				e = EISDIR
 			}
 		}
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	// Ignore O_TRUNC if the file has just been created.
 	if flag&O_TRUNC == O_TRUNC &&
 		(createmode == OPEN_EXISTING || (createmode == OPEN_ALWAYS && GetLastErrno() == ERROR_ALREADY_EXISTS)) {
 		Ftruncate(h, 0) else {
 			CloseHandle(h)?
-			error(error)
+			throw error
 		}
 	}
 	ret h
@@ -503,7 +503,7 @@ fn LoadLibrary(libname: str)!: Handle {
 	utf16libname := integ::UTF16FromStr(libname)
 	phandle := Addrcall[*unsafe](uintptr(extern.LoadLibraryW), &utf16libname[0])
 	if phandle == nil {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	ret Handle(phandle)
 }
@@ -512,7 +512,7 @@ fn LoadLibraryEx(libname: str, zero: Handle, flags: uintptr)!: Handle {
 	utf16libname := integ::UTF16FromStr(libname)
 	phandle := Addrcall[*unsafe](uintptr(extern.LoadLibraryExW), &utf16libname[0], unsafe { (*unsafe)(zero) }, flags)
 	if phandle == nil {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	ret Handle(phandle)
 }
@@ -521,7 +521,7 @@ fn GetProcAddress(module: Handle, procname: str)!: (proc: uintptr) {
 	_procname := integ::BytesFromStr(procname)
 	procp := Addrcall[*unsafe](uintptr(extern.GetProcAddress), unsafe { (*unsafe)(module) }, &_procname[0])
 	if procp == nil {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 	ret uintptr(procp)
 }
@@ -529,13 +529,13 @@ fn GetProcAddress(module: Handle, procname: str)!: (proc: uintptr) {
 fn FreeLibrary(handle: Handle)! {
 	r := Addrcall[i32](uintptr(extern.FreeLibrary), unsafe { (*unsafe)(handle) })
 	if r == 0 {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }
 
 fn CancelIoEx(s: Handle, &o: *Overlapped)! {
 	r := Addrcall[i32](uintptr(extern.CancelIoEx), s, o)
 	if r == 0 {
-		error(GetLastErrno())
+		throw GetLastErrno()
 	}
 }

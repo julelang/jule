@@ -60,11 +60,11 @@ fn appendStrictRFC3339(&t: *Time, mut b: []byte)!: []byte {
 	num2 := fn(b: []byte): byte { ret 10*(b[0]-'0') + (b[1] - '0') }
 	match {
 	| b[n0+len("9999")] != '-': // year must be exactly 4 digits wide
-		error(errors::New("year outsize of range [0,9999]"))
+		throw errors::New("year outsize of range [0,9999]")
 	| b[len(b)-1] != 'Z':
 		c := b[len(b)-len("Z07:00")]
 		if ('0' <= c && c <= '9') || num2(b[len(b)-len("07:00"):]) >= 24 {
-			error(errors::New("timezone hour outside of range [0,23]"))
+			throw errors::New("timezone hour outside of range [0,23]")
 		}
 	}
 	ret b
@@ -156,19 +156,19 @@ fn parseStrictRFC3339(b: []byte)!: Time {
 		| true:
 			ret t
 		| b[len("2006-01-02T")+1] == ':': // hour must be two digits
-			error(&ParseError{RFC3339, str(b), "15", str(b[len("2006-01-02T"):][:1]), ""})
+			throw &ParseError{RFC3339, str(b), "15", str(b[len("2006-01-02T"):][:1]), ""}
 		| b[len("2006-01-02T15:04:05")] == ',': // sub-second separator must be a period
-			error(&ParseError{RFC3339, str(b), ".", ",", ""})
+			throw &ParseError{RFC3339, str(b), ".", ",", ""}
 		| b[len(b)-1] != 'Z':
 			match {
 			| num2(b[len(b)-len("07:00"):]) >= 24: // timezone hour must be in range
-				error(&ParseError{RFC3339, str(b), "Z07:00", str(b[len(b)-len("Z07:00"):]), ": timezone hour out of range"})
+				throw &ParseError{RFC3339, str(b), "Z07:00", str(b[len(b)-len("Z07:00"):]), ": timezone hour out of range"}
 			| num2(b[len(b)-len("00"):]) >= 60: // timezone minute must be in range
-				error(&ParseError{RFC3339, str(b), "Z07:00", str(b[len(b)-len("Z07:00"):]), ": timezone minute out of range"})
+				throw &ParseError{RFC3339, str(b), "Z07:00", str(b[len(b)-len("Z07:00"):]), ": timezone minute out of range"}
 			}
 		|:
 			// unknown error; should not occur
-			error(&ParseError{RFC3339, str(b), RFC3339, str(b), ""})
+			throw &ParseError{RFC3339, str(b), RFC3339, str(b), ""}
 		}
 	}
 	ret t

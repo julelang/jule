@@ -69,7 +69,7 @@ impl FD {
 			size := u32(mem::SizeOf(flag))
 			fr := unsafe { sys::WSAIoctl(sys::Handle(self.File), sys::SIO_UDP_CONNRESET, (*byte)(&flag), size, nil, 0, &r) }
 			if fr != 0 {
-				error(sys::Errno(sys::WSAGetLastError()))
+				throw sys::Errno(sys::WSAGetLastError())
 			}
 		}
 		// For eventpoll, just pollable is not enough.
@@ -233,9 +233,9 @@ impl FD {
 				// Close uses CancelIoEx to interrupt concurrent I/O for pipes.
 				// If the fd is a pipe and the Write was interrupted by CancelIoEx,
 				// we assume it is interrupted by Close.
-				error(ErrFileClosing)
+				throw ErrFileClosing
 			}
-			error(error)
+			throw error
 		}
 	}
 
@@ -407,9 +407,9 @@ impl FD {
 				// Close uses CancelIoEx to interrupt concurrent I/O for pipes.
 				// If the fd is a pipe and the Read was interrupted by CancelIoEx,
 				// we assume it is interrupted by Close.
-				error(ErrFileClosing)
+				throw ErrFileClosing
 			}
-			error(error)
+			throw error
 		}
 	}
 
@@ -502,12 +502,12 @@ impl FD {
 			unsafe { AcceptEx(sys::Handle(o.fd.File), s, (*byte)(&(*rawsa)[0]), 0, rsan, rsan, &o.qty, &o.o)? }
 		}).await else {
 			sys::CloseSocket(s) else {}
-			error(error)
+			throw error
 		}
 		// Inherit properties of the listening socket.
 		sys::Setsockopt(s, sys::SOL_SOCKET, sys::SO_UPDATE_ACCEPT_CONTEXT, uintptr(&self.File), sys::Socklen(mem::SizeOf(self.File))) else {
 			sys::CloseSocket(s) else {}
-			error(error)
+			throw error
 		}
 	}
 
@@ -536,7 +536,7 @@ impl FD {
 					// Ignore these and try again.
 					continue
 				|:
-					error(error)
+					throw error
 				}
 			}
 			// Get peer addr out of AcceptEx buffer.
@@ -550,7 +550,7 @@ impl FD {
 	// means relative to the current offset, and 2 (Seek.End) means relative to end.
 	async fn Seek(mut *self, offset: i64, whence: int)!: (newoffset: i64) {
 		if self.Flags&Pipe != 0 {
-			error(sys::ESPIPE)
+			throw sys::ESPIPE
 		}
 		self.incref()?
 		defer { self.decref() else {} }
@@ -630,7 +630,7 @@ impl FD {
 		// reference, it is already closed.
 		semacquire(&self.csema).await
 		if err != nil {
-			error(err)
+			throw err
 		}
 	}
 
@@ -675,7 +675,7 @@ async fn execIO(mut &o: *operation, submit: fn(mut &o: *operation)!)!: int {
 	// Start IO.
 	submit(o) else {
 		if error != sys::ERROR_IO_PENDING {
-			error(error)
+			throw error
 		}
 		// IO started, and we have to wait for its completion.
 	}
@@ -688,7 +688,7 @@ async fn execIO(mut &o: *operation, submit: fn(mut &o: *operation)!)!: int {
 		| runtime::pollErrClosing | runtime::pollErrTimeout:
 			// Will deal with those.
 		|:
-			error(error)
+			throw error
 		}
 		// Cancel our request.
 		sys::CancelIoEx(h, &o.o) else {
@@ -702,9 +702,9 @@ async fn execIO(mut &o: *operation, submit: fn(mut &o: *operation)!)!: int {
 		mut err := error
 		windows::WSAGetOverlappedResult(h, &o.o, &o.qty, false, &o.flags) else {
 			if error == sys::ERROR_OPERATION_ABORTED { // IO Canceled
-				error(err)
+				throw err
 			}
-			error(error)
+			throw error
 		}
 		// We issued a cancellation request. But, it seems, IO operation succeeded
 		// before the cancellation request run. We need to treat the IO operation as
@@ -716,7 +716,7 @@ async fn execIO(mut &o: *operation, submit: fn(mut &o: *operation)!)!: int {
 		if error == sys::ERROR_MORE_DATA || error == windows::WSAEMSGSIZE {
 			ret int(o.qty)
 		}
-		error(error)
+		throw error
 	}
 	// All is good.
 	ret int(o.qty)

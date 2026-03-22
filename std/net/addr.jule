@@ -49,40 +49,40 @@ fn SplitHostPort(hostport: str)!: (host: str, port: str) {
 	mut j, mut k := 0, 0
 	i := byteslite::LastIndexByteStr(hostport, ':')
 	if i == -1 {
-		error(&AddrError{Err: missingPort, Addr: hostport})
+		throw &AddrError{Err: missingPort, Addr: hostport}
 	}
 	if hostport[0] == '[' {
 		// Expect the first ']' just before the last ':'.
 		end := byteslite::IndexByteStr(hostport, ']')
 		if end == -1 {
-			error(&AddrError{Err: "missing ']' in address", Addr: hostport})
+			throw &AddrError{Err: "missing ']' in address", Addr: hostport}
 		}
 		match end + 1 {
 		| len(hostport):
-			error(&AddrError{Err: missingPort, Addr: hostport})
+			throw &AddrError{Err: missingPort, Addr: hostport}
 		| i:
 			// Expected result, it's fine.
 		|:
 			// Either ']' isn't followed by a colon, or it is
 			// followed by a colon that is not the last one.
 			if hostport[end+1] == ':' {
-				error(&AddrError{Err: tooManyColons, Addr: hostport})
+				throw &AddrError{Err: tooManyColons, Addr: hostport}
 			}
-			error(&AddrError{Err: missingPort, Addr: hostport})
+			throw &AddrError{Err: missingPort, Addr: hostport}
 		}
 		host = hostport[1:end]
 		j, k = 1, end+1 // There can't be a '[' resp. ']' before these positions.
 	} else {
 		host = hostport[:i]
 		if byteslite::IndexByteStr(host, ':') != -1 {
-			error(&AddrError{Err: tooManyColons, Addr: hostport})
+			throw &AddrError{Err: tooManyColons, Addr: hostport}
 		}
 	}
 	if byteslite::IndexByteStr(hostport[j:], '[') != -1 {
-		error(&AddrError{Err: "unexpected '[' in address", Addr: hostport})
+		throw &AddrError{Err: "unexpected '[' in address", Addr: hostport}
 	}
 	if byteslite::IndexByteStr(hostport[k:], ']') != -1 {
-		error(&AddrError{Err: "unexpected ']' in address", Addr: hostport})
+		throw &AddrError{Err: "unexpected ']' in address", Addr: hostport}
 	}
 	port = hostport[i+1:]
 	ret
@@ -126,10 +126,10 @@ fn parseAddr(addr: str)!: IPAddr {
 		| '%':
 			// Assume that this was trying to be an IPv6 address with
 			// a zone specifier, but the address is missing.
-			error(&parseAddrError{input: addr, msg: "missing IPv6 address"})
+			throw &parseAddrError{input: addr, msg: "missing IPv6 address"}
 		}
 	}
-	error(&parseAddrError{input: addr, msg: "unable to parse IP"})
+	throw &parseAddrError{input: addr, msg: "unable to parse IP"}
 }
 
 // Represents a list of network endpoint addresses.
@@ -243,7 +243,7 @@ fn filterAddrList(filter: fn(mut IPAddr): bool, net: Network, mut ips: []IPAddr,
 		}
 	}
 	if len(addrs) == 0 {
-		error(&AddrError{Err: "no suitable address found", Addr: originalAddr})
+		throw &AddrError{Err: "no suitable address found", Addr: originalAddr}
 	}
 	ret addrs
 }
@@ -265,7 +265,7 @@ async fn resolveInternetAddrList(net: Network, addr: str)!: addrList {
 			host = addr
 		}
 	|:
-		error(&AddrError{Err: "invalid network: " + str(net)})
+		throw &AddrError{Err: "invalid network: " + str(net)}
 	}
 	if host == "" {
 		ret [internetAddr(net, IPAddr{}, portnum)]

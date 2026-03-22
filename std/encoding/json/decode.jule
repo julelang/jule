@@ -47,7 +47,7 @@ impl decoder {
 		for i < len(self.data) {
 			op := self.scan.step(&self.scan, self.data[i])
 			if op == scanError {
-				error(self.scan.err)
+				throw self.scan.err
 			}
 			i++
 			if len(self.scan.parseState) < depth {
@@ -59,7 +59,7 @@ impl decoder {
 		self.opcode = self.scan.eof()
 		self.off = len(self.data) + 1 // mark processed EOF with len+1
 		if self.opcode != scanError {
-			error(self.scan.err)
+			throw self.scan.err
 		}
 	}
 
@@ -71,7 +71,7 @@ impl decoder {
 		for i < len(self.data) {
 			op := self.scan.step(&self.scan, self.data[i])
 			if op == scanError {
-				error(self.scan.err)
+				throw self.scan.err
 			}
 			i++
 			if op != scanContinue {
@@ -83,7 +83,7 @@ impl decoder {
 		self.opcode = self.scan.eof()
 		self.off = len(self.data) + 1 // mark processed EOF with len+1
 		if self.opcode != scanError {
-			error(self.scan.err)
+			throw self.scan.err
 		}
 	}
 
@@ -121,7 +121,7 @@ impl decoder {
 		for i < len(self.data) {
 			newOp := self.scan.step(&self.scan, self.data[i])
 			if newOp == scanError {
-				error(self.scan.err)
+				throw self.scan.err
 			}
 			i++
 			if newOp != op {
@@ -134,7 +134,7 @@ impl decoder {
 		self.off = len(self.data) + 1 // mark processed EOF with len+1
 		self.opcode = self.scan.eof()
 		if self.opcode == scanError {
-			error(self.scan.err)
+			throw self.scan.err
 		}
 	}
 
@@ -163,7 +163,7 @@ impl decoder {
 			| comptime::Array:
 				if i >= len(*a) {
 					// Ran out of fixed array.
-					error(errors::New("json: array exceeds length of fixed array of type :" + t.Str() + ", got " + conv::Itoa(i)))
+					throw errors::New("json: array exceeds length of fixed array of type :" + t.Str() + ", got " + conv::Itoa(i))
 				}
 				self.value(&(*a)[i])?
 			| comptime::Slice:
@@ -227,7 +227,7 @@ impl decoder {
 		| keyT.Kind() == comptime::U64:
 			break
 		|:
-			error(&UnsupportedTypeError{Type: mapT.Str()})
+			throw &UnsupportedTypeError{Type: mapT.Str()}
 		}
 		// Consider string and dynamic JSON value types as quoted. Directly assign string as key.
 		const quoted = keyT.Kind() == comptime::Str || keyT == valueT || keyT == stringT
@@ -239,7 +239,7 @@ impl decoder {
 				break
 			}
 			if self.opcode != scanBeginLiteral {
-				error(errors::New("json: invalid character " + quoteChar(self.data[self.readIndex()]) + " looking for beginning of object key string"))
+				throw errors::New("json: invalid character " + quoteChar(self.data[self.readIndex()]) + " looking for beginning of object key string")
 			}
 			// Save the current position of decoder.
 			// We use it to select beginning of literal.
@@ -262,7 +262,7 @@ impl decoder {
 				mut s := ""
 				ok := decodeStr(&s, keylit)
 				if !ok {
-					error(errors::New("json: invalid value for type " + keyT.Str() + ": " + unsafe::BytesStr(keylit)))
+					throw errors::New("json: invalid value for type " + keyT.Str() + ": " + unsafe::BytesStr(keylit))
 				}
 				if *m == nil {
 					*m = Map{} // create new map
@@ -277,7 +277,7 @@ impl decoder {
 				// Quoted non-string type, parse unquoted value by type to assign.
 				key := unquoteBytes(keylit)
 				if key == nil {
-					error(errors::New("json: invalid value for object key type" + keyT.Str() + ": " + unsafe::BytesStr(keylit)))
+					throw errors::New("json: invalid value for object key type" + keyT.Str() + ": " + unsafe::BytesStr(keylit))
 				}
 				let mut keyV: K
 				const match keyT.Kind() {
@@ -315,7 +315,7 @@ impl decoder {
 				break
 			}
 			if self.opcode != scanBeginLiteral {
-				error(errors::New("json: invalid character " + quoteChar(self.data[self.readIndex()]) + " looking for beginning of object key string"))
+				throw errors::New("json: invalid character " + quoteChar(self.data[self.readIndex()]) + " looking for beginning of object key string")
 			}
 			// Save the current position of decoder.
 			// We use it to select beginning of literal.
@@ -323,7 +323,7 @@ impl decoder {
 			self.rescanLiteral()?
 			keylit := unquoteBytes(self.data[start:self.readIndex()])
 			if keylit == nil {
-				error(errors::New("json: invalid value for DecodeText function:" + unsafe::BytesStr(keylit)))
+				throw errors::New("json: invalid value for DecodeText function:" + unsafe::BytesStr(keylit))
 			}
 			key := unsafe::StrFromBytes(keylit)
 			// Read : before value.
@@ -400,7 +400,7 @@ impl decoder {
 												self.rescanLiteral()?
 												lit := unquoteBytes(self.data[start:self.readIndex()])
 												if lit == nil {
-													error(errors::New("json: invalid value for DecodeText function:" + unsafe::BytesStr(lit)))
+													throw errors::New("json: invalid value for DecodeText function:" + unsafe::BytesStr(lit))
 												}
 												m.Unwrap()(lit)?
 												ret true
@@ -444,7 +444,7 @@ impl decoder {
 				self.scanNext()
 				ret
 			|:
-				error(errors::New("json: invalid value for type " + tt.Str() + ": array"))
+				throw errors::New("json: invalid value for type " + tt.Str() + ": array")
 			}
 		| scanBeginObject:
 			const match {
@@ -463,7 +463,7 @@ impl decoder {
 				self.scanNext()
 				ret
 			|:
-				error(errors::New("json: invalid value for type " + tt.Str() + ": object"))
+				throw errors::New("json: invalid value for type " + tt.Str() + ": object")
 			}
 		| scanBeginLiteral:
 			// All bytes inside literal return scanContinue op code.
@@ -473,7 +473,7 @@ impl decoder {
 			ret
 		|:
 			b := self.data[self.readIndex()]
-			error(errors::New("json: invalid character " + quoteChar(b) + " looking for beginning of value"))
+			throw errors::New("json: invalid character " + quoteChar(b) + " looking for beginning of value")
 		}
 	}
 
@@ -509,7 +509,7 @@ impl decoder {
 		self.scan.reset()
 		self.scanWhile(scanSkipSpace)?
 		if self.opcode == scanEnd {
-			error(errors::New("json: unexpected JSON input"))
+			throw errors::New("json: unexpected JSON input")
 		}
 		self.value(t)?
 		self.scanWhile(scanSkipSpace)?
@@ -526,14 +526,14 @@ fn decodeLiteral[T](mut data: []byte, mut &t: *T)! {
 			mut s := ""
 			ok := decodeStr(&s, data)
 			if !ok {
-				error(errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(data)))
+				throw errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(data))
 			}
 			*t = String(s)
 			ret
 		| tt.Kind() == comptime::Str:
 			ok := decodeStr(unsafe { &(*(*str)(t)) }, data)
 			if !ok {
-				error(errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(data)))
+				throw errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(data))
 			}
 			ret
 		| tt.Kind() == comptime::Slice:
@@ -541,21 +541,21 @@ fn decodeLiteral[T](mut data: []byte, mut &t: *T)! {
 			| comptime::U8:
 				mut s2 := unquoteBytes(data)
 				if s2 == nil {
-					error(errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(data)))
+					throw errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(data))
 				}
 				mut r := base64::Decode(s2)
 				*t = unsafe { *(*T)(&r) }
 				ret
 			}
 		}
-		error(errors::New("json: invalid value for type " + tt.Str() + ": string"))
+		throw errors::New("json: invalid value for type " + tt.Str() + ": string")
 	| 'n': // Null literal.
 		const match {
 		| tt.CanNil():
 			*t = nil
 			ret
 		|:
-			error(errors::New("json: invalid value for type " + tt.Str() + ": null"))
+			throw errors::New("json: invalid value for type " + tt.Str() + ": null")
 		}
 	| 't' | 'f': // Boolean literal.
 		const match {
@@ -566,7 +566,7 @@ fn decodeLiteral[T](mut data: []byte, mut &t: *T)! {
 			*t = data[0] == 't'
 			ret
 		|:
-			error(errors::New("json: invalid value for type " + tt.Str() + ": boolean"))
+			throw errors::New("json: invalid value for type " + tt.Str() + ": boolean")
 		}
 	| '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '-': // Number literal.
 		const match {
@@ -595,7 +595,7 @@ fn decodeLiteral[T](mut data: []byte, mut &t: *T)! {
 			decodeFloat(t, data)?
 			ret
 		|:
-			error(errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(data)))
+			throw errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(data))
 		}
 	|:
 		panic("unreachable")
@@ -861,7 +861,7 @@ fn decodeInt[T](mut &t: *T, lit: []byte)! {
 	// The byte buffer will not change, so it's safe and efficient.
 	const tt = comptime::TypeOf(T)
 	n := conv::ParseInt(unsafe::BytesStr(lit), 10, tt.Bits()) else {
-		error(errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(lit)))
+		throw errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(lit))
 	}
 	*t = (T)(n)
 }
@@ -872,7 +872,7 @@ fn decodeUInt[T](mut &t: *T, lit: []byte)! {
 	// The byte buffer will not change, so it's safe and efficient.
 	const tt = comptime::TypeOf(T)
 	n := conv::ParseUint(unsafe::BytesStr(lit), 10, tt.Bits()) else {
-		error(errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(lit)))
+		throw errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(lit))
 	}
 	*t = (T)(n)
 }
@@ -883,7 +883,7 @@ fn decodeFloat[T](mut &t: *T, lit: []byte)! {
 	// The byte buffer will not change, so it's safe and efficient.
 	const tt = comptime::TypeOf(T)
 	n := conv::ParseFloat(unsafe::BytesStr(lit), tt.Bits()) else {
-		error(errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(lit)))
+		throw errors::New("json: invalid value for type " + tt.Str() + ": " + unsafe::BytesStr(lit))
 	}
 	*t = (T)(n)
 }

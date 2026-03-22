@@ -48,7 +48,7 @@ impl Reader {
 	fn ReadAt(*self, mut b: []byte, off: i64)!: (n: int) {
 		// cannot modify state - see io::ReaderAt
 		if off < 0 {
-			error(errors::New("strings::Reader.ReadAt: negative offset"))
+			throw errors::New("strings::Reader.ReadAt: negative offset")
 		}
 		if off >= i64(len(self.s)) {
 			ret io::EOF
@@ -71,7 +71,7 @@ impl Reader {
 	// Implements behavior the io::ByteScanner trait.
 	fn UnreadByte(*self)! {
 		if self.i <= 0 {
-			error(errors::New("strings::Reader.UnreadByte: at beginning of string"))
+			throw errors::New("strings::Reader.UnreadByte: at beginning of string")
 		}
 		self.prevRune = -1
 		self.i--
@@ -97,10 +97,10 @@ impl Reader {
 	// Implements behavior the io::RuneScanner trait.
 	fn UnreadRune(*self)! {
 		if self.i <= 0 {
-			error(errors::New("strings::Reader.UnreadRune: at beginning of string"))
+			throw errors::New("strings::Reader.UnreadRune: at beginning of string")
 		}
 		if self.prevRune < 0 {
-			error(errors::New("strings::Reader.UnreadRune: previous operation was not ReadRune"))
+			throw errors::New("strings::Reader.UnreadRune: previous operation was not ReadRune")
 		}
 		self.i = i64(self.prevRune)
 		self.prevRune = -1
@@ -118,10 +118,10 @@ impl Reader {
 		| io::SeekEnd:
 			abs = i64(len(self.s)) + offset
 		|:
-			error(errors::New("strings::Reader.Seek: invalid whence"))
+			throw errors::New("strings::Reader.Seek: invalid whence")
 		}
 		if abs < 0 {
-			error(errors::New("strings::Reader.Seek: negative position"))
+			throw errors::New("strings::Reader.Seek: negative position")
 		}
 		self.i = abs
 		ret abs
@@ -141,7 +141,7 @@ impl Reader {
 		self.i += i64(m)
 		n = i64(m)
 		if m != len(s) {
-			error(io::ErrShortWrite)
+			throw io::ErrShortWrite
 		}
 		ret
 	}

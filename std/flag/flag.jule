@@ -213,7 +213,7 @@ impl argParser {
 
 		data := self.getData()
 		if data == "" {
-			error("--" + flag.Name() + ": expression missing")
+			throw "--" + flag.Name() + ": expression missing"
 		}
 
 		match type flag {
@@ -224,7 +224,7 @@ impl argParser {
 				ret i, true
 			})
 			if !ok {
-				error("--" + flag.Name() + ": expression must be valid signed integer")
+				throw "--" + flag.Name() + ": expression must be valid signed integer"
 			}
 		| UintFlag:
 			mut uintf := flag.(UintFlag)
@@ -233,12 +233,12 @@ impl argParser {
 				ret i, true
 			})
 			if !ok {
-				error("--" + flag.Name() + ": expression must be valid unsigned integer")
+				throw "--" + flag.Name() + ": expression must be valid unsigned integer"
 			}
 		| FloatFlag:
 			mut ff := flag.(FloatFlag)
 			*ff.data = conv::ParseFloat(data, bitSize) else {
-				error("--" + flag.Name() + ": expression must be valid floating-point")
+				throw "--" + flag.Name() + ": expression must be valid floating-point"
 			}
 		| StrFlag:
 			*flag.(StrFlag).data = data
@@ -247,13 +247,13 @@ impl argParser {
 
 	fn singleDash(mut *self, arg: str)! {
 		if len(arg) == 1 { // Just dash.
-			error(arg + ": missing argument")
+			throw arg + ": missing argument"
 		}
 		// Start at 1 to skip dash.
 		for _, r in arg[1:] {
 			mut flag := self.set.FindFlagShort(r)
 			if flag == nil {
-				error(arg + ": flag is not exist: " + str(r))
+				throw arg + ": flag is not exist: " + str(r)
 			}
 			self.processFlag(flag)?
 		}
@@ -261,11 +261,11 @@ impl argParser {
 
 	fn doubleDash(mut *self, arg: str)! {
 		if len(arg) == 2 { // Just dash.
-			error(arg + ": missing argument")
+			throw arg + ": missing argument"
 		}
 		mut flag := self.set.FindFlag(arg[2:]) // Start at 2 to skip dashes.
 		if flag == nil {
-			error(arg + ": flag is not exist")
+			throw arg + ": flag is not exist"
 		}
 		self.processFlag(flag)?
 	}

@@ -414,7 +414,7 @@ async fn eventpollblock(mut pd: &polldesc, mode: i32, waitio: bool): bool {
 fn eventpollreset(mut pd: &polldesc, mode: i32)! {
 	errcode := eventpollcheckerr(pd, mode)
 	if errcode != pollNoError {
-		error(errcode)
+		throw errcode
 	}
 	match mode {
 	| 'r':
@@ -430,12 +430,12 @@ fn eventpollreset(mut pd: &polldesc, mode: i32)! {
 async fn eventpollwait(mut pd: &polldesc, mode: i32)! {
 	mut errcode := eventpollcheckerr(pd, mode)
 	if errcode != pollNoError {
-		error(errcode)
+		throw errcode
 	}
 	for !eventpollblock(pd, mode, false).await {
 		errcode = eventpollcheckerr(pd, mode)
 		if errcode != pollNoError {
-			error(errcode)
+			throw errcode
 		}
 		// Can happen if timeout has fired and unblocked us,
 		// but before we had a chance to run, timeout has been reset.
@@ -600,7 +600,7 @@ fn eventpollnew(fd: u64)!: &polldesc {
 
 	eventpollopen(fd, &(*pd)) else {
 		pollcache.free(pd)
-		error(error)
+		throw error
 	}
 	ret pd
 }

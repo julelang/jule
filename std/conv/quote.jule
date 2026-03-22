@@ -292,12 +292,12 @@ fn unhex(b: byte): (v: rune, ok: bool) {
 fn UnquoteChar(mut s: str, quote: byte)!: (value: rune, multibyte: bool, tail: str) {
 	// easy cases
 	if len(s) == 0 {
-		error(ErrSyntax)
+		throw ErrSyntax
 	}
 	mut c := s[0]
 	match {
 	| c == quote && (quote == '\'' || quote == '"'):
-		error(ErrSyntax)
+		throw ErrSyntax
 	| c >= utf8::RuneSelf:
 		r, size := utf8::DecodeRuneStr(s)
 		ret r, true, s[size:]
@@ -307,7 +307,7 @@ fn UnquoteChar(mut s: str, quote: byte)!: (value: rune, multibyte: bool, tail: s
 
 	// hard case: c is backslash
 	if len(s) <= 1 {
-		error(ErrSyntax)
+		throw ErrSyntax
 	}
 	c = s[1]
 	s = s[2:]
@@ -339,13 +339,13 @@ fn UnquoteChar(mut s: str, quote: byte)!: (value: rune, multibyte: bool, tail: s
 		}
 		let mut v: rune
 		if len(s) < n {
-			error(ErrSyntax)
+			throw ErrSyntax
 		}
 		mut j := 0
 		for j < n; j++ {
 			x, ok := unhex(s[j])
 			if !ok {
-				error(ErrSyntax)
+				throw ErrSyntax
 			}
 			v = v<<4 | x
 		}
@@ -356,37 +356,37 @@ fn UnquoteChar(mut s: str, quote: byte)!: (value: rune, multibyte: bool, tail: s
 			break
 		}
 		if !utf8::ValidRune(v) {
-			error(ErrSyntax)
+			throw ErrSyntax
 		}
 		value = v
 		multibyte = true
 	| '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7':
 		mut v := rune(c) - '0'
 		if len(s) < 2 {
-			error(ErrSyntax)
+			throw ErrSyntax
 		}
 		mut j := 0
 		for j < 2; j++ { // one digit already; two more
 			x := rune(s[j]) - '0'
 			if x < 0 || x > 7 {
-				error(ErrSyntax)
+				throw ErrSyntax
 			}
 			v = (v << 3) | x
 		}
 		s = s[2:]
 		if v > 255 {
-			error(ErrSyntax)
+			throw ErrSyntax
 		}
 		value = v
 	| '\\':
 		value = '\\'
 	| '\'' | '"':
 		if c != quote {
-			error(ErrSyntax)
+			throw ErrSyntax
 		}
 		value = rune(c)
 	|:
-		error(ErrSyntax)
+		throw ErrSyntax
 	}
 	tail = s
 	ret
@@ -397,7 +397,7 @@ fn UnquoteChar(mut s: str, quote: byte)!: (value: rune, multibyte: bool, tail: s
 fn QuotedPrefix(s: str)!: str {
 	out, _, mut err := unquote(s, false)
 	if err != nil {
-		error(err)
+		throw err
 	}
 	ret out
 }
@@ -411,10 +411,10 @@ fn QuotedPrefix(s: str)!: str {
 fn Unquote(s: str)!: str {
 	out, rem, mut err := unquote(s, true)
 	if len(rem) > 0 {
-		error(ErrSyntax)
+		throw ErrSyntax
 	}
 	if err != nil {
-		error(err)
+		throw err
 	}
 	ret out
 }

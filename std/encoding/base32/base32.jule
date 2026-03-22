@@ -303,7 +303,7 @@ impl Encoding {
 				if c == 0 {
 					if self.padByte != NoPadding {
 						// We have reached the end and are missing padding
-						error(CorruptInputError(len(src) - c - j))
+						throw CorruptInputError(len(src) - c - j)
 					}
 					// We have reached the end and are not expecting any padding
 					end = true
@@ -317,13 +317,13 @@ impl Encoding {
 					// We've reached the end and there's padding
 					if len(src)+j < 8-1 {
 						// Not enough padding.
-						error(CorruptInputError(len(src)))
+						throw CorruptInputError(len(src))
 					}
 					mut k := int(uintptr(sp - spf))
 					for k < 8-1-j; k++ {
 						if c > k && src[k] != self.padByte {
 							// Incorrect padding.
-							error(CorruptInputError(len(src) - c + k - 1))
+							throw CorruptInputError(len(src) - c + k - 1)
 						}
 					}
 					// 7, 5 and 2 are not valid padding lengths, and so 1, 3 and 6 are not
@@ -332,14 +332,14 @@ impl Encoding {
 					// Examples" for an illustration for how the 1st, 3rd and 6th base32
 					// src bytes do not yield enough information to decode a dst byte.
 					if j == 1 || j == 3 || j == 6 {
-						error(CorruptInputError(len(src) - c - 1))
+						throw CorruptInputError(len(src) - c - 1)
 					}
 					end = true
 					ret
 				}
 				d := self.decodeMap[b]
 				if d == invalidIndex {
-					error(CorruptInputError(len(src) - c - 1))
+					throw CorruptInputError(len(src) - c - 1)
 				}
 				buffer <<= 5
 				bits += 5
@@ -466,13 +466,13 @@ async fn readEncodedData(mut r: io::Reader, mut buf: []byte, min: int, expectsPa
 		if nn == io::EOF {
 			// Data was read, less than min bytes could be read.
 			if n < min && n > 0 {
-				error(io::ErrUnexpectedEOF)
+				throw io::ErrUnexpectedEOF
 			}
 			// No data was read, the buffer already contains some data
 			// when padding is disabled this is not an error, as the message can be of
 			// any length.
 			if expectsPadding && min < 8 && n == 0 {
-				error(io::ErrUnexpectedEOF)
+				throw io::ErrUnexpectedEOF
 			}
 			break
 		}
@@ -520,7 +520,7 @@ impl io::Reader for decoder {
 			self.nbuf += nn
 		}
 		if nn > 0 && self.end {
-			error(CorruptInputError(0))
+			throw CorruptInputError(0)
 		}
 
 		// Decode chunk into p, or d.out and then p if p is too small.

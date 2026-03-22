@@ -41,7 +41,7 @@ fn integLookupIP(net: Network, host: str)!: (addrs: []IPAddr) {
 	let mut res: *extern.addrinfo
 	e := sys::Addrcall[int](uintptr(extern.getaddrinfo), uintptr(&hostb[0]), uintptr(0), uintptr(&hints), uintptr(&res))
 	if e != 0 {
-		error(sys::Errno(e))
+		throw sys::Errno(e)
 	}
 
 	unsafe {
@@ -103,7 +103,7 @@ fn integLookupPortMap(network: Network, service: str)!: (port: int) {
 		hints.ai_socktype = sys::SOCK_DGRAM
 		hints.ai_protocol = sys::IPPROTO_UDP
 	|:
-		error(&DNSError{Err: "unknown network", Name: networkToStr(network) + "/" + service})
+		throw &DNSError{Err: "unknown network", Name: networkToStr(network) + "/" + service}
 	}
 	mut serviceb := integ::BytesFromStr(service)
 	// Lowercase the C service name.
@@ -113,7 +113,7 @@ fn integLookupPortMap(network: Network, service: str)!: (port: int) {
 	let mut res: *extern.addrinfo
 	e := sys::Addrcall[int](uintptr(extern.getaddrinfo), uintptr(0), uintptr(&serviceb[0]), uintptr(&hints), uintptr(&res))
 	if e != 0 {
-		error(sys::Errno(e))
+		throw sys::Errno(e)
 	}
 
 	defer { sys::Addrcall(uintptr(extern.freeaddrinfo), uintptr(res)) }
@@ -133,5 +133,5 @@ fn integLookupPortMap(network: Network, service: str)!: (port: int) {
 			}
 		}
 	}
-	error(newDNSError("unknown port", networkToStr(network)+"/"+service, ""))
+	throw newDNSError("unknown port", networkToStr(network)+"/"+service, "")
 }

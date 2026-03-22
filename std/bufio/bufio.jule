@@ -180,7 +180,7 @@ impl Reader {
 	// until the next read operation.
 	async fn Peek(mut *self, mut n: int)!: (data: []byte, full: bool, eof: bool) {
 		if n < 0 {
-			error(ErrNegativeCount)
+			throw ErrNegativeCount
 		}
 
 		self.lastByte = -1
@@ -209,7 +209,7 @@ impl Reader {
 				n = avail
 			} else {
 				// throw the error, probably buffer is not filled because of that
-				error(err)
+				throw err
 			}
 		}
 		data = self.buf[self.r : self.r+n]
@@ -223,7 +223,7 @@ impl Reader {
 	// reading from the underlying io::Reader.
 	async fn Discard(mut *self, n: int)!: (discarded: int) {
 		if n < 0 {
-			error(ErrNegativeCount)
+			throw ErrNegativeCount
 		}
 		if n == 0 {
 			ret
@@ -252,7 +252,7 @@ impl Reader {
 				ret n - remain
 			}
 			if self.err != nil {
-				error(self.readErr())
+				throw self.readErr()
 			}
 		}
 	}
@@ -271,13 +271,13 @@ impl Reader {
 				ret 0
 			}
 			if self.err != nil {
-				error(self.readErr())
+				throw self.readErr()
 			}
 			ret 0
 		}
 		if self.r == self.w {
 			if self.err != nil {
-				error(self.readErr())
+				throw self.readErr()
 			}
 			if len(p) >= len(self.buf) {
 				// Large read, empty buffer.
@@ -329,7 +329,7 @@ impl Reader {
 				ret 0, io::EOF
 			}
 			if self.err != nil {
-				error(self.readErr())
+				throw self.readErr()
 			}
 			eof = self.fill().await // buffer is empty
 		}
@@ -346,7 +346,7 @@ impl Reader {
 	// considered read operations.
 	async fn UnreadByte(mut *self)! {
 		if self.lastByte < 0 || self.r == 0 && self.w > 0 {
-			error(ErrInvalidUnreadByte)
+			throw ErrInvalidUnreadByte
 		}
 		// self.r > 0 || self.w == 0
 		if self.r > 0 {
@@ -373,7 +373,7 @@ impl Reader {
 		self.lastRuneSize = -1
 		if self.r == self.w {
 			if self.err != nil {
-				error(self.readErr())
+				throw self.readErr()
 			}
 			ret 0, io::EOF
 		}
@@ -393,7 +393,7 @@ impl Reader {
 	// from any read operation.)
 	async fn UnreadRune(mut *self)! {
 		if self.lastRuneSize < 0 || self.r < self.lastRuneSize {
-			error(ErrInvalidUnreadRune)
+			throw ErrInvalidUnreadRune
 		}
 		self.r -= self.lastRuneSize
 		self.lastByte = -1
@@ -430,7 +430,7 @@ impl Reader {
 			// Pending error?
 			if self.err != nil {
 				self.r = self.w
-				error(self.readErr())
+				throw self.readErr()
 			}
 
 			// EOF?
@@ -606,7 +606,7 @@ impl Reader {
 		}
 
 		if self.err != nil {
-			error(self.readErr())
+			throw self.readErr()
 		}
 
 		ret n
@@ -697,18 +697,18 @@ impl Writer {
 	// Writes any buffered data to the underlying [io::Writer].
 	async fn Flush(mut *self)! {
 		if self.err != nil {
-			error(self.err)
+			throw self.err
 		}
 		if self.n == 0 {
 			ret
 		}
 		n := self.wr.Write(self.buf[0:self.n]).await else {
 			self.err = error
-			error(self.err)
+			throw self.err
 		}
 		if n < self.n {
 			self.err = io::ErrShortWrite
-			error(self.err)
+			throw self.err
 		}
 		self.n = 0
 	}
@@ -749,7 +749,7 @@ impl Writer {
 			unsafe { *(&p) = (*(&p))[n:] }
 		}
 		if self.err != nil {
-			error(self.err)
+			throw self.err
 		}
 		n := copy(self.buf[self.n:], p)
 		self.n += n
@@ -760,7 +760,7 @@ impl Writer {
 	// Writes a single byte.
 	async fn WriteByte(mut *self, c: byte)! {
 		if self.err != nil {
-			error(self.err)
+			throw self.err
 		}
 		if self.Available() <= 0 {
 			self.Flush().await?
@@ -778,7 +778,7 @@ impl Writer {
 			ret 1
 		}
 		if self.err != nil {
-			error(self.err)
+			throw self.err
 		}
 		mut n := self.Available()
 		if n < utf8::UTFMax {
@@ -809,7 +809,7 @@ impl Writer {
 			s = s[n:]
 		}
 		if self.err != nil {
-			error(self.err)
+			throw self.err
 		}
 		n := copy(self.buf[self.n:], s)
 		self.n += n
@@ -820,7 +820,7 @@ impl Writer {
 	// Implements [io::ReaderFrom].
 	async fn ReadFrom(mut *self, mut r: io::Reader)!: (n: i64) {
 		if self.err != nil {
-			error(self.err)
+			throw self.err
 		}
 		let mut m: int
 	Loop:
@@ -839,7 +839,7 @@ impl Writer {
 				nr++
 			}
 			if nr == maxConsecutiveEmptyReads {
-				error(io::ErrNoProgress)
+				throw io::ErrNoProgress
 			}
 			self.n += m
 			n += i64(m)
