@@ -569,12 +569,13 @@ struct field {
 }
 
 // Field cache data for structure types and associated RWMutex.
-let mut fieldMap = map[uintptr][]&field{}
+let mut fieldMap = map[uintptr][]field{}
 let mut fieldMapLock = runtime::rwmutex{}
 
 // Returns field cache data for the structure type T.
 // If the structure is not cached yet, it will cache it.
-fn cachedFields[T](): []&field {
+#disable nilptr boundary
+fn cachedFields[T](): []field {
 	const t = comptime::TypeOf(T)
 	fieldMapLock.rLock()
 	mut cache, mut exist := fieldMap[t.Hash()]
@@ -597,16 +598,24 @@ fn cachedFields[T](): []&field {
 	p := unsafe { (*T)(0) }
 	const pv = comptime::ValueOf(unsafe { *p })
 	const fields = t.Fields()
-	const for i, f in t.Decl().Fields() {
-		const tag = f.Tag("json")
+	mut n := 0
+	// Grow cache by field count,
+	// a typical JSON structure is encoded with all fields.
+	cache = make([]field, len(fields))
+	const for i, f in fields {
+		const fd = f.Decl()
+		const tag = fd.Tag("json")
 		const match {
-		| f.Public() | tag != "":
-			name := getFieldName[T](f.Public(), f.Name(), tag)
+		| fd.Public() | tag != "":
+			name := getFieldName[T](fd.Public(), fd.Name(), tag)
 			if name != "" {
-				comptime::TypeAlias(fieldType, fields[i].Type())
+				comptime::TypeAlias(fieldType, f.Type())
 
-				mut fieldCache := new(field)
+				// Initialize directly the slice's memory.
+				// This is efficient than appending a temporary cache object.
+				mut &fieldCache := unsafe { &(*&cache[n]) }
 				fieldCache.offset = uintptr(&pv.FieldByIndex(i).Unwrap())
+				n++
 
 				// Cache name for non-escape.
 				fieldCache.nameNonEsc = name
@@ -624,11 +633,12 @@ fn cachedFields[T](): []&field {
 				fieldCache.encodePlain = typeEncoderPlain[fieldType]
 				fieldCache.encodeIndent = typeEncoderIndent[fieldType]
 				fieldCache.decode = typeDecoder[fieldType]
-
-				cache = append(cache, fieldCache)
 			}
 		}
 	}
+	// Truncate the cache, there may be skipped fields.
+	cache = cache[:n]
+	// Save the cache and return.
 	fieldMap[t.Hash()] = cache
 	fieldMapLock.unlock()
 	ret cache
