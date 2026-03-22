@@ -83,7 +83,7 @@ class __jule_thread;
 // Historically, this field was a smart pointer.
 // However, due to a toolchain bug in Windows, it's supposed to be a trivial type.
 // See: https://github.com/mstorsjo/llvm-mingw/issues/541
-inline thread_local __jule_thread *__jule_ct = nullptr;
+inline constinit thread_local __jule_thread *__jule_ct = nullptr;
 
 // Non-templated coroutine handle used by the runtime.
 // The runtime never needs promise-type information.
@@ -107,7 +107,7 @@ struct __jule_RetireNode
 
 // One retire list per worker thread.
 // This is strictly thread-local and never shared.
-inline thread_local __jule_RetireNode *__jule_retireHead = nullptr;
+inline constinit thread_local __jule_RetireNode *__jule_retireHead = nullptr;
 
 // Pushes a coroutine frame onto the retire list.
 static inline void __jule_retirePush(__jule_RetireNode &n, __jule_cHandle h) noexcept
@@ -130,6 +130,12 @@ static inline void __jule_retirePush(__jule_RetireNode &n, __jule_cHandle h) noe
 // Destroys all retired coroutine frames for the current worker thread.
 static inline void __jule_retireDrain(void) noexcept
 {
+    // Fast-path: Mostly, there is nothing to retire.
+    if (!__jule_retireHead) [[likely]]
+    {
+        return;
+    }
+
     __jule_RetireNode *list = __jule_retireHead;
     __jule_retireHead = nullptr;
     while (list)
@@ -168,7 +174,7 @@ struct __jule_TrampNode
     __jule_cHandle h{};
 };
 
-inline thread_local __jule_TrampNode *__jule_trampHead = nullptr;
+inline constinit thread_local __jule_TrampNode *__jule_trampHead = nullptr;
 
 // Enqueue using a persistent node (embedded in a promise or other stable storage).
 static inline void __jule_trampolineEnqueueNode(__jule_TrampNode &n, __jule_cHandle h) noexcept
@@ -197,10 +203,8 @@ static inline void __jule_trampolineRun(void) noexcept
         __jule_trampHead = n->next;
 
         __jule_cHandle h = n->h;
-        n->h = {};
-        n->next = nullptr;
 
-        if (h && !h.done())
+        if (h && !h.done()) [[likely]]
         {
             h.resume();
         }
@@ -245,9 +249,8 @@ public:
         // Continuation coroutine (awaiter).
         __jule_cHandle continuation{};
 
-        // Persistent trampoline nodes (allocation-free).
-        __jule_TrampNode self_node{};
-        __jule_TrampNode cont_node{};
+        // Persistent trampoline node (allocation-free).
+        __jule_TrampNode tramp_node{};
 
         __jule_Async<T> get_return_object(void) noexcept
         {
@@ -264,14 +267,14 @@ public:
         {
             bool await_ready(void) noexcept { return false; }
 
-            __jule_cHandle await_suspend(std::coroutine_handle<promise_type> h) noexcept
+            void await_suspend(std::coroutine_handle<promise_type> h) noexcept
             {
                 auto &p = h.promise();
                 if (p.continuation)
                 {
-                    __jule_trampolineEnqueueNode(p.cont_node, p.continuation);
+                    __jule_trampolineEnqueueNode(p.tramp_node, p.continuation);
                 }
-                return std::noop_coroutine();
+                return;
             }
 
             void await_resume(void) noexcept {}
@@ -279,7 +282,7 @@ public:
 
         Final final_suspend(void) noexcept { return {}; }
 
-        void unhandled_exception(void)
+        void unhandled_exception(void) noexcept
         {
             // Jule does not propagate exceptions across coroutine boundaries.
             std::terminate();
@@ -326,16 +329,16 @@ public:
                 return h.done();
             }
 
-            __jule_cHandle await_suspend(__jule_cHandle caller) noexcept
+            void await_suspend(__jule_cHandle caller) noexcept
             {
                 auto &p = h.promise();
                 p.continuation = caller;
 
                 // Enqueue task itself; do NOT symmetric-transfer into it.
-                __jule_trampolineEnqueueNode(p.self_node, h);
+                __jule_trampolineEnqueueNode(p.tramp_node, h);
 
                 // Return to scheduler boundary (no deep chaining).
-                return std::noop_coroutine();
+                return;
             }
 
             T await_resume(void)
@@ -360,9 +363,8 @@ public:
     {
         __jule_cHandle continuation{};
 
-        // Persistent trampoline nodes (allocation-free).
-        __jule_TrampNode self_node{};
-        __jule_TrampNode cont_node{};
+        // Persistent trampoline node (allocation-free).
+        __jule_TrampNode tramp_node{};
 
         __jule_VoidAsync get_return_object(void) noexcept
         {
@@ -375,14 +377,14 @@ public:
         {
             bool await_ready(void) noexcept { return false; }
 
-            __jule_cHandle await_suspend(std::coroutine_handle<promise_type> h) noexcept
+            void await_suspend(std::coroutine_handle<promise_type> h) noexcept
             {
                 auto &p = h.promise();
                 if (p.continuation)
                 {
-                    __jule_trampolineEnqueueNode(p.cont_node, p.continuation);
+                    __jule_trampolineEnqueueNode(p.tramp_node, p.continuation);
                 }
-                return std::noop_coroutine();
+                return;
             }
 
             void await_resume(void) noexcept {}
@@ -390,7 +392,7 @@ public:
 
         Final final_suspend(void) noexcept { return {}; }
 
-        void unhandled_exception(void) { std::terminate(); }
+        void unhandled_exception(void) noexcept { std::terminate(); }
         void return_void(void) noexcept {}
     };
 
@@ -424,16 +426,16 @@ public:
                 return h.done();
             }
 
-            __jule_cHandle await_suspend(__jule_cHandle caller) noexcept
+            void await_suspend(__jule_cHandle caller) noexcept
             {
                 auto &p = h.promise();
                 p.continuation = caller;
 
                 // Enqueue the task coroutine; do NOT symmetric-transfer.
-                __jule_trampolineEnqueueNode(p.self_node, h);
+                __jule_trampolineEnqueueNode(p.tramp_node, h);
 
                 // Return to scheduler boundary.
-                return std::noop_coroutine();
+                return;
             }
 
             void await_resume(void) noexcept
@@ -465,11 +467,11 @@ public:
         {
             bool await_ready(void) noexcept { return false; }
 
-            __jule_cHandle await_suspend(std::coroutine_handle<promise_type> h) noexcept
+            void await_suspend(std::coroutine_handle<promise_type> h) noexcept
             {
                 auto &p = h.promise();
                 __jule_retirePush(p.retire_node, h);
-                return std::noop_coroutine();
+                return;
             }
 
             void await_resume(void) noexcept {}
@@ -477,7 +479,7 @@ public:
 
         Final final_suspend(void) noexcept { return {}; }
 
-        void unhandled_exception(void) { std::terminate(); }
+        void unhandled_exception(void) noexcept { std::terminate(); }
         void return_void(void) noexcept {}
     };
 
