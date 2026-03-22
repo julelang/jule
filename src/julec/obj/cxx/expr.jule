@@ -1730,123 +1730,6 @@ impl exprCoder {
 		self.oc.write(");")
 	}
 
-	fn errorCall(mut &self, mut m: &sema::BuiltinErrorCallExpr) {
-		hasDefer := m.Func.Decl != nil && m.Func.Decl.HasDefer
-		if m.Func.Decl.IsVoid() {
-			mut v, _ := m.Err.Model.(&sema::Var)
-			if v != nil && v.Name == "error" {
-				if !hasDefer {
-					self.oc.write(returnKw(m.Func))
-					self.oc.write(" __jule_VoidExceptional{.error=std::move(")
-					// Handle error variable like ordinary variable.
-					// Because it may be captured, use captured variable handler.
-					self.var(v)
-					self.oc.write(")}")
-					ret
-				}
-				self.oc.write("{\n")
-				self.oc.addIndent()
-				self.oc.indent()
-				self.oc.write(typeAny)
-				self.oc.write(" __result = std::move(")
-				// Handle error variable like ordinary variable.
-				// Because it may be captured, use captured variable handler.
-				self.var(v)
-				self.oc.write(");\n")
-				self.oc.sc.emitDefers(0, false)
-				self.oc.write("\n")
-				self.oc.indent()
-				self.oc.write(returnKw(m.Func))
-				self.oc.write(" __jule_VoidExceptional{.error=std::move(__result)};\n")
-				self.oc.doneIndent()
-				self.oc.indent()
-				self.oc.write("}")
-				ret
-			}
-			if !hasDefer {
-				self.oc.write(returnKw(m.Func))
-				self.oc.write(" __jule_VoidExceptional{.error=")
-				self.possibleRefExpr(m.Err.Model)
-				self.oc.write("}")
-				ret
-			}
-			self.oc.write("{\n")
-			self.oc.addIndent()
-			self.oc.indent()
-			self.oc.write(typeAny)
-			self.oc.write(" __result = ")
-			self.possibleRefExpr(m.Err.Model)
-			self.oc.write(";\n")
-			self.oc.sc.emitDefers(0, false)
-			self.oc.indent()
-			self.oc.write(returnKw(m.Func))
-			self.oc.write(" __jule_VoidExceptional{.error=std::move(__result)};\n")
-			self.oc.doneIndent()
-			self.oc.indent()
-			self.oc.write("}")
-		} else {
-			mut v, _ := m.Err.Model.(&sema::Var)
-			if v != nil && v.Name == "error" {
-				if !hasDefer {
-					self.oc.write(returnKw(m.Func))
-					self.oc.write(" __jule_Exceptional<")
-					self.oc.tc.rc.codeMut1(&self.oc.Buf, m.Func.Result)
-					self.oc.write(">{.error=std::move(")
-					// Handle error variable like ordinary variable.
-					// Because it may be captured, use captured variable handler.
-					self.var(v)
-					self.oc.write(")}")
-					ret
-				}
-				self.oc.write("{\n")
-				self.oc.addIndent()
-				self.oc.indent()
-				self.oc.write(typeAny)
-				self.oc.write(" __result = std::move(")
-				// Handle error variable like ordinary variable.
-				// Because it may be captured, use captured variable handler.
-				self.var(v)
-				self.oc.write(");\n")
-				self.oc.sc.emitDefers(0, false)
-				self.oc.write("\n")
-				self.oc.indent()
-				self.oc.write(returnKw(m.Func))
-				self.oc.write(" __jule_Exceptional<")
-				self.oc.tc.rc.codeMut1(&self.oc.Buf, m.Func.Result)
-				self.oc.write(">{.error=std::move(__result)};\n")
-				self.oc.doneIndent()
-				self.oc.indent()
-				self.oc.write("}")
-				ret
-			}
-			if !hasDefer {
-				self.oc.write(returnKw(m.Func))
-				self.oc.write(" __jule_Exceptional<")
-				self.oc.tc.rc.codeMut1(&self.oc.Buf, m.Func.Result)
-				self.oc.write(">{.error=")
-				self.possibleRefExpr(m.Err.Model)
-				self.oc.write("}")
-				ret
-			}
-			self.oc.write("{\n")
-			self.oc.addIndent()
-			self.oc.indent()
-			self.oc.write(typeAny)
-			self.oc.write(" __result = ")
-			self.possibleRefExpr(m.Err.Model)
-			self.oc.write(";\n")
-			self.oc.sc.emitDefers(0, false)
-			self.oc.indent()
-			self.oc.write(returnKw(m.Func))
-			self.oc.write(" __jule_Exceptional<")
-			self.oc.tc.rc.codeMut1(&self.oc.Buf, m.Func.Result)
-			self.oc.write(">{.error=std::move(__result)};\n")
-			self.oc.doneIndent()
-			self.oc.indent()
-			self.oc.write("}")
-		}
-	}
-
 	fn copyCall(mut &self, mut m: &sema::BuiltinCopyCallExpr) {
 		// We have to use mutable memory for the dest argument of copy due to lang spec.
 		if opt::IsZCopyArray(m.Dest.Model) {
@@ -2399,8 +2282,6 @@ impl exprCoder {
 			self.newCall(m.(&sema::BuiltinNewCallExpr))
 		| &sema::BuiltinPanicCallExpr:
 			self.panicCall(m.(&sema::BuiltinPanicCallExpr))
-		| &sema::BuiltinErrorCallExpr:
-			self.errorCall(m.(&sema::BuiltinErrorCallExpr))
 		| &sema::BuiltinMakeCallExpr:
 			self.makeCall(m.(&sema::BuiltinMakeCallExpr))
 		| &sema::BuiltinAppendCallExpr:

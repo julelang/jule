@@ -179,15 +179,18 @@ impl scopeDeadCode {
 			self.optimizeAssign(st.(&sema::Assign))
 		| &sema::MultiAssign:
 			self.optimizeMultiAssign(st.(&sema::MultiAssign))
+		| &sema::Throw:
+			// Remove followed statements of the throw statements.
+			// Unreachable code.
+			self.eliminateFollowed()
 		| &sema::Value:
 			mut val := st.(&sema::Value)
 			if self.except {
 				break
 			}
 			match type val.Model {
-			| &sema::BuiltinErrorCallExpr
 			| &sema::BuiltinPanicCallExpr:
-				// Remove followed statements of the function call.
+				// Remove followed statements of the panic call.
 				// Unreachable code.
 				self.eliminateFollowed()
 			|:

@@ -219,38 +219,6 @@ fn findPackageBuiltinDef(linkPath: str, name: str): any {
 	}
 }
 
-fn builtinCallerError(mut e: &eval, mut fc: &ast::CallExpr): &Value {
-	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, "error value is missing for error call")
-		e.pushSuggestion("call like; error(myError)")
-		ret nil
-	}
-	if len(fc.Args) > 1 {
-		e.pushErr(fc.Token, "passed more argument than expected to error call")
-		e.pushSuggestion("call like; error(myError)")
-	}
-	mut expr := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
-	if expr == nil {
-		ret nil
-	}
-
-	mut token := fc.Args[0].Token
-	if expr.IsNil() {
-		e.pushErr(token, "error calls does not supports nil literal as error")
-	}
-
-	const Reference = false
-	const Mutable = true
-	if !e.s.checkValidityForInitExpr(Mutable, Reference, primAny, expr, token) {
-		ret nil
-	}
-
-	applyImplicitCast(e.s, primAny, expr, token, e.getOwnerRefers())
-	mut v := buildVoidValue()
-	v.Model = &BuiltinErrorCallExpr{Err: expr}
-	ret v
-}
-
 fn builtinCallerPrint(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, "expression is missing for print/println")

@@ -2362,12 +2362,10 @@ impl eval {
 							// then assign scope of variable to the child.
 							mut errorVar := buildErrorVar(s.scope, fc)
 							model.Except = s.getChild()
-							mut ec := buildVoidValue()
-							ec.Model = &BuiltinErrorCallExpr{
+							model.Except.Stmts = append(model.Except.Stmts, &Throw{
 								Func: root.owner,
-								Err: self.evalVar(errorVar, fc.Token),
-							}
-							model.Except.Stmts = append(model.Except.Stmts, ec)
+								Error: self.evalVar(errorVar, fc.Token),
+							})
 							errorVar.Scope = model.Except
 							break
 						}
@@ -2394,15 +2392,6 @@ impl eval {
 		mut prefix := self.prefix
 		self.prefix = nil
 		defer { self.prefix = prefix }
-
-		_, isName := fc.Func.Data.(&ast::NameExpr)
-		if isName {
-			// Use fc.expr.Token.Kind instead of casting.
-			// Same thing, but more efficient and performant.
-			if fc.Func.Token.ID == token::ERROR {
-				ret builtinCallerError(self, fc)
-			}
-		}
 
 		mut _func := self.evalExprPlain(fc.Func)
 		if _func == nil {

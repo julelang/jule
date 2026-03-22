@@ -12,16 +12,12 @@ use "std/strings"
 //                                      ^^^^^^^^^^^^ forwarding
 fn IsForwarded(s: &sema::Scope): bool {
 	last := s.Stmts[len(s.Stmts)-1]
-	v, mut isValue := last.(&sema::Value)
-	if !isValue {
+	t, mut ok := last.(&sema::Throw)
+	if !ok {
 		ret false
 	}
-	err, isValue := v.Model.(&sema::BuiltinErrorCallExpr)
-	if !isValue {
-		ret false
-	}
-	var, isValue := err.Err.Model.(&sema::Var)
-	ret isValue && var.Name == "error"
+	v, ok := t.Error.Model.(&sema::Var)
+	ret ok && v.Name == "error"
 }
 
 // Reports whether expression comes from external define.

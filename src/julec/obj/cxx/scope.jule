@@ -1944,6 +1944,123 @@ impl scopeCoder {
 		self.oc.write(" __result;")
 	}
 
+	fn throwStmt(mut &self, mut m: &sema::Throw) {
+		hasDefer := m.Func.Decl != nil && m.Func.Decl.HasDefer
+		if m.Func.Decl.IsVoid() {
+			mut v, _ := m.Error.Model.(&sema::Var)
+			if v != nil && v.Name == "error" {
+				if !hasDefer {
+					self.oc.write(returnKw(m.Func))
+					self.oc.write(" __jule_VoidExceptional{.error=std::move(")
+					// Handle error variable like ordinary variable.
+					// Because it may be captured, use captured variable handler.
+					self.oc.ec.var(v)
+					self.oc.write(")}")
+					ret
+				}
+				self.oc.write("{\n")
+				self.oc.addIndent()
+				self.oc.indent()
+				self.oc.write(typeAny)
+				self.oc.write(" __result = std::move(")
+				// Handle error variable like ordinary variable.
+				// Because it may be captured, use captured variable handler.
+				self.oc.ec.var(v)
+				self.oc.write(");\n")
+				self.emitDefers(0, false)
+				self.oc.write("\n")
+				self.oc.indent()
+				self.oc.write(returnKw(m.Func))
+				self.oc.write(" __jule_VoidExceptional{.error=std::move(__result)};\n")
+				self.oc.doneIndent()
+				self.oc.indent()
+				self.oc.write("}")
+				ret
+			}
+			if !hasDefer {
+				self.oc.write(returnKw(m.Func))
+				self.oc.write(" __jule_VoidExceptional{.error=")
+				self.oc.ec.possibleRefExpr(m.Error.Model)
+				self.oc.write("}")
+				ret
+			}
+			self.oc.write("{\n")
+			self.oc.addIndent()
+			self.oc.indent()
+			self.oc.write(typeAny)
+			self.oc.write(" __result = ")
+			self.oc.ec.possibleRefExpr(m.Error.Model)
+			self.oc.write(";\n")
+			self.emitDefers(0, false)
+			self.oc.indent()
+			self.oc.write(returnKw(m.Func))
+			self.oc.write(" __jule_VoidExceptional{.error=std::move(__result)};\n")
+			self.oc.doneIndent()
+			self.oc.indent()
+			self.oc.write("}")
+		} else {
+			mut v, _ := m.Error.Model.(&sema::Var)
+			if v != nil && v.Name == "error" {
+				if !hasDefer {
+					self.oc.write(returnKw(m.Func))
+					self.oc.write(" __jule_Exceptional<")
+					self.oc.tc.rc.codeMut1(&self.oc.Buf, m.Func.Result)
+					self.oc.write(">{.error=std::move(")
+					// Handle error variable like ordinary variable.
+					// Because it may be captured, use captured variable handler.
+					self.oc.ec.var(v)
+					self.oc.write(")}")
+					ret
+				}
+				self.oc.write("{\n")
+				self.oc.addIndent()
+				self.oc.indent()
+				self.oc.write(typeAny)
+				self.oc.write(" __result = std::move(")
+				// Handle error variable like ordinary variable.
+				// Because it may be captured, use captured variable handler.
+				self.oc.ec.var(v)
+				self.oc.write(");\n")
+				self.emitDefers(0, false)
+				self.oc.write("\n")
+				self.oc.indent()
+				self.oc.write(returnKw(m.Func))
+				self.oc.write(" __jule_Exceptional<")
+				self.oc.tc.rc.codeMut1(&self.oc.Buf, m.Func.Result)
+				self.oc.write(">{.error=std::move(__result)};\n")
+				self.oc.doneIndent()
+				self.oc.indent()
+				self.oc.write("}")
+				ret
+			}
+			if !hasDefer {
+				self.oc.write(returnKw(m.Func))
+				self.oc.write(" __jule_Exceptional<")
+				self.oc.tc.rc.codeMut1(&self.oc.Buf, m.Func.Result)
+				self.oc.write(">{.error=")
+				self.oc.ec.possibleRefExpr(m.Error.Model)
+				self.oc.write("}")
+				ret
+			}
+			self.oc.write("{\n")
+			self.oc.addIndent()
+			self.oc.indent()
+			self.oc.write(typeAny)
+			self.oc.write(" __result = ")
+			self.oc.ec.possibleRefExpr(m.Error.Model)
+			self.oc.write(";\n")
+			self.oc.sc.emitDefers(0, false)
+			self.oc.indent()
+			self.oc.write(returnKw(m.Func))
+			self.oc.write(" __jule_Exceptional<")
+			self.oc.tc.rc.codeMut1(&self.oc.Buf, m.Func.Result)
+			self.oc.write(">{.error=std::move(__result)};\n")
+			self.oc.doneIndent()
+			self.oc.indent()
+			self.oc.write("}")
+		}
+	}
+
 	// Generates C++ code of statement.
 	fn st(mut &self, mut st: compStmt) {
 		if st == nil {
@@ -1987,6 +2104,8 @@ impl scopeCoder {
 			self.breakStmt(st.(&sema::Break))
 		| &sema::Ret:
 			self.retStmt(st.(&sema::Ret))
+		| &sema::Throw:
+			self.throwStmt(st.(&sema::Throw))
 		| &opt::PushToSliceExpr:
 			self.oc.ec.pushToSlice(st.(&opt::PushToSliceExpr))
 		| &opt::MutSlicingExpr:
@@ -2200,12 +2319,12 @@ impl scopeCoder {
 		if len(f.Scope.Stmts) > 0 {
 			stmt := f.Scope.Stmts[len(f.Scope.Stmts)-1]
 			match type stmt {
+			| &sema::Throw
 			| &sema::Ret:
 				ret
 			| &sema::Value:
 				v := stmt.(&sema::Value)
 				match type v.Model {
-				| &sema::BuiltinErrorCallExpr
 				| &sema::BuiltinPanicCallExpr:
 					ret
 				|:

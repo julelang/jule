@@ -3509,13 +3509,16 @@ impl missingRetChecker {
 				if self.checkScope(st.(&Scope), 0) {
 					ret true
 				}
+			| &Throw:
+				// Following statements will not be executed, ignore them, if any.
+				// Throw makes the return value unavailable.
+				ret true
 			| &Value:
 				mut v := st.(&Value)
 				match type v.Model {
-				| &BuiltinPanicCallExpr
-				| &BuiltinErrorCallExpr:
+				| &BuiltinPanicCallExpr:
 					// Following statements will not be executed, ignore them, if any.
-					// And panic or error call makes the return value unavailable.
+					// Panic call makes the return value unavailable.
 					ret true
 				| &FuncCallExpr:
 					// Function call appeared.

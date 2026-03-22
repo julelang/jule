@@ -33,6 +33,7 @@ enum Stmt: type {
 	&Ret,
 	&Select,
 	&Use,
+	&Throw,
 }
 
 fn newScopeCheckerBase(mut s: &sema, mut owner: &FuncIns): &scopeChecker {
@@ -148,6 +149,12 @@ struct Break {
 	It:     uintptr
 	Match:  uintptr
 	Select: uintptr
+}
+
+// Throw statement.
+struct Throw {
+	Func:  &FuncIns
+	Error: &Value
 }
 
 // Label.
@@ -716,18 +723,6 @@ impl scopeChecker {
 		self.scope.Stmts = append(self.scope.Stmts, s)
 	}
 
-	fn processErrorCall(mut &self, mut m: &BuiltinErrorCallExpr, err: &token::Token) {
-		if self.isDeferred() {
-			self.s.pushErr(err, "error calls are not allowed in deferred scope")
-		}
-
-		mut root := self.getRoot()
-		if !root.owner.Decl.Exceptional {
-			self.s.pushErr(err, "error calls are not allowed in non-exceptional scopes")
-		}
-		m.Func = root.owner
-	}
-
 	fn checkExpr(mut &self, mut expr: &ast::Expr, flags: int) {
 		mut eval := self.s.eval(self)
 		eval.target.ignored = true
@@ -743,10 +738,6 @@ impl scopeChecker {
 		}
 
 		match type v.Model {
-		| &BuiltinErrorCallExpr:
-			mut m := v.Model.(&BuiltinErrorCallExpr)
-			self.processErrorCall(m, expr.Token)
-			self.scope.Stmts = append(self.scope.Stmts, v)
 		| &BackendEmitExpr
 		| &AddrcallExpr
 		| &BuiltinAppendCallExpr
@@ -2303,6 +2294,39 @@ impl scopeChecker {
 		// Validated at end of scope's analysis.
 	}
 
+	fn checkThrow(mut &self, mut t: &ast::Throw) {
+		mut expr := self.s.eval(self).evalExpr(t.Error, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+		if expr == nil {
+			ret
+		}
+		if expr.IsNil() {
+			self.s.pushErr(t.Token, "error calls does not supports nil literal as error")
+		}
+
+		const Reference = false
+		const Mutable = true
+		if !self.s.checkValidityForInitExpr(Mutable, Reference, primAny, expr, t.Token) {
+			ret
+		}
+
+		if self.isDeferred() {
+			self.s.pushErr(t.Token, "error calls are not allowed in deferred scope")
+			ret
+		}
+
+		mut root := self.getRoot()
+		if !root.owner.Decl.Exceptional {
+			self.s.pushErr(t.Token, "error calls are not allowed in non-exceptional scopes")
+		}
+
+		applyImplicitCast(self.s, primAny, expr, t.Token, self.getOwnerRefers())
+
+		self.scope.Stmts = append(self.scope.Stmts, &Throw{
+			Func: root.owner,
+			Error: expr,
+		})
+	}
+
 	fn checkNode(mut &self, mut node: ast::StmtData, flags: int) {
 		match type node {
 		| &ast::ScopeTree:
@@ -2335,6 +2359,8 @@ impl scopeChecker {
 			self.checkBreak(node.(&ast::Break))
 		| &ast::Ret:
 			self.checkRet(node.(&ast::Ret))
+		| &ast::Throw:
+			self.checkThrow(node.(&ast::Throw))
 		| &ast::UseExpr:
 			self.checkUseExpr(node.(&ast::UseExpr))
 		|:
@@ -2364,17 +2390,14 @@ impl scopeChecker {
 			match type v.Model {
 			| &BuiltinPanicCallExpr:
 				self.scope.Stmts = append(self.scope.Stmts, v)
-			| &BuiltinErrorCallExpr:
-				mut m := v.Model.(&BuiltinErrorCallExpr)
-				self.processErrorCall(m, expr.Token)
-				self.scope.Stmts = append(self.scope.Stmts, v)
 			|:
 				ret
 			}
 		| &ast::Goto
 		| &ast::Break
 		| &ast::Continue
-		| &ast::Ret:
+		| &ast::Ret
+		| &ast::Throw:
 			self.checkNode(stmt.Data, checkNodeDefault)
 		|:
 			self.checkNode(stmt.Data, checkNodeDefault)
