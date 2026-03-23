@@ -37,15 +37,14 @@
 
 const fnParseCmplx = "ParseCmplx"
 
-// convErr splits an error returned by parseFloatPrefix
-// into a syntax or range error for ParseCmplx.
-fn convErr(mut err: any, s: str): any {
+// Handles error returned by parseFloatPrefix for ParseCmplx.
+fn handleErr(mut err: any, s: str): any {
 	mut x, ok := err.(&NumError)
 	if ok {
 		x.Func = fnParseCmplx
 		x.Num = s
 	}
-	ret x
+	ret err
 }
 
 // Converts the string s to a complex number
@@ -84,7 +83,7 @@ fn ParseCmplx(mut s: str, bitSize: int)!: cmplx128 {
 	// Read real part (possibly imaginary part if followed by 'i').
 	mut re, mut n, mut err := parseFloatPrefix(s, size)
 	if err != nil {
-		throw convErr(err, orig)
+		throw handleErr(err, orig)
 	}
 
 	s = s[n:]
@@ -117,7 +116,7 @@ fn ParseCmplx(mut s: str, bitSize: int)!: cmplx128 {
 	// Read imaginary part.
 	im, n, err := parseFloatPrefix(s, size)
 	if err != nil {
-		throw convErr(err, orig)
+		throw handleErr(err, orig)
 	}
 	s = s[n:]
 	if s != "i" {
