@@ -3920,6 +3920,15 @@ impl unaryEval {
 		|:
 			match {
 			| canGetPtr(self.v):
+				// If the value is error, complain.
+				var, _ := self.v.Model.(&Var)
+				if var != nil && var.Name == "error" {
+					self.e.pushErr(self.u.X.Token, "cannot take pointer of the error value")
+					self.e.pushSuggestion("use an intermediary variable: myerr := error; &myerr")
+					self.v.Decl = true
+					ret
+				}
+
 				self.v.Type = &Type{
 					Kind: &Ptr{Value: self.v.Type},
 				}
