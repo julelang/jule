@@ -435,18 +435,15 @@ impl FD {
 			self.pd.evict()
 		}
 
+		defer {
+			// Wait until the descriptor is closed. If this was the only
+			// reference, it is already closed.
+			semacquire(&self.csema).await
+		}
+
 		// The call to decref will call destroy if there are no other
 		// references.
-		let mut err: any
-		self.decref() else { err = error }
-
-		// Wait until the descriptor is closed. If this was the only
-		// reference, it is already closed.
-		semacquire(&self.csema).await
-
-		if err != nil {
-			throw err
-		}
+		self.decref()?
 	}
 }
 
