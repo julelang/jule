@@ -12,9 +12,9 @@ fn hostname()!: (name: str) {
 	// Try uname first, as it's only one system call and reading
 	// from /proc is not allowed on Android (future-proof).
 	let mut un: sys::Utsname
-	let mut err: any
+	mut err := false
 	sys::Uname(&un) else {
-		err = error
+		err = true
 	}
 
 	mut buf := make([]byte, 512) // Enough for a DNS name.
@@ -27,7 +27,7 @@ fn hostname()!: (name: str) {
 	}
 	// If we got a name and it's not potentially truncated
 	// (Nodename is 65 bytes), return it.
-	if err == nil && len(name) > 0 && len(name) < 64 {
+	if !err && len(name) > 0 && len(name) < 64 {
 		ret name
 	}
 
