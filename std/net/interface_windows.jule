@@ -13,24 +13,21 @@ fn adapterAddresses(mut &b: *[]byte)!: []*windows::IpAdapterAddresses {
 	for {
 		*b = make([]byte, l)
 		const flags = windows::GAA_FLAG_INCLUDE_PREFIX | windows::GAA_FLAG_INCLUDE_GATEWAYS
-		let mut err: any
 		unsafe {
 			windows::GetAdaptersAddresses(sys::AF_UNSPEC, flags, 0, (*windows::IpAdapterAddresses)(&(*b)[0]), &l) else {
-				err = error
+				if error != sys::ERROR_BUFFER_OVERFLOW {
+					throw error
+				}
+				if l <= u32(len(*b)) {
+					throw error
+				}
+				continue
 			}
 		}
-		if err == nil {
-			if l == 0 {
-				ret nil
-			}
-			break
+		if l == 0 {
+			ret nil
 		}
-		if err != sys::ERROR_BUFFER_OVERFLOW {
-			throw err
-		}
-		if l <= u32(len(*b)) {
-			throw err
-		}
+		break
 	}
 	let mut aas: []*windows::IpAdapterAddresses
 	unsafe {
