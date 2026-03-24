@@ -66,13 +66,13 @@ fn newFile(fd: int, mut flags: int, nonBlocking: bool)!: &File {
 		const match runtime::OS {
 		| "darwin":
 			let mut st: sys::SysStat
-			let mut err: any
+			mut err := false
 			mut &_err := &err // For closure.
 			mut &_st := &st   // For closure.
 			ignoringEINTR(fn|| {
 				unsafe {
 					sys::Fstat(fd, _st) else {
-						*_err = error
+						*_err = true
 					}
 				}
 			})!
@@ -84,7 +84,7 @@ fn newFile(fd: int, mut flags: int, nonBlocking: bool)!: &File {
 			// only once as ready (both read and write).
 			// Go's issue 19093.
 			// Also don't add directories to the eventpoller.
-			if err == nil && (typ == sys::S_IFREG || typ == sys::S_IFDIR) {
+			if !err && (typ == sys::S_IFREG || typ == sys::S_IFDIR) {
 				pollable = false
 			}
 
@@ -106,7 +106,7 @@ fn newFile(fd: int, mut flags: int, nonBlocking: bool)!: &File {
 		if nonBlocking {
 			// no-op
 		} else {
-			let mut err: bool
+			mut err := false
 			sys::SetNonblock(fd, true) else {
 				err = true
 			}
