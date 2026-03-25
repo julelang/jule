@@ -386,3 +386,35 @@ fn setBytesW(mut z: []Word, buf: []byte): []Word {
 
 	ret normW(z)
 }
+
+// Writes the value of z into buf using big-endian encoding.
+// The value of z is encoded in the slice buf[i:]. If the value of z
+// cannot be represented in buf, bytes panics. The number i of unused
+// bytes at the beginning of buf is returned as result.
+fn bytesW(z: []Word, mut buf: []byte): (i: int) {
+	// This function is used in cryptographic operations. It must not leak
+	// anything but the Int's sign and bit size through side-channels. Any
+	// changes must be reviewed by a security expert.
+	i = len(buf)
+	for (_, mut d) in z {
+		mut j := 0
+		for j < _S; j++ {
+			i--
+			if i >= 0 {
+				buf[i] = byte(d)
+			} else if byte(d) != 0 {
+				panic("math/big: buffer too small to fit value")
+			}
+			d >>= 8
+		}
+	}
+
+	if i < 0 {
+		i = 0
+	}
+	for i < len(buf) && buf[i] == 0 {
+		i++
+	}
+
+	ret
+}
