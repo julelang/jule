@@ -173,15 +173,20 @@ fn memcopy[Dest, Src](mut dest: Dest, mut src: Src): (n: int) {
 	ret
 }
 
+// Returns the next capacity for a growing slice.
 fn nextslicecap(newLen: int, oldCap: int): int {
-	if oldCap == 0 {
-		ret newLen
-	}
-	newcap := (oldCap<<1 + oldCap) >> 1 // oldCap * 1.5
-	// We need to check `newcap >= newLen` and whether `newcap` overflowed.
-	// newLen is guaranteed to be larger than zero, hence
-	// when newcap overflows then `uint(newcap) > uint(newLen)`.
-	// This allows to check for both with the same comparison.
+	// Various approaches were tested here, such as Go's transition algorithm
+	// (from 2x down to 1.25x). However, these led to increased memory consumption in practice.
+	// While the exact cause remains unclear, they appeared to be incompatible with the
+	// C/C++ allocator. A 1.5x growth factor provided the best balance.
+
+	// Grows by 1.5x to stay below the golden ratio (1.618), enabling
+	// allocator reuse of previously freed blocks and reducing heap fragmentation.
+	// Falls back to newLen if 1.5x is insufficient or overflows.
+	newcap := oldCap + oldCap>>1 // 1.5x
+	// Check newcap >= newLen and overflow simultaneously:
+	// if newcap overflows to negative, uint(newcap) wraps to a large value,
+	// which still satisfies the comparison since newLen is guaranteed > 0.
 	if uint(newcap) >= uint(newLen) {
 		ret newcap
 	}
