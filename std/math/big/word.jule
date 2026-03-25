@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/encoding/binary"
 use "std/math/bits"
 use "std/math/rand"
 
@@ -349,4 +350,39 @@ fn stickyW(x: []Word, i: uint): uint {
 		ret 1
 	}
 	ret 0
+}
+
+// Returns the contents of b interpreted as a big-endian encoded Word value.
+fn bigEndianWord(b: []byte): Word {
+	if _W == 64 {
+		_ = b[7] // Bounds check hint to compiler.
+		ret Word(u64(b[7]) | u64(b[6])<<8 | u64(b[5])<<16 | u64(b[4])<<24 |
+			u64(b[3])<<32 | u64(b[2])<<40 | u64(b[1])<<48 | u64(b[0])<<56)
+	}
+	_ = b[3] // Bounds check hint to compiler.
+	ret Word(u32(b[3]) | u32(b[2])<<8 | u32(b[1])<<16 | u32(b[0])<<24)
+}
+
+// Interprets buf as the bytes of a big-endian unsigned integer,
+// sets z to that value and returns z.
+fn setBytesW(mut z: []Word, buf: []byte): []Word {
+	z = makeW(z, (len(buf)+_S-1)/_S)
+
+	mut i := len(buf)
+	mut k := 0
+	for i >= _S; k++ {
+		z[k] = bigEndianWord(buf[i-_S : i])
+		i -= _S
+	}
+	if i > 0 {
+		let mut d: Word
+		mut s := uint(0)
+		for i > 0; s += 8 {
+			d |= Word(buf[i-1]) << s
+			i--
+		}
+		z[len(z)-1] = d
+	}
+
+	ret normW(z)
 }
