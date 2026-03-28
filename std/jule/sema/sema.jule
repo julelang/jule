@@ -65,11 +65,11 @@ fn isValidModelForRef(mut m: Expr): bool {
 
 fn compilerErr(token: &token::Token, line: bool, fmt: str, args: ...any): log::Log {
 	mut log := log::Log{
-		Kind: log::Error,
-		Row: token.Row,
+		Kind:   log::Error,
+		Row:    token.Row,
 		Column: token.Column,
-		Path: token.File.Path,
-		Text: log::Logf(fmt, args...),
+		Path:   token.File.Path,
+		Text:   log::Logf(fmt, args...),
 	}
 	if line {
 		log.Line = token.File.GetRow(token.Row)
@@ -101,11 +101,11 @@ fn updateRetVars(mut &dest: *[]&Var, mut f: &FuncIns, mut i: int) {
 			v = (*dest)[i]
 		} else {
 			v = &Var{
-				Used: true,
+				Used:    true,
 				Mutable: true,
-				Name: name.Kind,
-				Token: name,
-				Scope: f.Scope,
+				Name:    name.Kind,
+				Token:   name,
+				Scope:   f.Scope,
 				TypeSym: new(TypeSym),
 				ValueSym: &ValueSym{
 					Value: new(Value),
@@ -141,15 +141,15 @@ fn updateParamVars(mut &dest: *[]&Var, mut f: &FuncIns): (n: int) {
 			v = (*dest)[i]
 		} else {
 			v = &Var{
-				Checked: true,
-				Used: true,
+				Checked:   true,
+				Used:      true,
 				Reference: p.Decl.Reference,
-				Mutable: p.Decl.Mutable,
-				Name: p.Decl.Name,
-				Token: p.Decl.Token,
-				TypeSym: new(TypeSym),
-				Scope: f.Scope,
-				ValueSym: new(ValueSym),
+				Mutable:   p.Decl.Mutable,
+				Name:      p.Decl.Name,
+				Token:     p.Decl.Token,
+				TypeSym:   new(TypeSym),
+				Scope:     f.Scope,
+				ValueSym:  new(ValueSym),
 			}
 			*dest = append(*dest, v)
 		}
@@ -158,7 +158,7 @@ fn updateParamVars(mut &dest: *[]&Var, mut f: &FuncIns): (n: int) {
 		| p.Decl.IsSelf():
 			v.TypeSym.Type = &Type{
 				Variadic: false,
-				Kind: f.Owner,
+				Kind:     f.Owner,
 			}
 			match {
 			| p.Decl.IsSmartptr():
@@ -213,11 +213,11 @@ fn appendGenericTypeAliases(mut &dest: *[]&TypeAlias, mut f: &FuncIns) {
 		}
 		mut decl := f.Decl.Generics[i]
 		*dest = append(*dest, &TypeAlias{
-			Used: true,
+			Used:    true,
 			Generic: true,
-			Scope: f.Decl.Scope,
-			Name: decl.Name,
-			Token: decl.Token,
+			Scope:   f.Decl.Scope,
+			Name:    decl.Name,
+			Token:   decl.Token,
 			TypeSym: &TypeSym{Type: g.Type},
 		})
 	}
@@ -227,11 +227,11 @@ fn appendGenericTypeAliases(mut &dest: *[]&TypeAlias, mut f: &FuncIns) {
 		for (i, mut g) in owner.Generics {
 			mut decl := owner.Decl.Generics[i]
 			*dest = append(*dest, &TypeAlias{
-				Used: true,
+				Used:    true,
 				Generic: true,
-				Scope: f.Decl.Scope,
-				Name: decl.Name,
-				Token: decl.Token,
+				Scope:   f.Decl.Scope,
+				Name:    decl.Name,
+				Token:   decl.Token,
 				TypeSym: &TypeSym{Type: g.Type},
 			})
 		}
@@ -445,12 +445,12 @@ impl sema {
 
 	fn pushErrorFromLitError(mut *self, t: &token::Token, err: lit::Error) {
 		self.errors = append(self.errors, log::Log{
-			Kind: log::Error,
-			Row: t.Row,
+			Kind:   log::Error,
+			Row:    t.Row,
 			Column: t.Column + err.Offset,
-			Path: t.File.Path,
-			Text: err.Text,
-			Line: t.File.GetRow(t.Row),
+			Path:   t.File.Path,
+			Text:   err.Text,
+			Line:   t.File.GetRow(t.Row),
 		})
 	}
 
@@ -618,9 +618,9 @@ impl sema {
 		for (i, mut imp) in imports {
 			if !imp.Extern {
 				mut s := &sema{
-					files: imp.Package.Files,
-					flags: self.flags,
-					meta: self.meta,
+					files:    imp.Package.Files,
+					flags:    self.flags,
+					meta:     self.meta,
 					importer: self.importer,
 				}
 				s.setSemaFields()
@@ -683,10 +683,10 @@ impl sema {
 	fn typeChecker(mut &self, mut l: Lookup, mut generics: []&TypeAlias,
 		mut referencer: &referencer): typeChecker {
 		mut tc := typeChecker{
-			s: self,
-			rootLookup: l,
-			lookup: l,
-			referencer: referencer,
+			s:           self,
+			rootLookup:  l,
+			lookup:      l,
+			referencer:  referencer,
 			useGenerics: generics,
 		}
 		match type l {
@@ -739,10 +739,10 @@ impl sema {
 	// Same as the checkTypeSym but takes referencer.
 	fn checkTypeSymRefers(mut &self, mut t: &ast::Expr, mut l: Lookup, mut refers: &ReferenceStack): &Type {
 		mut tc := &typeChecker{
-			s: self,
+			s:          self,
 			rootLookup: l,
-			lookup: l,
-			refers: refers,
+			lookup:     l,
+			refers:     refers,
 		}
 		ret tc.checkDecl(t)
 	}
@@ -752,11 +752,11 @@ impl sema {
 	fn buildTypeWithGenerics(mut &self, mut t: &ast::Expr,
 		mut generics: []&TypeAlias, mut refers: &ReferenceStack): &Type {
 		mut tc := &typeChecker{
-			s: self,
-			rootLookup: self,
-			lookup: self,
+			s:           self,
+			rootLookup:  self,
+			lookup:      self,
 			useGenerics: generics,
-			refers: refers,
+			refers:      refers,
 		}
 		ret tc.checkDecl(t)
 	}
@@ -769,10 +769,10 @@ impl sema {
 	// Select type with name selection.
 	fn selectType(mut &self, mut t: &ast::Expr): &Type {
 		mut tc := &typeChecker{
-			s: self,
+			s:          self,
 			rootLookup: self,
-			lookup: self,
-			selection: true,
+			lookup:     self,
+			selection:  true,
 		}
 		ret tc.checkDecl(t)
 	}
@@ -781,9 +781,9 @@ impl sema {
 	// type prefix and checks var dependencies.
 	fn evalpd(mut &self, mut l: Lookup, mut p: &Type, mut owner: &Var): &eval {
 		mut e := &eval{
-			s: self,
+			s:      self,
 			lookup: l,
-			owner: owner,
+			owner:  owner,
 		}
 		match type l {
 		| &scopeChecker:
@@ -823,11 +823,11 @@ impl sema {
 			}
 		} else {
 			mut atc := &assignTypeChecker{
-				s: self,
+				s:          self,
 				errorToken: errorToken,
-				dest: dest,
-				v: v,
-				refers: refers,
+				dest:       dest,
+				v:          v,
+				refers:     refers,
 			}
 			ok := atc.check()
 			if !ok {
@@ -863,11 +863,11 @@ impl sema {
 			ret false
 		}
 		mut tcc := typeCompatibilityChecker{
-			s: self,
+			s:          self,
 			errorToken: errorToken,
-			dest: dest,
-			src: src,
-			flags: flags,
+			dest:       dest,
+			src:        src,
+			flags:      flags,
 		}
 		ret tcc.check()
 	}
@@ -914,13 +914,13 @@ impl sema {
 	fn buildNonGenericType(mut &self, mut ast: &ast::Expr,
 		mut useGenerics: []&TypeAlias, mut ignoreGenerics: []&ast::Generic, mut &ignored: *[]&Type, mut &recheckNeed: *[]recheckableType): &Type {
 		mut tc := &typeChecker{
-			s: self,
-			rootLookup: self,
-			lookup: self,
-			useGenerics: useGenerics,
-			ignoreGenerics: ignoreGenerics,
+			s:               self,
+			rootLookup:      self,
+			lookup:          self,
+			useGenerics:     useGenerics,
+			ignoreGenerics:  ignoreGenerics,
 			ignoredGenerics: ignored,
-			recheckNeed: recheckNeed,
+			recheckNeed:     recheckNeed,
 		}
 		ret tc.checkDecl(ast)
 	}
@@ -954,9 +954,9 @@ impl sema {
 		mut ins := f.instanceForce()
 
 		mut tc := &typeChecker{
-			s: self,
+			s:          self,
 			rootLookup: self,
-			lookup: self,
+			lookup:     self,
 		}
 		for (_, mut p) in ins.Params {
 			if !p.Decl.IsSelf() {
@@ -1219,8 +1219,8 @@ impl sema {
 			}
 		}
 		mut atc := &assignTypeChecker{
-			s: self,
-			v: v,
+			s:          self,
+			v:          v,
 			errorToken: errorToken,
 		}
 		ret atc.checkValidity()
@@ -1236,9 +1236,9 @@ impl sema {
 			}
 		}
 		mut referencer := &referencer{
-			name: ta.Name,
+			name:  ta.Name,
 			owner: ta,
-			prev: prev,
+			prev:  prev,
 		}
 		if prev != nil {
 			prev.next = referencer
@@ -2320,7 +2320,7 @@ impl sema {
 						| types::IsNum(prim.Str()):
 							v.ValueSym.Expr.Data = &ast::NameExpr{
 								Token: v.Token,
-								Name: "iota",
+								Name:  "iota",
 							}
 						|:
 							panic("unreachable")
@@ -2438,10 +2438,10 @@ impl sema {
 	fn recheckType(mut &self, mut t: recheckableType, mut errorToken: &token::Token,
 		mut refers: &ReferenceStack): (ok: bool) {
 		mut tc := &typeChecker{
-			s: self,
+			s:          self,
 			rootLookup: self,
-			lookup: self,
-			refers: refers,
+			lookup:     self,
+			refers:     refers,
 		}
 		ret tc.recheck(t, errorToken)
 	}
@@ -2528,15 +2528,15 @@ impl sema {
 			ret true
 		}
 		mut tc := typeChecker{
-			s: s.env.sema,
+			s:          s.env.sema,
 			rootLookup: s.env.sema,
-			lookup: s.env.sema,
+			lookup:     s.env.sema,
 			referencer: &referencer{
-				name: s.Decl.Name,
+				name:  s.Decl.Name,
 				owner: s,
-				prev: prev,
+				prev:  prev,
 			},
-			refers: s.Refers,
+			refers:      s.Refers,
 			useGenerics: s.env.generics,
 		}
 		if prev != nil {

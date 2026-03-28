@@ -205,11 +205,11 @@ impl eval {
 		mut constant := constant::NewStr(s)
 
 		ret &Value{
-			untyped: true,
-			Mutable: true,
+			untyped:  true,
+			Mutable:  true,
 			Constant: constant,
-			Type: primStr,
-			Model: constant,
+			Type:     primStr,
+			Model:    constant,
 		}
 	}
 
@@ -243,11 +243,11 @@ impl eval {
 		}
 		mut constant := constant::NewF64(f)
 		ret &Value{
-			untyped: true,
-			Mutable: true,
+			untyped:  true,
+			Mutable:  true,
 			Constant: constant,
-			Type: primF64,
-			Model: constant,
+			Type:     primF64,
+			Model:    constant,
 		}
 	}
 
@@ -258,11 +258,11 @@ impl eval {
 		}
 		mut constant := constant::NewCmplx128(cmplx(0, f))
 		ret &Value{
-			untyped: true,
-			Mutable: true,
+			untyped:  true,
+			Mutable:  true,
 			Constant: constant,
-			Type: primCmplx128,
-			Model: constant,
+			Type:     primCmplx128,
+			Model:    constant,
 		}
 	}
 
@@ -645,11 +645,11 @@ impl eval {
 
 	data:
 		mut val := &Value{
-			Lvalue: !v.Constant,
-			Mutable: v.Mutable,
+			Lvalue:    !v.Constant,
+			Mutable:   v.Mutable,
 			Reference: v.Reference,
-			Type: v.TypeSym.Type,
-			Model: v,
+			Type:      v.TypeSym.Type,
+			Model:     v,
 		}
 		if v.ValueSym != nil && v.ValueSym.Value != nil {
 			if !v.Extern && v.IsInitialized() {
@@ -812,8 +812,8 @@ impl eval {
 		mut pt := self.prefix.Array()
 
 		mut arr := &Array{
-			Auto: false,
-			N: 0,
+			Auto:  false,
+			N:     0,
 			Value: pt.Value,
 		}
 
@@ -889,7 +889,7 @@ impl eval {
 		mut i := 0
 		mut model := &SliceExpr{
 			ElemType: t,
-			Elems: make([]&Value, 0, len(s.X)),
+			Elems:    make([]&Value, 0, len(s.X)),
 		}
 		if first != nil {
 			model.Elems = append(model.Elems, first)
@@ -1033,11 +1033,11 @@ impl eval {
 		}
 		mut m := v.Type.Map()
 		mut atc := assignTypeChecker{
-			s: self.s,
-			dest: m.Key,
-			v: index,
+			s:          self.s,
+			dest:       m.Key,
+			v:          index,
 			errorToken: i.Index.Token,
-			refers: self.getOwnerRefers(),
+			refers:     self.getOwnerRefers(),
 		}
 		_ = atc.check()
 		v.Type = m.Value
@@ -1279,7 +1279,7 @@ impl eval {
 		} else {
 			v.Model = &IndexingExpr{
 				Token: i.Token,
-				Expr: new(Value, oldValue),
+				Expr:  new(Value, oldValue),
 				Index: index,
 			}
 		}
@@ -1306,7 +1306,7 @@ impl eval {
 		} else {
 			l = &Value{
 				Constant: constant::NewI64(0),
-				Type: primInt,
+				Type:     primInt,
 			}
 			l.Constant.Kind = types::Int
 			l.Model = l.Constant
@@ -1443,8 +1443,8 @@ impl eval {
 		} else {
 			mut model := &SlicingExpr{
 				Token: s.Token,
-				Expr: base,
-				Left: l.Model,
+				Expr:  base,
+				Left:  l.Model,
 			}
 			if r != nil {
 				model.Right = r.Model
@@ -1554,15 +1554,15 @@ impl eval {
 				s := c.ReadStr()
 				mut model := &SliceExpr{
 					ElemType: t,
-					Elems: make([]&Value, 0, len(s)),
+					Elems:    make([]&Value, 0, len(s)),
 				}
 				for _, b in []byte(s) {
 					mut bc := constant::NewU64(u64(b))
 					bc.Kind = prim.Kind
 					model.Elems = append(model.Elems, &Value{
-						Type: &Type{Kind: prim},
+						Type:     &Type{Kind: prim},
 						Constant: bc,
-						Model: bc,
+						Model:    bc,
 					})
 				}
 				v.Model = model
@@ -1571,15 +1571,15 @@ impl eval {
 				s := c.ReadStr()
 				mut model := &SliceExpr{
 					ElemType: t,
-					Elems: make([]&Value, 0, len(s)),
+					Elems:    make([]&Value, 0, len(s)),
 				}
 				for _, r in s {
 					mut rc := constant::NewI64(i64(r))
 					rc.Kind = prim.Kind
 					model.Elems = append(model.Elems, &Value{
-						Type: &Type{Kind: prim},
+						Type:     &Type{Kind: prim},
 						Constant: rc,
-						Model: rc,
+						Model:    rc,
 					})
 				}
 				v.Model = model
@@ -1989,18 +1989,18 @@ impl eval {
 		self.pushReference(s)
 
 		mut slc := structLitChecker{
-			e: self,
+			e:          self,
 			errorToken: errorToken,
-			s: s,
+			s:          s,
 		}
 		slc.check(lit.X)
 
 		ret &Value{
 			Mutable: self.target.mutable,
-			Type: t,
+			Type:    t,
 			Model: &StructLitExpr{
 				Strct: s,
-				Args: slc.args,
+				Args:  slc.args,
 			},
 		}
 	}
@@ -2055,14 +2055,14 @@ impl eval {
 		// Push reference to owner if global.
 		if self.owner != nil && self.owner.Scope == nil {
 			tc.referencer = &referencer{
-				name: self.owner.Name,
+				name:  self.owner.Name,
 				owner: self.owner,
 			}
 		}
 		// If field exist, push reference to struct.
 		if self.field != nil {
 			tc.referencer = &referencer{
-				name: self.field.Owner.Decl.Name,
+				name:  self.field.Owner.Decl.Name,
 				owner: self.field.Owner,
 			}
 		}
@@ -2079,8 +2079,8 @@ impl eval {
 			ret nil
 		}
 		ret &Value{
-			Decl: true,
-			Type: t1,
+			Decl:  true,
+			Type:  t1,
 			Model: t1,
 		}
 	}
@@ -2233,10 +2233,10 @@ impl eval {
 		}
 
 		mut fcac := fnCallArgChecker{
-			e: self,
-			args: fc.Args,
+			e:                 self,
+			args:              fc.Args,
 			dynamicAnnotation: dynamicAnnotation,
-			errorToken: fc.Token,
+			errorToken:        fc.Token,
 		}
 
 		// This will be used to collect recheck-needed types if dynamic annotation enabled.
@@ -2309,10 +2309,10 @@ impl eval {
 
 		mut model := &FuncCallExpr{
 			Token: fc.Token,
-			Func: f,
-			Expr: callModel,
-			Args: fcac.argModels,
-			IsCo: fc.IsCo,
+			Func:  f,
+			Expr:  callModel,
+			Args:  fcac.argModels,
+			IsCo:  fc.IsCo,
 			Await: fc.Await,
 		}
 		(*v).Model = model
@@ -2363,7 +2363,7 @@ impl eval {
 							mut errorVar := buildErrorVar(s.scope, fc)
 							model.Except = s.getChild()
 							model.Except.Stmts = append(model.Except.Stmts, &Throw{
-								Func: root.owner,
+								Func:  root.owner,
 								Error: self.evalVar(errorVar, fc.Token),
 							})
 							errorVar.Scope = model.Except
@@ -2440,8 +2440,8 @@ impl eval {
 			self.pushReference(ins)
 			v.Model = &StructStaticIdentExpr{
 				Structure: s,
-				Expr: v.Model,
-				Method: ins,
+				Expr:      v.Model,
+				Method:    ins,
 			}
 			v.Type = &Type{
 				Kind: ins,
@@ -2464,10 +2464,10 @@ impl eval {
 				Kind: f.instance(),
 			},
 			Model: &TraitSubIdentExpr{
-				Token: name,
-				Expr: v.Model,
+				Token:  name,
+				Expr:   v.Model,
 				Method: f,
-				Trt: trt,
+				Trt:    trt,
 			},
 		}
 	}
@@ -2477,7 +2477,7 @@ impl eval {
 	fn evalStructSelectorField(mut *self, mut v: &Value, mut s: &StructIns, mut tok: &token::Token, mut f: &FieldIns): &Value {
 		mut model := &StructSubIdentExpr{
 			Token: tok,
-			Expr: new(Value, *v),
+			Expr:  new(Value, *v),
 			Field: f,
 			Owner: s,
 		}
@@ -2522,10 +2522,10 @@ impl eval {
 		self.pushReference(ins)
 		mut model := new(Value, *v)
 		v.Model = &StructSubIdentExpr{
-			Token: tok,
-			Expr: model,
+			Token:  tok,
+			Expr:   model,
 			Method: ins,
-			Owner: s,
+			Owner:  s,
 		}
 		v.Type = &Type{Kind: ins}
 		ret v
@@ -2567,18 +2567,18 @@ impl eval {
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primInt,
-				untyped: true,
+				Model:    c,
+				Type:     primInt,
+				untyped:  true,
 			}
 		| "Min":
 			mut c := constant::NewI64(i64(types::Min(kind)))
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primInt,
-				untyped: true,
+				Model:    c,
+				Type:     primInt,
+				untyped:  true,
 			}
 		|:
 			self.pushErr(name, "undefined type int member: "+conv::Quote(name.Kind))
@@ -2594,9 +2594,9 @@ impl eval {
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primUint,
-				untyped: true,
+				Model:    c,
+				Type:     primUint,
+				untyped:  true,
 			}
 		|:
 			self.pushErr(name, "undefined type uint member: "+conv::Quote(name.Kind))
@@ -2616,18 +2616,18 @@ impl eval {
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primI8,
-				untyped: true,
+				Model:    c,
+				Type:     primI8,
+				untyped:  true,
 			}
 		| "Min":
 			mut c := constant::NewI64(min)
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primI8,
-				untyped: true,
+				Model:    c,
+				Type:     primI8,
+				untyped:  true,
 			}
 		|:
 			self.pushErr(name, "undefined type i8 member: @"+conv::Quote(name.Kind))
@@ -2647,18 +2647,18 @@ impl eval {
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primI16,
-				untyped: true,
+				Model:    c,
+				Type:     primI16,
+				untyped:  true,
 			}
 		| "Min":
 			mut c := constant::NewI64(min)
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primI16,
-				untyped: true,
+				Model:    c,
+				Type:     primI16,
+				untyped:  true,
 			}
 		|:
 			self.pushErr(name, "undefined type i16 member: "+conv::Quote(name.Kind))
@@ -2678,18 +2678,18 @@ impl eval {
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primI32,
-				untyped: true,
+				Model:    c,
+				Type:     primI32,
+				untyped:  true,
 			}
 		| "Min":
 			mut c := constant::NewI64(min)
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primI32,
-				untyped: true,
+				Model:    c,
+				Type:     primI32,
+				untyped:  true,
 			}
 		|:
 			self.pushErr(name, "undefined type i32 member: "+conv::Quote(name.Kind))
@@ -2709,18 +2709,18 @@ impl eval {
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primI64,
-				untyped: true,
+				Model:    c,
+				Type:     primI64,
+				untyped:  true,
 			}
 		| "Min":
 			mut c := constant::NewI64(min)
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primI64,
-				untyped: true,
+				Model:    c,
+				Type:     primI64,
+				untyped:  true,
 			}
 		|:
 			self.pushErr(name, "undefined type i64 member: "+conv::Quote(name.Kind))
@@ -2739,9 +2739,9 @@ impl eval {
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primU8,
-				untyped: true,
+				Model:    c,
+				Type:     primU8,
+				untyped:  true,
 			}
 		|:
 			self.pushErr(name, "undefined type u8 member: "+conv::Quote(name.Kind))
@@ -2760,9 +2760,9 @@ impl eval {
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primU16,
-				untyped: true,
+				Model:    c,
+				Type:     primU16,
+				untyped:  true,
 			}
 		|:
 			self.pushErr(name, "undefined type u16 member: "+conv::Quote(name.Kind))
@@ -2781,9 +2781,9 @@ impl eval {
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primU32,
-				untyped: true,
+				Model:    c,
+				Type:     primU32,
+				untyped:  true,
 			}
 		|:
 			self.pushErr(name, "undefined type u32 member: "+conv::Quote(name.Kind))
@@ -2802,9 +2802,9 @@ impl eval {
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primU64,
-				untyped: true,
+				Model:    c,
+				Type:     primU64,
+				untyped:  true,
 			}
 		|:
 			self.pushErr(name, "undefined type u64 member: "+conv::Quote(name.Kind))
@@ -2825,27 +2825,27 @@ impl eval {
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primF32,
-				untyped: true,
+				Model:    c,
+				Type:     primF32,
+				untyped:  true,
 			}
 		| "Min":
 			mut c := constant::NewF64(min)
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primF32,
-				untyped: true,
+				Model:    c,
+				Type:     primF32,
+				untyped:  true,
 			}
 		| "SmallestNonzero":
 			mut c := constant::NewF64(smallestNonzero)
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primF32,
-				untyped: true,
+				Model:    c,
+				Type:     primF32,
+				untyped:  true,
 			}
 		|:
 			self.pushErr(name, "undefined type f32 member: "+conv::Quote(name.Kind))
@@ -2866,27 +2866,27 @@ impl eval {
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primF64,
-				untyped: true,
+				Model:    c,
+				Type:     primF64,
+				untyped:  true,
 			}
 		| "Min":
 			mut c := constant::NewF64(min)
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primF64,
-				untyped: true,
+				Model:    c,
+				Type:     primF64,
+				untyped:  true,
 			}
 		| "SmallestNonzero":
 			mut c := constant::NewF64(smallestNonzero)
 			c.Kind = kind
 			ret &Value{
 				Constant: c,
-				Model: c,
-				Type: primF64,
-				untyped: true,
+				Model:    c,
+				Type:     primF64,
+				untyped:  true,
 			}
 		|:
 			self.pushErr(name, "undefined type f64 member: "+conv::Quote(name.Kind))
@@ -3074,7 +3074,7 @@ impl eval {
 		}
 
 		ret &Value{
-			Type: &Type{Kind: tupT},
+			Type:  &Type{Kind: tupT},
 			Model: model,
 		}
 	}
@@ -3125,15 +3125,15 @@ impl eval {
 			}
 
 			model.Entries = append(model.Entries, &KeyValueExpr{
-				Key: key.Model,
+				Key:   key.Model,
 				Value: value.Model,
 			})
 		}
 
 		ret &Value{
 			Mutable: true,
-			Type: t,
-			Model: model,
+			Type:    t,
+			Model:   model,
 		}
 	}
 
@@ -3238,8 +3238,8 @@ impl eval {
 			Type: &Type{Kind: ins},
 			Model: &AnonFuncExpr{
 				Captured: captured,
-				Func: ins,
-				Global: isGlobal,
+				Func:     ins,
+				Global:   isGlobal,
 			},
 		}
 	}
@@ -3300,11 +3300,11 @@ impl eval {
 		}
 		// Check assignment types and return.
 		mut checker := assignTypeChecker{
-			s: self.s,
-			dest: ch.Value,
-			v: r,
+			s:          self.s,
+			dest:       ch.Value,
+			v:          r,
 			errorToken: chs.X.Token,
-			refers: self.getOwnerRefers(),
+			refers:     self.getOwnerRefers(),
 		}
 		if !checker.check() {
 			ret nil
@@ -3312,8 +3312,8 @@ impl eval {
 		mut v := buildVoidValue()
 		v.Model = &ChanSend{
 			Token: chs.Chan.Token,
-			Chan: l,
-			Data: r,
+			Chan:  l,
+			Data:  r,
 		}
 		ret v
 	}
@@ -3371,8 +3371,8 @@ impl eval {
 		r.Mutable = v.Mutable
 		r.Model = &TypeAssertionExpr{
 			Token: errorToken,
-			Expr: v,
-			Type: t,
+			Expr:  v,
+			Type:  t,
 		}
 		ret r
 	}
@@ -3688,7 +3688,7 @@ impl unaryEval {
 
 		self.v.Model = &UnaryExpr{
 			Expr: new(Value, *self.v),
-			Op: self.u.Op,
+			Op:   self.u.Op,
 		}
 	}
 
@@ -3728,7 +3728,7 @@ impl unaryEval {
 
 		self.v.Model = &UnaryExpr{
 			Expr: new(Value, *self.v),
-			Op: self.u.Op,
+			Op:   self.u.Op,
 		}
 	}
 
@@ -3841,7 +3841,7 @@ impl unaryEval {
 
 		self.v.Model = &UnaryExpr{
 			Expr: new(Value, *self.v),
-			Op: self.u.Op,
+			Op:   self.u.Op,
 		}
 	}
 
@@ -3869,7 +3869,7 @@ impl unaryEval {
 
 		self.v.Model = &UnaryExpr{
 			Expr: new(Value, *self.v),
-			Op: self.u.Op,
+			Op:   self.u.Op,
 		}
 	}
 
@@ -3877,7 +3877,7 @@ impl unaryEval {
 		isRef := isRef(self.v)
 		self.v.Model = &UnaryExpr{
 			Expr: new(Value, *self.v),
-			Op: self.u.Op,
+			Op:   self.u.Op,
 		}
 
 		match {
@@ -3934,7 +3934,7 @@ impl unaryEval {
 				}
 				self.v.Model = &UnaryExpr{
 					Expr: new(Value, *self.v),
-					Op: self.u.Op,
+					Op:   self.u.Op,
 				}
 			|:
 				self.v = nil
@@ -3967,7 +3967,7 @@ impl unaryEval {
 		}
 		v.Model = &ChanRecv{
 			Token: self.u.X.Token,
-			Expr: new(Value, *v),
+			Expr:  new(Value, *v),
 		}
 		v.Type = ch.Value
 		ret v
@@ -4073,7 +4073,7 @@ impl binaryEval {
 	fn new(mut e: &eval, mut op: &token::Token,
 		mut lt: &token::Token, mut rt: &token::Token): binaryEval {
 		ret binaryEval{
-			e: e,
+			e:  e,
 			op: op,
 			lt: lt,
 			rt: rt,
@@ -4108,18 +4108,18 @@ impl binaryEval {
 		| token::EQL:
 			mut constant := constant::NewBool(l.base.Equal(r.base))
 			ret &Value{
-				untyped: true,
-				Type: primBool,
+				untyped:  true,
+				Type:     primBool,
 				Constant: constant,
-				Model: constant,
+				Model:    constant,
 			}
 		| token::NEQ:
 			mut constant := constant::NewBool(!l.base.Equal(r.base))
 			ret &Value{
-				untyped: true,
-				Type: primBool,
+				untyped:  true,
+				Type:     primBool,
 				Constant: constant,
-				Model: constant,
+				Model:    constant,
 			}
 		|:
 			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
@@ -4138,7 +4138,7 @@ impl binaryEval {
 		| token::NEQ:
 			ret &Value{
 				untyped: true,
-				Type: primBool,
+				Type:    primBool,
 			}
 		|:
 			self.e.pushErr(self.op, "operator @ is not defined for type nil", self.op.Kind)
@@ -4160,7 +4160,7 @@ impl binaryEval {
 			}
 			ret &Value{
 				untyped: true,
-				Type: primBool,
+				Type:    primBool,
 			}
 		|:
 			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
@@ -4178,7 +4178,7 @@ impl binaryEval {
 		| token::NEQ:
 			ret &Value{
 				untyped: true,
-				Type: primBool,
+				Type:    primBool,
 			}
 		|:
 			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
@@ -4196,7 +4196,7 @@ impl binaryEval {
 		| token::NEQ:
 			ret &Value{
 				untyped: true,
-				Type: primBool,
+				Type:    primBool,
 			}
 		|:
 			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
@@ -4214,7 +4214,7 @@ impl binaryEval {
 		| token::NEQ:
 			ret &Value{
 				untyped: true,
-				Type: primBool,
+				Type:    primBool,
 			}
 		|:
 			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
@@ -4231,7 +4231,7 @@ impl binaryEval {
 				}
 				ret &Value{
 					untyped: true,
-					Type: primBool,
+					Type:    primBool,
 				}
 			|:
 				self.e.pushErr(self.op, "operator @ is not defined for reference type @", self.op.Kind, self.l.Type.Str())
@@ -4252,7 +4252,7 @@ impl binaryEval {
 			}
 			ret &Value{
 				untyped: true,
-				Type: primBool,
+				Type:    primBool,
 			}
 		| token::ADD
 		| token::SUB:
@@ -4295,7 +4295,7 @@ impl binaryEval {
 			}
 			ret &Value{
 				untyped: true,
-				Type: primBool,
+				Type:    primBool,
 			}
 		|:
 			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
@@ -4312,7 +4312,7 @@ impl binaryEval {
 			}
 			ret &Value{
 				untyped: true,
-				Type: primBool,
+				Type:    primBool,
 			}
 		|:
 			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
@@ -4330,7 +4330,7 @@ impl binaryEval {
 		| token::NEQ:
 			ret &Value{
 				untyped: true,
-				Type: primBool,
+				Type:    primBool,
 			}
 		|:
 			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
@@ -4345,7 +4345,7 @@ impl binaryEval {
 			applyImplicitCast(self.e.s, self.l.Type, self.r, self.op, self.e.getOwnerRefers())
 			ret &Value{
 				untyped: true,
-				Type: primBool,
+				Type:    primBool,
 			}
 		|:
 			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
@@ -4386,7 +4386,7 @@ impl binaryEval {
 		| token::LEQ:
 			ret &Value{
 				untyped: true,
-				Type: primBool,
+				Type:    primBool,
 			}
 		|:
 			self.e.pushErr(self.op, "operator @ is not defined for type @", self.op.Kind, self.l.Type.Str())
@@ -4617,7 +4617,7 @@ impl binaryEval {
 			self.setTypeToGreater()
 			ret &Value{
 				untyped: true,
-				Type: primBool,
+				Type:    primBool,
 			}
 		}
 
@@ -4651,7 +4651,7 @@ impl binaryEval {
 			self.setTypeToGreater()
 			ret &Value{
 				untyped: true,
-				Type: primBool,
+				Type:    primBool,
 			}
 		}
 
@@ -4694,7 +4694,7 @@ impl binaryEval {
 		| token::LEQ:
 			ret &Value{
 				untyped: true,
-				Type: primBool,
+				Type:    primBool,
 			}
 		}
 
@@ -5032,11 +5032,11 @@ impl binaryEval {
 
 		v.Model = &BinaryExpr{
 			Left: &OperandExpr{
-				Type: l.Type,
+				Type:  l.Type,
 				Model: l.Model,
 			},
 			Right: &OperandExpr{
-				Type: r.Type,
+				Type:  r.Type,
 				Model: r.Model,
 			},
 			Op: self.op,
@@ -5135,13 +5135,13 @@ fn makeStructLitAlloc(mut v: &Value, mut lit: &StructLitExpr) {
 
 fn buildErrorVar(mut s: &Scope, mut fc: &ast::CallExpr): &Var {
 	ret &Var{
-		Used: true,
+		Used:      true,
 		Reference: false,
-		Mutable: true,
-		Name: "error",
-		Token: fc.Token,
-		TypeSym: findBuiltinTypeAlias(types::Any).TypeSym,
-		Scope: s,
+		Mutable:   true,
+		Name:      "error",
+		Token:     fc.Token,
+		TypeSym:   findBuiltinTypeAlias(types::Any).TypeSym,
+		Scope:     s,
 		ValueSym: &ValueSym{
 			Value: new(Value),
 		},
@@ -5211,7 +5211,7 @@ fn isPtrArithmeticCompatible(mut l: &Value, mut r: &Value): bool {
 
 	mut tcc := typeCompatibilityChecker{
 		dest: primInt,
-		src: r.Type,
+		src:  r.Type,
 	}
 	if tcc.check() {
 		ret true
@@ -5291,8 +5291,8 @@ fn applyCastKindModel(mut s: &sema, mut v: &Value, mut t: &Type,
 
 	v.Model = &CastingExpr{
 		Token: token,
-		Expr: new(Value, *v),
-		Type: t,
+		Expr:  new(Value, *v),
+		Type:  t,
 	}
 }
 
@@ -5464,7 +5464,7 @@ fn isLitBased(mut m: Expr): &StructLitExpr {
 fn makeImplicitDeref(mut v: &Value, mut baseToken: &token::Token) {
 	mut unary := &UnaryExpr{
 		Expr: new(Value, *v),
-		Op: new(token::Token, *baseToken),
+		Op:   new(token::Token, *baseToken),
 	}
 	unary.Op.ID = token::MUL
 	unary.Op.Kind = "*"
@@ -5474,8 +5474,8 @@ fn makeImplicitDeref(mut v: &Value, mut baseToken: &token::Token) {
 fn makeVariadic(mut v: &Value, mut elem: &Type) {
 	v.Type = &Type{
 		Variadic: true,
-		Generic: elem.Generic,
-		Kind: elem.Kind,
+		Generic:  elem.Generic,
+		Kind:     elem.Kind,
 	}
 }
 

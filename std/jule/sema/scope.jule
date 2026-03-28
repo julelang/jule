@@ -38,7 +38,7 @@ enum Stmt: type {
 
 fn newScopeCheckerBase(mut s: &sema, mut owner: &FuncIns): &scopeChecker {
 	ret &scopeChecker{
-		s: s,
+		s:     s,
 		owner: owner,
 		table: new(SymTab),
 	}
@@ -691,8 +691,8 @@ impl scopeChecker {
 
 	fn getChild(mut *self): &Scope {
 		ret &Scope{
-			Owner: uintptr(self.scope),
-			Parent: self.scope,
+			Owner:      uintptr(self.scope),
+			Parent:     self.scope,
 			ChildIndex: self.childIndex + 1,
 		}
 	}
@@ -771,7 +771,7 @@ impl scopeChecker {
 		}
 
 		ret &If{
-			Expr: v.Model,
+			Expr:  v.Model,
 			Scope: s,
 		}
 	}
@@ -894,10 +894,10 @@ impl scopeChecker {
 		}
 
 		mut rc := rangeChecker{
-			sc: self,
+			sc:   self,
 			Kind: kind,
 			rang: rang,
-			v: v,
+			v:    v,
 		}
 		ok := rc.check()
 		if !ok {
@@ -945,7 +945,7 @@ impl scopeChecker {
 		}
 
 		mut kind := &RangeIter{
-			Expr: v,
+			Expr:      v,
 			ExprToken: rang.X.Token,
 		}
 
@@ -960,10 +960,10 @@ impl scopeChecker {
 		}
 
 		mut rc := rangeChecker{
-			sc: self,
+			sc:   self,
 			Kind: kind,
 			rang: rang,
-			v: v,
+			v:    v,
 		}
 		ok := rc.check()
 		if !ok {
@@ -1138,7 +1138,7 @@ impl scopeChecker {
 		}
 
 		mut label := &Label{
-			Name: l.Name,
+			Name:  l.Name,
 			Scope: self.scope,
 			Index: self.i,
 		}
@@ -1146,14 +1146,14 @@ impl scopeChecker {
 		self.scope.Stmts = append(self.scope.Stmts, label)
 		*self.labels = append(*self.labels, &scopeLabel{
 			token: l.Token,
-			node: label,
+			node:  label,
 		})
 	}
 
 	fn pushGoto(mut &self, mut gt: &ast::Goto) {
 		mut st := &Goto{
 			Token: gt.Label,
-			Name: gt.Label.Kind,
+			Name:  gt.Label.Kind,
 			Scope: self.scope,
 			Index: self.i,
 		}
@@ -1198,7 +1198,7 @@ impl scopeChecker {
 
 		self.scope.Stmts = append(self.scope.Stmts, &Postfix{
 			Expr: v.Model,
-			Op: a.Op.Kind,
+			Op:   a.Op.Kind,
 		})
 	}
 
@@ -1293,11 +1293,11 @@ impl scopeChecker {
 		}
 
 		mut lm := &OperandExpr{
-			Type: l.Type,
+			Type:  l.Type,
 			Model: l.Model,
 		}
 		mut rm := &OperandExpr{
-			Type: r.Type,
+			Type:  r.Type,
 			Model: r.Model,
 		}
 		self.scope.Stmts = append(self.scope.Stmts, &Assign{Left: lm, Right: rm, Op: a.Op})
@@ -1353,23 +1353,23 @@ impl scopeChecker {
 
 			// Add new variable declaration statement.
 			mut v := &Var{
-				Name: lexpr.Name,
-				Token: lexpr.Token,
-				Mutable: lexpr.Mutable,
+				Name:      lexpr.Name,
+				Token:     lexpr.Token,
+				Mutable:   lexpr.Mutable,
 				Reference: lexpr.Reference,
-				Scope: self.scope,
+				Scope:     self.scope,
 				ValueSym: &ValueSym{
-					Expr: r.expr,
+					Expr:  r.expr,
 					Value: r.data,
 				},
 			}
 			self.s.checkVarValue(v)
 			st.Left = append(st.Left, &Value{
-				Lvalue: !v.Constant,
-				Mutable: v.Mutable,
+				Lvalue:    !v.Constant,
+				Mutable:   v.Mutable,
 				Reference: v.Reference,
-				Type: v.TypeSym.Type,
-				Model: v,
+				Type:      v.TypeSym.Type,
+				Model:     v,
 			})
 			st.Decls = append(st.Decls, v)
 			self.table.Vars = append(self.table.Vars, v)
@@ -1475,7 +1475,7 @@ impl scopeChecker {
 					parts = append(parts, exprPart{
 						&Value{
 							Mutable: true, // Function return.
-							Type: kind,
+							Type:    kind,
 						},
 						a.Y,
 					})
@@ -1569,7 +1569,7 @@ impl scopeChecker {
 
 		mut st := &MultiAssign{
 			Right: rightData.Model,
-			Op: a.Op,
+			Op:    a.Op,
 		}
 		for i in a.X {
 			mut lexpr := a.X[i]
@@ -1697,11 +1697,11 @@ impl scopeChecker {
 				expr.Type.comptimeTypeInfo() == nil ||
 				v.Type.comptimeTypeInfo() == nil {
 				mut checker := assignTypeChecker{
-					s: self.s,
-					dest: expr.Type,
-					v: v,
+					s:          self.s,
+					dest:       expr.Type,
+					v:          v,
 					errorToken: e.Token,
-					refers: self.getOwnerRefers(),
+					refers:     self.getOwnerRefers(),
 				}
 				checker.check()
 			}
@@ -1881,10 +1881,10 @@ impl scopeChecker {
 		}
 
 		mut tm := &Match{
-			Scope: self.scope,
+			Scope:     self.scope,
 			TypeMatch: true,
-			Expr: v,
-			Comptime: m.Comptime,
+			Expr:      v,
+			Comptime:  m.Comptime,
 		}
 
 		// Do not check default if comptime matching enabled.
@@ -1934,9 +1934,9 @@ impl scopeChecker {
 		let mut v: &Value = nil
 		if m.X == nil {
 			v = &Value{
-				untyped: true,
+				untyped:  true,
 				Constant: constant::NewBool(true),
-				Type: primBool,
+				Type:     primBool,
 			}
 			v.Model = v.Constant
 		} else {
@@ -1959,8 +1959,8 @@ impl scopeChecker {
 		}
 
 		mut mc := &Match{
-			Scope: self.scope,
-			Expr: v,
+			Scope:    self.scope,
+			Expr:     v,
 			Comptime: m.Comptime,
 		}
 
@@ -2256,10 +2256,10 @@ impl scopeChecker {
 		self.scope.Stmts = append(self.scope.Stmts, rt)
 
 		mut rtc := &retTypeChecker{
-			sc: self,
-			f: rt.Func,
+			sc:         self,
+			f:          rt.Func,
 			errorToken: token,
-			mutable: true,
+			mutable:    true,
 		}
 		ok := rtc.check(x)
 		if !ok {
@@ -2322,7 +2322,7 @@ impl scopeChecker {
 		applyImplicitCast(self.s, primAny, expr, t.Token, self.getOwnerRefers())
 
 		self.scope.Stmts = append(self.scope.Stmts, &Throw{
-			Func: root.owner,
+			Func:  root.owner,
 			Error: expr,
 		})
 	}
@@ -2374,10 +2374,10 @@ impl scopeChecker {
 		| &ast::UseExpr:
 			mut ue := stmt.Data.(&ast::UseExpr)
 			mut rtc := &retTypeChecker{
-				sc: self,
-				f: self.result.func,
+				sc:         self,
+				f:          self.result.func,
 				errorToken: ue.X.Token,
-				mutable: self.result.mutable,
+				mutable:    self.result.mutable,
 			}
 			_ = rtc.check(ue.X)
 			self.scope.Stmts = append(self.scope.Stmts, &Use{Value: rtc.expr})
