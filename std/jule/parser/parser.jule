@@ -722,19 +722,22 @@ impl parser {
 	}
 
 	fn buildMultiRetType(mut &self, mut t: &ast::RetType, mut tokens: []&token::Token, mut &i: *int): (ok: bool) {
-		*i++
-		if *i >= len(tokens) {
-			*i--
+		if *i+1 >= len(tokens) {
 			t.Type, ok = self.buildType(tokens, i, false)
 			ret
 		}
 
-		*i-- // For point to parentheses - ( -
+		lparen := tokens[*i]
 		mut rangeTokens := range(i, token::LPAREN, token::RPAREN, tokens)
 
 		mut parts, errs := parts(rangeTokens, token::COMMA, true)
 		self.errors = append(self.errors, errs...)
+		// Empty range.
 		if len(parts) == 0 {
+			// Make sure there is no error before complain.
+			if len(errs) == 0 {
+				self.pushErr(lparen, "missing type")
+			}
 			ret
 		}
 
