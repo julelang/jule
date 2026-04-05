@@ -189,6 +189,24 @@ impl exprCoder {
 	}
 
 	fn divByZeroBinary(mut &self, loc: &token::Token, opID: int, mut l: compExpr, mut lt: &sema::Type, mut r: compExpr, mut rt: &sema::Type) {
+		lp, rp := lt.Prim(), rt.Prim()
+
+		// We are using IEEE 754 (we must), and the behavior is safe.
+		// No extra attention needed.
+		if types::IsFloat(lp.Kind) || types::IsFloat(rp.Kind) {
+			self.possibleRefExpr(l)
+			match opID {
+			| token::QUO
+			| token::QUO_ASSIGN:
+				self.oc.write(" / ")
+			| token::REM
+			| token::REM_ASSIGN:
+				self.oc.write(" % ")
+			}
+			self.possibleRefExpr(r)
+			ret
+		}
+
 		const (
 			xVar = "__jule_x"
 			yVar = "__jule_y"
@@ -207,35 +225,19 @@ impl exprCoder {
 		self.possibleRefExpr(r)
 		self.oc.write("; if (")
 		self.oc.write(yVar)
-		self.oc.write(` == 0) `)
-		lp, rp := lt.Prim(), rt.Prim()
-		if types::IsFloat(lp.Kind) || types::IsFloat(rp.Kind) {
-			if types::IsFloat(lp.Kind) {
-				self.oc.tc.kind(&self.oc.Buf, lt)
-			} else {
-				self.oc.tc.kind(&self.oc.Buf, rt)
+		self.oc.write(` == 0) __jule_panicStr(`)
+		strLitF(&self.oc.Buf, fn|| {
+			self.oc.write("\"runtime: divide by zero")
+			mut len := 23 // runtime: divide by zero
+			if !env::Production {
+				self.oc.write("\\nlocation: ")
+				len += 11 // \nlocation:
+				len += unsafe { self.oc.locInfo(loc) }
 			}
-			self.oc.write("(__jule_Inf(")
-			self.oc.write(xVar)
-			self.oc.write(" > 0 && ")
-			self.oc.write(yVar)
-			self.oc.write(" > 0 ? 1 : -1)); ")
-		} else {
-			self.oc.write(`__jule_panicStr(`)
-			strLitF(&self.oc.Buf, fn|| {
-				self.oc.write("\"runtime: divide by zero")
-				mut len := 23 // runtime: divide by zero
-				if !env::Production {
-					self.oc.write("\\nlocation: ")
-					len += 11 // \nlocation:
-					len += unsafe { self.oc.locInfo(loc) }
-				}
-				self.oc.write("\"")
-				ret len
-			})
-			self.oc.write("); ")
-		}
-		self.oc.write("((")
+			self.oc.write("\"")
+			ret len
+		})
+		self.oc.write("); ((")
 		self.oc.tc.kind(&self.oc.Buf, lt)
 		self.oc.write(")(")
 		self.oc.write(xVar)
