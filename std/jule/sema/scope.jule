@@ -10,6 +10,7 @@ use "std/jule/constant"
 use "std/jule/log"
 use "std/jule/token"
 use "std/jule/types"
+use "std/slices"
 use "std/strings"
 
 // Statement type.
@@ -2442,7 +2443,7 @@ impl scopeChecker {
 					// Following append calls will append the group members
 					// to slice's selected memory block.
 					tn := len(self.table.Vars)
-					self.table.Vars = growSlice(self.table.Vars, len(astv.Group))
+					self.table.Vars = slices::Grow(self.table.Vars, len(astv.Group))
 					mut group := self.table.Vars[tn : tn+len(astv.Group) : tn+len(astv.Group)]
 					for (i, mut v) in astv.Group {
 						mut cv := buildVar(v)
@@ -2904,19 +2905,4 @@ fn isValidStmtForNext2(st: Stmt): bool {
 	|:
 		ret false
 	}
-}
-
-// Increases the slice's capacity, if necessary, to guarantee space for
-// another n elements. After growSlice(n), at least n elements can be appended
-// to the slice without another allocation. If n is negative or too large to
-// allocate the memory, it panics.
-fn growSlice[S: []E, E](mut s: S, mut n: int): S {
-	if n < 0 {
-		panic("cannot be negative")
-	}
-	n -= cap(s) - len(s)
-	if n > 0 {
-		s = append(s[:cap(s)], make([]E, n)...)[:len(s)]
-	}
-	ret s
 }
