@@ -2301,23 +2301,29 @@ impl scopeChecker {
 			ret
 		}
 		if expr.IsNil() {
-			self.s.pushErr(t.Token, "error calls does not supports nil literal as error")
+			self.s.pushErr(t.Token, "throw statements does not supports nil literal as error")
 		}
 
 		const Reference = false
 		const Mutable = true
-		if !self.s.checkValidityForInitExpr(Mutable, Reference, primAny, expr, t.Token) {
+		if !self.s.checkValidityForInitExpr(Mutable, Reference, primAny, expr, t.Error.Token) {
+			ret
+		}
+
+		if !isSafeToThrow(expr) {
+			self.s.pushErr(t.Error.Token, `forbidden throw: error must be an explicit, non-nil type. Avoid using "any" or "nil".`)
+			self.s.pushSuggestion("consider forwarding with error variable or wrapping with a custom error type")
 			ret
 		}
 
 		if self.isDeferred() {
-			self.s.pushErr(t.Token, "error calls are not allowed in deferred scope")
+			self.s.pushErr(t.Token, "throw statements are not allowed in deferred scope")
 			ret
 		}
 
 		mut root := self.getRoot()
 		if !root.owner.Decl.Exceptional {
-			self.s.pushErr(t.Token, "error calls are not allowed in non-exceptional scopes")
+			self.s.pushErr(t.Token, "throw statements are not allowed in non-exceptional scopes")
 		}
 
 		applyImplicitCast(self.s, primAny, expr, t.Token, self.getOwnerRefers())
@@ -2905,4 +2911,31 @@ fn isValidStmtForNext2(st: Stmt): bool {
 	|:
 		ret false
 	}
+}
+
+// Reports whether v is suitable for throw statement.
+fn isSafeToThrow(mut v: &Value): bool {
+	// Report true, if type is not <any> and <nil>.
+	if v.IsNil() {
+		ret false
+	}
+	typ := v.Type.Prim()
+	if typ == nil || !typ.IsAny() {
+		ret true
+	}
+
+	// May be error value?
+	var, mut ok := v.Model.(&Var)
+	if ok && var.Name == "error" {
+		ret true
+	}
+
+	// May be casted to <any> from a non-<any> type?
+	mut cast, ok := v.Model.(&CastingExpr)
+	if !ok {
+		ret false
+	}
+
+	// Check value of the cast expression.
+	ret isSafeToThrow(cast.Expr)
 }
