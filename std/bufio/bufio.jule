@@ -209,7 +209,7 @@ impl Reader {
 				n = avail
 			} else {
 				// throw the error, probably buffer is not filled because of that
-				throw err
+				unsafe throw err
 			}
 		}
 		data = self.buf[self.r : self.r+n]
@@ -252,7 +252,7 @@ impl Reader {
 				ret n - remain
 			}
 			if self.err != nil {
-				throw self.readErr()
+				unsafe throw self.readErr()
 			}
 		}
 	}
@@ -271,13 +271,13 @@ impl Reader {
 				ret 0
 			}
 			if self.err != nil {
-				throw self.readErr()
+				unsafe throw self.readErr()
 			}
 			ret 0
 		}
 		if self.r == self.w {
 			if self.err != nil {
-				throw self.readErr()
+				unsafe throw self.readErr()
 			}
 			if len(p) >= len(self.buf) {
 				// Large read, empty buffer.
@@ -329,7 +329,7 @@ impl Reader {
 				ret 0, io::EOF
 			}
 			if self.err != nil {
-				throw self.readErr()
+				unsafe throw self.readErr()
 			}
 			eof = self.fill().await // buffer is empty
 		}
@@ -373,7 +373,7 @@ impl Reader {
 		self.lastRuneSize = -1
 		if self.r == self.w {
 			if self.err != nil {
-				throw self.readErr()
+				unsafe throw self.readErr()
 			}
 			ret 0, io::EOF
 		}
@@ -430,7 +430,7 @@ impl Reader {
 			// Pending error?
 			if self.err != nil {
 				self.r = self.w
-				throw self.readErr()
+				unsafe throw self.readErr()
 			}
 
 			// EOF?
@@ -606,7 +606,7 @@ impl Reader {
 		}
 
 		if self.err != nil {
-			throw self.readErr()
+			unsafe throw self.readErr()
 		}
 
 		ret n
@@ -697,18 +697,18 @@ impl Writer {
 	// Writes any buffered data to the underlying [io::Writer].
 	async fn Flush(mut *self)! {
 		if self.err != nil {
-			throw self.err
+			unsafe throw self.err
 		}
 		if self.n == 0 {
 			ret
 		}
 		n := self.wr.Write(self.buf[0:self.n]).await else {
 			self.err = error
-			throw self.err
+			unsafe throw self.err
 		}
 		if n < self.n {
 			self.err = io::ErrShortWrite
-			throw self.err
+			unsafe throw self.err
 		}
 		self.n = 0
 	}
@@ -749,7 +749,7 @@ impl Writer {
 			unsafe { *(&p) = (*(&p))[n:] }
 		}
 		if self.err != nil {
-			throw self.err
+			unsafe throw self.err
 		}
 		n := copy(self.buf[self.n:], p)
 		self.n += n
@@ -760,7 +760,7 @@ impl Writer {
 	// Writes a single byte.
 	async fn WriteByte(mut *self, c: byte)! {
 		if self.err != nil {
-			throw self.err
+			unsafe throw self.err
 		}
 		if self.Available() <= 0 {
 			self.Flush().await?
@@ -778,7 +778,7 @@ impl Writer {
 			ret 1
 		}
 		if self.err != nil {
-			throw self.err
+			unsafe throw self.err
 		}
 		mut n := self.Available()
 		if n < utf8::UTFMax {
@@ -809,7 +809,7 @@ impl Writer {
 			s = s[n:]
 		}
 		if self.err != nil {
-			throw self.err
+			unsafe throw self.err
 		}
 		n := copy(self.buf[self.n:], s)
 		self.n += n
@@ -820,7 +820,7 @@ impl Writer {
 	// Implements [io::ReaderFrom].
 	async fn ReadFrom(mut *self, mut r: io::Reader)!: (n: i64) {
 		if self.err != nil {
-			throw self.err
+			unsafe throw self.err
 		}
 		let mut m: int
 	Loop:
