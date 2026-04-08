@@ -923,7 +923,7 @@ impl scopeParser {
 		ret m
 	}
 
-	fn buildThrow(mut *self, mut tokens: []&token::Token): &ast::Throw {
+	fn buildThrow(mut *self, mut tokens: []&token::Token, _unsafe: bool): &ast::Throw {
 		if len(tokens) == 1 {
 			self.pushErr(tokens[0], "throw statement needs an error expression")
 			self.pushSuggestion("write like; throw myError")
@@ -934,8 +934,9 @@ impl scopeParser {
 			ret nil
 		}
 		ret &ast::Throw{
-			Token: tokens[0],
-			Error: x,
+			Token:  tokens[0],
+			Unsafe: _unsafe,
+			Error:  x,
 		}
 	}
 
@@ -1367,14 +1368,18 @@ impl scopeParser {
 		| token::SELECT:
 			ret self.buildSelect(st.tokens)
 		| token::THROW:
-			ret self.buildThrow(st.tokens)
+			ret self.buildThrow(st.tokens, false)
 		| token::UNSAFE:
 			if len(st.tokens) < 1 {
 				break
 			}
-			if st.tokens[1].ID == token::DEFER ||
-				st.tokens[1].ID == token::LBRACE { // Scope.
+			tok1 := st.tokens[1]
+			match tok1.ID {
+			| token::DEFER | token::LBRACE: // Scope.
 				ret self.buildScopeSt(st.tokens)
+			| token::THROW: // Throw statement.
+				st.tokens = st.tokens[1:] // Trim unsafe keyword.
+				ret self.buildThrow(st.tokens, true)
 			}
 		| token::DEFER:
 			ret self.buildScopeSt(st.tokens)
