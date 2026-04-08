@@ -2,37 +2,37 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-#ifndef __JULE_EXCEPTIONAL_HPP
-#define __JULE_EXCEPTIONAL_HPP
+#ifndef __JULE_FALLIBLE_HPP
+#define __JULE_FALLIBLE_HPP
 
 #include "any.hpp"
 
-// Wrapper structure for Jule's void exceptionals.
-class __jule_VoidExceptional
+// Wrapper structure for Jule's void fallible functions.
+class __jule_VoidFallible
 {
 public:
     __jule_Any error;
 
-    // Reports whether no exception.
+    // Reports whether no error.
     bool ok(void) const noexcept
     {
         return this->error == nullptr;
     }
 };
 
-// Wrapper structure for Jule's exceptionals.
+// Wrapper structure for Jule's fallible functions.
 template <typename T>
-class __jule_Exceptional
+class __jule_Fallible
 {
 public:
     __jule_Any error;
     T result;
 
-    // Reports whether no exception.
+    // Reports whether no error.
     bool ok(void) const noexcept
     {
         return this->error == nullptr;
     }
 };
 
-#endif // __JULE_EXCEPTIONAL_HPP
+#endif // __JULE_FALLIBLE_HPP

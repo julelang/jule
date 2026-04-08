@@ -22,7 +22,7 @@ CONFIGURATION DEFINES
 #include "any.hpp"
 #include "array.hpp"
 #include "error.hpp"
-#include "exceptional.hpp"
+#include "fallible.hpp"
 #include "fn.hpp"
 #include "platform.hpp"
 #include "ptr.hpp"
