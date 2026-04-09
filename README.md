@@ -27,7 +27,7 @@ It contains the reference compiler, API, and the standard library.
 - Built-in testing framework
 - Easy and efficient low-level development
 - [Cross compilation](https://manual.jule.dev/compiler/cross-compilation) made simple: standard library support, target-specific IR generation, and architecture imitation
-- Lightweight error handling with [exceptionals](https://manual.jule.dev/error-handling/exceptionals), similar to optional types
+- Lightweight error handling with [fallible functions](https://manual.jule.dev/error-handling/fallible-functions), similar to optional types
 - Built-in [concurrency](https://manual.jule.dev/concurrency): async runtime and coroutines, channels, mutexes, condition variables, and more
 - High [interoperability](https://manual.jule.dev/integrated-jule/interoperability) with C, C++, Objective-C, and Objective-C++
 - C++ [API](https://manual.jule.dev/api) for extending Jule or integrating with existing codebases

@@ -488,8 +488,8 @@ impl sema {
 	}
 
 	// Reports this identifier duplicated in package's global scope.
-	// The "self" parameter represents address of exception identifier.
-	// If founded identifier address equals to self, will be skipped.
+	// The "itself" parameter represents address of exception identifier.
+	// If founded identifier address equals to "itself", will be skipped.
 	fn isDuplicatedName(*self, itself: uintptr, name: str, _extern: bool): bool {
 		for _, f in self.files {
 			if f.isDuplicatedName(itself, name, _extern) {
@@ -1614,8 +1614,8 @@ impl sema {
 	// Checks generics, parameters and return type.
 	// Not checks scope, and other things.
 	fn checkFuncDeclPrototype(mut &self, mut f: &Func) {
-		if f.Exceptional && f.Extern {
-			self.pushErr(f.Token, "external functions cannot be exceptional")
+		if f.Fallible && f.Extern {
+			self.pushErr(f.Token, "external functions cannot be fallible")
 			ret
 		}
 
@@ -2220,14 +2220,14 @@ impl sema {
 
 	// Checks value of variable.
 	fn checkVarValue(mut &self, mut v: &Var) {
-		// Catch the exceptional function calls for initialization value if variable static.
+		// Catch the fallible function calls for initialization value if variable static.
 		// If variable is constant, no need for extra attention.
-		// An exceptional function cannot return a constant value.
+		// A fallible function cannot return a constant value.
 		if v.Static && v.ValueSym != nil && v.ValueSym.Value != nil {
 			fc, isFuncCall := v.ValueSym.Value.Model.(&FuncCallExpr)
-			if isFuncCall && fc.Func.Decl != nil && fc.Func.Decl.Exceptional {
-				self.pushErr(v.ValueSym.Expr.Token, "using of exceptional function disallowed in this scope")
-				self.pushSuggestion("wrap the exceptional with a non-exceptional function")
+			if isFuncCall && fc.Func.Decl != nil && fc.Func.Decl.Fallible {
+				self.pushErr(v.ValueSym.Expr.Token, "using of fallible function disallowed in this scope")
+				self.pushSuggestion("wrap the fallible function with a non-fallible function")
 			}
 		}
 
@@ -2384,7 +2384,7 @@ impl sema {
 		}
 
 		// Do not unwrap untyped literals, type analysis will check overflows.
-		mut evalFlags := evalDefault | evalExceptional
+		mut evalFlags := evalDefault | evalFallible
 		if v.Reference {
 			evalFlags |= evalRefptr
 		}
@@ -3440,23 +3440,23 @@ impl missingRetChecker {
 				mut r := st.(&Ret)
 				mut f, isFunc := r.Expr.(&FuncCallExpr)
 				// Function call appeared.
-				// We have to check exceptional handler scope, if exist.
+				// We have to check error handler scope, if exist.
 				// To collect break statements, it is needed.
 				// Also if it is reports false, do not report true, continue.
-				if isFunc && f.Except != nil && !self.checkScope(f.Except, 0) {
+				if isFunc && f.Handler != nil && !self.checkScope(f.Handler, 0) {
 					break
 				}
 				ret true
 			| &Use:
-				// Use expression appeared, we are in exceptional handler scope.
+				// Use expression appeared, we are in error handler scope.
 				// This is fine, check this like return expression.
 				mut u := st.(&Use)
 				mut f, isFunc := u.Value.Model.(&FuncCallExpr)
 				// Function call appeared.
-				// We have to check exceptional handler scope, if exist.
+				// We have to check error handler scope, if exist.
 				// To collect break statements, it is needed.
 				// Also if it is reports false, do not report true, continue.
-				if isFunc && f.Except != nil && !self.checkScope(f.Except, 0) {
+				if isFunc && f.Handler != nil && !self.checkScope(f.Handler, 0) {
 					break
 				}
 				ret true
@@ -3522,11 +3522,11 @@ impl missingRetChecker {
 					ret true
 				| &FuncCallExpr:
 					// Function call appeared.
-					// We have to check exceptional handler scope, if exist.
+					// We have to check error handler scope, if exist.
 					// To collect break statements, it is needed.
 					mut f := v.Model.(&FuncCallExpr)
-					if f.Except != nil {
-						self.checkScope(f.Except, 0)
+					if f.Handler != nil {
+						self.checkScope(f.Handler, 0)
 					}
 				|:
 					// no-op

@@ -919,8 +919,8 @@ impl scopeOptimizer {
 	fn optimizeRet(mut &self, mut r: &sema::Ret) {
 		exprOptimizer.optimizeValue(&r.Expr, self.data, self)
 
-		// Break algorithm is exceptional-specific optimizations are not enabled.
-		// The following algorithms tries to apply specific optimizations for exceptionals.
+		// Break algorithm if fallible-specific optimizations are not enabled.
+		// The following algorithms tries to apply specific optimizations for fallibles.
 		if !Fallible {
 			ret
 		}
@@ -931,17 +931,17 @@ impl scopeOptimizer {
 			ret
 		}
 		mut fc := r.Expr.(&sema::FuncCallExpr)
-		if !fc.Func.Decl.Exceptional ||
-			fc.Except == nil ||
-			len(fc.Except.Stmts) != 1 ||
-			!obj::IsForwarded(fc.Except) {
+		if !fc.Func.Decl.Fallible ||
+			fc.Handler == nil ||
+			len(fc.Handler.Stmts) != 1 ||
+			!obj::IsForwarded(fc.Handler) {
 			ret
 		}
 		mut owner := self.getOwner()
 		if owner == nil {
 			panic("unreachable")
 		}
-		self.setCurrentStmt(&ExceptionalForwardingExpr{Func: owner, Expr: fc})
+		self.setCurrentStmt(&ErrorForwardingExpr{Func: owner, Expr: fc})
 	}
 
 	// Like optimizeStmt, but handles independent statement from the scope.

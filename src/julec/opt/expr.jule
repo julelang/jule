@@ -826,13 +826,13 @@ impl exprOptimizer {
 	}
 
 	fn optimizeStrBuilderCall(*self, mut m: &sema::FuncCallExpr) {
-		// Some strings::Builder methods are not real-exceptional implementations.
-		// They just implements interfaces and not throws any exceptional.
-		// Therefore we can remove exceptional handling algorithms for these method calls.
+		// Some strings::Builder methods are not real-fallible implementations.
+		// They just implements interfaces and not throws any error.
+		// Therefore we can remove error handling algorithms for these method calls.
 		const meta = comptime::ValueOf(*meta::Program.StrBuilder)
 		const for _, f in meta.Type().Decl().Fields() {
 			if meta.Field(f.Name()).Unwrap() == m.Func {
-				mut model := any(&FuncCallIgnoreExceptionalExpr{Base: m})
+				mut model := any(&FuncCallIgnoreErrorExpr{Base: m})
 				*self.model = unsafe { *(*sema::Expr)(&model) }
 				// Return function, skip following if statements if exist.
 				ret
@@ -928,11 +928,11 @@ impl exprOptimizer {
 
 	fn funcCall(*self, mut m: &sema::FuncCallExpr) {
 		self.args(m.Func.Params, m.Args)
-		if m.Except != nil {
-			// Handle exceptional handler scope as child.
+		if m.Handler != nil {
+			// Handle error handler scope as child.
 			// Because it is actually a child scope.
 			const Child = true
-			self.scope(nil, m.Except, Child)
+			self.scope(nil, m.Handler, Child)
 		}
 		match {
 		| StdStrings && meta::Program.StrBuilder != nil:

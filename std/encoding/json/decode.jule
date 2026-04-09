@@ -362,8 +362,8 @@ impl decoder {
 
 	// Tries to use custom decoding method if exist for supported types.
 	// Reports whether it found and decoded successfully.
-	// Forwards any exception, all exceptionals are forwarded.
-	// So, any exception means custom decode method found and it threw exception.
+	// Forwards any error, all errors are forwarded.
+	// So, any error means custom decode method found and it threw error.
 	#disable nilptr boundary
 	fn tryCustomDecode[T](*self, mut &t: *T)!: bool {
 		const tt = comptime::TypeOf(T)
@@ -385,7 +385,7 @@ impl decoder {
 								const match type m.Type().Params()[1].Type() {
 								| []byte:
 									const match {
-									| m.Type().Decl().Exceptional() &&
+									| m.Type().Decl().Fallible() &&
 										m.Type().Result().Kind() == comptime::Void:
 										const match name {
 										| "DecodeText":
@@ -610,9 +610,9 @@ fn decodeLiteral[T](mut data: []byte, mut &t: *T)! {
 // Decoding details:
 //	Since this function designed for comptime type analysis, the type [T] should
 //	be valid type for comptime. The type [any], which is stores dynamic type, is not valid.
-//	Any unsupported type causes exceptional with [UnsupportedTypeError].
+//	Any unsupported type causes error with [UnsupportedTypeError].
 //	Any incompatible value for type, invalid literal or something else causes
-//	exceptional with [UnsupportedTypeError].
+//	error with [UnsupportedTypeError].
 //
 //	Signed/Unsigned Integers, Floating-Points:
 //		Decode as JSON numbers.
@@ -622,7 +622,7 @@ fn decodeLiteral[T](mut data: []byte, mut &t: *T)! {
 //
 //	Strings:
 //		Decode as JSON strings. Invalid UTF-8 or invalid UTF-16 surrogate pairs
-//		are not treated as an exception. Instead, they are replaced by the
+//		are not treated as an error. Instead, they are replaced by the
 //		Unicode replacement character U+FFFD.
 //
 //	Structs:
@@ -648,7 +648,7 @@ fn decodeLiteral[T](mut data: []byte, mut &t: *T)! {
 //	Maps:
 //		Decode as JSON object.
 //		Map's key type only can be: signed integer, unsigned integer and string.
-//		Other types will cause exceptional with [UnsupportedTypeError].
+//		Other types will cause error with [UnsupportedTypeError].
 //
 //	Smart Pointers:
 //		If smart pointer is nil, will be allocated by the algorithm for decoding.

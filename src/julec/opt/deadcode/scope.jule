@@ -7,40 +7,40 @@ use "std/jule/sema"
 
 // Dead code eliminate optimizer for scopes.
 struct scopeDeadCode {
-	parent: &scopeDeadCode
-	s:      &sema::Scope
-	i:      int // Position.
-	labels: &[]&sema::Label
-	gotos:  &[]&sema::Goto
-	except: bool
+	parent:  &scopeDeadCode
+	s:       &sema::Scope
+	i:       int // Position.
+	labels:  &[]&sema::Label
+	gotos:   &[]&sema::Goto
+	handler: bool
 }
 
 impl scopeDeadCode {
 	fn optimizeChild(mut &self, mut s: &sema::Scope) {
 		mut sdc := &scopeDeadCode{
 			parent: self,
-			s: s,
+			s:      s,
 			labels: self.labels,
-			gotos: self.gotos,
+			gotos:  self.gotos,
 		}
 		unsafe { sdc.optimizeStmts() }
 	}
 
-	fn optimizeBodyChildExceptional(mut &self, mut s: &sema::Scope) {
+	fn optimizeBodyChildHandler(mut &self, mut s: &sema::Scope) {
 		mut sdc := &scopeDeadCode{
-			s: s,
-			labels: self.labels,
-			gotos: self.gotos,
-			except: true,
+			s:       s,
+			labels:  self.labels,
+			gotos:   self.gotos,
+			handler: true,
 		}
 		unsafe { sdc.optimizeStmts() }
 	}
 
 	fn optimizeBodyChild(mut &self, mut s: &sema::Scope) {
 		mut sdc := &scopeDeadCode{
-			s: s,
+			s:      s,
 			labels: self.labels,
-			gotos: self.gotos,
+			gotos:  self.gotos,
 		}
 		unsafe { sdc.optimizeStmts() }
 	}
@@ -185,7 +185,7 @@ impl scopeDeadCode {
 			self.eliminateFollowed()
 		| &sema::Value:
 			mut val := st.(&sema::Value)
-			if self.except {
+			if self.handler {
 				break
 			}
 			match type val.Model {
@@ -231,9 +231,9 @@ fn eliminateDeadCodeOfScope(mut s: &sema::Scope) {
 	labels := make([]&sema::Label, 0, 1<<4)
 	gotos := make([]&sema::Goto, 0, 1<<4)
 	mut sdc := &scopeDeadCode{
-		s: s,
+		s:      s,
 		labels: unsafe { (&[]&sema::Label)(&labels) },
-		gotos: unsafe { (&[]&sema::Goto)(&gotos) },
+		gotos:  unsafe { (&[]&sema::Goto)(&gotos) },
 	}
 	unsafe { sdc.optimizeStmts() }
 }

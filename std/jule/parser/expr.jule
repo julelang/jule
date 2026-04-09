@@ -1108,44 +1108,44 @@ impl exprBuilder {
 				t := self.t
 				self.next()
 				// Trailing not operator.
-				// It should be call expression to an exceptional function.
+				// It should be call expression to a fallible function.
 				mut f, isFunc := ast::Unparen(x).Data.(&ast::CallExpr)
 				if !isFunc {
 					self.pushErr(t, "trailing not operator expects a function call")
 					break
 				}
-				if f.Exception == ast::Ignored {
-					self.pushErr(t, "function call already ignores the exceptional")
+				if f.Handler == ast::Ignored {
+					self.pushErr(t, "function call already ignores the error")
 					break
 				}
-				f.Exception = ast::Ignored
+				f.Handler = ast::Ignored
 			| token::QMARK:
 				t := self.t
 				self.next()
 				// Trailing question-mark operator.
-				// It should be call expression to an exceptional function.
+				// It should be call expression to a fallible function.
 				mut f, isFunc := ast::Unparen(x).Data.(&ast::CallExpr)
 				if !isFunc {
 					self.pushErr(t, "trailing question-mark operator expects a function call")
 					break
 				}
-				if f.Exception == ast::Forwarded {
-					self.pushErr(t, "function call already forwards the exceptional")
+				if f.Handler == ast::Forwarded {
+					self.pushErr(t, "function call already forwards the error")
 					break
 				}
-				f.Exception = ast::Forwarded
+				f.Handler = ast::Forwarded
 			| token::ELSE:
 				t := self.t
 				self.next()
 				// Trailing else keyword.
-				// It should be call expression to an exceptional function.
+				// It should be call expression to a fallible function.
 				mut f, isFunc := ast::Unparen(x).Data.(&ast::CallExpr)
 				if !isFunc {
 					self.pushErr(t, "else keyword expects a function call")
 					break
 				}
-				if f.Exception != nil {
-					self.pushErr(t, "exceptional is already handled for this call")
+				if f.Handler != nil {
+					self.pushErr(t, "error is already handled for this call")
 				}
 				if self.eof() || self.t.ID != token::LBRACE {
 					self.pushErr(t, "expected {")
@@ -1155,7 +1155,7 @@ impl exprBuilder {
 				self.i-- // back to }, to advance properly
 				self.next()
 				mut rbrace := self.l[self.i-1]
-				f.Exception = self.p.buildScope(blockTokens, rbrace)
+				f.Handler = self.p.buildScope(blockTokens, rbrace)
 				x.End = rbrace
 			| token::PERIOD:
 				mut t := self.t
@@ -1167,14 +1167,14 @@ impl exprBuilder {
 				match self.t.ID {
 				| token::AWAIT:
 					// Trailing await keyword.
-					// It should be call expression to an exceptional function.
+					// It should be call expression to a fallible function.
 					mut f, isFunc := ast::Unparen(x).Data.(&ast::CallExpr)
 					if !isFunc {
 						self.pushErr(t, "await keyword expects a function call")
 						break
 					}
-					if f.Exception != nil {
-						self.pushErr(t, "exceptional must be handled after await")
+					if f.Handler != nil {
+						self.pushErr(t, "fallible function must be handled after await")
 						break
 					}
 					f.Await = true

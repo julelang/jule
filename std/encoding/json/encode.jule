@@ -409,7 +409,7 @@ impl encoder {
 						| len(params) == 1 && !params[0].Mutable():
 							const m = comptime::ValueOf(t).Method(method.Name())
 							const match {
-							| m.Type().Decl().Exceptional() &&
+							| m.Type().Decl().Fallible() &&
 								m.Type().Result() == comptime::TypeOf([]byte):
 								bytes := m.Unwrap()() else {
 									throw &EncodeError{Type: tt.Str(), Err: error, sourceFunc: name}
@@ -498,11 +498,11 @@ impl encoder {
 // Encoding details:
 //	Since this function designed for comptime type analysis, the type [T] should
 //	be valid type for comptime. The type [any], which is stores dynamic type, is not valid.
-//	Any unsupported type causes exceptional with [UnsupportedTypeError].
+//	Any unsupported type causes error with [UnsupportedTypeError].
 //
 //	Signed/Unsigned Integers, Floating-Points:
 //		Encode as JSON numbers.
-//		For floating-points, NaN or ±Inf will cause exceptional with [UnsupportedValueError].
+//		For floating-points, NaN or ±Inf will cause error with [UnsupportedValueError].
 //
 //	Booleans:
 //		Encode as JSON booleans.
@@ -537,7 +537,7 @@ impl encoder {
 //		If map is nil, encode as empty object {} JSON value.
 //		The keys of the map always will be quoted.
 //		Also map's key type only can be: signed integer, unsigned integer and string.
-//		Other types will cause exceptional with [UnsupportedTypeError].
+//		Other types will cause error with [UnsupportedTypeError].
 //
 //	Smart Pointers:
 //		If smart pointer is nil, encode as null JSON value.

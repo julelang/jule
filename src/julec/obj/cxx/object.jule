@@ -985,7 +985,7 @@ impl ObjectCoder {
 			buf.WriteStr("inline ")!
 		}
 		if f.Decl.Async {
-			if f.Decl.IsVoid() && !f.Decl.Exceptional {
+			if f.Decl.IsVoid() && !f.Decl.Fallible {
 				buf.WriteStr("__jule_VoidAsync")!
 			} else {
 				buf.WriteStr("__jule_Async<")!
@@ -1131,9 +1131,9 @@ impl ObjectCoder {
 	}
 
 	fn commonVarInit(mut &self, mut v: &sema::Var) {
-		mut fc := isExceptionalResult(v.ValueSym.Value.Model)
+		mut fc := isFallibleResult(v.ValueSym.Value.Model)
 		if fc != nil {
-			self.ec.handleExceptionalCallWithData(fc, useExprMemory{
+			self.ec.handleFallibleCallWithData(fc, useExprMemory{
 				Loc:      v.ValueSym.Expr.Token,
 				DestType: v.TypeSym.Type,
 				Model:    v,
@@ -1266,11 +1266,11 @@ impl ObjectCoder {
 				self.write("{\n")
 				self.indent()
 				if m.Async {
-					if !m.IsVoid() || m.Exceptional {
+					if !m.IsVoid() || m.Fallible {
 						self.write("__jule_AsyncRet ")
 					}
 					self.write("__jule_AsyncAwait ")
-				} else if m.Exceptional || !m.IsVoid() {
+				} else if m.Fallible || !m.IsVoid() {
 					self.write("return ")
 				}
 				identCoder.func(&self.Buf, sm)

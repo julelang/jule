@@ -298,8 +298,8 @@ struct result {
 
 // Stmt node analysis flags.
 const (
-	checkNodeDefault       = iota
-	checkNodeNoExceptional = 1 << iota
+	checkNodeDefault    = iota
+	checkNodeNoFallible = 1 << iota
 )
 
 // Scope checker.
@@ -589,8 +589,8 @@ impl scopeChecker {
 	}
 
 	// Reports this identifier duplicated in scope.
-	// The "self" parameter represents address of exception identifier.
-	// If founded identifier address equals to self, will be skipped.
+	// The "itself" parameter represents address of error identifier.
+	// If found identifier address equals to "itself", it will be skipped.
 	fn isDuplicatedName(mut *self, itself: uintptr, name: str): bool {
 		const Closure = false
 		shadowing := self.s.isFlag(Shadowing)
@@ -728,8 +728,8 @@ impl scopeChecker {
 		mut eval := self.s.eval(self)
 		eval.target.ignored = true
 		mut evalFlags := evalDefault | evalPhysicalMem | evalUnwrapUntyped
-		if flags&checkNodeNoExceptional == 0 {
-			evalFlags |= evalExceptional
+		if flags&checkNodeNoFallible == 0 {
+			evalFlags |= evalFallible
 		}
 		mut v := eval.evalExpr(expr, evalFlags)
 		if v == nil || v.Model == nil {
@@ -863,7 +863,7 @@ impl scopeChecker {
 			}
 
 			n := len(self.scope.Stmts)
-			self.checkNode(wh.Next, checkNodeNoExceptional)
+			self.checkNode(wh.Next, checkNodeNoFallible)
 			if n < len(self.scope.Stmts) {
 				mut st := self.scope.Stmts[n]
 				self.scope.Stmts = self.scope.Stmts[:n] // Remove trailing statements.
@@ -1257,8 +1257,8 @@ impl scopeChecker {
 		// Eval with evalUnwrapUntyped if l == nil, otherwise type will be checked.
 		// So, do not unwrap untyped values.
 		mut evalFlags := evalDefault
-		if flags&checkNodeNoExceptional == 0 {
-			evalFlags |= evalExceptional
+		if flags&checkNodeNoFallible == 0 {
+			evalFlags |= evalFallible
 		}
 		if l == nil {
 			evalFlags |= evalUnwrapUntyped
@@ -1459,7 +1459,7 @@ impl scopeChecker {
 			// It is mutability safe even if map stored in immutable memory and have mutable type value.
 			// Because mutability will be checked by assignment analysis.
 			updateMut(0)
-			mut evalFlags := evalDefault | evalPhysicalMem | evalUnwrapUntyped | evalExceptional
+			mut evalFlags := evalDefault | evalPhysicalMem | evalUnwrapUntyped | evalFallible
 			if a.X[0].Reference {
 				evalFlags |= evalRefptr
 			}
@@ -2030,7 +2030,7 @@ impl scopeChecker {
 				}
 			| &ast::Assign:
 				mut assign := c.Stmt.(&ast::Assign)
-				ssc.checkAssign(assign, checkNodeDefault|checkNodeNoExceptional)
+				ssc.checkAssign(assign, checkNodeDefault|checkNodeNoFallible)
 				if self.stopped() {
 					ret nil
 				}
@@ -2281,7 +2281,7 @@ impl scopeChecker {
 
 	fn checkUseExpr(mut &self, ue: &ast::UseExpr) {
 		if self.result == nil {
-			self.s.pushErr(ue.Token, "use expression is not allowed out of exceptional handler scope")
+			self.s.pushErr(ue.Token, "use expression is not allowed out of error handler scope")
 			ret
 		}
 
@@ -2322,8 +2322,8 @@ impl scopeChecker {
 		}
 
 		mut root := self.getRoot()
-		if !root.owner.Decl.Exceptional {
-			self.s.pushErr(t.Token, "throw statements are not allowed in non-exceptional scopes")
+		if !root.owner.Decl.Fallible {
+			self.s.pushErr(t.Token, "throw statements are not allowed in non-fallible scopes")
 		}
 
 		applyImplicitCast(self.s, primAny, expr, t.Token, self.getOwnerRefers())
@@ -2390,7 +2390,7 @@ impl scopeChecker {
 			self.scope.Stmts = append(self.scope.Stmts, &Use{Value: rtc.expr})
 		| &ast::Expr:
 			mut expr := stmt.Data.(&ast::Expr)
-			mut v := self.s.eval(self).evalExpr(expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped|evalExceptional)
+			mut v := self.s.eval(self).evalExpr(expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped|evalFallible)
 			if v == nil {
 				ret
 			}

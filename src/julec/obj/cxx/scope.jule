@@ -32,7 +32,7 @@ enum compStmt: type {
 	&opt::PushToSliceExpr,
 	&opt::MutSlicingExpr,
 	&opt::SwapExpr,
-	&opt::ExceptionalForwardingExpr,
+	&opt::ErrorForwardingExpr,
 	&opt::StrRuneIter,
 }
 
@@ -759,9 +759,9 @@ impl scopeCoder {
 	}
 
 	fn cmplxAssign(mut &self, opID: int, opKind: str, mut l: compExpr, mut lt: &sema::Type, mut r: compExpr, mut rt: &sema::Type, kind: str) {
-		mut fc := isExceptionalResult(r)
+		mut fc := isFallibleResult(r)
 		if opID == token::ASSIGN && fc != nil {
-			self.oc.ec.handleExceptionalCallWithData(fc, useExprMemory{
+			self.oc.ec.handleFallibleCallWithData(fc, useExprMemory{
 				Loc:      nil,
 				DestType: lt,
 				Model:    l,
@@ -779,7 +779,7 @@ impl scopeCoder {
 			self.oc.indent()
 			self.oc.tc.kind(&self.oc.Buf, rt)
 			self.oc.write(" __cmplx_temp;")
-			self.oc.ec.handleExceptionalCallWithData(fc, useExprMemory{
+			self.oc.ec.handleFallibleCallWithData(fc, useExprMemory{
 				Loc:      nil,
 				DestType: lt,
 				Model:    "__cmplx_temp",
@@ -862,9 +862,9 @@ impl scopeCoder {
 			ret
 		}
 
-		mut fc := isExceptionalResult(r)
+		mut fc := isFallibleResult(r)
 		if fc != nil {
-			self.oc.ec.handleExceptionalCallWithData(fc, useExprMemory{
+			self.oc.ec.handleFallibleCallWithData(fc, useExprMemory{
 				Loc:      loc,
 				DestType: lt,
 				Model:    l,
@@ -1044,7 +1044,7 @@ impl scopeCoder {
 
 		mut fc := a.Right.(&sema::FuncCallExpr)
 		self.oc.tc.rc.codeMut1(&self.oc.Buf, fc.Func.Result)
-		if fc.Func.Decl != nil && fc.Func.Decl.Exceptional {
+		if fc.Func.Decl != nil && fc.Func.Decl.Fallible {
 			let mut dest = useExprMemory{
 				Loc:      nil,
 				DestType: nil, // Should not be required in this case.
@@ -1055,7 +1055,7 @@ impl scopeCoder {
 			}
 			self.oc.write(" " + assignResultName + ";\n")
 			self.oc.indent()
-			self.oc.ec.handleExceptionalCallWithData(fc, dest)
+			self.oc.ec.handleFallibleCallWithData(fc, dest)
 			self.oc.write("\n")
 		} else {
 			self.oc.write(" " + assignResultName + " = ")
@@ -1668,7 +1668,7 @@ impl scopeCoder {
 	}
 
 	fn setResult(mut &self, mut r: &sema::Ret) {
-		mut fc := isExceptionalResult(r.Expr)
+		mut fc := isFallibleResult(r.Expr)
 		if fc != nil {
 			// If result types are not equal, must be handled like an assign.
 			// See the documentation of the &FuncCallExpr case below.
@@ -1683,7 +1683,7 @@ impl scopeCoder {
 				OpID:     token::ASSIGN,
 				OpKind:   "=",
 			}
-			self.oc.ec.handleExceptionalCallWithData(fc, dest)
+			self.oc.ec.handleFallibleCallWithData(fc, dest)
 			self.oc.write("\n")
 			self.oc.indent()
 			ret
@@ -1709,7 +1709,7 @@ impl scopeCoder {
 			}
 			ret
 		| &sema::FuncCallExpr:
-			// If function call could not returned by isExceptionalResult,
+			// If function call could not returned by isFallibleResult,
 			// the use the pure function call.
 			if fc == nil {
 				fc = r.Expr.(&sema::FuncCallExpr)
@@ -1745,7 +1745,7 @@ impl scopeCoder {
 				OpID:     token::ASSIGN,
 				OpKind:   "=",
 			}
-			self.oc.ec.handleExceptionalCallWithData(fc, dest)
+			self.oc.ec.handleFallibleCallWithData(fc, dest)
 		} else {
 			mut a := new(sema::MultiAssign)
 			a.Decls = nil // not needed
@@ -1771,14 +1771,14 @@ impl scopeCoder {
 
 	fn retStmt(mut &self, mut r: &sema::Ret) {
 		hasDefer := r.Func.Decl != nil && r.Func.Decl.HasDefer
-		mut fc := isExceptionalResult(r.Expr) // Exceptional functions should be handled with setResult.
+		mut fc := isFallibleResult(r.Expr) // Fallible functions should be handled with setResult.
 		if r.Func.Decl.IsVoid() {
 			if hasDefer {
 				self.emitDefers(0, false)
 				self.oc.write("\n")
 				self.oc.indent()
 			}
-			if r.Func.Decl.Exceptional {
+			if r.Func.Decl.Fallible {
 				self.oc.write(returnKw(r.Func))
 				self.oc.write(" __jule_VoidFallible{};")
 				ret
@@ -1787,7 +1787,7 @@ impl scopeCoder {
 			self.oc.write(";")
 			ret
 		} else if len(r.Func.Decl.Result.Names) == 0 && fc == nil {
-			if r.Func.Decl.Exceptional {
+			if r.Func.Decl.Fallible {
 				// Use scope to prevent "goto" errors about declarations.
 				self.oc.write("{\n")
 				self.oc.addIndent()
@@ -1869,7 +1869,7 @@ impl scopeCoder {
 			self.oc.write("\n")
 			self.oc.indent()
 		}
-		if r.Func.Decl.Exceptional {
+		if r.Func.Decl.Fallible {
 			self.oc.write(returnKw(r.Func))
 			self.oc.write(" __jule_Fallible<")
 			self.oc.tc.rc.codeMut1(&self.oc.Buf, r.Func.Result)
@@ -1920,7 +1920,7 @@ impl scopeCoder {
 		self.oc.write(")")
 	}
 
-	fn exceptionalForwarding(mut &self, mut m: &opt::ExceptionalForwardingExpr) {
+	fn errorForwarding(mut &self, mut m: &opt::ErrorForwardingExpr) {
 		hasDefer := m.Func.Decl != nil && m.Func.Decl.HasDefer
 		if !hasDefer {
 			self.oc.write(returnKw(m.Func))
@@ -2112,8 +2112,8 @@ impl scopeCoder {
 			self.mutSlicing(st.(&opt::MutSlicingExpr))
 		| &opt::SwapExpr:
 			self.swap(st.(&opt::SwapExpr))
-		| &opt::ExceptionalForwardingExpr:
-			self.exceptionalForwarding(st.(&opt::ExceptionalForwardingExpr))
+		| &opt::ErrorForwardingExpr:
+			self.errorForwarding(st.(&opt::ErrorForwardingExpr))
 		| &opt::StrRuneIter:
 			mut sit := st.(&opt::StrRuneIter)
 			self.strRuneIter(*sit, false)
@@ -2340,8 +2340,8 @@ impl scopeCoder {
 		self.emitDefers(nds, true)
 
 		if !raw && f.Decl.IsVoid() {
-			if f.Decl.Exceptional {
-				// Just for void exceptionals.
+			if f.Decl.Fallible {
+				// Just for void fallible.
 				// Other cases checked by semantic analsis and disallowed
 				// if they are not returns.
 				self.oc.indent()

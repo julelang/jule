@@ -196,24 +196,24 @@ struct BinaryExpr {
 	Op: &token::Token // Operator.
 }
 
-// Special exceptional handler scopes.
-let mut Ignored = new(ScopeTree)   // Exception is ignored, like foo()!
-let mut Forwarded = new(ScopeTree) // Exception is forwarded, like foo()?
+// Special error handler scopes.
+let mut Ignored = new(ScopeTree)   // Error is ignored, like foo()!
+let mut Forwarded = new(ScopeTree) // Error is forwarded, like foo()?
 
 // Function call expression kind.
 struct CallExpr {
-	Token:     &token::Token
-	Func:      &Expr      // Function expression.
-	Args:      []&Expr    // Function arguments, or nil.
-	Exception: &ScopeTree // Exception handling scope, or nil.
-	IsCo:      bool       // Whether this is the concurrent call.
-	Await:     bool       // Awaited.
+	Token:   &token::Token
+	Func:    &Expr      // Function expression.
+	Args:    []&Expr    // Function arguments, or nil.
+	Handler: &ScopeTree // Error handling scope, or nil.
+	IsCo:    bool       // Whether this is the concurrent call.
+	Await:   bool       // Awaited.
 }
 
 impl CallExpr {
-	// Reports whether exception is not handled.
+	// Reports whether error is not handled.
 	fn Unhandled(*self): bool {
-		ret self.Exception == nil
+		ret self.Handler == nil
 	}
 }
 
@@ -405,21 +405,21 @@ impl Param {
 // Also represents anonymous function expression and function type declarations..
 // For short function literals, Scope will be deferred to represent one-line body.
 struct Func {
-	Token:       &token::Token
-	Global:      bool
-	Async:       bool
-	Unsafe:      bool
-	Public:      bool
-	Extern:      bool
-	Short:       bool // Whether this function is an anonymous function, defined by short literal.
-	Static:      bool
-	Exceptional: bool
-	Name:        str
-	Directives:  []&Directive
-	Scope:       &ScopeTree
-	Generics:    []&Generic
-	Result:      &RetType
-	Params:      []&Param
+	Token:      &token::Token
+	Global:     bool
+	Async:      bool
+	Unsafe:     bool
+	Public:     bool
+	Extern:     bool
+	Short:      bool // Whether this function is an anonymous function, defined by short literal.
+	Static:     bool
+	Fallible:   bool
+	Name:       str
+	Directives: []&Directive
+	Scope:      &ScopeTree
+	Generics:   []&Generic
+	Result:     &RetType
+	Params:     []&Param
 }
 
 impl Func {

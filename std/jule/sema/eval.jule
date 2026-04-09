@@ -95,7 +95,7 @@ const (
 	evalDefault       = 0         // Default evaluation mode.
 	evalPhysicalMem   = 1 << iota // Checks whether the value is sutaible for physical memory.
 	evalUnwrapUntyped             // Unwraps untyped literal value to physical memory with default type.
-	evalExceptional               // Allows calling exceptional functions.
+	evalFallible                  // Allows calling fallible functions.
 	evalRefptr                    // Eval for reference pointer memory.
 )
 
@@ -2096,8 +2096,8 @@ impl eval {
 			self.pushErr(fc.Token, "concurrent call is undefined for casting expressions")
 			*v = nil
 			ret
-		} else if fc.Exception != nil {
-			self.pushErr(fc.Token, "exceptional handler scope is undefined for casting expressions")
+		} else if fc.Handler != nil {
+			self.pushErr(fc.Token, "error handler scope is undefined for casting expressions")
 			*v = nil
 			ret
 		}
@@ -2114,9 +2114,9 @@ impl eval {
 	}
 
 	fn callBuiltinFunc(mut &self, mut fc: &ast::CallExpr, mut &v: *&Value) {
-		if !fc.Unhandled() { // Exceptional handled?
-			// Built-in functions are not exceptional.
-			self.pushErr(fc.Token, "non-exceptionals cannot be handled like exceptionals")
+		if !fc.Unhandled() { // Error handled?
+			// Built-in functions are not fallible.
+			self.pushErr(fc.Token, "non-fallible function cannot be handled like fallible functions")
 		}
 		*v = (*v).Type.Func().caller(self, fc, *v)
 		if *v == nil {
@@ -2143,14 +2143,14 @@ impl eval {
 		}
 	}
 
-	fn processExceptionalHandler(mut *self, mut f: &FuncIns, mut fc: &ast::CallExpr, mut v: &Value) {
+	fn processErrorHandler(mut *self, mut f: &FuncIns, mut fc: &ast::CallExpr, mut v: &Value) {
 		resultNeeded := !self.target.ignored && !f.Decl.IsVoid()
 		let mut csc: &scopeChecker = nil
 		let mut ch: &Scope = nil
 
 		mut fcValue := v.Model.(&FuncCallExpr)
 
-		// self.lookup is always scopeChecker because exceptionals are
+		// self.lookup is always scopeChecker because fallible functions are
 		// not allowed in global scope due to static variables are not allowed.
 		// Therefore, if lookup is not scopeChecker, return immediately.
 		mut sc, ok := self.lookup.(&scopeChecker)
@@ -2163,15 +2163,15 @@ impl eval {
 		}
 		ch = sc.getChild()
 		ch.Traits |= ST_ERROR_HANDLER
-		fc.Exception.Parent = sc.tree
+		fc.Handler.Parent = sc.tree
 		csc.table.Vars = append(csc.table.Vars, buildErrorVar(ch, fc))
-		sc.checkChildSsc(fc.Exception, ch, csc)
+		sc.checkChildSsc(fc.Handler, ch, csc)
 
 		fcValue.Assigned = resultNeeded
-		fcValue.Except = ch
+		fcValue.Handler = ch
 
 		if resultNeeded && csc.result != nil {
-			self.pushErr(fc.Token, "exceptional returns an expression, therefore else block should return an expression")
+			self.pushErr(fc.Token, "fallible function returns an expression, therefore else block should return an expression")
 			self.pushSuggestion("write an use expression end of the scope, like; use value")
 		}
 	}
@@ -2336,49 +2336,49 @@ impl eval {
 			self.s.pushErr(fc.Token, "only `async` functions can be awaited")
 		}
 
-		if f.Decl.Exceptional {
+		if f.Decl.Fallible {
 			if fc.IsCo {
-				self.s.pushErr(fc.Token, "concurrent calls are not allowed to exceptional functions")
-				self.s.pushSuggestion("handle the exceptional function in a separate function or anonymous function")
+				self.s.pushErr(fc.Token, "concurrent calls are not allowed to fallible functions")
+				self.s.pushSuggestion("handle the fallible function in a separate function or anonymous function")
 			}
 			match {
 			| fc.Unhandled():
-				self.pushErr(fc.Token, "exceptionals must be handled")
-				self.pushSuggestion(`use the "!" operator after an calling exceptional to handle it automatically`)
-			| fc.Exception == ast::Ignored:
-				model.Except = nil
-			| fc.Exception == ast::Forwarded:
+				self.pushErr(fc.Token, "fallible functions must be handled")
+				self.pushSuggestion(`use the "!" operator after an calling a fallible function to handle it automatically`)
+			| fc.Handler == ast::Ignored:
+				model.Handler = nil
+			| fc.Handler == ast::Forwarded:
 				mut s, (ok) := self.lookup.(&scopeChecker)
 				if ok {
 					if s.isDeferred() {
-						self.s.pushErr(fc.Token, "function call forwards exception in a deferred scope")
+						self.s.pushErr(fc.Token, "function call forwards error in a deferred scope")
 					} else {
 						mut root := s.getRoot()
-						if root.owner.Decl.Exceptional {
+						if root.owner.Decl.Fallible {
 							// Build error variable. Declare in the current scope.
 							// Since there is no child scope analysis,
 							// current scope may will capture it for closure.
 							// To avoid it, handle it like declared in the current scope,
 							// then assign scope of variable to the child.
 							mut errorVar := buildErrorVar(s.scope, fc)
-							model.Except = s.getChild()
-							model.Except.Stmts = append(model.Except.Stmts, &Throw{
+							model.Handler = s.getChild()
+							model.Handler.Stmts = append(model.Handler.Stmts, &Throw{
 								Func:  root.owner,
 								Error: self.evalVar(errorVar, fc.Token),
 							})
-							errorVar.Scope = model.Except
+							errorVar.Scope = model.Handler
 							break
 						}
 					}
 				}
-				self.s.pushErr(fc.Token, "function call forwards exceptional in non-exceptional scope")
-				self.s.pushSuggestion("make the function exceptional to forward")
+				self.s.pushErr(fc.Token, "function call forwards error in non-fallible scope")
+				self.s.pushSuggestion("make the function fallible to forward the error")
 			|:
 				// Handled with scope.
-				self.processExceptionalHandler(f, fc, *v)
+				self.processErrorHandler(f, fc, *v)
 			}
 		} else if !fc.Unhandled() {
-			self.pushErr(fc.Token, "non-exceptionals cannot be handled like exceptionals")
+			self.pushErr(fc.Token, "non-fallible functions cannot be handled like fallible functions")
 		}
 
 		if fc.IsCo {
@@ -3169,7 +3169,7 @@ impl eval {
 			ins = f.Decl.instanceForce()
 			ins.Decl = buildFunc(decl)
 			ins.Decl.Result = f.Decl.Result
-			ins.Decl.Exceptional = f.Decl.Exceptional
+			ins.Decl.Fallible = f.Decl.Fallible
 			ins.Decl.sema = self.s
 			ins.Result = f.Result
 			for (i, mut param) in ins.Params {
@@ -5507,11 +5507,11 @@ fn findNamespace(mut lookup: Lookup, namespace: str): &ImportInfo {
 
 // Checks value by flags.
 fn checkValue(mut v: &Value, mut s: &sema, mut token: &token::Token, flags: int): (ok: bool) {
-	if flags&evalExceptional == 0 {
+	if flags&evalFallible == 0 {
 		fc, (ok) := v.Model.(&FuncCallExpr)
-		if ok && fc.Func.Decl.Exceptional {
-			s.pushErr(token, "exceptionals must be used alone, not in binary expression or etc.")
-			s.pushSuggestion("consider assign result of exceptional to variable and then use it")
+		if ok && fc.Func.Decl.Fallible {
+			s.pushErr(token, "fallible functions must be used alone, not in binary expression or etc.")
+			s.pushSuggestion("consider assign result of fallible function to variable and then use it")
 			ret false
 		}
 	}

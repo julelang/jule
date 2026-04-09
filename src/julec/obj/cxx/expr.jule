@@ -37,7 +37,7 @@ enum compExpr: type {
 	&opt::EmptyCompareExpr,
 	&opt::UnsafeDerefExpr,
 	&opt::UnsafeTypeAssertionExpr,
-	&opt::FuncCallIgnoreExceptionalExpr,
+	&opt::FuncCallIgnoreErrorExpr,
 	&opt::StrConcatExpr,
 	&opt::StrFromBytes,
 	&opt::ArrayAsSlice,
@@ -1180,8 +1180,8 @@ impl exprCoder {
 		childIndex++
 		if dest.Model != nil {
 			mut fc, ok := val.Model.(&sema::FuncCallExpr)
-			if ok && fc.Func.Decl != nil && fc.Func.Decl.Exceptional {
-				self.handleExceptionalCallWithData(fc, dest)
+			if ok && fc.Func.Decl != nil && fc.Func.Decl.Fallible {
+				self.handleFallibleCallWithData(fc, dest)
 				self.oc.sc.emitDefersByLevel(childIndex, true)
 				ret
 			}
@@ -1218,87 +1218,87 @@ impl exprCoder {
 		self.oc.sc.emitDefersByLevel(childIndex, true)
 	}
 
-	fn handleExceptionalCallWithData(mut &self, mut m: &sema::FuncCallExpr, mut dest: useExprMemory) {
+	fn handleFallibleCallWithData(mut &self, mut m: &sema::FuncCallExpr, mut dest: useExprMemory) {
 		// Use unique identifier to handle each call with explicit variable.
 		// Otherwise back-end compiler may use wrong variable, which is may lead even segfault.
 		// To generate unique identifier, use the memory address of function call.
 		// But the error variable is not have associated function data, but scope.
-		// Therefore, if exceptional handler scope exist, use the scope address.
-		mut exceptName := "__jule_except_"
-		if m.Except != nil {
-			exceptName += conv::FormatUint(u64(uintptr(m.Except)), 16)
+		// Therefore, if error handler scope exist, use the scope address.
+		mut errorName := "__jule_error_"
+		if m.Handler != nil {
+			errorName += conv::FormatUint(u64(uintptr(m.Handler)), 16)
 		} else {
-			exceptName += conv::FormatUint(u64(uintptr(m)), 16)
+			errorName += conv::FormatUint(u64(uintptr(m)), 16)
 		}
 
 		let mut destData: sema::Expr = &sema::Var{
 			Extern: true, // to use identifier directly
-			Name:   exceptName + ".result",
+			Name:   errorName + ".result",
 		}
 
 		self.oc.write("{\n")
-		// Generate code for exceptional.
+		// Generate code for fallible.
 
 		self.oc.addIndent()
 		self.oc.indent()
 		self.oc.tc.funcInsResult(&self.oc.Buf, m.Func)
 		self.oc.write(" ")
-		self.oc.write(exceptName)
+		self.oc.write(errorName)
 		self.oc.write(" = ")
 		self.pureFuncCall(m)
 		self.oc.write(";\n")
 		self.oc.indent()
-		if m.Except != nil {
+		if m.Handler != nil {
 			if m.Func.Result == nil || dest.Model == nil {
-				mut stmt := m.Except.Stmts[len(m.Except.Stmts)-1]
+				mut stmt := m.Handler.Stmts[len(m.Handler.Stmts)-1]
 				self.oc.write("if (!")
-				self.oc.write(exceptName)
+				self.oc.write(errorName)
 				self.oc.write(".ok()) ")
 				match type stmt {
 				| &sema::Use:
 					self.oc.write("{\n")
 					self.oc.addIndent()
-					m.Except.Stmts = m.Except.Stmts[:len(m.Except.Stmts)-1]
+					m.Handler.Stmts = m.Handler.Stmts[:len(m.Handler.Stmts)-1]
 					self.oc.indent()
-					self.oc.sc.scope2(m.Except, true)
+					self.oc.sc.scope2(m.Handler, true)
 					self.oc.write("\n")
 					self.oc.indent()
 					mut v := stmt.(&sema::Use).Value
-					self.writeUseExpr(m.Except, m.Func, v, dest)
+					self.writeUseExpr(m.Handler, m.Func, v, dest)
 					self.oc.doneIndent()
 					self.oc.write("\n")
 					self.oc.indent()
 					self.oc.write("}\n")
 				|:
-					self.oc.sc.scope(m.Except)
+					self.oc.sc.scope(m.Handler)
 					self.oc.write("\n")
-					self.oc.sc.emitDefersByLevel(m.Except.ChildIndex+1, true)
+					self.oc.sc.emitDefersByLevel(m.Handler.ChildIndex+1, true)
 				}
 				self.oc.write("\n")
 			} else {
 				self.oc.write("if (")
-				self.oc.write(exceptName)
+				self.oc.write(errorName)
 				self.oc.write(".ok()) { ")
 				dest.write(self, destData, m.Func.Result)
 				self.oc.write("; }\n")
 				self.oc.indent()
 				self.oc.write("else ")
-				mut stmt := m.Except.Stmts[len(m.Except.Stmts)-1]
+				mut stmt := m.Handler.Stmts[len(m.Handler.Stmts)-1]
 				self.oc.write("{\n")
 				self.oc.addIndent()
 				self.oc.indent()
 				match type stmt {
 				| &sema::Use:
-					m.Except.Stmts = m.Except.Stmts[:len(m.Except.Stmts)-1]
-					self.oc.sc.scope2(m.Except, true)
+					m.Handler.Stmts = m.Handler.Stmts[:len(m.Handler.Stmts)-1]
+					self.oc.sc.scope2(m.Handler, true)
 					self.oc.write("\n")
 					self.oc.indent()
 					mut v := stmt.(&sema::Use).Value
-					self.writeUseExpr(m.Except, m.Func, v, dest)
+					self.writeUseExpr(m.Handler, m.Func, v, dest)
 				|:
-					self.oc.sc.scope(m.Except)
+					self.oc.sc.scope(m.Handler)
 					self.oc.write("\n")
-					self.oc.sc.emitDefersByLevel(m.Except.ChildIndex+1, true)
+					self.oc.sc.emitDefersByLevel(m.Handler.ChildIndex+1, true)
 				}
 				self.oc.write("\n")
 				self.oc.doneIndent()
@@ -1308,13 +1308,13 @@ impl exprCoder {
 			self.oc.doneIndent()
 		} else {
 			self.oc.write("if (!")
-			self.oc.write(exceptName)
+			self.oc.write(errorName)
 			self.oc.write(".ok()) __jule_panicStr(")
-			strLit(&self.oc.Buf, "unhandled exceptional: ", "23")
+			strLit(&self.oc.Buf, "unhandled error: ", "23")
 			self.oc.write(" + ")
-			self.oc.write(exceptName)
+			self.oc.write(errorName)
 			self.oc.write(".error.type->to_str(")
-			self.oc.write(exceptName)
+			self.oc.write(errorName)
 			self.oc.write(".error.data) + ")
 			strLitF(&self.oc.Buf, fn|| {
 				self.oc.write("\"\\nlocation: ")
@@ -1336,7 +1336,7 @@ impl exprCoder {
 		self.oc.write("}")
 	}
 
-	fn funcCall(mut &self, mut m: &sema::FuncCallExpr, ignoreExceptional: bool) {
+	fn funcCall(mut &self, mut m: &sema::FuncCallExpr, ignoreError: bool) {
 		// Compiler implemented functions.
 		match m.Func {
 		| meta::Program.Runtime.Park:
@@ -1394,21 +1394,21 @@ impl exprCoder {
 		}
 
 		if m.IsCo {
-			// Do not check for exceptionals,
-			// exceptional functions cannot be called with co.
+			// Do not check for errors,
+			// fallible functions cannot be called with co.
 			self.coFuncCall(m)
 			ret
 		}
 		if m.Func.IsBuiltin() ||
-			!m.Func.Decl.Exceptional ||
-			m.Except != nil && len(m.Except.Stmts) == 0 {
+			!m.Func.Decl.Fallible ||
+			m.Handler != nil && len(m.Handler.Stmts) == 0 {
 			self.pureFuncCall(m)
 			ret
 		}
 
-		// Ignore exceptional mode is on.
-		// Just call function purely and use return value of exceptional if exist.
-		if ignoreExceptional {
+		// Ignore error mode is on.
+		// Just call function purely and use return value of fallible function if exist.
+		if ignoreError {
 			self.pureFuncCall(m)
 			if m.Func.Result != nil {
 				self.oc.write(".result")
@@ -1416,10 +1416,10 @@ impl exprCoder {
 			ret
 		}
 
-		// Code for exceptional.
+		// Code for fallible.
 		// Result must be not assigned in this case.
-		// For result needed cases, use the handleExceptionalCallWithData method instead.
-		self.handleExceptionalCallWithData(m, useExprMemory{})
+		// For result needed cases, use the handleFallibleCallWithData method instead.
+		self.handleFallibleCallWithData(m, useExprMemory{})
 	}
 
 	fn slice(mut &self, mut m: &sema::SliceExpr) {
@@ -2332,8 +2332,8 @@ impl exprCoder {
 			self.unsafeDeref(m.(&opt::UnsafeDerefExpr))
 		| &opt::UnsafeTypeAssertionExpr:
 			self.unsafeTypeAssertion(m.(&opt::UnsafeTypeAssertionExpr))
-		| &opt::FuncCallIgnoreExceptionalExpr:
-			self.funcCall(m.(&opt::FuncCallIgnoreExceptionalExpr).Base, true)
+		| &opt::FuncCallIgnoreErrorExpr:
+			self.funcCall(m.(&opt::FuncCallIgnoreErrorExpr).Base, true)
 		| &opt::StrConcatExpr:
 			self.strConcat(m.(&opt::StrConcatExpr))
 		| &opt::StrFromBytes:
@@ -2716,13 +2716,13 @@ impl useExprMemory {
 	}
 }
 
-fn isExceptionalResult(mut m: compExpr): (fc: &sema::FuncCallExpr) {
+fn isFallibleResult(mut m: compExpr): (fc: &sema::FuncCallExpr) {
 	mut c, mut ok := m.(&sema::CastingExpr)
 	if ok {
 		m = c.Expr.Model
 	}
 	fc, ok := m.(&sema::FuncCallExpr)
-	if !ok || fc.Func.Decl == nil || !fc.Func.Decl.Exceptional {
+	if !ok || fc.Func.Decl == nil || !fc.Func.Decl.Fallible {
 		fc = nil
 	}
 	ret

@@ -54,16 +54,16 @@ struct Func {
 	// It may be nil if function is created by a deferred scope.
 	Token: &token::Token
 
-	Global:      bool
-	Async:       bool
-	Unsafe:      bool
-	Public:      bool
-	Extern:      bool
-	Static:      bool
-	Exceptional: bool
-	HasDefer:    bool // Whether function has at least one deferred scope.
-	Name:        str
-	Directives:  []&ast::Directive
+	Global:     bool
+	Async:      bool
+	Unsafe:     bool
+	Public:     bool
+	Extern:     bool
+	Static:     bool
+	Fallible:   bool
+	HasDefer:   bool // Whether function has at least one deferred scope.
+	Name:       str
+	Directives: []&ast::Directive
 
 	// Scope is the scope of function, aka body.
 	// If this function is created by a deferred scope, the Scope.Deferred will be true.
@@ -270,7 +270,7 @@ impl FuncIns {
 	// If the responsive is true, checks by responsiveness of functions.
 	// See: https://manual.jule.dev/responsiveness/mutability
 	fn EqualFunc(&self, f: &FuncIns, responsive: bool): bool {
-		if self.Decl.Exceptional != f.Decl.Exceptional {
+		if self.Decl.Fallible != f.Decl.Fallible {
 			ret false
 		}
 		if self.Decl.Unsafe != f.Decl.Unsafe {
@@ -429,7 +429,7 @@ impl FuncIns {
 			}
 		}
 		s.WriteByte(')')!
-		if self.Decl != nil && self.Decl.Exceptional {
+		if self.Decl != nil && self.Decl.Fallible {
 			s.WriteByte('!')!
 		}
 		if self.Decl != nil && !self.Decl.IsVoid() {
