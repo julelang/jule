@@ -3073,7 +3073,6 @@ struct missingRetChecker {
 	mut labels:  map[uintptr]int  // memoization for labels, reports state of label's following statements
 	mut fell:    bool             // fall statement seen
 	mut hard:    bool             // hard register, this should be true for the final report
-	mut lead:    &Label           // goto label which is closest one to the root scope
 }
 
 impl missingRetChecker {
@@ -3125,11 +3124,6 @@ impl missingRetChecker {
 		// Goto statement appeared. We have to check statements by label.
 		// Following statements will not be executed, ignore them, if any.
 
-		// Update lead label data. If it is nil, set to g's label.
-		// Otherwise make sure g's label is more close to the root.
-		if self.lead == nil || self.lead.Scope.ChildIndex > g.Label.Scope.ChildIndex {
-			self.lead = g.Label
-		}
 		let mut r: int
 		// If goto jumps down, assume the label is not memoized yet.
 		// Because label is declared below in the code.
@@ -3348,69 +3342,15 @@ impl missingRetChecker {
 
 	// Reports we have infinite iteration, starts from i.
 	fn checkInfinite(*self, it: uintptr, mut s: &Scope, i: int): bool {
-		mut lead := self.lead
 		hard := self.hard
 
-		// Clear lead label data for now.
-		self.lead = nil
+		defer { self.hard = hard }
 
 		// Check scope, but report is not a valid information.
 		// Because checkScope reports false for no-return.
 		// But we look for iteration breaker, not for return.
 		// Just check the scope and collect break statements.
 		self.checkScope(s, i)
-
-		// We have lead label data, check it.
-		if self.lead != nil {
-			// If scopes are same, lead label is in iteration.
-			// Otherwise scopes are different, make them equal.
-			if s.ChildIndex > self.lead.Scope.ChildIndex {
-				// See documentation of the [scopeChecker.checkGoto].
-				mut itsc := s
-				for itsc.ChildIndex-1 > self.lead.Scope.ChildIndex {
-					itsc = itsc.Parent
-				}
-				// Scopes are same now, make sure the goto jumps down before report false.
-				//
-				// Scheme on pseudo AST
-				//	╭──────────────────────╮
-				//	│ fn example() {       │
-				//	│ Foo:                 │
-				//	│     for {            │
-				//	│         if true {    │
-				//	│             goto Foo │ > jumping to Foo is ok, repeats infinite iteration
-				//	│         }            │
-				//	│         goto Bar     │ > jumping to Bar is crucial, it breaks iteration
-				//	│     }                │
-				//	│ Bar:                 │
-				//	│ }                    │
-				//	╰──────────────────────╯
-				if itsc.StmtIndex < self.lead.Index {
-					ret false
-				}
-			}
-			// There is no old lead or the new lead more close to the root scope,
-			// do not fallback to the old lead, because we have report it to parent
-			// infinite loop analysis, if any. This lead might be breaker for it.
-			//
-			// Scheme on pseudo AST
-			//	╭──────────────────────╮
-			//	│ fn example() {       │
-			//	│     for {            │
-			//	│         for {        │
-			//  │             goto Foo │ < jumps to below, out of even the root infinite iteration
-			//	│         }            │   if we clear the current lead, analysis of the root iteration
-			//	│     }                │   will not be aware of it is breaked
-			//	│ Foo:                 │
-			//	│ }                    │
-			//	╰──────────────────────╯
-			if lead == nil || lead.Scope.ChildIndex > self.lead.Scope.ChildIndex {
-				lead = self.lead
-			}
-		}
-
-		self.lead = lead
-		self.hard = hard
 
 		// Time to catch break statements for the iteration.
 		if self.breaked[it] {
