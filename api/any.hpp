@@ -140,16 +140,8 @@ public:
         if (this->operator==(nullptr)) {
             return other.operator==(nullptr);
         }
-
-        if (other.operator==(nullptr)) {
-            return false;
-        }
-
-        if (this->type != other.type) {
-            return false;
-        }
-
-        return this->type->eq(this->data.alloc, other.data.alloc);
+        return other.operator!=(nullptr) && this->type == other.type &&
+               this->type->eq(this->data.alloc, other.data.alloc);
     }
 
     inline __jule_Bool operator!=(const __jule_Any &other) const noexcept {
