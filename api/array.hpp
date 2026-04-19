@@ -57,18 +57,11 @@ public:
         if (start == end) {
             return __jule_Slice<Item>();
         }
-
         __jule_Slice<Item> slice;
         slice.alloc_new(0, end - start);
         slice._len = slice._cap;
-
-        Item *s_it = slice.begin();
-        __jule_Array<Item, N>::ConstIterator a_it = this->begin() + start;
-        __jule_Array<Item, N>::ConstIterator a_end = this->begin() + end;
-        while (a_it < a_end) {
-            *s_it++ = *a_it++;
-        }
-
+        (void)std::copy(this->begin() + start, this->begin() + end,
+                        slice.begin());
         return slice;
     }
 
