@@ -8,8 +8,10 @@
 #ifndef NDEBUG
 #include <limits>
 
-static_assert(std::numeric_limits<float>::is_iec559, "Jule needs IEEE 754 compliance");
-static_assert(std::numeric_limits<double>::is_iec559, "Jule needs IEEE 754 compliance");
+static_assert(std::numeric_limits<float>::is_iec559,
+              "Jule needs IEEE 754 compliance");
+static_assert(std::numeric_limits<double>::is_iec559,
+              "Jule needs IEEE 754 compliance");
 #endif
 
 #include <cstddef>

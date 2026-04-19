@@ -17,13 +17,16 @@
 #define __JULE_OS_UNIX
 #endif
 
-#if defined(__amd64) || defined(__amd64__) || defined(__x86_64) || defined(__x86_64__) || defined(_M_AMD64)
+#if defined(__amd64) || defined(__amd64__) || defined(__x86_64) ||             \
+    defined(__x86_64__) || defined(_M_AMD64)
 #define __JULE_ARCH_AMD64
-#elif defined(__arm__) || defined(__thumb__) || defined(_M_ARM) || defined(__arm)
+#elif defined(__arm__) || defined(__thumb__) || defined(_M_ARM) ||             \
+    defined(__arm)
 #define __JULE_ARCH_ARM
 #elif defined(__aarch64__)
 #define __JULE_ARCH_ARM64
-#elif defined(i386) || defined(__i386) || defined(__i386__) || defined(_X86_) || defined(__I86__) || defined(__386)
+#elif defined(i386) || defined(__i386) || defined(__i386__) ||                 \
+    defined(_X86_) || defined(__I86__) || defined(__386)
 #define __JULE_ARCH_I386
 #endif
 

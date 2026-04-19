@@ -6,18 +6,15 @@
 #define __JULE_FN_HPP
 
 #include <cstddef>
-#include <thread>
 
-#include "runtime.hpp"
-#include "types.hpp"
 #include "error.hpp"
 #include "ptr.hpp"
+#include "runtime.hpp"
 #include "str.hpp"
+#include "types.hpp"
 
 // Anonymous function / closure wrapper of julec.
-template <typename Ret, typename... Args>
-struct __jule_Fn
-{
+template <typename Ret, typename... Args> struct __jule_Fn {
 public:
     Ret (*f)(void *, Args...) = nullptr;
     __jule_Ptr<__jule_Uintptr> ctx; // Closure ctx.
@@ -27,16 +24,11 @@ public:
     __jule_Fn(const __jule_Fn<Ret, Args...> &) = default;
     __jule_Fn(std::nullptr_t) noexcept : __jule_Fn() {}
 
-    __jule_Fn(Ret (*f)(void *, Args...)) noexcept
-    {
-        this->f = f;
-    }
+    __jule_Fn(Ret (*f)(void *, Args...)) noexcept { this->f = f; }
 
-    void dealloc(void) noexcept
-    {
+    void dealloc(void) noexcept {
         this->f = nullptr;
-        if (this->ctxHandler)
-        {
+        if (this->ctxHandler) {
             this->ctxHandler(this->ctx);
             this->ctxHandler = nullptr;
         }
@@ -44,44 +36,35 @@ public:
         this->ctx = nullptr;     // Assign to nullptr safely.
     }
 
-    ~__jule_Fn(void) noexcept
-    {
-        this->dealloc();
-    }
+    ~__jule_Fn(void) noexcept { this->dealloc(); }
 
-    inline __jule_Fn<Ret, Args...> &must_ok(const char *file) noexcept
-    {
+    inline __jule_Fn<Ret, Args...> &must_ok(const char *file) noexcept {
 #ifndef __JULE_DISABLE__SAFETY
-        if (this->f == nullptr)
-        {
-            __jule_panicStr(__jule_Str(__JULE_ERROR__INVALID_MEMORY "\nfile: ") + file);
+        if (this->f == nullptr) {
+            __jule_panicStr(
+                __jule_Str(__JULE_ERROR__INVALID_MEMORY "\nfile: ") + file);
         }
 #endif // SAFETY
         return *this;
     }
 
-    template <typename... Arguments>
-    Ret call(Args... args) noexcept
-    {
+    template <typename... Arguments> Ret call(Args... args) noexcept {
         return this->f((void *)(this->ctx.alloc), args...);
     }
 
-    inline auto operator()(Args... args)
-    {
+    inline auto operator()(Args... args) {
         return this->call<Args...>(args...);
     }
 
-    inline __jule_Fn<Ret, Args...> &operator=(std::nullptr_t) noexcept
-    {
+    inline __jule_Fn<Ret, Args...> &operator=(std::nullptr_t) noexcept {
         this->dealloc();
         return *this;
     }
 
-    inline __jule_Fn<Ret, Args...> &operator=(const __jule_Fn<Ret, Args...> &f)
-    {
+    inline __jule_Fn<Ret, Args...> &
+    operator=(const __jule_Fn<Ret, Args...> &f) {
         // Assignment to itself.
-        if (this->ctx.alloc == f.ctx.alloc)
-        {
+        if (this->ctx.alloc == f.ctx.alloc) {
             this->f = f.f;
             this->ctxHandler = f.ctxHandler;
             return *this;
@@ -93,8 +76,7 @@ public:
         return *this;
     }
 
-    inline __jule_Fn<Ret, Args...> &operator=(__jule_Fn<Ret, Args...> &&f)
-    {
+    inline __jule_Fn<Ret, Args...> &operator=(__jule_Fn<Ret, Args...> &&f) {
         this->dealloc();
         this->ctx = std::move(f.ctx);
         this->f = f.f;
@@ -102,25 +84,23 @@ public:
         return *this;
     }
 
-    constexpr __jule_Bool operator==(std::nullptr_t) const noexcept
-    {
+    constexpr __jule_Bool operator==(std::nullptr_t) const noexcept {
         return this->f == nullptr;
     }
 
-    constexpr __jule_Bool operator!=(std::nullptr_t) const noexcept
-    {
+    constexpr __jule_Bool operator!=(std::nullptr_t) const noexcept {
         return !this->operator==(nullptr);
     }
 
-    inline operator __jule_Uintptr(void) const noexcept
-    {
+    inline operator __jule_Uintptr(void) const noexcept {
         return (__jule_Uintptr)(this->f);
     }
 };
 
 template <typename Ret, typename... Args>
-__jule_Fn<Ret, Args...> __jule_new_closure(void *fn, __jule_Ptr<__jule_Uintptr> ctx, void (*ctxHandler)(__jule_Ptr<__jule_Uintptr> &)) noexcept
-{
+__jule_Fn<Ret, Args...>
+__jule_new_closure(void *fn, __jule_Ptr<__jule_Uintptr> ctx,
+                   void (*ctxHandler)(__jule_Ptr<__jule_Uintptr> &)) noexcept {
     __jule_Fn<Ret, Args...> fn2((Ret (*)(void *, Args...))fn);
     fn2.ctx = std::move(ctx);
     fn2.ctxHandler = ctxHandler;

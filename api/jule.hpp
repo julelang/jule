@@ -16,16 +16,16 @@ CONFIGURATION DEFINES
 #ifndef __JULE_HPP
 #define __JULE_HPP
 
-#include "runtime.hpp"
-#include "async.hpp"
-#include "impl_flag.hpp"
 #include "any.hpp"
 #include "array.hpp"
+#include "async.hpp"
 #include "error.hpp"
 #include "fallible.hpp"
 #include "fn.hpp"
+#include "impl_flag.hpp"
 #include "platform.hpp"
 #include "ptr.hpp"
+#include "runtime.hpp"
 #include "slice.hpp"
 #include "str.hpp"
 #include "types.hpp"
