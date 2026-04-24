@@ -272,7 +272,7 @@ impl Cmd {
 		stdout := self.childStdout()?
 		stderr := self.childStderr()?
 		self.spawn(path, stdin, stdout, stderr)?
-		atomic::Store(&self.started, 1, atomic::Relaxed)
+		atomic::Store(&self.started, 1, atomic::Release)
 		started = true
 	}
 
@@ -291,7 +291,7 @@ impl Cmd {
 		}
 		self.parentIOFiles = nil
 		self.stdin, self.stdout, self.stderr = nil, nil, nil
-		atomic::Store(&self.started, 0, atomic::Relaxed)
+		atomic::Store(&self.started, 0, atomic::Release)
 	}
 
 	// Waits for the command to exit.
@@ -306,6 +306,15 @@ impl Cmd {
 		c := self.wait()?
 		self.clean()?
 		ret c
+	}
+
+	// Kills the command.
+	// The command must have been started by [Cmd.Start].
+	fn Kill(*self)! {
+		if atomic::Load(&self.started, atomic::Acquire) == 0 {
+			panic("std/os: Cmd.Kill: command is not started")
+		}
+		self.kill()?
 	}
 
 	// Returns command-line arguments to start command.
