@@ -90,8 +90,16 @@ impl FD {
 			part := buf[n:max]
 			nn := ignoringEINTRIO2(sys::Write, int(self.File), part) else {
 				if error == sys::EAGAIN && self.pollable {
-					self.WaitWrite().await?
+					self.WaitWrite().await else {
+						if n > 0 {
+							ret n
+						}
+						throw error
+					}
 					continue
+				}
+				if n > 0 {
+					ret n
 				}
 				throw error
 			}
@@ -135,7 +143,12 @@ impl FD {
 				max = n + maxRW
 			}
 			part := buf[n:max]
-			nn := ignoringEINTRIO2(sys::Write, int(self.File), part)?
+			nn := ignoringEINTRIO2(sys::Write, int(self.File), part) else {
+				if n > 0 {
+					ret n
+				}
+				throw error
+			}
 			if nn == 0 {
 				throw io::ErrUnexpectedEOF
 			}

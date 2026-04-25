@@ -128,15 +128,30 @@ impl FD {
 			mut nn := 0
 			match {
 			| self.Flags&Console != 0:
-				nn = self.writeConsole(b)?
+				nn = self.writeConsole(b) else {
+					if n > 0 {
+						ret n
+					}
+					throw error
+				}
 			| self.Flags&(File|Pipe) != 0:
-				nn = self.writeFile(b)?
+				nn = self.writeFile(b) else {
+					if n > 0 {
+						ret n
+					}
+					throw error
+				}
 			| self.Flags&(Socket|SocketNoConn) != 0:
 				mut &o := &self.wop
 				o.InitBuf(b)
 				nn = execIO(o, fn|mut o| {
 					sys::WSASend(sys::Handle(o.fd.File), &o.buf, 1, &o.qty, 0, &o.o, nil)?
-				}).await?
+				}).await else {
+					if n > 0 {
+						ret n
+					}
+					throw error
+				}
 			|:
 				panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Write")
 			}
@@ -164,9 +179,19 @@ impl FD {
 			mut nn := 0
 			match {
 			| self.Flags&Console != 0:
-				nn = self.writeConsole(b)?
+				nn = self.writeConsole(b) else {
+					if n > 0 {
+						ret n
+					}
+					throw error
+				}
 			| self.Flags&(File|Pipe) != 0:
-				nn = self.writeFile(b)?
+				nn = self.writeFile(b) else {
+					if n > 0 {
+						ret n
+					}
+					throw error
+				}
 			| self.Flags&(Socket|SocketNoConn) != 0:
 				panic("unsupported")
 			|:
@@ -212,7 +237,12 @@ impl FD {
 			n += execIO(o, fn|mut o| {
 				&sa := unsafe { &(*(*sys::RawSockaddrAny)(o.sa)) }
 				sys::WSASendto(sys::Handle(o.fd.File), &o.buf, 1, &o.qty, 0, sa, i32(addrLen), &o.o, nil)?
-			}).await?
+			}).await else {
+				if n > 0 {
+					ret n
+				}
+				throw error
+			}
 			if n == len(buf) {
 				ret
 			}
@@ -226,7 +256,6 @@ impl FD {
 	}
 
 	// Writes buf to file handle, returns written byte count.
-	// Returns -1 if error occurred.
 	fn writeFile(mut *self, mut buf: []byte)!: (n: int) {
 		ret sys::WriteFile(sys::Handle(self.File), buf) else {
 			if self.Flags&Pipe != 0 && error == sys::ERROR_OPERATION_ABORTED {
@@ -240,7 +269,6 @@ impl FD {
 	}
 
 	// Writes buf to console handle, returns written byte count.
-	// Returns -1 if error occurred.
 	fn writeConsole(mut *self, mut buf: []byte)!: (n: int) {
 		n = len(buf)
 		mut runes := make([]rune, 0, 256)
