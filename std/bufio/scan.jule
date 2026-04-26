@@ -215,16 +215,18 @@ impl Scanner {
 				self.start = 0
 			}
 			// Finally we can read some input
-			n := self.r.Read(self.buf[self.end:]).await?
-			if n == io::EOF {
-				// Read buffer should not be empty.
-				// So, by documentation of the io::Reader,
-				// the zero read count means EOF.
-				self.state |= scanEOF
-				// If there is data in the buffer, give the splitter function
-				// a chance to handle data with EOF state. So, do not return here.
-				// Let next iteration step handle this case.
-				continue
+			n := self.r.Read(self.buf[self.end:]).await else {
+				if error == io::EOF {
+					// Read buffer should not be empty.
+					// So, by documentation of the io::Reader,
+					// the zero read count means EOF.
+					self.state |= scanEOF
+					// If there is data in the buffer, give the splitter function
+					// a chance to handle data with EOF state. So, do not return here.
+					// Let next iteration step handle this case.
+					continue
+				}
+				throw error
 			}
 			if n < 0 || len(self.buf)-self.end < n {
 				throw ErrBadReadCount

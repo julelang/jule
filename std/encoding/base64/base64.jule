@@ -559,8 +559,7 @@ impl io::WriteCloser for encoder {
 
 struct decoder {
 	err:     any
-	readErr: any  // error from r.Read
-	readEOF: bool // EOF status of r.Read
+	readErr: any // error from r.Read
 	enc:     &Encoding
 	r:       io::Reader
 	buf:     [1024]byte // leftover input
@@ -581,9 +580,6 @@ impl io::Reader for decoder {
 		if self.err != nil {
 			unsafe throw self.err
 		}
-		if self.readEOF {
-			ret io::EOF
-		}
 
 		// This code assumes that self.r strips supported whitespace ('\r' and '\n').
 
@@ -591,7 +587,7 @@ impl io::Reader for decoder {
 		mut outbuf := unsafe::Slice(&self.outbuf[0], len(self.outbuf), len(self.outbuf))
 
 		// Refill buffer.
-		for self.nbuf < 4 && self.readErr == nil && !self.readEOF {
+		for self.nbuf < 4 && self.readErr == nil {
 			mut nn := len(p) / 3 * 4
 			if nn < 4 {
 				nn = 4
@@ -599,14 +595,9 @@ impl io::Reader for decoder {
 			if nn > len(buf) {
 				nn = len(buf)
 			}
-			nn = self.r.Read(buf[self.nbuf:nn]).await else {
+			self.nbuf += self.r.Read(buf[self.nbuf:nn]).await else {
 				self.readErr = error
-				use 0
-			}
-			if nn != io::EOF {
-				self.nbuf += nn
-			} else {
-				self.readEOF = true
+				break
 			}
 		}
 
@@ -629,7 +620,7 @@ impl io::Reader for decoder {
 				}
 			}
 			self.err = self.readErr
-			if self.readEOF && self.nbuf > 0 {
+			if self.err == io::EOF && self.nbuf > 0 {
 				self.err = io::ErrUnexpectedEOF
 			}
 			unsafe throw self.err
@@ -712,7 +703,7 @@ struct newlineFilteringReader {
 impl io::Reader for newlineFilteringReader {
 	async fn Read(mut *self, mut p: []byte)!: int {
 		mut n := self.wrapped.Read(p).await?
-		for n != io::EOF && n > 0 {
+		for n > 0 {
 			mut offset := 0
 			for i, b in p[:n] {
 				if b != '\r' && b != '\n' {

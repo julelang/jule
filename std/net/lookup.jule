@@ -305,15 +305,15 @@ async fn lookupParallel(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype1: u
 	read := async fn(mut &buf: *[]byte, mut &results: *[]IPAddr): (id: u16, ok: bool) {
 		let mut n: int
 		if conf.useTCP {
-			n = io::ReadFull(conn, (*buf)[:bigEndianU16Size]).await else { use io::EOF }
+			n = io::ReadFull(conn, (*buf)[:bigEndianU16Size]).await else { use 0 }
 			if n > 0 {
 				ln := binary::BigEndian.DecodeU16((*buf)[:bigEndianU16Size])
 				growBuffer(buf, int(ln))
-				n = io::ReadFull(conn, *buf).await else { use io::EOF }
+				n = io::ReadFull(conn, *buf).await else { use 0 }
 			}
 		} else {
 			for {
-				n = conn.Read((*buf)[:maxDNSPacketSize]).await else { use io::EOF }
+				n = conn.Read((*buf)[:maxDNSPacketSize]).await else { use 0 }
 				break
 			}
 		}
@@ -389,14 +389,14 @@ async fn lookupSingle(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype: u16,
 
 		let mut n: int
 		if conf.useTCP {
-			n = io::ReadFull(conn, (*buf)[:bigEndianU16Size]).await else { use io::EOF }
+			n = io::ReadFull(conn, (*buf)[:bigEndianU16Size]).await else { use 0 }
 			if n > 0 {
 				ln := binary::BigEndian.DecodeU16((*buf)[:bigEndianU16Size])
 				growBuffer(buf, int(ln))
-				n = io::ReadFull(conn, *buf).await else { use io::EOF }
+				n = io::ReadFull(conn, *buf).await else { use 0 }
 			}
 		} else {
-			n = conn.Read((*buf)[:maxDNSPacketSize]).await else { use io::EOF }
+			n = conn.Read((*buf)[:maxDNSPacketSize]).await else { use 0 }
 		}
 		if n <= 0 {
 			continue

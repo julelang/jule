@@ -121,10 +121,12 @@ async fn ReadFile(path: str)!: []byte {
 
 	mut data := make([]byte, 0, size)
 	for {
-		n := f.Read(data[len(data):cap(data)]).await?
-		if n == io::EOF {
-			f.Close().await?
-			ret data
+		n := f.Read(data[len(data):cap(data)]).await else {
+			if error == io::EOF {
+				f.Close().await?
+				ret data
+			}
+			throw error
 		}
 		data = data[:len(data)+n]
 		if len(data) >= cap(data) {
@@ -160,10 +162,12 @@ fn ReadFileSync(path: str)!: []byte {
 
 	mut data := make([]byte, 0, size)
 	for {
-		n := f.ReadSync(data[len(data):cap(data)])?
-		if n == io::EOF {
-			f.CloseSync()?
-			ret data
+		n := f.ReadSync(data[len(data):cap(data)]) else {
+			if error == io::EOF {
+				f.CloseSync()?
+				ret data
+			}
+			throw error
 		}
 		data = data[:len(data)+n]
 		if len(data) >= cap(data) {

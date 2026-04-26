@@ -44,21 +44,11 @@ impl TCPConn {
 	// If the buffer is larger than the number of bytes that can be read,
 	// the buffer will not cause an overflow.
 	// It will panic if connection is closed.
-	// If connection is closed by server, it returns zero and sets connection
-	// state as closed. So if you try read again, function will panic because of
-	// connection state is closed.
 	async fn Read(mut *self, mut buf: []byte)!: int {
 		if self.fd == nil {
 			panic("net: TCPConn.Read: connection is closed")
 		}
-		if len(buf) == 0 {
-			ret 0
-		}
-		n := self.fd.Read(buf).await?
-		if n == io::EOF {
-			self.Close().await!
-		}
-		ret n
+		ret self.fd.Read(buf).await?
 	}
 
 	// Writes bytes to connection and returns written byte count.

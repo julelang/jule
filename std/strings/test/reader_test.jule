@@ -25,8 +25,8 @@ fn testReader(t: &testing::T) {
 		{seek: io::SeekStart, off: 1, n: 1, want: "1"},
 		{seek: io::SeekCurrent, off: 1, wantpos: 3, n: 2, want: "34"},
 		{seek: io::SeekStart, off: -1, seekerr: "strings::Reader.Seek: negative position"},
-		{seek: io::SeekStart, off: 1 << 33, wantpos: 1 << 33},
-		{seek: io::SeekCurrent, off: 1, wantpos: 1<<33 + 1},
+		{seek: io::SeekStart, off: 1 << 33, wantpos: 1 << 33, readerr: io::EOF},
+		{seek: io::SeekCurrent, off: 1, wantpos: 1<<33 + 1, readerr: io::EOF},
 		{seek: io::SeekStart, n: 5, want: "01234"},
 		{seek: io::SeekCurrent, n: 5, want: "56789"},
 		{seek: io::SeekEnd, off: -1, n: 1, wantpos: 9, want: "9"},
@@ -56,9 +56,6 @@ fn testReader(t: &testing::T) {
 			err = error
 			use 0
 		}
-		if n == io::EOF {
-			n = 0
-		}
 		if err != tt.readerr {
 			t.Errorf("{}. read = {}; want {}", i, err, tt.readerr)
 			continue
@@ -83,15 +80,19 @@ fn testReadAfterBigSeek(t: &testing::T) {
 	err = nil
 	n := r.Read(make([]byte, 10)) else {
 		err = error
-		use io::EOF
+		use -1
 	}
-	if n != io::EOF {
+	if err != io::EOF {
 		t.Errorf("Read = {}, {}; want EOF", n, err)
-	} else {
-		z := r.Read(make([]byte, 10)) else { use io::EOF }
-		if z != io::EOF {
-			t.Errorf("Read = {}, {}; want EOF", n, err)
-		}
+		ret
+	}
+	err = nil
+	z := r.Read(make([]byte, 10)) else {
+		err = error
+		use -1
+	}
+	if err != io::EOF {
+		t.Errorf("Read = {}, {}; want EOF", z, err)
 	}
 }
 
@@ -109,7 +110,7 @@ fn testReaderAt(t: &testing::T) {
 		{0, 10, "0123456789", nil},
 		{1, 10, "123456789", nil},
 		{1, 9, "123456789", nil},
-		{11, 10, "", nil},
+		{11, 10, "", io::EOF},
 		{0, 0, "", nil},
 		{-1, 0, "", "strings::Reader.ReadAt: negative offset"},
 	])
@@ -119,9 +120,6 @@ fn testReaderAt(t: &testing::T) {
 		mut rn := r.ReadAt(b, tt.off) else {
 			err = error
 			use 0
-		}
-		if rn == io::EOF {
-			rn = 0
 		}
 		got := str(b[:rn])
 		if got != tt.want {

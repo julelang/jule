@@ -276,12 +276,13 @@ impl encoder {
 }
 
 struct decoder {
-	r:      io::Reader
-	eof:    bool
-	buf:    []byte // leftover input
-	nbuf:   int
-	out:    []byte // leftover decoded output
-	outbuf: []byte
+	err:     any
+	readErr: any
+	r:       io::Reader
+	buf:     []byte // leftover input
+	nbuf:    int
+	out:     []byte // leftover decoded output
+	outbuf:  []byte
 }
 
 impl io::Reader for decoder {
@@ -289,8 +290,8 @@ impl io::Reader for decoder {
 		if len(p) == 0 {
 			ret 0
 		}
-		if self.eof {
-			ret io::EOF
+		if self.err != nil {
+			unsafe throw self.err
 		}
 		for {
 			// Copy leftover output from last decode.
@@ -301,9 +302,12 @@ impl io::Reader for decoder {
 			}
 
 			// Decode leftover input from last read.
-			mut nn, mut nsrc, mut ndst := 0, 0, 0
+			mut nsrc, mut ndst := 0, 0
 			if self.nbuf > 0 {
-				ndst, nsrc = Decode(self.outbuf, self.buf[:self.nbuf], true)?
+				ndst, nsrc = Decode(self.outbuf, self.buf[:self.nbuf], self.readErr != nil) else {
+					self.err = error
+					unsafe throw self.err
+				}
 				if ndst > 0 {
 					self.out = self.outbuf[:ndst]
 					self.nbuf = copy(self.buf, self.buf[nsrc:self.nbuf])
@@ -323,16 +327,17 @@ impl io::Reader for decoder {
 					self.nbuf = off
 				}
 			}
-			if self.eof {
-				ret io::EOF
+
+			// Out of input, out of decoded output. Check errors.
+			if self.readErr != nil {
+				self.err = self.readErr
+				unsafe throw self.err
 			}
 
 			// Read more data.
-			nn = self.r.Read(self.buf[self.nbuf:]).await?
-			if nn == io::EOF {
-				self.eof = true
-			} else {
-				self.nbuf += nn
+			self.nbuf += self.r.Read(self.buf[self.nbuf:]).await else {
+				self.readErr = error
+				use 0
 			}
 		}
 	}

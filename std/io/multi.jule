@@ -6,7 +6,7 @@ struct eofReader{}
 
 impl Reader for eofReader {
 	async fn Read(*self, []byte)!: int {
-		ret EOF
+		throw EOF
 	}
 }
 
@@ -25,24 +25,30 @@ impl Reader for multiReader {
 					continue
 				}
 			}
-			n = self.readers[0].Read(p).await?
-			if n == EOF {
-				// Use eofReader instead of nil to avoid nil panic
-				// after performing flatten (Go's issue 18232).
-				self.readers[0] = eofReader{}
-				self.readers = self.readers[1:]
-				// Don't return EOF yet. More readers remain.
-			} else if n > 0 {
+			n = self.readers[0].Read(p).await else {
+				if error == EOF {
+					// Use eofReader instead of nil to avoid nil panic
+					// after performing flatten (Go's issue 18232).
+					self.readers[0] = eofReader{}
+					self.readers = self.readers[1:]
+					if len(self.readers) > 0 {
+						// Don't throw EOF yet. More readers remain.
+						continue
+					}
+				}
+				throw error
+			}
+			if n > 0 {
 				ret
 			}
 		}
-		ret EOF
+		throw EOF
 	}
 }
 
 // Returns a Reader that's the logical concatenation of
 // the provided input readers. They're read sequentially. Once all
-// inputs have returned EOF, Read will return EOF.  If any of the readers
+// inputs have throw EOF, Read will throw EOF.  If any of the readers
 // return a non-nil, non-EOF error, Read will return that error.
 fn MultiReader(mut readers: ...Reader): Reader {
 	mut r := make([]Reader, len(readers))

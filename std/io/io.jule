@@ -11,9 +11,6 @@ const (
 	SeekEnd     = 2 // seek relative to the end
 )
 
-// EOF read count for the Reader trait.
-const EOF = -1
-
 // Implements the basic Read method.
 //
 // Reads up to len(buf) bytes into buf. It returns the number of bytes
@@ -23,9 +20,8 @@ const EOF = -1
 // returns what is available instead of waiting for more.
 //
 // If len(buf) == 0, Read should always return n == 0.
-// Implementations of Read are should return io::EOF for EOF.
-// If len(buf) != 0 and EOF reached, should return io::EOF to represent EOF.
-// Negative read count values are undefined, but io::EOF may be negative.
+// Implementations of Read are should throw io::EOF for EOF.
+// If len(buf) != 0 and EOF reached, should throw io::EOF to represent EOF.
 //
 // The Read method mutable because implementation may should do mutable operations,
 // or this method may called needed from the mutable method, which is not cannot be internally mutable.
@@ -64,7 +60,7 @@ trait StrWriter {
 // Implements the basic ReadByte method.
 //
 // It should read byte and return one for n without throwing error if success.
-// It should return n as io:EOF for EOF, the EOF byte is implementation-dependent.
+// It should throw io:EOF for EOF.
 // If read failed, should throw error.
 //
 // The ReadByte method mutable because of same reasons of the `Reader` trait.
@@ -100,7 +96,7 @@ trait ByteWriter {
 //
 // It reads a single encoded Unicode character
 // and returns the rune and its size in bytes.
-// It should return size as io::EOF for EOF, the EOF rune is implementation-dependent.
+// It should throw io:EOF for EOF.
 //
 // The ReadRune method mutable because of same reasons of the `Reader` trait.
 //
@@ -163,7 +159,7 @@ trait Closer {
 // the data is available or an error occurs.
 // In this respect ReadAt is different from Read.
 //
-// It should return io::EOF for EOF.
+// It should throw io:EOF for EOF.
 //
 // If it is reading from an input source with a seek offset,
 // it should not affect nor be affected by the underlying
@@ -186,7 +182,7 @@ trait ReaderAt {
 // The return value n is the number of bytes read.
 // Any error encountered during the read is also forwarded.
 //
-// It should return io::EOF for EOF.
+// It should throw io:EOF for EOF.
 trait ReaderFrom {
 	async fn ReadFrom(mut *self, mut r: Reader)!: (n: i64)
 }
@@ -296,7 +292,7 @@ let mut Discard = discard{}
 // Reads from R but limits the amount of
 // data returned to just N bytes. Each call to Read
 // updates N to reflect the new amount remaining.
-// Read returns EOF when N <= 0 or when the underlying R returns EOF.
+// Read throws EOF when N <= 0 or when the underlying R throws EOF.
 struct LimitedReader {
 	R: Reader // underlying reader
 	N: i64    // max bytes remaining
@@ -311,15 +307,13 @@ impl LimitedReader {
 impl Reader for LimitedReader {
 	async fn Read(mut *self, mut p: []byte)!: (n: int) {
 		if self.N <= 0 {
-			ret EOF
+			throw EOF
 		}
 		if i64(len(p)) > self.N {
 			p = p[0:self.N]
 		}
 		n = self.R.Read(p).await?
-		if n != EOF {
-			self.N -= i64(n)
-		}
+		self.N -= i64(n)
 		ret
 	}
 }
@@ -356,9 +350,7 @@ async fn CopyN(mut dst: Writer, mut src: Reader, n: i64)!: (written: i64) {
 
 // Copies from src to dst until either EOF is reached
 // on src or an error occurs. It returns the number of bytes
-// copied and the first error encountered while copying, if any.
-//
-// Forwards any error and may be throw InvalidWrite or ShortWrite.
+// copied, if any. Otherwise, if throws the error, if any.
 async fn Copy(mut dst: Writer, mut src: Reader)!: (written: i64) {
 	ret copyBuffer(dst, src, nil).await?
 }
@@ -381,12 +373,19 @@ async fn copyBuffer(mut dst: Writer, mut src: Reader, mut buf: []byte)!: (writte
 		buf = make([]byte, 32*1024)
 	}
 	for {
-		nr := src.Read(buf).await?
-		if nr == EOF {
-			break
+		nr := src.Read(buf).await else {
+			if error == EOF {
+				break
+			}
+			throw error
 		}
 		if nr > 0 {
-			nw := dst.Write(buf[0:nr]).await?
+			nw := dst.Write(buf[0:nr]).await else {
+				if written > 0 {
+					break
+				}
+				throw error
+			}
 			if nw < 0 || nr < nw {
 				throw errInvalidWrite
 			}
@@ -427,14 +426,14 @@ async fn ReadAll(mut r: Reader)!: []byte {
 	let mut finalSize: int
 	for {
 		n := r.Read(b[len(b):cap(b)]).await else {
+			if error == EOF {
+				break
+			}
 			// If any data was read, ignore the error and return the data.
 			if len(chunks) > 0 || len(b) > 0 {
 				break
 			}
 			throw error
-		}
-		if n == EOF {
-			break
 		}
 		b = b[:len(b)+n]
 		if cap(b)-len(b) < cap(b)/16 {
@@ -472,20 +471,15 @@ async fn ReadAtLeast(mut r: Reader, mut buf: []byte, min: int)!: (n: int) {
 		throw ErrShortBuffer
 	}
 	for n < min {
-		rn := r.Read(buf[n:]).await else {
+		n += r.Read(buf[n:]).await else {
 			if n >= min {
 				ret n
 			}
-			throw error
-		}
-		if rn == EOF {
-			if n > 0 {
+			if n > 0 && error == EOF {
 				throw ErrUnexpectedEOF
 			}
-			n = EOF
-			break
+			throw error
 		}
-		n += rn
 	}
 	ret
 }

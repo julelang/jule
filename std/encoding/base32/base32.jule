@@ -450,6 +450,7 @@ fn NewEncoder(mut enc: &Encoding, mut w: io::Writer): io::WriteCloser {
 }
 
 struct decoder {
+	err:    any
 	enc:    &Encoding
 	r:      io::Reader
 	end:    bool       // saw end of message
@@ -461,19 +462,21 @@ struct decoder {
 
 async fn readEncodedData(mut r: io::Reader, mut buf: []byte, min: int, expectsPadding: bool)!: (n: int) {
 	for n < min {
-		nn := r.Read(buf[n:]).await?
-		if nn == io::EOF {
-			// Data was read, less than min bytes could be read.
-			if n < min && n > 0 {
-				throw io::ErrUnexpectedEOF
+		nn := r.Read(buf[n:]).await else {
+			if error == io::EOF {
+				// Data was read, less than min bytes could be read.
+				if n < min && n > 0 {
+					throw io::ErrUnexpectedEOF
+				}
+				// No data was read, the buffer already contains some data
+				// when padding is disabled this is not an error, as the message can be of
+				// any length.
+				if expectsPadding && min < 8 && n == 0 {
+					throw io::ErrUnexpectedEOF
+				}
+				break
 			}
-			// No data was read, the buffer already contains some data
-			// when padding is disabled this is not an error, as the message can be of
-			// any length.
-			if expectsPadding && min < 8 && n == 0 {
-				throw io::ErrUnexpectedEOF
-			}
-			break
+			throw error
 		}
 		n += nn
 	}
@@ -490,6 +493,10 @@ impl io::Reader for decoder {
 				ret n
 			}
 			ret n
+		}
+
+		if self.err != nil {
+			unsafe throw self.err
 		}
 
 		// Read a chunk.
@@ -514,10 +521,11 @@ impl io::Reader for decoder {
 
 		mut buf := unsafe::Slice(&self.buf[0], len(self.buf), len(self.buf))
 
-		nn = readEncodedData(self.r, buf[self.nbuf:nn], min, expectsPadding).await?
-		if nn != io::EOF {
-			self.nbuf += nn
+		nn = readEncodedData(self.r, buf[self.nbuf:nn], min, expectsPadding).await else {
+			self.err = error
+			unsafe throw self.err
 		}
+		self.nbuf += nn
 		if nn > 0 && self.end {
 			throw CorruptInputError(0)
 		}
@@ -534,12 +542,18 @@ impl io::Reader for decoder {
 		if nw > len(p) {
 			mut outbuf := unsafe::Slice(&self.outbuf[0], len(self.outbuf), len(self.outbuf))
 
-			nw, self.end = self.enc.decode(outbuf[0:], buf[0:nr])?
+			nw, self.end = self.enc.decode(outbuf[0:], buf[0:nr]) else {
+				self.err = error
+				unsafe throw self.err
+			}
 			self.out = outbuf[0:nw]
 			n = copy(p, self.out)
 			self.out = self.out[n:]
 		} else {
-			n, self.end = self.enc.decode(p, buf[0:nr])?
+			n, self.end = self.enc.decode(p, buf[0:nr]) else {
+				self.err = error
+				unsafe throw self.err
+			}
 		}
 		self.nbuf -= nr
 		mut i := 0

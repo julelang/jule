@@ -27,11 +27,11 @@ async fn testOneByteReader_nonEmptyReader(t: &testing::T) {
 	mut i := 0
 	for ; i++ {
 		n = obr.Read(b).await else {
+			if error == io::EOF {
+				break
+			}
 			t.Errorf("unexpected error: {}", error)
 			ret
-		}
-		if n == io::EOF {
-			break
 		}
 		g, w := n, 1
 		if g != w {
@@ -61,12 +61,12 @@ async fn testOneByteReader_emptyReader(t: &testing::T) {
 
 	b = make([]byte, 5)
 	n = obr.Read(b).await else {
-		t.Errorf("unexpected error: {}", error)
+		if error != io::EOF {
+			t.Errorf("unexpected error: {}, expected EOF", error)
+		}
 		ret
 	}
-	if n != io::EOF {
-		t.Errorf("expected EOF, got: {}", n)
-	}
+	t.Errorf("expected EOF, found {}", n)
 }
 
 #test
@@ -90,11 +90,11 @@ async fn testHalfReader_nonEmptyReader(t: &testing::T) {
 	mut i := 0
 	for ; i++ {
 		n = obr.Read(b).await else {
+			if error == io::EOF {
+				break
+			}
 			t.Errorf("unexpected error: {}", error)
 			ret
-		}
-		if n == io::EOF {
-			break
 		}
 		g, w := n, 1
 		if g != w {
@@ -115,19 +115,25 @@ async fn testHalfReader_emptyReader(t: &testing::T) {
 	mut obr := HalfReader(r.Async())
 	let mut b: []byte
 	mut n := obr.Read(b).await else {
-		t.Errorf("unexpected error: {}", error)
-		ret
+		if error != io::EOF {
+			t.Errorf("expected EOF, unexpected error: {}", error)
+			ret
+		}
+		use -1
 	}
-	if n != io::EOF {
+	if n != -1 {
 		t.Errorf("Empty buffer read returned n={}", n)
 	}
 
 	b = make([]byte, 5)
 	n = obr.Read(b).await else {
-		t.Errorf("unexpected error: {}", error)
-		ret
+		if error != io::EOF {
+			t.Errorf("unexpected error: {}", error)
+			ret
+		}
+		use -1
 	}
-	if n != io::EOF {
+	if n != -1 {
 		t.Errorf("expected EOF, got: {}", n)
 	}
 }
@@ -143,17 +149,17 @@ async fn testDataErrReader_nonEmptyReader(t: &testing::T) {
 	mut got := new(strings::Builder)
 	for {
 		n := der.Read(b).await else {
+			if error == io::EOF {
+				break
+			}
 			t.Errorf("unexpected error: {}", error)
 			ret
-		}
-		if n == io::EOF {
-			break
 		}
 		got.Write(b[:n])!
 	}
 	g, w := got.Str(), "Hello, World!"
 	if g != w {
-		t.Errorf("Read mismatch\n\tGot:  {\n\tWant: {}", g, w)
+		t.Errorf("Read mismatch\n\tGot:  {}\n\tWant: {}", g, w)
 	}
 }
 
@@ -164,19 +170,25 @@ async fn testDataErrReader_emptyReader(t: &testing::T) {
 	mut der := DataErrReader(r.Async())
 	let mut b: []byte
 	mut n := der.Read(b).await else {
-		t.Errorf("unexpected error: {}", error)
-		ret
+		if error != io::EOF {
+			t.Errorf("unexpected error: {}", error)
+			ret
+		}
+		use -1
 	}
-	if n != io::EOF {
+	if n != -1 {
 		t.Errorf("Empty buffer read returned n={}", n)
 	}
 
 	b = make([]byte, 5)
 	n = der.Read(b).await else {
-		t.Errorf("unexpected error: {}", error)
-		ret
+		if error != io::EOF {
+			t.Errorf("unexpected error: {}", error)
+			ret
+		}
+		use -1
 	}
-	if n != io::EOF {
+	if n != -1 {
 		t.Errorf("expected EOF, got: {}", n)
 	}
 }

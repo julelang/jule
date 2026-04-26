@@ -512,11 +512,13 @@ impl bufreader {
 				copy(buf, self.buf)
 				self.buf = buf
 			}
-			w := self.rd.Read(self.buf[self.r+n:]).await?
-			if w == io::EOF {
-				line = self.buf[self.r:self.w]
-				self.r = self.w
-				ret
+			w := self.rd.Read(self.buf[self.r+n:]).await else {
+				if error == io::EOF {
+					line = self.buf[self.r:self.w]
+					self.r = self.w
+					ret
+				}
+				throw error
 			}
 			n += w
 			self.w += w

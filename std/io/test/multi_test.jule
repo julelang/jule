@@ -27,23 +27,32 @@ async fn testMultiReader(t: &testing::T) {
 	expectRead := async fn(size: int, expected: str, eof: bool) {
 		unsafe {
 			*_nread++
-			n := (*_mr).Read((*_buf)[0:size]).await!
-			mut nwant := io::EOF
-			if !eof {
-				nwant = len(expected)
+			n := (*_mr).Read((*_buf)[0:size]).await else {
+				if eof {
+					if error != io::EOF {
+						t.Errorf("expected EOF, found {}", error)
+					}
+				} else {
+					t.Errorf("expected no error, found {}", error)
+				}
+				ret
 			}
+			if eof {
+				t.Errorf("expected EOF, found {} bytes", n)
+				ret
+			}
+			nwant := len(expected)
 			if n != nwant {
 				t.Errorf("#{}, expected {} bytes; got {}",
 					*_nread, nwant, n)
+				ret
 			}
-			if n != io::EOF {
-				got := str((*_buf)[0:n])
-				if got != expected {
-					t.Errorf("#{}, expected {}; got {}",
-						*_nread, expected, got)
-				}
-				*_buf = (*_buf)[n:]
+			got := str((*_buf)[0:n])
+			if got != expected {
+				t.Errorf("#{}, expected {}; got {}",
+					*_nread, expected, got)
 			}
+			*_buf = (*_buf)[n:]
 		}
 	}
 	withFooBar(async fn() {
@@ -89,7 +98,7 @@ impl io::Reader for byteAndEOFReader {
 			panic("unexpected call")
 		}
 		if *self == 0 {
-			ret io::EOF
+			throw io::EOF
 		}
 		p[0] = byte(*self)
 		*self = 0
@@ -121,13 +130,13 @@ async fn testMultiReaderFinalEOF(t: &testing::T) {
 	if n != 1 {
 		t.Errorf("got {}; want 1", n)
 	}
-	n = r.Read(buf).await else {
-		t.Errorf("unexpected error: {}", error)
-		use io::EOF
+	r.Read(buf).await else {
+		if error != io::EOF {
+			t.Errorf("unexpected error: {}, expected EOF", error)
+		}
+		ret
 	}
-	if n != io::EOF {
-		t.Errorf("got {}; want EOF", n)
-	}
+	t.Errorf("expected EOF")
 }
 
 #test

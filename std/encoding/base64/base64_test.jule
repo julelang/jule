@@ -117,7 +117,13 @@ async fn testStdDecoder(t: &testing::T) {
 		mut sr := strings::Reader.New(str(case[1]))
 		mut dec := NewDecoder(StdEncoding, sr.Async())
 		mut buf := make([]byte, StdEncoding.DecodedLen(len(case[1])))
-		n := dec.Read(buf).await!
+		n := dec.Read(buf).await else {
+			if error != io::EOF {
+				t.Errorf("unexpected error {}", error)
+				continue
+			}
+			use 0
+		}
 		r := buf[:n]
 		d := case[0]
 		if !bytesequal(r, d) {
@@ -138,10 +144,10 @@ async fn testDecoderBuffering(t: &testing::T) {
 		let mut err: any
 		for total < len(bigtest[0]) && err == nil {
 			n = decoder.Read(buf[total : total+bs]).await else {
+				if error == io::EOF {
+					break
+				}
 				err = error
-				break
-			}
-			if n == io::EOF {
 				break
 			}
 			total += n

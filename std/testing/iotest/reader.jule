@@ -85,13 +85,14 @@ impl io::Reader for dataErrReader {
 	async fn Read(mut *self, mut p: []byte)!: (n: int) {
 		// loop because first call needs two reads:
 		// one to get data and a second to look for an error.
-		n = io::EOF
 		for {
 			if len(self.unread) == 0 {
-				mut n1 := self.r.Read(self.data).await?
-				if n1 == io::EOF {
+				mut n1 := self.r.Read(self.data).await else {
 					self.unread = self.data[0:0]
-					ret
+					if n > 0 {
+						break
+					}
+					throw error
 				}
 				self.unread = self.data[0:n1]
 			}

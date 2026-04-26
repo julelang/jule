@@ -46,9 +46,11 @@ async fn readBytes(mut buf: &Reader): str {
 	let mut b: [1000]byte
 	mut nb := 0
 	for {
-		c, n := buf.ReadByte().await!
-		if n == io::EOF {
-			break
+		c, _ := buf.ReadByte().await else {
+			if error == io::EOF {
+				break
+			}
+			panic("error")
 		}
 		b[nb] = c
 		nb++
@@ -89,11 +91,13 @@ let readMakers: []readMaker = [
 async fn readLines(mut b: &Reader): str {
 	mut s := ""
 	for {
-		s1, eof := b.ReadStr('\n').await!
-		s += s1
-		if eof {
-			break
+		s1 := b.ReadStr('\n').await else {
+			if error == io::EOF {
+				break
+			}
+			panic("error")
 		}
+		s += s1
 	}
 	ret s
 }
@@ -104,9 +108,11 @@ async fn reads(mut buf: &Reader, m: int): str {
 	mut bs := unsafe::Slice(&b[0], 1000, 1000)
 	mut nb := 0
 	for {
-		n := buf.Read(bs[nb : nb+m]).await!
-		if n == io::EOF {
-			break
+		n := buf.Read(bs[nb : nb+m]).await else {
+			if error == io::EOF {
+				break
+			}
+			panic("error")
 		}
 		nb += n
 	}
@@ -212,7 +218,7 @@ impl io::Reader for StrReader {
 			n = copy(p, s)
 			self.step++
 		} else {
-			ret io::EOF
+			throw io::EOF
 		}
 		ret
 	}
@@ -223,9 +229,11 @@ async fn readRuneSegments(t: &testing::T, mut segments: []str) {
 	want := strings::Join(segments, "")
 	mut r := Reader.New(&StrReader{data: segments})
 	for {
-		rn, n := r.ReadRune().await else { ret }
-		if n == io::EOF {
-			break
+		rn, _ := r.ReadRune().await else {
+			if error == io::EOF {
+				break
+			}
+			ret
 		}
 		got += str(rn)
 	}
@@ -261,10 +269,10 @@ async fn testUnreadRune(t: &testing::T) {
 	// Normal execution.
 	for {
 		r1, mut n := r.ReadRune().await else {
+			if error == io::EOF {
+				break
+			}
 			t.Errorf("unexpected error on ReadRune: {}", error)
-			break
-		}
-		if n == io::EOF {
 			break
 		}
 		got += str(r1)
@@ -275,10 +283,6 @@ async fn testUnreadRune(t: &testing::T) {
 		}
 		r2, n := r.ReadRune().await else {
 			t.Errorf("unexpected error reading after unreading: {}", error)
-			ret
-		}
-		if n == io::EOF {
-			t.Errorf("unexpected EOF")
 			ret
 		}
 		if r1 != r2 {
@@ -352,10 +356,10 @@ async fn testUnreadByte(t: &testing::T) {
 	// Normal execution.
 	for {
 		b1, mut n := r.ReadByte().await else {
+			if error == io::EOF {
+				break
+			}
 			t.Errorf("unexpected error on ReadByte: {}", error)
-			break
-		}
-		if n == io::EOF {
 			break
 		}
 		got += str(b1)
@@ -366,10 +370,6 @@ async fn testUnreadByte(t: &testing::T) {
 		}
 		b2, n := r.ReadByte().await else {
 			t.Errorf("unexpected error reading after unreading: {}", error)
-			ret
-		}
-		if n == io::EOF {
-			t.Errorf("unexpected EOF")
 			ret
 		}
 		if b1 != b2 {
@@ -392,12 +392,8 @@ async fn testUnreadByteMultiple(t: &testing::T) {
 		// Read n bytes.
 		mut i := 0
 		for i < n; i++ {
-			b, size := r.ReadByte().await else {
+			b, _ := r.ReadByte().await else {
 				t.Errorf("n = {}: unexpected error on ReadByte: {}", n, error)
-				ret
-			}
-			if size == io::EOF {
-				t.Errorf("unexpected EOF")
 				ret
 			}
 			if b != data[i] {
@@ -487,19 +483,12 @@ async fn testUnreadRuneError(t: &testing::T) {
 	r.ReadRune().await else {
 		t.Errorf("unexpected error on ReadRune (4): {}", error)
 	}
-	mut line, _, _ := r.ReadSlice(0).await else {
+	mut line, _ := r.ReadSlice(0).await else {
 		t.Errorf("unexpected error on ReadSlice (4):", error)
-		use buf, false, false
+		use buf, false
 	}
 	if line == nil || len(line) == 0 {
 		t.Errorf("unexpected result on ReadSlice (4)")
-	}
-	line, _, _ = r.ReadSlice(0).await else {
-		t.Errorf("unexpected error on ReadSlice (4):", error)
-		use make([]byte, 0), false, false
-	}
-	if line == nil || len(line) != 0 {
-		t.Errorf("expected EOF on ReadSlice (4)")
 	}
 	err = false
 	r.UnreadRune().await else { err = true }
@@ -516,10 +505,13 @@ async fn testUnreadRuneAtEOF(t: &testing::T) {
 	r.ReadRune().await else {}
 	r.UnreadRune().await else {}
 	_, n := r.ReadRune().await else {
-		t.Errorf("unexpected error: {}", error)
-		use 0, io::EOF
+		if error != io::EOF {
+			t.Errorf("expected EOF, found error: {}", error)
+			ret
+		}
+		use 0, -1
 	}
-	if n != io::EOF {
+	if n != -1 {
 		t.Errorf("expected error at EOF")
 	}
 }
@@ -544,14 +536,14 @@ fn testReaderNewSizeIdempotent(t: &testing::T) {
 async fn testBufferFull(t: &testing::T) {
 	const longString = "And now, hello, world! It is the time for all good men to come to the aid of their party"
 	mut buf := Reader.NewSize(strings::Reader.New(longString).Async(), minReadBufferSize)
-	mut line, mut full, _ := buf.ReadSlice('!').await else {
+	mut line, mut full := buf.ReadSlice('!').await else {
 		t.Errorf("unexpected error: {}", error)
 		ret
 	}
 	if str(line) != "And now, hello, " || !full {
 		t.Errorf("first ReadSlice(,) = {}, {}", line, full)
 	}
-	line, full, _ = buf.ReadSlice('!').await else {
+	line, full = buf.ReadSlice('!').await else {
 		t.Errorf("unexpected error: {}", error)
 		ret
 	}
@@ -660,13 +652,12 @@ async fn testPeek(t: &testing::T) {
 		ret
 	}
 	s, _, _ = buf.Peek(1).await else {
-		t.Errorf("unexpected error: {}", error)
+		if error != io::EOF {
+			t.Errorf("unexpected error: {}", error)
+		}
 		ret
 	}
-	if s == nil || len(s) > 0 {
-		t.Errorf("want EOF got {}", str(s))
-		ret
-	}
+	t.Errorf("want EOF got {}", str(s))
 }
 
 #test
@@ -701,7 +692,7 @@ impl io::Reader for testReaderImpl {
 		copy(buf, self.data)
 		self.data = self.data[n:]
 		if n == 0 {
-			ret io::EOF
+			throw io::EOF
 		}
 		ret
 	}
@@ -714,15 +705,15 @@ async fn _testReadLine(t: &testing::T, mut input: []byte) {
 		mut reader := &testReaderImpl{input, stride}
 		mut l := Reader.NewSize(reader, len(input)+1)
 		for {
-			line, isPrefix, _ := l.ReadLine().await else {
+			line, isPrefix := l.ReadLine().await else {
+				if error == io::EOF {
+					break
+				}
 				t.Errorf("unknown error: {}", error)
 				ret
 			}
 			if isPrefix {
 				t.Errorf("ReadLine returned prefix")
-			}
-			if line != nil && len(line) == 0 {
-				break
 			}
 			want := testOutput[done : done+len(line)]
 			if !bytes::Equal(want, line) {
@@ -752,36 +743,31 @@ async fn testLineTooLong(t: &testing::T) {
 	mut data := unsafe { sb.Buf() }
 	mut buf := strings::Reader.New(sb.Str())
 	mut l := Reader.NewSize(buf.Async(), minReadBufferSize)
-	mut line, mut isPrefix, _ := l.ReadLine().await else {
+	mut line, mut isPrefix := l.ReadLine().await else {
 		t.Errorf("unexpected error: {}", error)
-		use nil, false, false
+		use nil, false
 	}
 	if !isPrefix || !bytes::Equal(line, data[:minReadBufferSize]) {
 		t.Errorf("bad result for first line: got {} want {}", line, data[:minReadBufferSize])
 	}
 	data = data[len(line):]
-	line, isPrefix, _ = l.ReadLine().await else {
+	line, isPrefix = l.ReadLine().await else {
 		t.Errorf("unexpected error: {}", error)
-		use nil, false, false
+		use nil, false
 	}
 	if !isPrefix || !bytes::Equal(line, data[:minReadBufferSize]) {
 		t.Errorf("bad result for second line: got {} want {}", line, data[:minReadBufferSize])
 	}
 	data = data[len(line):]
-	line, isPrefix, _ = l.ReadLine().await else {
+	line, isPrefix = l.ReadLine().await else {
 		t.Errorf("unexpected error: {}", error)
-		use nil, false, false
+		use nil, false
 	}
 	if isPrefix || !bytes::Equal(line, data[:minReadBufferSize/2]) {
 		t.Errorf("bad result for third line: got {} want {}", line, data[:minReadBufferSize/2])
 	}
-	line, isPrefix, _ = l.ReadLine().await else {
-		t.Errorf("unexpected error: {}", error)
-		use nil, false, false
-	}
-	if isPrefix || line == nil || len(line) > 0 {
-		t.Errorf("expected no more lines: {}", line)
-	}
+	line, isPrefix = l.ReadLine().await else { ret }
+	t.Errorf("expected no more lines: {}", line)
 }
 
 #test
@@ -792,9 +778,9 @@ async fn testReadAfterLines(t: &testing::T) {
 	mut outbuf := new(strings::Builder)
 	maxLineLength := len(line1) + len(restData)/2
 	mut l := Reader.NewSize(inbuf.Async(), maxLineLength)
-	line, isPrefix, _ := l.ReadLine().await else {
+	line, isPrefix := l.ReadLine().await else {
 		t.Errorf("unexpected error: {}", error)
-		use nil, false, false
+		use nil, false
 	}
 	if isPrefix || str(line) != line1 {
 		t.Errorf("bad result for first line: isPrefix={} line={}", isPrefix, str(line))
@@ -814,13 +800,13 @@ async fn testReadAfterLines(t: &testing::T) {
 #test
 async fn testReadEmptyBuffer(t: &testing::T) {
 	mut l := Reader.NewSize(strings::Reader.New("").Async(), minReadBufferSize)
-	line, isPrefix, _ := l.ReadLine().await else {
-		t.Errorf("unexpected error: {}", error)
+	line, isPrefix := l.ReadLine().await else {
+		if error != io::EOF {
+			t.Errorf("expected EOF, found error: {}", error)
+		}
 		ret
 	}
-	if isPrefix || line == nil || len(line) > 0 {
-		t.Errorf("expected EOF from ReadLine, got '{}' {}", line, isPrefix)
-	}
+	t.Errorf("expected EOF from ReadLine, got '{}' {}", line, isPrefix)
 }
 
 #test
@@ -831,13 +817,13 @@ async fn testLinesAfterRead(t: &testing::T) {
 		ret
 	}
 
-	line, isPrefix, _ := l.ReadLine().await else {
-		t.Errorf("unexpected error: {}", error)
+	line, isPrefix := l.ReadLine().await else {
+		if error != io::EOF {
+			t.Errorf("expected EOF, found error: {}", error)
+		}
 		ret
 	}
-	if isPrefix || line == nil || len(line) > 0 {
-		t.Errorf("expected EOF from ReadLine, got '{}' {}", line, isPrefix)
-	}
+	t.Errorf("expected EOF from ReadLine, got '{}' {}", line, isPrefix)
 }
 
 struct readLineResult {
@@ -857,13 +843,13 @@ let mut readLineNewlinesTests: []readLineTest = [
 			{nil, false, nil},
 			{[]byte("012345678901234"), true, nil},
 			{nil, false, nil},
-			{make([]byte, 0), false, nil},
+			{make([]byte, 0), false, io::EOF},
 		])},
 	{"0123456789012345\r012345678901234\r", []readLineResult([
 			{[]byte("0123456789012345"), true, nil},
 			{[]byte("\r012345678901234"), true, nil},
 			{[]byte("\r"), false, nil},
-			{make([]byte, 0), false, nil},
+			{make([]byte, 0), false, io::EOF},
 		])},
 ]
 
@@ -878,9 +864,9 @@ async fn _testReadLineNewlines(t: &testing::T, input: str, expect: []readLineRes
 	mut b := Reader.NewSize(strings::Reader.New(input).Async(), minReadBufferSize)
 	for i, e in expect {
 		let mut err: any
-		line, isPrefix, _ := b.ReadLine().await else {
+		line, isPrefix := b.ReadLine().await else {
 			err = error
-			use e.line, e.isPrefix, false
+			use e.line, e.isPrefix
 		}
 		if !bytes::Equal(line, e.line) {
 			t.Errorf("{} call {}, line == {}, want {}", input, i, line, e.line)

@@ -24,7 +24,7 @@ impl io::Reader for testbuffer {
 		}
 		n := copy(data, self.buf[self.r:])
 		if n == 0 {
-			ret io::EOF
+			throw io::EOF
 		}
 		self.r += n
 		ret n
@@ -112,10 +112,12 @@ async fn testReadAtLeast(t: &testing::T) {
 		t.Errorf("expected to have read 2 bytes, got {}", n)
 	}
 	n = io::ReadAtLeast(rb, buf, 2).await else {
-		t.Errorf("{}", error)
-		use 0
+		if error != io::EOF {
+			t.Errorf("expected EOF, got {}", error)
+		}
+		use -1
 	}
-	if n != io::EOF {
+	if n != -1 {
 		t.Errorf("expected EOF, got {}", n)
 	}
 	rb.Write([]byte("4")).await!
