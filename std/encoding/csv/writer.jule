@@ -35,11 +35,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ====================================================
 
-use "std/bytes"
+use "std/bufio"
 use "std/io"
+use "std/strings"
 use "std/unicode"
 use "std/unicode/utf8"
-use "std/unsafe"
 
 // A Writer writes records using CSV encoding.
 //
@@ -59,7 +59,7 @@ struct Writer {
 	Comma:   rune // Field delimiter (set to ',' by new)
 	UseCRLF: bool // True to use \r\n as the line terminator
 
-	w: io::Writer
+	w: &bufio::Writer
 }
 
 impl Writer {
@@ -67,7 +67,7 @@ impl Writer {
 	fn New(mut w: io::Writer): &Writer {
 		ret &Writer{
 			Comma: ',',
-			w:     w,
+			w:     bufio::Writer.New(w),
 		}
 	}
 
@@ -83,11 +83,11 @@ impl Writer {
 	// Not quoting the empty string also makes this package match the behavior
 	// of Microsoft Excel and Google Drive.
 	// For Postgres, quote the data terminating string `\.`.
-	fn fieldNeedsQuotes(*self, field: []byte): bool {
+	fn fieldNeedsQuotes(*self, field: str): bool {
 		if len(field) == 0 {
 			ret false
 		}
-		if len(field) == 2 && field[0] == '\\' && field[1] == '.' {
+		if field == `\.` {
 			ret true
 		}
 		if self.Comma < utf8::RuneSelf {
@@ -98,11 +98,11 @@ impl Writer {
 					ret true
 				}
 			}
-		} else if bytes::ContainsRune(field, self.Comma) ||
-			bytes::ContainsAny(field, "\"\r\n") {
+		} else if strings::ContainsRune(field, self.Comma) ||
+			strings::ContainsAny(field, "\"\r\n") {
 			ret true
 		}
-		r1, _ := utf8::DecodeRune(field)
+		r1, _ := utf8::DecodeRuneStr(field)
 		ret unicode::IsSpace(r1)
 	}
 
@@ -114,61 +114,61 @@ impl Writer {
 		}
 		for (n, mut field) in record {
 			if n > 0 {
-				mut bytes := make([]byte, utf8::UTFMax)
-				j := utf8::EncodeRune(bytes, self.Comma)
-				self.w.Write(bytes[:j]).await?
+				self.w.WriteRune(self.Comma).await?
 			}
-
-			// Use fb instead of field to avoid copying.
-			mut fb := unsafe::StrBytes(field)
 
 			// If we don't have to have a quoted field then just
 			// write out the field and continue to the next field.
-			if !self.fieldNeedsQuotes(fb) {
-				self.w.Write(fb).await?
+			if !self.fieldNeedsQuotes(field) {
+				self.w.WriteStr(field).await?
 				continue
 			}
 
-			self.w.Write(['"']).await?
+			self.w.WriteByte('"').await?
 
-			for len(fb) > 0 {
+			for len(field) > 0 {
 				// Search for special characters.
-				mut i := bytes::IndexAny(fb, "\"\r\n")
+				mut i := strings::IndexAny(field, "\"\r\n")
 				if i < 0 {
-					i = len(fb)
+					i = len(field)
 				}
 
 				// Copy verbatim everything before the special character.
-				self.w.Write(fb[:i]).await?
-				fb = fb[i:]
+				self.w.WriteStr(field[:i]).await?
+				field = field[i:]
 
 				// Encode the special character.
-				if len(fb) > 0 {
-					match fb[0] {
+				if len(field) > 0 {
+					match field[0] {
 					| '"':
-						self.w.Write(unsafe::StrBytes(`""`)).await?
+						self.w.WriteStr(`""`).await?
 					| '\r':
 						if !self.UseCRLF {
-							self.w.Write(['\r']).await?
+							self.w.WriteByte('\r').await?
 						}
 					| '\n':
 						if self.UseCRLF {
-							self.w.Write(unsafe::StrBytes("\r\n")).await?
+							self.w.WriteStr("\r\n").await?
 						} else {
-							self.w.Write(unsafe::StrBytes("\n")).await?
+							self.w.WriteByte('\n').await?
 						}
 					}
-					fb = fb[1:]
+					field = field[1:]
 				}
 			}
 
-			self.w.Write(unsafe::StrBytes("\"")).await?
+			self.w.WriteByte('"').await?
 		}
 		if self.UseCRLF {
-			self.w.Write(unsafe::StrBytes("\r\n")).await?
+			self.w.WriteStr("\r\n").await?
 		} else {
-			self.w.Write(unsafe::StrBytes("\n")).await?
+			self.w.WriteByte('\n').await?
 		}
+	}
+
+	// Writes any buffered data to the underlying io::Writer.
+	async fn Flush(mut *self)! {
+		self.w.Flush().await?
 	}
 
 	// Writes multiple CSV records using [Writer.Write].
@@ -176,5 +176,6 @@ impl Writer {
 		for _, record in records {
 			self.Write(record).await?
 		}
+		self.w.Flush().await?
 	}
 }

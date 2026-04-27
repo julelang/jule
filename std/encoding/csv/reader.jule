@@ -83,6 +83,7 @@
 //	{`Multi-line
 //	field`, `comma is ,`}
 
+use "std/bufio"
 use "std/bytes"
 use "std/errors"
 use "std/fmt"
@@ -171,13 +172,16 @@ struct Reader {
 	// By default, each call to read returns newly allocated memory owned by the caller.
 	ReuseRecord: bool
 
-	r: &bufreader
+	r: &bufio::Reader
 
 	// The current line being read in the CSV file.
 	numLine: int
 
 	// The input stream byte offset of the current reader position.
 	offset: i64
+
+	// A line buffer only used by the readLine method.
+	rawBuffer: []byte
 
 	// Holds the unescaped fields, one after another.
 	// The fields can be accessed by using the indexes in fieldIndexes.
@@ -202,7 +206,7 @@ impl Reader {
 	fn New(mut r: io::Reader): &Reader {
 		ret &Reader{
 			Comma: ',',
-			r:     bufreader.new(r),
+			r:     bufio::Reader.New(r),
 		}
 	}
 
@@ -249,23 +253,43 @@ impl Reader {
 	// Each record is a slice of fields.
 	async fn ReadAll(mut *self)!: (records: [][]str) {
 		for {
-			mut record := self.readRecord(nil).await?
-			if len(record) == 0 {
-				break
+			mut record := self.readRecord(nil).await else {
+				if error == io::EOF {
+					ret
+				}
+				throw error
 			}
 			records = append(records, record)
 		}
-		ret
 	}
 
 	// Reads the next line (with the trailing endline).
 	// If EOF is hit without a trailing endline, it will be omitted.
 	// The result is only valid until the next call to readLine.
 	async fn readLine(mut *self)!: []byte {
-		mut line := self.r.readSlice('\n').await?
+		mut _EOF := false
+		mut line, mut full := self.r.ReadSlice('\n').await?
+		self.r.Read(nil).await else {
+			// Detect if reached to EOF.
+			_EOF = error == io::EOF
+		}
+		if full {
+			self.rawBuffer = append(self.rawBuffer[:0], line...)
+			for full {
+				line, full = self.r.ReadSlice('\n').await else {
+					if error == io::EOF {
+						_EOF = true
+						break
+					}
+					throw error
+				}
+				self.rawBuffer = append(self.rawBuffer, line...)
+			}
+			line = self.rawBuffer
+		}
 		mut readSize := len(line)
-		if readSize > 0 {
-			// For backwards compatibility, drop trailing \r before EOF.
+		if readSize > 0 && _EOF {
+			// Drop trailing \r before EOF.
 			if line[readSize-1] == '\r' {
 				line = line[:readSize-1]
 			}
@@ -292,15 +316,10 @@ impl Reader {
 		let mut line: []byte
 		for {
 			line = self.readLine().await?
-			if len(line) == 0 {
-				ret nil
-			}
 			if self.Comment != 0 && nextRune(line) == self.Comment {
-				line = nil
 				continue // Skip comment lines
 			}
-			if len(line) == lengthNl(line) {
-				line = nil
+			if len(line) == lengthNL(line) {
 				continue // Skip empty lines
 			}
 			break
@@ -320,7 +339,7 @@ impl Reader {
 				mut i := bytes::IndexFunc(line, fn|r| !unicode::IsSpace(r))
 				if i == -1 {
 					i = len(line)
-					pos.col -= lengthNl(line)
+					pos.col -= lengthNL(line)
 				}
 				line = line[i:]
 				pos.col += i
@@ -332,7 +351,7 @@ impl Reader {
 				if i >= 0 {
 					field = field[:i]
 				} else {
-					field = field[:len(field)-lengthNl(field)]
+					field = field[:len(field)-lengthNL(field)]
 				}
 				// Check to make sure a quote does not appear in field.
 				if !self.LazyQuotes {
@@ -382,7 +401,7 @@ impl Reader {
 							self.fieldIndexes = append(self.fieldIndexes, len(self.recordBuffer))
 							self.fieldPositions = append(self.fieldPositions, fieldPos)
 							continue parseField
-						| lengthNl(line) == len(line):
+						| lengthNL(line) == len(line):
 							// `"\n` sequence (end of line).
 							self.fieldIndexes = append(self.fieldIndexes, len(self.recordBuffer))
 							self.fieldPositions = append(self.fieldPositions, fieldPos)
@@ -404,7 +423,12 @@ impl Reader {
 						// Hit end of line (copy all data so far).
 						self.recordBuffer = append(self.recordBuffer, line...)
 						pos.col += len(line)
-						line = self.readLine().await?
+						line = self.readLine().await else {
+							if error != io::EOF {
+								throw error
+							}
+							use nil
+						}
 						if len(line) > 0 {
 							pos.line++
 							pos.col = 1
@@ -475,53 +499,9 @@ fn nextRune(b: []byte): rune {
 }
 
 // Reports the number of bytes for the trailing \n.
-fn lengthNl(b: []byte): int {
+fn lengthNL(b: []byte): int {
 	if len(b) > 0 && b[len(b)-1] == '\n' {
 		ret 1
 	}
 	ret 0
-}
-
-struct bufreader {
-	buf: []byte
-	rd:  io::Reader // reader provided by the client
-	r:   int
-	w:   int
-}
-
-impl bufreader {
-	fn new(mut r: io::Reader): &bufreader {
-		const defaultBufSize = 4096
-		mut br := new(bufreader)
-		br.buf = make([]byte, defaultBufSize)
-		br.rd = r
-		ret br
-	}
-
-	async fn readSlice(mut *self, delim: byte)!: (line: []byte) {
-		mut n := 0
-		for {
-			i := bytes::IndexByte(self.buf[self.r:], delim)
-			if i >= 0 {
-				line = self.buf[self.r : self.r+i+1]
-				self.r += i + 1
-				ret
-			}
-			if self.r >= len(self.buf) {
-				mut buf := make([]byte, len(self.buf)*2)
-				copy(buf, self.buf)
-				self.buf = buf
-			}
-			w := self.rd.Read(self.buf[self.r+n:]).await else {
-				if error == io::EOF {
-					line = self.buf[self.r:self.w]
-					self.r = self.w
-					ret
-				}
-				throw error
-			}
-			n += w
-			self.w += w
-		}
-	}
 }
