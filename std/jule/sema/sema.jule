@@ -699,8 +699,10 @@ impl sema {
 
 	// Builds type, builds result as kind and collects referred type aliases.
 	fn buildTypeWithRefers(mut &self, mut t: &ast::Expr, mut l: Lookup,
-		mut generics: []&TypeAlias, mut referencer: &referencer): &Type {
-		ret self.typeChecker(l, generics, referencer).checkDecl(t)
+		mut generics: []&TypeAlias, mut referencer: &referencer, mut refers: &ReferenceStack): &Type {
+		mut tc := self.typeChecker(l, generics, referencer)
+		tc.refers = refers
+		ret tc.checkDecl(t)
 	}
 
 	// Checks TypeSYm, builds result as Type and collects referred type aliases.
@@ -708,16 +710,21 @@ impl sema {
 	// See also developer reference (9).
 	fn checkTypeSymWithRefers(mut &self, mut t: &TypeSym, mut l: Lookup, mut generics: []&TypeAlias, mut referencer: &referencer): (ok: bool) {
 		mut ta := false // Referencer owner is type alias.
+		let mut refers: &ReferenceStack
 		if t.checked() {
 			match type referencer.owner {
 			| &TypeAlias:
 				ta = true
+				mut typal := referencer.owner.(&TypeAlias)
+				if typal.Strict {
+					refers = typal.TypeSym.Type.SoftStruct().Refers
+				}
 			}
 			if !ta {
 				ret true
 			}
 		}
-		mut tt := self.buildTypeWithRefers(t.Decl, l, generics, referencer)
+		mut tt := self.buildTypeWithRefers(t.Decl, l, generics, referencer, refers)
 		if tt == nil || !ta {
 			t.Type = tt
 		} else {
