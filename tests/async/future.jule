@@ -1,0 +1,128 @@
+// Copyright 2026 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+#ready
+fn commonReady(): int {
+	ready(true)
+	return 1
+}
+
+#ready
+fn commonNonReady(): int {
+	ready(false)
+	return 1
+}
+
+async fn commonSuspend(): int {
+	return 2
+}
+
+async fn commonSuspendButAnon(): int {
+	return 2
+}
+
+#future
+async fn commonFunc(): int {
+	future(commonReady, commonSuspend)
+}
+
+#future
+async fn commonFuncNonReady(): int {
+	future(commonNonReady, commonSuspend)
+}
+
+#future
+async fn commonFuncButAnon(): int {
+	future(commonReady, commonSuspendButAnon)
+}
+
+#future
+async fn commonClosure(): int {
+	future(commonReady, async fn(): int {
+		return 2
+	})
+}
+
+#future
+async fn commonClosureShort(): int {
+	future(commonReady, async fn|| 2)
+}
+
+#ready
+fn commonReadyFallible()!: int {
+	ready(true)
+	return 1
+}
+
+async fn commonSuspendFallible()!: int {
+	return 2
+}
+
+#future
+async fn commonFuncFallible()!: int {
+	future(commonReadyFallible, commonSuspendFallible)
+}
+
+#ready
+fn commonReadyGeneric[T](): T {
+	ready(true)
+	return 1
+}
+
+async fn commonSuspendGeneric[T](): T {
+	return 2
+}
+
+#future
+async fn commonFuncGeneric[T](): T {
+	future(commonReadyGeneric[T], commonSuspendGeneric[T])
+}
+
+async fn sumReady() {
+	mut i, mut x := 0, 0
+	for i < 1_000; i++ {
+		x += commonClosureShort().await
+	}
+	if x != 1_000 {
+		panic("expected 1_000")
+	}
+}
+
+async fn sumNonReady() {
+	mut i, mut x := 0, 0
+	for i < 1_000; i++ {
+		x += commonFuncNonReady().await
+	}
+	if x != 2_000 {
+		panic("expected 2_000")
+	}
+}
+
+async fn sumReadyFallible() {
+	mut i, mut x := 0, 0
+	for i < 1_000; i++ {
+		x += commonFuncFallible().await!
+	}
+	if x != 1_000 {
+		panic("expected 1_000")
+	}
+}
+
+async fn sumReadyGeneric() {
+	mut i, mut x := 0, 0
+	for i < 1_000; i++ {
+		x += commonFuncGeneric[int]().await
+	}
+	if x != 1_000 {
+		panic("expected 1_000")
+	}
+}
+
+async fn main() {
+	_ = commonSuspendButAnon // Make anonymous this function.
+	sumReady().await
+	sumNonReady().await
+	sumReadyFallible().await
+	sumReadyGeneric().await
+}
