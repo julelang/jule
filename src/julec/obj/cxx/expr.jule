@@ -2105,6 +2105,110 @@ impl exprCoder {
 		self.oc.write("\").alloc)")
 	}
 
+	fn futureCall(mut &self, mut m: &sema::BuiltinFutureCallExpr) {
+		mut ready := m.Ready.Type.Func()
+		mut suspend := m.Suspend.Type.Func()
+		if ready.Decl.AST.Flags&ast::F_FALLIBLE == 0 && ready.Decl.IsVoid() {
+			// It does not returns anything, including fallible data.
+			self.oc.write(typeBool + " __jule_ready = false;\n")
+			self.oc.indent()
+			// We can use this naive approach because the `ready` function
+			// cannot be anonymous like the `suspend` function.
+			// Because anonymous functions cannot have `#ready` directive.
+			self.oc.ic.funcIns(&self.oc.Buf, ready)
+			self.oc.write("(")
+			// Pass the `ready` parameter.
+			self.oc.write("&__jule_ready")
+			if len(ready.Params) > 0 {
+				self.oc.write(", ")
+			}
+			// Pass the ordinary parameters of the owner function.
+			for i, p in m.Owner.Params {
+				if i > 0 {
+					self.oc.write(", ")
+				}
+				self.oc.ic.param(&self.oc.Buf, p.Decl)
+			}
+			self.oc.write(");\n")
+			self.oc.indent()
+			self.oc.write("if (__jule_ready) {\n")
+			self.oc.addIndent()
+			self.oc.indent()
+			self.oc.write("__jule_VoidAsync __jule_handle;\n")
+			self.oc.indent()
+			self.oc.write("__jule_handle.ready = true;\n")
+			self.oc.indent()
+			self.oc.write("return __jule_handle;\n")
+			self.oc.doneIndent()
+			self.oc.indent()
+			self.oc.write("}\n")
+			self.oc.indent()
+		} else {
+			// Function has return value.
+			self.oc.write("__jule_Async<")
+			self.oc.tc.funcInsResult(&self.oc.Buf, suspend)
+			self.oc.write("> __jule_handle;\n")
+			self.oc.indent()
+			self.oc.write("__jule_handle.ready = false;\n")
+			self.oc.indent()
+			self.oc.write("__jule_handle.value = std::move(")
+			// We can use this naive approach because the `ready` function
+			// cannot be anonymous like the `suspend` function.
+			// Because anonymous functions cannot have `#ready` directive.
+			self.oc.ic.funcIns(&self.oc.Buf, ready)
+			self.oc.write("(")
+			// Pass the `ready` parameter.
+			self.oc.write("&__jule_handle.ready")
+			if len(ready.Params) > 0 {
+				self.oc.write(", ")
+			}
+			// Pass the ordinary parameters of the owner function.
+			for i, p in m.Owner.Params {
+				if i > 0 {
+					self.oc.write(", ")
+				}
+				self.oc.ic.param(&self.oc.Buf, p.Decl)
+			}
+			self.oc.write("));\n")
+			self.oc.indent()
+			self.oc.write("if (__jule_handle.ready) { return __jule_handle; }\n")
+			self.oc.indent()
+		}
+		// Same ending for both cases, return the suspend function handle.
+		self.oc.write("return ")
+		// If function is not an anonymous function, just write the identifier.
+		// Otherwise, expression should be annonymous.
+		if suspend.Flags&sema::F_ANON == 0 {
+			self.oc.ic.funcIns(&self.oc.Buf, suspend)
+		} else {
+			self.possibleRefExpr(m.Suspend.Model)
+		}
+		self.oc.write("(")
+		// If the `suspend` function is used as anonymous function,
+		// pass nullptr as ctx pointer because this should be global.
+		// Therefore, it cannot capture any memory.
+		if suspend.Flags&sema::F_AS_ANON != 0 &&
+			suspend.Flags&sema::F_ANON == 0 {
+			self.oc.write("nullptr")
+			if len(suspend.Params) > 0 {
+				self.oc.write(", ")
+			}
+		}
+		// Pass the ordinary parameters of the owner function.
+		for i, p in m.Owner.Params {
+			if i > 0 {
+				self.oc.write(", ")
+			}
+			self.oc.ic.param(&self.oc.Buf, p.Decl)
+		}
+		self.oc.write(");")
+	}
+
+	fn readyCall(mut &self, mut m: &sema::BuiltinReadyCallExpr) {
+		self.oc.write("*" + readyStatusParamName + " = ")
+		self.possibleRefExpr(m.Status.Model)
+	}
+
 	fn addrcallExpr(mut &self, mut m: &sema::AddrcallExpr) {
 		self.oc.write("((")
 		if m.Result == nil {
@@ -2338,6 +2442,10 @@ impl exprCoder {
 			self.chanSend(m.(&sema::ChanSend))
 		| &sema::BuiltinCloseCallExpr:
 			self.closeCall(m.(&sema::BuiltinCloseCallExpr))
+		| &sema::BuiltinFutureCallExpr:
+			self.futureCall(m.(&sema::BuiltinFutureCallExpr))
+		| &sema::BuiltinReadyCallExpr:
+			self.readyCall(m.(&sema::BuiltinReadyCallExpr))
 		| &sema::TypeAssertionExpr:
 			self.typeAssertion(m.(&sema::TypeAssertionExpr))
 		| &sema::AddrcallExpr:

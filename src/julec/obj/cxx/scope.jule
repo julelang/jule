@@ -2361,7 +2361,12 @@ impl scopeCoder {
 		// Because they are placed in this scope.
 		self.emitDefers(nds, true)
 
-		if !raw && f.Decl.IsVoid() {
+		isFuture := f.Decl.Flags&sema::F_FUTURE != 0
+
+		// Do not generate return statement if the function is a `#future`.
+		// Because it generates `co_return` statement instead of `return
+		// if the function is async and C++ compiler handle it like a coroutine.
+		if !raw && !isFuture && f.Decl.IsVoid() {
 			if f.Decl.AST.Flags&ast::F_FALLIBLE != 0 {
 				// Just for void fallible.
 				// Other cases checked by semantic analsis and disallowed

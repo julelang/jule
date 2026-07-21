@@ -91,6 +91,7 @@ const (
 	evalUnwrapUntyped             // Unwraps untyped literal value to physical memory with default type.
 	evalFallible                  // Allows calling fallible functions.
 	evalRefptr                    // Eval for reference pointer memory.
+	evalFuture                    // Eval for the built-in `future` call.
 )
 
 struct eval {
@@ -3515,8 +3516,15 @@ impl eval {
 				self.s.pushErr(expr.Token, "methods must be invoked")
 			} else if findDirective(f.Decl.AST.Directives, directive::Export) != nil {
 				self.s.pushErr(expr.Token, "define @ is exported for backend and cannot used as anonymous", conv::Quote(f.Decl.AST.Name))
+			} else if flags&evalFuture == 0 && f.Decl.Flags&F_READY != 0 {
+				self.s.pushErr(expr.Token, "define @ is declared as `#ready` and cannot used outside of a `future` call", conv::Quote(f.Decl.AST.Name))
 			} else {
-				f.Flags |= F_AS_ANON
+				// Mark function `AS_ANON` only if expression is evaluated
+				// not for a built-in `future` call.
+				// Because this function will not use it as anonymous function.
+				if flags&evalFuture == 0 {
+					f.Flags |= F_AS_ANON
+				}
 			}
 		| v.Decl:
 			// Check evaluated type declarations.

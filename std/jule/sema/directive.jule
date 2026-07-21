@@ -166,6 +166,70 @@ impl directiveChecker {
 		}
 	}
 
+	fn checkFuture(mut *self, mut d: &ast::Directive) {
+		match type self.o {
+		| &Func:
+			mut f := self.o.(&Func)
+			if f.AST.Flags&ast::F_ASYNC == 0 {
+				self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
+				self.s.pushSuggestion("declaration must be an async function")
+				return
+			}
+			if f.Flags&F_READY != 0 {
+				self.s.pushErr(d.Tag, "function must be #future or #ready, not both")
+				return
+			}
+			if f.IsInit() {
+				self.s.pushErr(d.Tag, "initializer functions cannot be #future")
+				return
+			}
+			if f.IsEntryPoint() {
+				self.s.pushErr(d.Tag, "entry point function cannot be #future")
+				return
+			}
+			f.Flags |= F_FUTURE
+		|:
+			self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
+			self.s.pushSuggestion("declaration must be an async function")
+			return
+		}
+		if len(d.Args) > 0 {
+			self.s.pushErr(d.Args[0], "the #future will not take any arguments")
+		}
+	}
+
+	fn checkReady(mut *self, mut d: &ast::Directive) {
+		match type self.o {
+		| &Func:
+			mut f := self.o.(&Func)
+			if f.AST.Flags&ast::F_ASYNC != 0 {
+				self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
+				self.s.pushSuggestion("declaration must be a sync function")
+				return
+			}
+			if f.Flags&F_FUTURE != 0 {
+				self.s.pushErr(d.Tag, "function must be #future or #ready, not both")
+				return
+			}
+			if f.IsInit() {
+				self.s.pushErr(d.Tag, "initializer functions cannot be #ready")
+				return
+			}
+			if f.IsEntryPoint() {
+				self.s.pushErr(d.Tag, "entry point function cannot be #ready")
+				return
+			}
+			f.Flags |= F_READY
+		|:
+			self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
+			self.s.pushSuggestion("declaration must be a sync function")
+			return
+		}
+		if len(d.Args) > 0 {
+			self.s.pushErr(d.Args[0], "the #ready will not take any arguments")
+		}
+	}
+
 	fn checkDirective(mut *self, mut d: &ast::Directive) {
 		match d.Tag.Kind {
 		| directive::Cdef:
@@ -182,6 +246,10 @@ impl directiveChecker {
 			self.s.pushSuggestion("Place the directive at the very top of your source code.")
 		| directive::Disable:
 			self.checkDisable(d)
+		| directive::Future:
+			self.checkFuture(d)
+		| directive::Ready:
+			self.checkReady(d)
 		|:
 			self.s.pushErr(d.Tag, "invalid label: "+d.Tag.Kind)
 		}

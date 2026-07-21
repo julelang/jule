@@ -28,6 +28,7 @@ const (
 	anyTypeIdent             = "__jule_any_type"
 	deallocatedTypeIdent     = "__jule_type_deallocator"
 	traitMethodWrapperPrefix = "__jule_trait_method_wrapper_"
+	readyStatusParamName     = "__jule_ready_status_param"
 )
 
 // coSpawn prefix should take suffix before offset data
@@ -1101,13 +1102,21 @@ impl ObjectCoder {
 	}
 
 	fn paramsIns(mut &self, mut &buf: *strings::Builder, mut f: &sema::FuncIns) {
-		if f.Flags&sema::F_AS_ANON == 0 && len(f.Params) == 0 {
+		if len(f.Params) == 0 &&
+			f.Flags&sema::F_AS_ANON == 0 &&
+			f.Decl.Flags&sema::F_READY == 0 {
 			buf.WriteString("(void)")!
 			return
 		}
 		buf.WriteByte('(')!
 		if f.Flags&sema::F_AS_ANON != 0 {
 			buf.WriteString(ctxParamType + " " + ctxParamIdent)!
+			if len(f.Params) > 0 || f.Decl.Flags&sema::F_READY != 0 {
+				buf.WriteString(", ")!
+			}
+		}
+		if f.Decl.Flags&sema::F_READY != 0 {
+			buf.WriteString(typeBool + " *" + readyStatusParamName)!
 			if len(f.Params) > 0 {
 				buf.WriteString(", ")!
 			}

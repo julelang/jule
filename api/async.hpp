@@ -47,7 +47,8 @@
 
 #include "types.hpp"
 
-#define __jule_AsyncReturn co_return  // Equivalent to `return` in async functions.
+#define __jule_AsyncReturn                                                     \
+    co_return                      // Equivalent to `return` in async functions.
 #define __jule_AsyncAwait co_await // Equivalent to `await` in async functions.
 
 #if defined(_MSC_VER)
@@ -281,11 +282,14 @@ public:
 
     using HandleType = std::coroutine_handle<promise_type>;
     HandleType handle{};
+    bool ready;
+    std::optional<T> value;
 
     __jule_Async() = default;
     explicit __jule_Async(HandleType h) noexcept : handle(h) {}
     __jule_Async(__jule_Async &&o) noexcept
-        : handle(std::exchange(o.handle, {})) {}
+        : handle(std::exchange(o.handle, {})), ready(o.ready),
+          value(std::move(o.value)) {}
 
     __jule_Async(const __jule_Async &) = delete;
     __jule_Async &operator=(__jule_Async &&) = delete;
@@ -301,14 +305,16 @@ public:
     auto operator co_await() && noexcept {
         struct Awaiter {
             HandleType h;
+            bool ready;
+            std::optional<T> value;
 
             bool await_ready(void) const noexcept {
 #ifndef NDEBUG
-                if (!h) {
+                if (!ready && !h) {
                     std::terminate();
                 }
 #endif
-                return h.done();
+                return ready || h.done();
             }
 
             void await_suspend(__jule_cHandle caller) noexcept {
@@ -323,6 +329,9 @@ public:
             }
 
             T await_resume(void) {
+                if (ready) {
+                    return std::move(*value);
+                }
                 auto &p = h.promise();
                 T out = std::move(*p.value);
 
@@ -332,7 +341,7 @@ public:
             }
         };
 
-        return Awaiter{std::exchange(handle, {})};
+        return Awaiter{std::exchange(handle, {}), ready, std::move(value)};
     }
 };
 
@@ -373,11 +382,12 @@ public:
 
     using HandleType = std::coroutine_handle<promise_type>;
     HandleType handle{};
+    bool ready;
 
     __jule_VoidAsync() = default;
     explicit __jule_VoidAsync(HandleType h) noexcept : handle(h) {}
     __jule_VoidAsync(__jule_VoidAsync &&o) noexcept
-        : handle(std::exchange(o.handle, {})) {}
+        : handle(std::exchange(o.handle, {})), ready(o.ready) {}
 
     __jule_VoidAsync(const __jule_VoidAsync &) = delete;
     __jule_VoidAsync &operator=(__jule_VoidAsync &&) = delete;
@@ -388,14 +398,15 @@ public:
     auto operator co_await() && noexcept {
         struct Awaiter {
             HandleType h;
+            bool ready;
 
             bool await_ready(void) const noexcept {
 #ifndef NDEBUG
-                if (!h) {
+                if (!ready && !h) {
                     std::terminate();
                 }
 #endif
-                return h.done();
+                return ready || h.done();
             }
 
             void await_suspend(__jule_cHandle caller) noexcept {
@@ -409,10 +420,14 @@ public:
                 return;
             }
 
-            void await_resume(void) noexcept { h.destroy(); }
+            void await_resume(void) noexcept {
+                if (h) {
+                    h.destroy();
+                }
+            }
         };
 
-        return Awaiter{std::exchange(handle, {})};
+        return Awaiter{std::exchange(handle, {}), ready};
     }
 };
 

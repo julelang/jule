@@ -2881,8 +2881,36 @@ impl sema {
 		sc.check(f.Decl.AST.Scope, f.Scope)
 		f.Scope.Owner = uintptr(f)
 
+		isFuture := f.Decl.Flags&F_FUTURE != 0
+
+		// If the function is a `#future` function, check for the scope pattern.
+		if isFuture {
+			if len(f.Scope.Stmts) == 0 {
+				self.pushErr(f.Decl.AST.Token, "a `#future` function must be call the built-in `future` function in its body")
+				self.pushSuggestion("return a future like this: future(ready(...), suspend(...))")
+			} else if len(f.Scope.Stmts) > 1 {
+				self.pushErr(f.Decl.AST.Token, "a `#future` function must only be call the built-in `future` function in its body")
+				self.pushSuggestion("remove the trailing statements from the function body")
+			} else {
+				mut v, mut ok := f.Scope.Stmts[0].(&Value)
+				if !ok {
+					self.pushErr(f.Decl.AST.Token, "a `#future` function must only be call the built-in `future` function in its body")
+					self.pushSuggestion("return a future like this: future(ready(...), suspend(...))")
+				} else {
+					_, ok = v.Model.(&BuiltinFutureCallExpr)
+					if !ok {
+						self.pushErr(f.Decl.AST.Token, "a `#future` function must only be call the built-in `future` function in its body")
+						self.pushSuggestion("return a future like this: future(ready(...), suspend(...))")
+					}
+				}
+			}
+		}
+
 		// Check return statements if scopeChecker not forced to stop and no error.
-		if !sc.stopped() && len(sc.s.meta.errors) == n {
+		// Do not check for `#future` functions, because they always returns.
+		// Also the analysis probably will log an error because the built-in
+		// `future` function is not a valid return statement.
+		if !isFuture && !sc.stopped() && len(sc.s.meta.errors) == n {
 			self.checkRets(f, sc)
 		}
 	}

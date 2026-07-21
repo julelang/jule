@@ -7,6 +7,7 @@ use "std/fmt"
 use "std/internal/jule/mod"
 use "std/jule/ast"
 use "std/jule/constant"
+use "std/jule/directive"
 use "std/jule/log"
 use "std/jule/types"
 use "std/os/filepath"
@@ -1114,6 +1115,151 @@ fn builtinCallerCmplx(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	return r
 }
 
+fn builtinCallerFuture(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
+	if len(fc.Args) < 1 {
+		e.pushErr(fc.Token, "the ready function call of the future is missing")
+		e.pushSuggestion("call like; future(ready(...), suspend(...))")
+		return nil
+	}
+	if len(fc.Args) < 2 {
+		e.pushErr(fc.Token, "the suspend function call of the future is missing")
+		e.pushSuggestion("call like; future(ready(...), suspend(...))")
+		return nil
+	}
+	if len(fc.Args) > 2 {
+		e.pushErr(fc.Token, "passed more argument than expected to future")
+		e.pushSuggestion("call like; future(ready(...), suspend(...))")
+	}
+
+	if !e.isAsync() {
+		e.pushErr(fc.Token, "`future` function can only be called from within an `async` scope")
+	}
+	mut sc, mut ok := e.lookup.(&scopeChecker)
+	if !ok {
+		e.pushErr(fc.Token, "`future` function allowed for only `#future` async functions")
+		return nil
+	}
+	mut root := sc.getRoot()
+	if root.owner == nil || root.owner.Decl.Flags&F_FUTURE == 0 {
+		e.pushErr(fc.Token, "`future` function allowed for only `#future` async functions")
+		return nil
+	}
+
+	mut readyArg := fc.Args[0]
+	mut suspendArg := fc.Args[1]
+
+	mut prefix := e.prefix
+	defer { e.prefix = prefix }
+
+	e.prefix = nil
+	mut readyValue := e.eval(readyArg, evalDefault|evalFuture)
+	if readyValue == nil {
+		return nil
+	}
+	mut readyFunc := readyValue.Type.Func()
+	if readyFunc == nil {
+		e.pushErr(readyArg.Token, "`ready` function must be a function or an explicit closure")
+		return nil
+	}
+	if readyFunc.Decl.Flags&F_READY == 0 {
+		e.pushErr(readyArg.Token, "`ready` function must be a `#ready` function")
+		return nil
+	}
+	if !isGoodFutureFunc(readyValue) {
+		e.pushErr(readyArg.Token, "`ready` function must be a function or an explicit closure")
+		return nil
+	}
+	// Add `async` state to the `ready` function for type compatibility analysis.
+	readyFunc.Decl.AST.Flags |= ast::F_ASYNC
+	ok = readyFunc.EqualFunc(root.owner, false)
+	// Remove the `async` state of the `ready` function.
+	readyFunc.Decl.AST.Flags &= ^ast::F_ASYNC
+	if !ok {
+		e.pushErr(readyArg.Token, "`ready` function type is not same as the owner function type")
+		e.pushSuggestion("type of the owner function: @", root.owner.String())
+		return nil
+	}
+
+	mut typ := Type{Kind: root.owner}
+	e.prefix = unsafe { (&Type)(&typ) }
+	mut suspendValue := e.eval(suspendArg, evalDefault|evalFuture)
+	if suspendValue == nil {
+		return nil
+	}
+	mut suspendFunc := suspendValue.Type.Func()
+	if suspendFunc == nil {
+		e.pushErr(suspendArg.Token, "`suspend` function must be a function or an explicit closure")
+		return nil
+	}
+	if !isGoodFutureFunc(suspendValue) {
+		e.pushErr(suspendArg.Token, "`suspend` function must be a function or an explicit closure")
+		return nil
+	}
+	if !suspendFunc.EqualFunc(root.owner, false) {
+		e.pushErr(suspendArg.Token, "`suspend` function type is not same as the owner function type")
+		e.pushSuggestion("type of the owner function: @", root.owner.String())
+		return nil
+	}
+
+	mut future := buildVoidValue()
+	future.Model = &BuiltinFutureCallExpr{
+		Owner:   root.owner,
+		Ready:   readyValue,
+		Suspend: suspendValue,
+	}
+	return future
+}
+
+fn builtinCallerReady(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
+	if len(fc.Args) < 1 {
+		e.pushErr(fc.Token, "the ready status argument is missing")
+		e.pushSuggestion("call like; ready(status)")
+		return nil
+	}
+	if len(fc.Args) > 1 {
+		e.pushErr(fc.Token, "passed more argument than expected")
+		e.pushSuggestion("call like; ready(status)")
+	}
+
+	mut sc, mut ok := e.lookup.(&scopeChecker)
+	if !ok {
+		e.pushErr(fc.Token, "`ready` function allowed for only `#ready` functions")
+		return nil
+	}
+	mut root := sc.getRoot()
+	if root.owner == nil || root.owner.Decl.Flags&F_READY == 0 {
+		e.pushErr(fc.Token, "`ready` function allowed for only `#ready` functions")
+		return nil
+	}
+
+	mut v := e.eval(fc.Args[0], evalDefault)
+	if v == nil {
+		return nil
+	}
+
+	// Check type if validity is good.
+	// Helps to reduce error logs and duplicated logs.
+	const (
+		Mutable   = false
+		Reference = false
+	)
+	if e.s.checkValidityForInitExpr(Mutable, Reference, primBool, v, fc.Token) {
+		const FirstAssignToDest = true // The argument takes first assignment with the function call.
+		if !e.s.checkAssignType(Reference, FirstAssignToDest,
+			primBool, v, fc.Token, e.getOwnerRefers()) {
+			return nil
+		}
+	} else {
+		return nil
+	}
+
+	mut ready := buildVoidValue()
+	ready.Model = &BuiltinReadyCallExpr{
+		Status: v,
+	}
+	return ready
+}
+
 fn builtinCallerStdComptimeTypeOf(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, "type or expression is missing for TypeOf")
@@ -1574,6 +1720,20 @@ fn buildIota(i: i64): &Var {
 	}
 }
 
+// Reports whether the value v is a good value for the built-in `future` function.
+fn isGoodFutureFunc(v: &Value): bool {
+	if v == nil {
+		return false
+	}
+	let mut ok: bool
+	_, ok = v.Model.(&AnonFuncExpr)
+	if ok {
+		return true
+	}
+	_, ok = v.Model.(&FuncIns)
+	return ok
+}
+
 fn init() {
 	// Initialize built-in functions.
 	builtinFuncs["print"] = &FuncIns{caller: builtinCallerPrint}
@@ -1590,6 +1750,8 @@ fn init() {
 	builtinFuncs["real"] = &FuncIns{caller: builtinCallerReal}
 	builtinFuncs["imag"] = &FuncIns{caller: builtinCallerImag}
 	builtinFuncs["cmplx"] = &FuncIns{caller: builtinCallerCmplx}
+	builtinFuncs["future"] = &FuncIns{caller: builtinCallerFuture}
+	builtinFuncs["ready"] = &FuncIns{caller: builtinCallerReady}
 
 	// Initialize built-in functions of the "std/mem" package.
 	builtinFuncsStdMem["SizeOf"] = &FuncIns{caller: builtinCallerStdMemSizeOf}
