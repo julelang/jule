@@ -282,7 +282,7 @@ public:
 
     using HandleType = std::coroutine_handle<promise_type>;
     HandleType handle{};
-    bool ready;
+    bool ready = false;
     std::optional<T> value;
 
     __jule_Async() = default;
@@ -382,7 +382,7 @@ public:
 
     using HandleType = std::coroutine_handle<promise_type>;
     HandleType handle{};
-    bool ready;
+    bool ready = false;
 
     __jule_VoidAsync() = default;
     explicit __jule_VoidAsync(HandleType h) noexcept : handle(h) {}
