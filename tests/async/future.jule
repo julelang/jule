@@ -136,12 +136,38 @@ impl futureBase {
 	async fn staticFuture(): int {
 		future(futureBase.staticReady, futureBase.staticSuspend)
 	}
+
+	#ready
+	fn methodReady(*self): int {
+		ready(true)
+		return 1
+	}
+
+	async fn methodSuspend(*self): int {
+		return 2
+	}
+
+	#future
+	async fn methodFuture(*self): int {
+		future(self.methodReady, self.methodSuspend)
+	}
 }
 
 async fn sumStatic() {
 	mut i, mut x := 0, 0
 	for i < 1_000; i++ {
 		x += futureBase.staticFuture().await
+	}
+	if x != 1_000 {
+		panic("expected 1_000")
+	}
+}
+
+async fn sumMethod() {
+	mut fb := futureBase{}
+	mut i, mut x := 0, 0
+	for i < 1_000; i++ {
+		x += fb.methodFuture().await
 	}
 	if x != 1_000 {
 		panic("expected 1_000")
@@ -155,4 +181,5 @@ async fn main() {
 	sumReadyFallible().await
 	sumReadyGeneric().await
 	sumStatic().await
+	sumMethod().await
 }
