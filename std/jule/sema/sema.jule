@@ -1005,6 +1005,9 @@ impl sema {
 			ok = true
 			for (_, mut p) in f.Params {
 				if !p.Decl.IsSelf() {
+					// Save length of the ignored types.
+					// We need this information for variadic argument handling.
+					ignoredlen := unsafe { len(*ignored) }
 					p.Type = sema.buildNonGenericType(
 						p.Decl.AST.Type,
 						generics,
@@ -1012,6 +1015,36 @@ impl sema {
 						unsafe { ignored },
 						unsafe { recheckNeed })
 					ok = ok && p.Type != nil
+					// If type analysis done and our parameter is variadic,
+					// we have handle it's type as variadic like actual types.
+					if ok && p.Decl.AST.Flags&ast::F_VARIADIC != 0 {
+						// If parameter type is ignored, we have to know this.
+						// Because our variadic type will not be annotated if
+						// we do not append this type as ignored.
+						// When types annotating, the only ignored types will be
+						// handled. But `makeVariadic` type uses types's kind
+						// instead of type's itself. So kind will remain old.
+						// To point new resolved type, append this type as ignored,
+						// so analysis will update kind to the resolved type.
+						//
+						// NOTE: if there is no new ignored type, there is no risk.
+						if ignoredlen != unsafe { len(*ignored) } {
+							// Save the original type for ignored type analysis.
+							pType := p.Type
+							// Make type variadic.
+							makeVariadic(&p.Type, p.Type)
+							for i, it in unsafe { *ignored } {
+								if it == pType {
+									// Replace old ignored type with the new type.
+									unsafe { (*ignored)[i] = p.Type }
+									break
+								}
+							}
+						} else {
+							// Make type variadic.
+							makeVariadic(&p.Type, p.Type)
+						}
+					}
 				}
 			}
 			if !f.Decl.IsVoid() {
