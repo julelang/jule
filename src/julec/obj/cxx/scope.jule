@@ -2403,17 +2403,17 @@ impl scopeCoder {
 		}
 
 		// Anonymous function may have different runtime model.
-		oldAsync := self.oc.mode & _OBJ_ASYNC
+		oldAsync := self.oc.Flags & F_ASYNC
 		if m.Func.Decl.AST.Flags&ast::F_ASYNC != 0 {
-			self.oc.mode |= _OBJ_ASYNC
+			self.oc.Flags |= F_ASYNC
 		} else {
-			self.oc.mode &= ^_OBJ_ASYNC
+			self.oc.Flags &= ^F_ASYNC
 		}
 
 		self.commonFuncScope(m.Func, false)
 
 		// Restore old runtime model.
-		self.oc.mode |= oldAsync
+		self.oc.Flags |= oldAsync
 
 		self.oc.doneIndent()
 		self.oc.indent()
@@ -2429,22 +2429,22 @@ impl scopeCoder {
 			return
 		}
 
-		// Save the mode and restore before return.
-		mut mode := self.oc.mode
-		defer { self.oc.mode = mode }
+		// Save the state and restore before return.
+		mut flags := self.oc.Flags
+		defer { self.oc.Flags = flags }
 
 		// Update modes according to function.
 		disable := obj::FindDirective(f.Decl.AST.Directives, directive::Disable)
 		if disable == nil {
-			self.oc.mode &= ^_OBJ_DISABLE
+			self.oc.Flags &= ^F_DISABLE
 		} else {
-			self.oc.mode = obj::HasDirectiveArg(disable, "boundary", self.oc.mode, _OBJC_DISABLE_BOUNDARY)
-			self.oc.mode = obj::HasDirectiveArg(disable, "nilptr", self.oc.mode, _OBJC_DISABLE_NILPTR)
+			self.oc.Flags = obj::HasDirectiveArg(disable, "boundary", self.oc.Flags, F_DISABLE_BOUNDARY)
+			self.oc.Flags = obj::HasDirectiveArg(disable, "nilptr", self.oc.Flags, F_DISABLE_NILPTR)
 		}
 		if f.Decl.AST.Flags&ast::F_ASYNC != 0 {
-			self.oc.mode |= _OBJ_ASYNC
+			self.oc.Flags |= F_ASYNC
 		} else {
-			self.oc.mode &= ^_OBJ_ASYNC
+			self.oc.Flags &= ^F_ASYNC
 		}
 
 		self.oc.write("{\n")

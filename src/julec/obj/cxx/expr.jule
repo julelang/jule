@@ -586,7 +586,7 @@ impl exprCoder {
 			self.oc.write("))")
 			return
 		| token::MUL:
-			nilptr := self.oc.mode&_OBJC_DISABLE_NILPTR != 0
+			nilptr := self.oc.Flags&F_DISABLE_NILPTR != 0
 			mut v, _ := m.Expr.Model.(&sema::Var)
 			if v != nil && v.AST.Flags&ast::F_REFERENCE != 0 {
 				self.oc.write("(*")
@@ -988,7 +988,7 @@ impl exprCoder {
 			return
 		}
 
-		nilptr := self.oc.mode&_OBJC_DISABLE_NILPTR != 0
+		nilptr := self.oc.Flags&F_DISABLE_NILPTR != 0
 		if !nilptr {
 			self.oc.write(".must_ok(\"")
 			self.oc.locInfo(m.Token)
@@ -1037,7 +1037,7 @@ impl exprCoder {
 	}
 
 	fn pureFuncCall(mut &self, mut m: &sema::FuncCallExpr) {
-		nilptr := self.oc.mode&_OBJC_DISABLE_NILPTR != 0
+		nilptr := self.oc.Flags&F_DISABLE_NILPTR != 0
 		wrapped := self.isWrapped(m)
 		if m.Await {
 			self.oc.write("__jule_AsyncAwait ")
@@ -1501,7 +1501,7 @@ impl exprCoder {
 			self.oc.write(")")
 		|:
 			// Index access with safety measures, by configuration.
-			self.indexingWithSafety(m, self.oc.mode&_OBJC_DISABLE_BOUNDARY == 0)
+			self.indexingWithSafety(m, self.oc.Flags&F_DISABLE_BOUNDARY == 0)
 		}
 	}
 
@@ -1578,7 +1578,7 @@ impl exprCoder {
 	}
 
 	fn slicing(mut &self, mut m: &sema::SlicingExpr) {
-		boundarycheck := self.oc.mode&_OBJC_DISABLE_BOUNDARY == 0
+		boundarycheck := self.oc.Flags&F_DISABLE_BOUNDARY == 0
 		self.possibleRefExpr(m.Expr.Model)
 		if boundarycheck {
 			self.oc.write(".safe_slice(\"")

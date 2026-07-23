@@ -78,9 +78,9 @@ struct traitCast {
 }
 
 struct anonHash {
-	expr: &sema::AnonFuncExpr
-	name: string
-	mode: int // ObjectCoder mode when this anonymous function appears.
+	expr:  &sema::AnonFuncExpr
+	name:  string
+	flags: int // ObjectCoder flags when this anonymous function appears.
 }
 
 struct traitHash {
@@ -94,27 +94,28 @@ struct metadata {
 
 // Internal ObjectCoder modes.
 const (
-	_OBJC_DEFAULT          = iota            // Default configuration.
-	_OBJC_DISABLE_BOUNDARY = 1 << (iota - 1) // Disable boundary checking.
-	_OBJC_DISABLE_NILPTR                     // Disable nil pointer checking.
-	_OBJ_ASYNC                               // Enable async runtime mode.
+	F_DEFAULT          = iota            // Default configuration.
+	F_DISABLE_BOUNDARY = 1 << (iota - 1) // Disable boundary checking.
+	F_DISABLE_NILPTR                     // Disable nil pointer checking.
+	F_ASYNC                              // Enable async runtime mode.
 
 	// All disable flags.
-	_OBJ_DISABLE = _OBJC_DISABLE_BOUNDARY | _OBJC_DISABLE_NILPTR
+	F_DISABLE = F_DISABLE_BOUNDARY | F_DISABLE_NILPTR
 )
 
 struct ObjectCoder {
-	mode: int
+	Flags: int
 
 	// Internal buffer which is commonly used.
 	Buf: strings::Builder
 
-	resultProto: strings::Builder // Prototype declarations of the result declarations.
-	resultDecls: strings::Builder // Struct wrappers for multi-return function types.
-	anyObj:      strings::Builder // Type handlers and others for the <any> type.
-	anonObj:     strings::Builder // Anonymous functions, but also used for trait type mappers.
-	deallocObj:  strings::Builder // Deallocation function for [self.deallocated] types.
-	coSpawnObj:  strings::Builder // Wrapper defines for co-spawns.
+	resultProto:  strings::Builder // Prototype declarations of the result declarations.
+	resultDecls:  strings::Builder // Struct wrappers for multi-return function types.
+	anyObj:       strings::Builder // Type handlers and others for the <any> type.
+	anonObj:      strings::Builder // Anonymous functions, but also used.
+	traitMappers: strings::Builder // Trait type mappers.
+	deallocObj:   strings::Builder // Deallocation function for [self.deallocated] types.
+	coSpawnObj:   strings::Builder // Wrapper defines for co-spawns.
 
 	ir:          &obj::IR
 	info:        SerializationInfo
@@ -148,9 +149,9 @@ struct ObjectCoder {
 }
 
 impl ObjectCoder {
-	fn New(mut ir: &obj::IR, mut info: SerializationInfo): &ObjectCoder {
+	fn New(mut ir: &obj::IR, flags: int, mut info: SerializationInfo): &ObjectCoder {
 		mut oc := &ObjectCoder{
-			mode:        _OBJC_DEFAULT,
+			Flags:       flags,
 			ir:          ir,
 			info:        info,
 			resultMap:   {},
@@ -367,7 +368,7 @@ impl ObjectCoder {
 		}
 
 		// Anonymous function.
-		self.anons = append(self.anons, &anonHash{expr: m, name: name, mode: self.mode})
+		self.anons = append(self.anons, &anonHash{expr: m, name: name, flags: self.Flags})
 		self.anonFuncInsDecl(m, name)
 		self.anonObj.WriteByte('\n')!
 		return
@@ -684,9 +685,9 @@ impl ObjectCoder {
 
 		// Not exist, push.
 		const data = "data"
-		self.anonObj.WriteString("void *")!
-		self.anonObj.Write(unsafe { ident.Buf() })!
-		self.anonObj.WriteString("(const void *" + data + ") noexcept { ")!
+		self.traitMappers.WriteString("void *")!
+		self.traitMappers.Write(unsafe { ident.Buf() })!
+		self.traitMappers.WriteString("(const void *" + data + ") noexcept { ")!
 
 		mut t1Ident := strings::Builder{}
 		mut t2Ident := strings::Builder{}
@@ -700,32 +701,32 @@ impl ObjectCoder {
 						i1 := obj::FindTraitTypeOffsetS(t1, s1i)
 						i2 := obj::FindTraitTypeOffsetS(t2, s1i)
 						// For: Type.
-						self.anonObj.WriteString("if (data == &")!
-						self.anonObj.Write(unsafe { t2Ident.Buf() })!
-						self.anonObj.WriteString("_mptr_data")!
-						self.anonObj.WriteString(conv::Itoa(i2))!
-						self.anonObj.WriteString(") return &")!
-						self.anonObj.Write(unsafe { t1Ident.Buf() })!
-						self.anonObj.WriteString("_mptr_data")!
-						self.anonObj.WriteString(conv::Itoa(i1))!
-						self.anonObj.WriteString("; ")!
+						self.traitMappers.WriteString("if (data == &")!
+						self.traitMappers.Write(unsafe { t2Ident.Buf() })!
+						self.traitMappers.WriteString("_mptr_data")!
+						self.traitMappers.WriteString(conv::Itoa(i2))!
+						self.traitMappers.WriteString(") return &")!
+						self.traitMappers.Write(unsafe { t1Ident.Buf() })!
+						self.traitMappers.WriteString("_mptr_data")!
+						self.traitMappers.WriteString(conv::Itoa(i1))!
+						self.traitMappers.WriteString("; ")!
 						// For: &Type.
-						self.anonObj.WriteString("if (data == &")!
-						self.anonObj.Write(unsafe { t2Ident.Buf() })!
-						self.anonObj.WriteString("_mptr_data")!
-						self.anonObj.WriteString(conv::Itoa(i2 + 1))!
-						self.anonObj.WriteString(") return &")!
-						self.anonObj.Write(unsafe { t1Ident.Buf() })!
-						self.anonObj.WriteString("_mptr_data")!
-						self.anonObj.WriteString(conv::Itoa(i1 + 1))!
-						self.anonObj.WriteString("; ")!
+						self.traitMappers.WriteString("if (data == &")!
+						self.traitMappers.Write(unsafe { t2Ident.Buf() })!
+						self.traitMappers.WriteString("_mptr_data")!
+						self.traitMappers.WriteString(conv::Itoa(i2 + 1))!
+						self.traitMappers.WriteString(") return &")!
+						self.traitMappers.Write(unsafe { t1Ident.Buf() })!
+						self.traitMappers.WriteString("_mptr_data")!
+						self.traitMappers.WriteString(conv::Itoa(i1 + 1))!
+						self.traitMappers.WriteString("; ")!
 					}
 				}
 			}
 		}
-		self.anonObj.WriteString("__jule_panicString(")!
-		stringLit(&self.anonObj, "trait casting failed because of an implementation mistake, this is a julec bug", "78")
-		self.anonObj.WriteString("); return nullptr; }\n")!
+		self.traitMappers.WriteString("__jule_panicString(")!
+		stringLit(&self.traitMappers, "trait casting failed because of an implementation mistake, this is a julec bug", "78")
+		self.traitMappers.WriteString("); return nullptr; }\n")!
 	}
 
 	// Writes location information of token as cstr bytes.
@@ -1565,9 +1566,9 @@ impl ObjectCoder {
 	}
 
 	fn anonHashes(mut &self) {
-		// Save the current mode and restore before return.
-		mode := self.mode
-		defer { self.mode = mode }
+		// Save the current state and restore before return.
+		flags := self.Flags
+		defer { self.Flags = flags }
 
 		// Use recursive algorithm, because anonymous function may have
 		// anonymous functions, so [self.anons] may grow.
@@ -1576,7 +1577,7 @@ impl ObjectCoder {
 		mut anons := self.anons
 		self.anons = nil
 		for (_, mut h) in anons {
-			self.mode = h.mode
+			self.Flags = h.flags
 			self.anonFuncIns(h.expr, h.name)
 		}
 		if len(self.anons) > 0 {
@@ -1736,6 +1737,9 @@ impl ObjectCoder {
 
 		self.insertBuf(&self.anonObj, self.declPos)
 		self.declPos += self.anonObj.Len()
+
+		self.insertBuf(&self.traitMappers, self.declPos)
+		self.declPos += self.traitMappers.Len()
 
 		self.insertBuf(&self.coSpawnObj, self.declPos)
 		self.declPos += self.coSpawnObj.Len()

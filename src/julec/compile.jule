@@ -58,8 +58,8 @@ fn openOutput(path: string): &os::File {
 }
 
 // Remove generated objects for compilation.
-fn clearObjects() {
-	os::Remove(getCompilePath()) else {
+fn clearObjects(compilePath: string) {
+	os::Remove(compilePath) else {
 		println("a problem occurs when object cleaning")
 		return
 	}
@@ -71,7 +71,7 @@ fn clearObjects() {
 }
 
 // Compile generated IR.
-fn compileIR(compiler: string, mut compilerArgs: []string) {
+fn compileIR(compilePath: string, compiler: string, mut compilerArgs: []string) {
 	mut cmd := os::Cmd.New(compiler, compilerArgs...)
 	cmd.Stdout(os::Stdout())!
 	cmd.Stderr(os::Stderr())!
@@ -89,7 +89,7 @@ fn compileIR(compiler: string, mut compilerArgs: []string) {
 		handle::Throw("")
 	}
 
-	clearObjects()
+	clearObjects(compilePath)
 }
 
 fn isExternSourceFile(path: string): bool {
@@ -582,6 +582,35 @@ fn buildIR(args: []string): &obj::IR {
 	return ir
 }
 
+fn codegenSingleUnit(mut ir: &obj::IR) {
+	// See compiler reference (1)
+	ir.Order()
+
+	compilePath := getCompilePath()
+	compiler, mut compilerArgs := genCompileCmd(compilePath, ir)
+
+	mut oc := cxx::ObjectCoder.New(ir, cxx::F_DEFAULT, cxx::SerializationInfo{
+		Compiler:     compiler,
+		CompilerArgs: compilerArgs,
+	})
+	if env::Test {
+		mut tc := cxx::TestCoder.New(oc)
+		tc.Serialize()
+	} else {
+		oc.Serialize()
+	}
+
+	mut file := openOutput(compilePath)
+	file.WriteSync(unsafe { oc.Buf.Buf() }) else {
+		handle::Throw("object code could not write")
+	}
+	file.CloseSync()!
+
+	if !env::Transpilation {
+		compileIR(compilePath, compiler, compilerArgs)
+	}
+}
+
 // Process build command by "ARGS" global.
 fn build(mut args: []string) {
 	args = args[1:] // Remove program path.
@@ -604,30 +633,5 @@ fn build(mut args: []string) {
 
 	applyTargetIndependentOptimizations(ir)
 
-	// See compiler reference (1)
-	ir.Order()
-
-	compPath := getCompilePath()
-	compiler, mut compilerArgs := genCompileCmd(compPath, ir)
-
-	mut oc := cxx::ObjectCoder.New(ir, cxx::SerializationInfo{
-		Compiler:     compiler,
-		CompilerArgs: compilerArgs,
-	})
-	if env::Test {
-		mut tc := cxx::TestCoder.New(oc)
-		tc.Serialize()
-	} else {
-		oc.Serialize()
-	}
-
-	mut file := openOutput(compPath)
-	file.WriteSync(unsafe { oc.Buf.Buf() }) else {
-		handle::Throw("object code could not write")
-	}
-	file.CloseSync()!
-
-	if !env::Transpilation {
-		compileIR(compiler, compilerArgs)
-	}
+	codegenSingleUnit(ir)
 }
