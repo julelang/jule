@@ -695,6 +695,13 @@ impl dynamicTypeAnnotation {
 	}
 
 	fn pushGeneric(mut *self, mut k: &Type, i: int) {
+		// Type may be variadic due to variadic parameter.
+		// We can not use this type directly.
+		// Allocate an immutable copy to use.
+		if k.Flags&F_VARIADIC != 0 {
+			k = new(Type, *k)
+			k.Flags &= ^F_VARIADIC
+		}
 		self.f.Generics[i] = &InsGeneric{Type: k}
 		mut gd := self.f.Decl.AST.Generics[i]
 		for (_, mut ignored) in self.ignored {
