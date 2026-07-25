@@ -5,13 +5,11 @@
 use "std/internal/runtime"
 use "std/internal/runtime/atomic"
 
-type eventpollError: string
-
 const (
-	pollNoError:        eventpollError = ""
-	pollErrClosing:     eventpollError = "descriptor is closed"
-	pollErrTimeout:     eventpollError = "I/O timeout"
-	pollErrNotPollable: eventpollError = "not pollable"
+	pollNoError        = 0
+	pollErrClosing     = 1 << iota // descriptor is closed
+	pollErrTimeout                 // I/O timeout
+	pollErrNotPollable             // not pollable
 )
 
 struct polldescqp {
@@ -327,7 +325,7 @@ impl polldesc {
 }
 
 #disable nilptr
-fn eventpollcheckerr(mut pd: &polldesc, mode: i32): eventpollError {
+fn eventpollcheckerr(mut pd: &polldesc, mode: i32): int {
 	info := pd.info()
 	if info.closing() {
 		return pollErrClosing
@@ -394,10 +392,10 @@ async fn eventpollblock(mut pd: &polldesc, mode: i32, waitio: bool): bool {
 
 // Prepares a descriptor for polling in mode, which is 'r' or 'w'.
 #disable nilptr
-fn eventpollreset(mut pd: &polldesc, mode: i32)! {
+fn eventpollreset(mut pd: &polldesc, mode: i32): int {
 	errcode := eventpollcheckerr(pd, mode)
 	if errcode != pollNoError {
-		throw errcode
+		return errcode
 	}
 	match mode {
 	| 'r':
@@ -405,25 +403,21 @@ fn eventpollreset(mut pd: &polldesc, mode: i32)! {
 	| 'w':
 		atomic::Store(&pd.wcp, pdNil, atomic::Release)
 	}
+	return pollNoError
 }
 
 // Waits for a descriptor to be ready for reading or writing,
 // according to mode, which is 'r' or 'w'.
 #disable nilptr
-async fn eventpollwait(mut pd: &polldesc, mode: i32)! {
+async fn eventpollwait(mut pd: &polldesc, mode: i32): int {
 	mut errcode := eventpollcheckerr(pd, mode)
-	if errcode != pollNoError {
-		throw errcode
-	}
-	for !eventpollblock(pd, mode, false).await {
+	for errcode == pollNoError && !eventpollblock(pd, mode, false).await {
 		errcode = eventpollcheckerr(pd, mode)
-		if errcode != pollNoError {
-			throw errcode
-		}
 		// Can happen if timeout has fired and unblocked us,
 		// but before we had a chance to run, timeout has been reset.
 		// Pretend it has not happened and retry.
 	}
+	return errcode
 }
 
 #disable nilptr

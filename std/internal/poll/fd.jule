@@ -3,16 +3,25 @@
 // license that can be found in the LICENSE file.
 
 use "std/errors"
-use "std/io"
 use "std/mem"
+use "std/runtime"
 use "std/sys"
 
 // Throw when a file descriptor is used after it has been closed.
 let mut ErrFileClosing = errors::New("use of closed file")
 
+// Throw when a network descriptor is used after it has been closed.
+let mut ErrNetClosing = errors::New("use of closed network connection")
+
 // Throw when a request is made to set a deadline
 // on a file type that does not use the poller.
 let mut ErrNoDeadline = errors::New("file type does not support deadline")
+
+// Throw for an expired deadline.
+let mut ErrDeadlineExceeded = errors::New("i/o timeout")
+
+// Throw when the file or socket is not suitable for event notification.
+let mut ErrNotPollable = errors::New("not pollable")
 
 // FD flags. Kind flags should not be combined like File|Console|Socket.
 const (
@@ -99,4 +108,18 @@ impl FD {
 	fn ShouldAsync(*self): bool {
 		return self.pollable
 	}
+}
+
+fn convertError(errcode: int, isFile: bool)! {
+	match errcode {
+	| runtime::pollNoError:
+		panic("convertError: pollNoError")
+	| runtime::pollErrClosing:
+		errClosing(isFile)?
+	| runtime::pollErrTimeout:
+		throw ErrDeadlineExceeded
+	| runtime::pollErrNotPollable:
+		throw ErrNotPollable
+	}
+	panic("unreachable")
 }

@@ -25,7 +25,10 @@ impl FD {
 	// After returning, either the coroutine is ready to be executed
 	// according to the mode, or an error has occurred (e.g., deadline exceeded).
 	async fn Wait(mut *self, mode: i32)! {
-		runtime::eventpollwait(self.pd, mode).await?
+		errcode := runtime::eventpollwait(self.pd, mode).await
+		if errcode != runtime::pollNoError {
+			convertError(errcode, self.isFile())?
+		}
 	}
 
 	// Waits until an event is triggered by eventpoll for read operation.
@@ -43,7 +46,10 @@ impl FD {
 	}
 
 	fn Prepare(mut *self, mode: i32)! {
-		runtime::eventpollreset(self.pd, mode)?
+		errcode := runtime::eventpollreset(self.pd, mode)
+		if errcode != runtime::pollNoError {
+			convertError(errcode, self.isFile())?
+		}
 	}
 
 	fn PrepareRead(mut *self)! {
