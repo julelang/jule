@@ -1298,8 +1298,14 @@ impl exprCoder {
 				self.oc.indent()
 				match type stmt {
 				| &sema::Use:
-					m.Handler.Stmts = m.Handler.Stmts[:len(m.Handler.Stmts)-1]
+					// Save statements and remove trailing use statement.
+					// We will generate code for it.
+					// Then restore the original statements, do not mutate scope.
+					mut stmts := m.Handler.Stmts
+					m.Handler.Stmts = stmts[:len(stmts)-1]
 					self.oc.sc.scope2(m.Handler, true)
+					m.Handler.Stmts = stmts
+
 					self.oc.write("\n")
 					self.oc.indent()
 					mut v := stmt.(&sema::Use).Value
