@@ -58,23 +58,6 @@
 #include <atomic>
 #endif
 
-// Entry point of the scheduler thread.
-void __jule_schedthread(void *);
-
-#ifdef __JULE_OS_WINDOWS
-DWORD WINAPI __jule_trampoline_schedthread(LPVOID data)
-#else
-void *__jule_trampoline_schedthread(void *data)
-#endif
-{
-    __jule_schedthread(data);
-#ifdef __JULE_OS_WINDOWS
-    return 0;
-#else
-    return NULL;
-#endif
-}
-
 // Represents a scheduler worker thread in the Jule runtime.
 // The full definition lives in the runtime, not here.
 class __jule_thread;

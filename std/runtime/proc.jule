@@ -175,9 +175,6 @@ use "std/internal/runtime/atomic"
 extern fn __jule_retireDrain()
 extern fn __jule_trampolineRun()
 
-// Calls schedthread with P.
-extern let __jule_trampoline_schedthread: *unsafe
-
 // The value of the COMAXPROCS.
 // Compiler will set it to zero for default value, which is initialized by runtime.
 // Otherwise, this is initialized by the compiler to a custom value before runtime initialized.
@@ -1167,8 +1164,12 @@ fn schedule() {
 // When a M is first started, it starts from here.
 // This function called by the trampoline, with M.
 // The mp is a pointer to the M.
+//
+// The operating system thread API passes a pointer to the function when calling it.
+// In the final stage, this function's signature fits with the OS thread API.
+//
+// Since this function never returns, there should be no risk about return value.
 #disable nilptr
-#export "__jule_schedthread"
 fn schedthread(mut mp: *unsafe) {
 	// Set thread-local data before scheduling.
 	mut m := unsafe { (&thread)((*thread)(mp)) }
@@ -1316,15 +1317,12 @@ fn schedinit() {
 
 // The sysmon (system-monitor) thread.
 //
-// This function handled like an anonymous function.
-// Therefore the compiler will add *unsafe argument to
-// the head of the argument list implicitly for anonymous function context.
 // The operating system thread API passes a pointer to the function when calling it.
 // In the final stage, this function's signature fits with the OS thread API.
 //
 // Since this function never returns, there should be no risk about return value.
 #disable nilptr
-fn sysmon() {
+fn sysmon(_: *unsafe) {
 	for {
 		// Sleep for the next period.
 		threadsleep(_Millisecond * 10)
@@ -1388,7 +1386,7 @@ fn startm(mut pp: &p, spinning: bool, lockheld: bool) {
 			_RCFree(mptr.Ref)
 			mptr.Ref = nil
 		}
-		ok := unsafe { threadSpawn((*unsafe)(uintptr(extern.__jule_trampoline_schedthread)), (*thread)(m)) }
+		ok := unsafe { threadSpawn((*unsafe)(uintptr(schedthread)), (*thread)(m)) }
 		if !ok {
 			panic("runtime: M creation failed")
 		}
