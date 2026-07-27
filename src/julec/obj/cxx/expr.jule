@@ -918,6 +918,20 @@ impl exprCoder {
 					self.oc.write(")")
 					return
 				}
+			| prim.IsUintptr():
+				// Handle `uintptr(func)` special cases.
+				func := m.Expr.Type.Func()
+				if func != nil {
+					// We should use `modelForCall` because general expression
+					// code generation may generate anonymous function wrappers,
+					// invalid code for struct selectors, and etc.
+					// We just need to know functions's address and this is what
+					// `modelForCall` actually does.
+					self.oc.write("(" + typeUintptr + ")(")
+					self.modelForCall(m.Expr.Model)
+					self.oc.write(")")
+					return
+				}
 			}
 		}
 		prim = m.Expr.Type.Prim()

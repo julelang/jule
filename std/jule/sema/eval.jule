@@ -92,6 +92,7 @@ const (
 	evalFallible                  // Allows calling fallible functions.
 	evalRefptr                    // Eval for reference pointer memory.
 	evalFuture                    // Eval for the built-in `future` call.
+	evalCasting                   // Eval for casting.
 )
 
 struct eval {
@@ -1954,7 +1955,7 @@ impl eval {
 		//
 		// For numeric types; do not eval with physical memory constraint or unwrap.
 		// Casting analysis will check the overflows for the corresponding type.
-		mut flags := evalDefault
+		mut flags := evalDefault | evalCasting
 		if t.Prim() == nil || !types::IsNum(t.Prim().Kind) {
 			flags |= evalPhysicalMem | evalUnwrapUntyped
 		}
@@ -3512,7 +3513,7 @@ impl eval {
 			if !self.s.checkGenericQuantity(required, given, expr.Token) {
 				return nil
 			}
-			if flags&evalFuture == 0 && f.Decl.AST.Flags&ast::F_STATIC == 0 && f.Decl.IsMethod() {
+			if flags&(evalFuture|evalCasting) == 0 && f.Decl.AST.Flags&ast::F_STATIC == 0 && f.Decl.IsMethod() {
 				self.s.pushErr(expr.Token, "methods must be invoked")
 			} else if findDirective(f.Decl.AST.Directives, directive::Export) != nil {
 				self.s.pushErr(expr.Token, "define @ is exported for backend and cannot used as anonymous", conv::Quote(f.Decl.AST.Name))
