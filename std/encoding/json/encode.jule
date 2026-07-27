@@ -253,7 +253,7 @@ impl encoder {
 
 	#disable nilptr
 	fn encodeStruct[T, Flag](mut *self, v: T)! {
-		const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeIndent)
+		const useIndent = comptime::Typeof(Flag) == comptime::Typeof(encodeIndent)
 		self.incdepth()?
 		mut next := byte('{')
 		p := uintptr(&v)
@@ -295,7 +295,7 @@ impl encoder {
 
 	#disable nilptr
 	fn encodeMap[T, Flag](mut *self, v: T)! {
-		const t = comptime::TypeOf(T)
+		const t = comptime::Typeof(T)
 		const keyT = t.Key()
 		match keyT.Kind() {
 		| comptime::String
@@ -318,7 +318,7 @@ impl encoder {
 			self.buf.writeString("{}")
 			return
 		}
-		const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeIndent)
+		const useIndent = comptime::Typeof(Flag) == comptime::Typeof(encodeIndent)
 		self.incdepth()?
 		comptime::TypeAlias(valueTyp, t.Value())
 		mut next := byte('{')
@@ -353,9 +353,9 @@ impl encoder {
 
 	#disable nilptr
 	fn encodeArray[T, Flag](mut *self, v: T)! {
-		const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeIndent)
+		const useIndent = comptime::Typeof(Flag) == comptime::Typeof(encodeIndent)
 		self.incdepth()?
-		comptime::TypeAlias(valueTyp, comptime::TypeOf(v).Value())
+		comptime::TypeAlias(valueTyp, comptime::Typeof(v).Value())
 		mut next := byte('[')
 		for _, e in v {
 			self.buf.writeByte(next)
@@ -389,7 +389,7 @@ impl encoder {
 			self.buf.writeString("[]")
 			return
 		}
-		const match comptime::TypeOf(T).Value().Kind() {
+		const match comptime::Typeof(T).Value().Kind() {
 		| comptime::U8:
 			self.encodeByteSlice([]byte(v))
 		|:
@@ -399,7 +399,7 @@ impl encoder {
 
 	#disable nilptr
 	fn encodePlain[T, Flag](mut *self, v: T)! {
-		const t = comptime::TypeOf(T)
+		const t = comptime::Typeof(T)
 		const match {
 		| t.Strict() || t.Kind() == comptime::Struct:
 			// Before using the default encoding strategy, look for the custom encoder
@@ -415,7 +415,7 @@ impl encoder {
 							const m = comptime::ValueOf(v).Method(method.Name())
 							const match {
 							| m.Type().Decl().Fallible() &&
-								m.Type().Result() == comptime::TypeOf([]byte):
+								m.Type().Result() == comptime::Typeof([]byte):
 								bytes := m.Unwrap()() else {
 									throw &EncodeError{Type: t.String(), Err: error, sourceFunc: name}
 								}
@@ -480,7 +480,7 @@ impl encoder {
 		// Handle external types here to avoid compile-time error messages for types.
 		// The [encodePlain] should be compile-time safe for type T.
 		// Prevent any compilation errors from being triggered.
-		const tt = comptime::TypeOf(T)
+		const tt = comptime::Typeof(T)
 		const match {
 		| tt.Extern():
 			throw &UnsupportedTypeError{Type: tt.String()}
@@ -593,7 +593,7 @@ let mut fieldMapLock = runtime::rwmutex{}
 // If the structure is not cached yet, it will cache it.
 #disable nilptr boundary
 fn cachedFields[T](): []field {
-	const t = comptime::TypeOf(T)
+	const t = comptime::Typeof(T)
 	fieldMapLock.rLock()
 	mut cache, mut exist := fieldMap[t.Hash()]
 	fieldMapLock.rUnlock()
@@ -664,7 +664,7 @@ fn cachedFields[T](): []field {
 // Reports whether the JSON tag name is duplicated.
 fn isDuplicateTag[T](tag: string): bool {
 	mut seen := false
-	const t = comptime::TypeOf(T).Decl()
+	const t = comptime::Typeof(T).Decl()
 	const for _, f in t.Fields() {
 		const ftag = f.Tag("json")
 		if ftag != "" && ftag == tag ||
@@ -721,7 +721,7 @@ fn isValidTag(s: string): bool {
 }
 
 fn resolveKeyName[T](k: T): string {
-	const t = comptime::TypeOf(T)
+	const t = comptime::Typeof(T)
 	const match t.Kind() {
 	| comptime::String:
 		return string(k)

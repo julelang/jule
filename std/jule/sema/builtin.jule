@@ -1264,15 +1264,15 @@ fn builtinCallerReady(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	return ready
 }
 
-fn builtinCallerStdComptimeTypeOf(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
+fn builtinCallerStdComptimeTypeof(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, "type or expression is missing for TypeOf")
-		e.pushSuggestion("call like; TypeOf(typeOrValue)")
+		e.pushErr(fc.Token, "type or expression is missing for Typeof")
+		e.pushSuggestion("call like; Typeof(typeOrValue)")
 		return nil
 	}
 	if len(fc.Args) > 1 {
-		e.pushErr(fc.Token, "passed more argument than expected to TypeOf")
-		e.pushSuggestion("call like; TypeOf(typeOrValue)")
+		e.pushErr(fc.Token, "passed more argument than expected to Typeof")
+		e.pushSuggestion("call like; Typeof(typeOrValue)")
 	}
 
 	mut v := e.eval(fc.Args[0], evalDefault)
@@ -1282,7 +1282,7 @@ fn builtinCallerStdComptimeTypeOf(mut e: &eval, mut fc: &ast::CallExpr, _: &Valu
 	f := v.Type.Func()
 	if f != nil {
 		if f.IsBuiltin() {
-			e.pushErr(fc.Args[0].Token, "TypeOf does not supports built-in functions")
+			e.pushErr(fc.Args[0].Token, "Typeof does not supports built-in functions")
 			return nil
 		}
 		if len(f.Generics) != len(f.Decl.AST.Generics) {
@@ -1296,11 +1296,11 @@ fn builtinCallerStdComptimeTypeOf(mut e: &eval, mut fc: &ast::CallExpr, _: &Valu
 		return nil
 	}
 	if v.Type.comptime() {
-		e.pushErr(fc.Args[0].Token, "comptime::TypeOf does not support type \"untyped literal\"")
+		e.pushErr(fc.Args[0].Token, "comptime::Typeof does not support type \"untyped literal\"")
 		return nil
 	}
 	if v.untyped {
-		e.pushErr(fc.Args[0].Token, "comptime::TypeOf does not support value \"untyped literal\"")
+		e.pushErr(fc.Args[0].Token, "comptime::Typeof does not support value \"untyped literal\"")
 		return nil
 	}
 	return buildComptimeTypeInfoData(e.s, v.Type)
@@ -1767,10 +1767,10 @@ fn init() {
 
 	// Initialize built-in functions of the "std/mem" package.
 	builtinFuncsStdMem["Sizeof"] = &FuncIns{caller: builtinCallerStdMemSizeof}
-	builtinFuncsStdMem["Alignof"] = &FuncIns{caller: builtinCallerStdMemAlignOf}
+	builtinFuncsStdMem["Alignof"] = &FuncIns{caller: builtinCallerStdMemAlignof}
 
 	// Initialize built-in functions of the "std/comptime" package.
-	builtinFuncsStdComptime["TypeOf"] = &FuncIns{caller: builtinCallerStdComptimeTypeOf}
+	builtinFuncsStdComptime["Typeof"] = &FuncIns{caller: builtinCallerStdComptimeTypeof}
 	builtinFuncsStdComptime["ValueOf"] = &FuncIns{caller: builtinCallerStdComptimeValueOf}
 	builtinFuncsStdComptime["Line"] = &FuncIns{caller: builtinCallerStdComptimeLine}
 	builtinFuncsStdComptime["File"] = &FuncIns{caller: builtinCallerStdComptimeFile}
