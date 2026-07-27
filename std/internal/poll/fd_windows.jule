@@ -67,7 +67,7 @@ impl FD {
 		if self.Flags&SocketNoConn != 0 {
 			r := u32(0)
 			flag := u32(0)
-			size := u32(mem::SizeOf(flag))
+			size := u32(mem::Sizeof(flag))
 			fr := unsafe { sys::WSAIoctl(sys::Handle(self.File), sys::SIO_UDP_CONNRESET, (*byte)(&flag), size, nil, 0, &r) }
 			if fr != 0 {
 				throw sys::Errno(sys::WSAGetLastError())
@@ -415,7 +415,7 @@ impl FD {
 				o.sa = uintptr(sab)
 			}
 			&sa := unsafe { &(*(*sys::RawSockaddrAny)(o.sa)) }
-			o.sal = sys::Socklen(mem::SizeOf(*sa))
+			o.sal = sys::Socklen(mem::Sizeof(*sa))
 			sal := i32(addrLen)
 			sys::WSARecvFrom(sys::Handle(o.fd.File), &o.buf, 1, &o.qty, &o.flags, sa, &sal, &o.o, nil)?
 		}).await?
@@ -533,14 +533,14 @@ impl FD {
 	async fn acceptOne(mut *self, s: sys::Handle, &rawsa: *[2]sys::RawSockaddrAny, mut &o: *operation)! {
 		// Submit accept request.
 		execIO(o, fn|mut o| {
-			rsan := unsafe { u32(mem::SizeOf((*rawsa)[0])) }
+			rsan := unsafe { u32(mem::Sizeof((*rawsa)[0])) }
 			unsafe { AcceptEx(sys::Handle(o.fd.File), s, (*byte)(&(*rawsa)[0]), 0, rsan, rsan, &o.qty, &o.o)? }
 		}).await else {
 			sys::CloseSocket(s) else {}
 			throw error
 		}
 		// Inherit properties of the listening socket.
-		sys::Setsockopt(s, sys::SOL_SOCKET, sys::SO_UPDATE_ACCEPT_CONTEXT, uintptr(&self.File), sys::Socklen(mem::SizeOf(self.File))) else {
+		sys::Setsockopt(s, sys::SOL_SOCKET, sys::SO_UPDATE_ACCEPT_CONTEXT, uintptr(&self.File), sys::Socklen(mem::Sizeof(self.File))) else {
 			sys::CloseSocket(s) else {}
 			throw error
 		}
