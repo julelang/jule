@@ -2370,6 +2370,11 @@ impl exprCoder {
 		self.oc.write(").as_slice()")
 	}
 
+	fn hint(mut &self, m: &sema::HintExpr) {
+		hints := m.Hints
+		self.oc.meta.concurrent = self.oc.meta.concurrent || hints&int(runtime::H_CONCURRENT) != 0
+	}
+
 	fn model(mut &self, mut m: cst::Expr) {
 		match type m {
 		| string:
@@ -2468,6 +2473,8 @@ impl exprCoder {
 			self.typeAssertion(m.(&sema::TypeAssertionExpr))
 		| &sema::AddrcallExpr:
 			self.addrcallExpr(m.(&sema::AddrcallExpr))
+		| &sema::HintExpr:
+			self.hint(m.(&sema::HintExpr))
 		| &cst::UnsafeBinaryExpr:
 			self.unsafeBinary(m.(&cst::UnsafeBinaryExpr).Node)
 		| &cst::StringCompExpr:

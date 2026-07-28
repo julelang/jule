@@ -144,6 +144,17 @@ fn findBuiltinDef(name: string): any {
 }
 
 // Initialized by the init function.
+let mut builtinFuncsStdRuntime = map[string]&FuncIns{}
+
+fn findBuiltinDefStdRuntime(name: string): any {
+	mut r, ok := builtinFuncsStdRuntime[name]
+	if ok {
+		return r
+	}
+	return nil
+}
+
+// Initialized by the init function.
 let mut builtinFuncsStdMem = map[string]&FuncIns{}
 
 fn findBuiltinDefStdMem(name: string): any {
@@ -207,6 +218,8 @@ fn findPackageBuiltinDef(linkPath: string, name: string): any {
 	match linkPath {
 	| "std/comptime":
 		return findBuiltinDefStdComptime(name)
+	| "std/runtime":
+		return findBuiltinDefStdRuntime(name)
 	| "std/mem":
 		return findBuiltinDefStdMem(name)
 	| "std/integ":
@@ -1548,6 +1561,53 @@ fn builtinCallerStdComptimeIncludeString(mut e: &eval, mut fc: &ast::CallExpr, _
 	}
 }
 
+fn builtinCallerStdRuntimeHint(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
+	mut result := buildVoidValue()
+
+	if len(fc.Args) < 1 {
+		e.pushErr(fc.Token, "hints is missing for Hint")
+		e.pushSuggestion("call like; Hint(hints)")
+		return result
+	}
+	if len(fc.Args) > 1 {
+		e.pushErr(fc.Token, "passed more argument than expected to Hint")
+		e.pushSuggestion("call like; Hint(hints)")
+	}
+
+	mut v := e.evalExpr(fc.Args[0], evalDefault)
+	if v == nil {
+		return result
+	}
+	if !v.IsConst() {
+		e.pushErr(fc.Token, "hints must be constant for Hint")
+		return result
+	}
+
+	if e.s.meta.runtimeHint != nil {
+		// Hint type is exist.
+		if e.s.meta.runtimeHint != v.Type.Kind {
+			e.pushErr(fc.Token, "hint type is invalid, push only runtime hint flags to Hint")
+			return result
+		}
+	} else {
+		// Hint type is not exist.
+		// Lazy evaluation.
+		mut s := v.Type.SoftStruct()
+		if s == nil || s.Decl == nil || s.Decl.AST == nil || s.Decl.AST.Token == nil ||
+			s.Decl.AST.Name != "hint" ||
+			!isStdPackage(e.s.importer.GetFileSet(s.Decl.AST.Token.FileSetID).Dir(), "runtime") {
+			e.pushErr(fc.Token, "hint type is invalid, push only runtime hint flags to Hint")
+			return result
+		}
+		e.s.meta.runtimeHint = s
+	}
+
+	result.Model = &HintExpr{
+		Hints: int(v.Constant.AsU64()),
+	}
+	return result
+}
+
 fn builtinCallerStdMemSizeof(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	mut result := &Value{
 		Type: primUint,
@@ -1764,6 +1824,9 @@ fn init() {
 	builtinFuncs["cmplx"] = &FuncIns{caller: builtinCallerCmplx}
 	builtinFuncs["future"] = &FuncIns{caller: builtinCallerFuture}
 	builtinFuncs["ready"] = &FuncIns{caller: builtinCallerReady}
+
+	// Initialize built-in functions of the "std/runtime" package.
+	builtinFuncsStdRuntime["Hint"] = &FuncIns{caller: builtinCallerStdRuntimeHint}
 
 	// Initialize built-in functions of the "std/mem" package.
 	builtinFuncsStdMem["Sizeof"] = &FuncIns{caller: builtinCallerStdMemSizeof}
