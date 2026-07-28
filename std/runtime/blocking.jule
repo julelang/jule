@@ -12,6 +12,9 @@ struct blockingJob {
 // Environment for the blocking thread pool.
 // Implements a worker thread pool for blocking tasks.
 // See "Thread synchronization" comment of the scheduler.
+//
+// This is also an ordinary thread pool.
+// Sync or async programs may use this for thread-based concurrency.
 struct blockingenv {
 	maxWorkers: i32 // Constant once initialized.
 
@@ -25,13 +28,12 @@ struct blockingenv {
 impl blockingenv {
 	// Gets a job from queues.
 	#disable nilptr boundary
-	fn getjob(mut *self, mut &job: *blockingJob): (ok: bool) {
+	fn getjob(mut *self, mut &job: *&blockingJob) {
 		self.mu.lock()
 		if self.head != nil {
-			*job = *self.head
-			self.head = self.head.link
-			job.link = nil
-			ok = true
+			*job = self.head
+			self.head = (*job).link
+			(*job).link = nil
 		}
 		self.mu.unlock()
 		return
@@ -71,19 +73,19 @@ let mut blocking = blockingenv{}
 // Since this function never returns, there should be no risk about return value.
 #disable nilptr
 fn blockingWorker(_: *unsafe) {
-	sett(newThread(roleBlockingWorker))
-	mut w := gett()
+	mut w := newThread(roleBlockingWorker)
+	sett(w)
 
 	const MaxSpin = 4
 	mut tried := 0
 	for {
-		let mut job: blockingJob
-		ok := blocking.getjob(&job)
-		if !ok {
+		let mut job: &blockingJob
+		blocking.getjob(&job)
+		if job == nil {
 			// No job to run.
 			// Under high contention, new job may be available since last lookup.
 			// Try again if reasonable.
-			if tried < MaxSpin && sched.ncrunning() > 0 {
+			if tried < MaxSpin && (!asynctime || sched.ncrunning() > 0) {
 				tried++
 				continue
 			}
@@ -102,9 +104,11 @@ fn blockingWorker(_: *unsafe) {
 			continue
 		}
 		tried = 0
-		// Do job and unpark the coroutine, it is ready to go.
+		// Do job and unpark the coroutine (if exist), it is ready to go.
 		job.job()
-		unpark(&(*job.cp))
+		if job.cp != nil {
+			unpark(&(*job.cp))
+		}
 	}
 }
 
@@ -138,11 +142,42 @@ async fn Blocking(job: fn()) {
 		blocking.tail.link = bjp
 		blocking.tail = bjp
 	}
-	// We use the tagged pointer to call `blocking.wakeworker` after adding
+	// We use the tagged pointer to call `blocking.wakew` after adding
 	// a new job to the queue. It is done by mutex-unlock algorithm.
 	// The `blocking.mu` will be released after park due to `mutexunlockJobAdd`.
 	tp := taggedPointerPack(nil, mutexunlockJobAdd)
 	sched.enterblock()
 	park2(&(*bj.cp), tp, reasonBlocking).await
 	sched.exitblock()
+}
+
+// Designed for CPU-bound work, where each task is executed on a thread pool.
+// This thread pool may be shared with the pool used by the [Blocking].
+// It is designed to enable synchronous programs to perform concurrent
+// computations for CPU-bound tasks without thread management concerns.
+#disable nilptr
+fn Task(job: fn()) {
+	// We need this compiler hint for sync programs.
+	// Because compiler does not know this function introduces concurrency.
+	// Therefore, it may use non-atomic reference counting for memory management,
+	// and non-atomic reference counting may cause issues like double-free
+	// with concurrent execution.
+	Hint(H_CONCURRENT)
+
+	// We will use heap allocation because this is not a blocking call.
+	// Therefore, we need heap allocation to avoid deallocation when scope ends.
+	mut bj := &blockingJob{job: job}
+	blocking.mu.lock()
+	if blocking.head == nil {
+		blocking.head = bj
+		blocking.tail = blocking.head
+	} else {
+		blocking.tail.link = bj
+		blocking.tail = bj
+	}
+	// We use the tagged pointer to call `blocking.wakew` after adding
+	// a new job to the queue. It is done by mutex-unlock algorithm.
+	// The `blocking.mu` will be released due to `mutexunlockJobAdd`.
+	tp := taggedPointerPack(nil, mutexunlockJobAdd)
+	mutexunlock(u64(tp))
 }
