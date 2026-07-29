@@ -1949,31 +1949,31 @@ impl sema {
 		return true
 	}
 
-	fn checkTraitImplMethods(mut *self, mut base: &Trait, ipl: &Impl): (ok: bool) {
+	fn checkTraitImplMethods(mut *self, mut base: &Trait, _impl: &ast::Impl): (ok: bool) {
 		ok = true
-		for _, f in ipl.Methods {
-			if base.FindMethod(f.AST.Name) == nil {
-				self.pushErr(f.AST.Token, "undefined name for trait @: @", conv::Quote(base.AST.Name), conv::Quote(f.AST.Name))
+		for _, f in _impl.Methods {
+			if base.FindMethod(f.Name) == nil {
+				self.pushErr(f.Token, "undefined name for trait @: @", conv::Quote(base.AST.Name), conv::Quote(f.Name))
 				ok = false
 			}
 		}
 		return
 	}
 
-	fn implToStruct(mut &self, mut dest: &Struct, mut ipl: &Impl): (ok: bool) {
+	fn implToStruct(mut &self, mut dest: &Struct, mut _impl: &ast::Impl): (ok: bool) {
 		ok = true
 
 		// Methods.
-		for (_, mut f) in ipl.Methods {
-			if dest.FindMethod(f.AST.Name, f.AST.Flags&ast::F_STATIC != 0) != nil ||
-				dest.FindField(f.AST.Name) != nil {
-				self.pushErr(f.AST.Token, "identifier @ is duplicated in scope of struct", dest.AST.Name, f.AST.Name)
+		for (_, mut f) in _impl.Methods {
+			if dest.FindMethod(f.Name, f.Flags&ast::F_STATIC != 0) != nil ||
+				dest.FindField(f.Name) != nil {
+				self.pushErr(f.Token, "identifier @ is duplicated in scope of struct", dest.AST.Name, f.Name)
 				ok = false
 				continue
 			}
 
-			if len(dest.AST.Generics) > 0 && len(f.AST.Generics) > 0 {
-				for _, fg in f.AST.Generics {
+			if len(dest.AST.Generics) > 0 && len(f.Generics) > 0 {
+				for _, fg in f.Generics {
 					for _, dg in dest.AST.Generics {
 						if fg.Name == dg.Name {
 							self.pushErr(fg.Token, "methods cannot have the same generic identifier as owner: "+conv::Quote(fg.Name))
@@ -1983,11 +1983,12 @@ impl sema {
 				}
 			}
 
-			self.checkDirectives(f.AST.Directives, f)
+			mut m := buildFunc(f)
+			self.checkDirectives(f.Directives, m)
 
-			f.sema = self
-			f.Owner = dest
-			dest.Methods = append(dest.Methods, f)
+			m.sema = self
+			m.Owner = dest
+			dest.Methods = append(dest.Methods, m)
 		}
 
 		if len(dest.Instances) == 1 {
@@ -2003,25 +2004,25 @@ impl sema {
 	}
 
 	// Implement trait to destination.
-	fn implTrait(mut &self, mut decl: &Impl) {
-		mut baseT := self.selectType(decl.AST.Base)
+	fn implTrait(mut &self, mut decl: &ast::Impl) {
+		mut baseT := self.selectType(decl.Base)
 		if baseT == nil {
 			return
 		}
 		mut base := baseT.Trait()
 		if base == nil {
-			self.pushErr(decl.AST.Base.Token, "base type @ is invalid for impl statement", baseT.String())
+			self.pushErr(decl.Base.Token, "base type @ is invalid for impl statement", baseT.String())
 			self.pushSuggestion("expected trait type")
 			return
 		}
 
-		mut destT := self.selectType(decl.AST.Dest)
+		mut destT := self.selectType(decl.Dest)
 		if destT == nil {
 			return
 		}
 		mut destS := destT.SoftStruct()
 		if destS == nil {
-			self.pushErr(decl.AST.Dest.Token, "destination type @ is invalid for impl statement", destT.String())
+			self.pushErr(decl.Dest.Token, "destination type @ is invalid for impl statement", destT.String())
 			self.pushSuggestion("expected structure type")
 			return
 		}
@@ -2030,7 +2031,7 @@ impl sema {
 		destFile := self.importer.GetFileSet(dest.AST.Token.FileSetID)
 
 		if destFile.Dir() != self.file.File.Dir() {
-			self.pushErr(decl.AST.Dest.Token, "illegal implementation to structure comes from different package")
+			self.pushErr(decl.Dest.Token, "illegal implementation to structure comes from different package")
 			return
 		}
 
@@ -2043,14 +2044,14 @@ impl sema {
 		}
 	}
 
-	fn implStruct(mut &self, mut decl: &Impl) {
-		mut destT := self.selectType(decl.AST.Dest)
+	fn implStruct(mut &self, mut decl: &ast::Impl) {
+		mut destT := self.selectType(decl.Dest)
 		if destT == nil {
 			return
 		}
 		mut destS := destT.SoftStruct()
 		if destS == nil {
-			self.pushErr(decl.AST.Dest.Token, "destination type @ is invalid for impl statement", destT.String())
+			self.pushErr(decl.Dest.Token, "destination type @ is invalid for impl statement", destT.String())
 			self.pushSuggestion("expected structure type")
 			return
 		}
@@ -2058,7 +2059,7 @@ impl sema {
 		mut dest := destS.Decl
 		destFile := self.importer.GetFileSet(dest.AST.Token.FileSetID)
 		if destFile.Dir() != self.file.File.Dir() {
-			self.pushErr(decl.AST.Dest.Token, "illegal implementation to structure comes from different package")
+			self.pushErr(decl.Dest.Token, "illegal implementation to structure comes from different package")
 			return
 		}
 
@@ -2066,7 +2067,7 @@ impl sema {
 	}
 
 	// Implement implementation.
-	fn implImpl(mut &self, mut decl: &Impl) {
+	fn implImpl(mut &self, mut decl: &ast::Impl) {
 		match {
 		| decl.IsTraitImpl():
 			self.implTrait(decl)
