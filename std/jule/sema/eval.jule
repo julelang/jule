@@ -529,15 +529,21 @@ impl eval {
 		}
 	}
 
-	fn evalFunc(mut *self, mut f: &Func, errorToken: &token::Token): &Value {
-		if !self.s.isAccessibleDefine(f.AST.Flags&ast::F_PUBLIC != 0, f.AST.Token) {
-			self.pushErr(errorToken, "define is private and could not be accessed: "+f.AST.Name)
-			self.pushSuggestion("make it public by starting with a capital letter")
-			return nil
-		}
-
+	fn _evalFunc(mut *self, mut owner: &StructIns, mut f: &Func): &FuncIns {
 		mut ins := f.instance()
+		ins.Owner = owner
 		if len(f.AST.Generics) == 0 {
+			// Check for non-generic functions.
+			// Because they may be instantiated but not type checked,
+			// so our instance may be invalidated in the future.
+			// Check it if needed and use the actual instance to avoid this.
+			if ins.Flags&F_RELOADED == 0 {
+				ok := self.s.reloadFuncInsTypes(ins)
+				ins.Flags |= F_RELOADED
+				if !ok {
+					return nil
+				}
+			}
 			// For generics; it is safe. Because compiler should disallow using
 			// genericed functions without instantiation. So, functions should be
 			// instantiated. But, there is no generics, function may have different
@@ -551,6 +557,17 @@ impl eval {
 			// Otherwise, add a reference when it is instantiated.
 			self.pushReference(ins)
 		}
+		return ins
+	}
+
+	fn evalFunc(mut *self, mut f: &Func, errorToken: &token::Token): &Value {
+		if !self.s.isAccessibleDefine(f.AST.Flags&ast::F_PUBLIC != 0, f.AST.Token) {
+			self.pushErr(errorToken, "define is private and could not be accessed: "+f.AST.Name)
+			self.pushSuggestion("make it public by starting with a capital letter")
+			return nil
+		}
+
+		mut ins := self._evalFunc(nil, f)
 		return self.evalFuncIns(ins)
 	}
 
@@ -2284,20 +2301,10 @@ impl eval {
 		// See developer reference (15).
 		let mut recheckNeed: []recheckableType
 
-		if !dynamicAnnotation {
-			if f.Flags&F_RELOADED == 0 {
-				ok := self.s.reloadFuncInsTypes(f)
-				f.Flags |= F_RELOADED
-				if !ok {
-					*v = nil
-					return
-				}
-			}
-			mut existInstance := f.Decl.appendInstance(f)
-			if existInstance != nil {
-				f = existInstance
-			}
-		} else {
+		// Check for generic types if dynamic annotation necessary.
+		// Otherwise, function must be reloaded (types must be resolved) before
+		// this routine triggered.
+		if dynamicAnnotation {
 			// Use non-nil slice for dynamic type annotation.
 			// Thus we can use recheck strategy even for zero recheck-need cases.
 			recheckNeed = make([]recheckableType, 0, len(f.Params)/2)
@@ -2553,9 +2560,7 @@ impl eval {
 		if m.Params[0].IsSmartptr() && !ref {
 			self.pushErr(tok, "method with smart-pointer receiver cannot be used without a smart-pointer instance")
 		}
-		mut ins := m.instance()
-		ins.Owner = s
-		self.pushReference(ins)
+		mut ins := self._evalFunc(s, m)
 		mut model := new(Value, *v)
 		v.Model = &StructSubIdentExpr{
 			Token:  tok,
