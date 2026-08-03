@@ -5354,20 +5354,21 @@ fn checkDataForIntegerIndex(mut s: &sema, mut v: &Value,
 		return ""
 	}
 
+	prim := v.Type.Prim()
 	match {
-	| v.Type.Prim() == nil:
-		return "invalid type for index"
-	| !types::IsInt(v.Type.Prim().String()):
-		return "invalid type for index"
-	| v.IsConst():
-		if v.Constant.AsF64() < 0 {
-			return "negative index value is illegal"
-		}
-	| v.Type.Prim() == nil
-	| v.IsConst()
-	| types::RealKindOf(v.Type.Prim().String()) != types::RealKindOf(types::Int):
+	| prim == nil:
+		return "invalid type for index: @"
+	| v.IsConst() && v.Constant.AsF64() < 0:
+		return "negative index value is illegal"
+	| (!v.IsConst() || !v.untyped) && types::IsInt(prim.String()):
 		applyCastKind(s, v, primInt, token, refers)
+		return ""
 	}
+	const (
+		DestIsRef         = false
+		FirstAssignToDest = true
+	)
+	_ = s.checkAssignType(DestIsRef, FirstAssignToDest, primInt, v, token, refers)
 	return ""
 }
 
