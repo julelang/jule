@@ -37,19 +37,27 @@ struct RWMutex {
 impl Locker for RWMutex {}
 
 impl RWMutex {
+	#ready
+	fn ready_RLock(*self) {
+		ready(self.readerCount.Add(1, atomic::AcqRel) >= 0)
+	}
+
+	async fn suspend_RLock(*self) {
+		if runtime::adjustbudget() {
+			runtime::yield().await
+		}
+		// A writer is pending, wait for it.
+		runtime::semacquire(&self.readerSem, false, runtime::reasonMutex).await
+	}
+
 	// Locks for reading.
 	//
 	// It should not be used for recursive read locking; a blocked Lock
 	// call excludes new readers from acquiring the lock. See the
 	// documentation on the [RWMutex] type.
+	#future
 	async fn RLock(*self) {
-		if runtime::adjustbudget() {
-			runtime::yield().await
-		}
-		if self.readerCount.Add(1, atomic::AcqRel) < 0 {
-			// A writer is pending, wait for it.
-			runtime::semacquire(&self.readerSem, false, runtime::reasonMutex).await
-		}
+		future(self.ready_RLock, self.suspend_RLock)
 	}
 
 	// Tries to lock for reading and reports whether it succeeded.
