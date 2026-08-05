@@ -2574,23 +2574,6 @@ impl sema {
 		}
 	}
 
-	// Returns new FuncIns as ready-to-analysis.
-	// If function already has a instance, returns existing instance.
-	// Returns nil if have a problem.
-	fn readyToCheckFunc(mut &self, mut s: &StructIns, mut f: &Func): &FuncIns {
-		mut ins := f.instance()
-		if len(f.Instances) != 0 {
-			return ins
-		}
-		ins.Owner = s
-		f.appendInstance(ins)
-		ins.Flags |= F_RELOADED
-		if self.reloadFuncInsTypes(ins) {
-			return ins
-		}
-		return nil
-	}
-
 	fn recheckType(mut &self, mut t: recheckableType, mut errorToken: &token::Token,
 		mut refers: &ReferenceStack): (ok: bool) {
 		mut tc := &typeChecker{
@@ -2666,7 +2649,26 @@ impl sema {
 		return
 	}
 
-	fn checkTypeMethod(mut &self, mut f: &Func) {
+	fn checkTypeMethod(mut &self, mut s: &StructIns, mut f: &Func) {
+		// If method is not generic and there is no instance,
+		// instance it and prepare to check. Normally, we can instantiate them
+		// during the owner structure prechecking and prepare for the check.
+		// However, we cannot do this since structures may be instantiated
+		// before all methods are implemented by `impl` statements.
+		// In such cases, all methods may not be dispatched to all instances.
+		// To solve this issue, we can check for this special case here.
+		// Since eval algorithm is instantiates and checks generics just-in-time,
+		// there is no risk for generics methods, but non-generic methods.
+		if len(f.AST.Generics) == 0 && len(f.Instances) == 0 {
+			mut ins := f.instance()
+			ins.Owner = s
+			f.appendInstance(ins)
+			ok := self.reloadFuncInsTypes(ins)
+			ins.Flags |= F_RELOADED
+			if !ok {
+				return
+			}
+		}
 		for (_, mut ins) in f.Instances {
 			self.checkFuncIns(ins)
 		}
@@ -2675,7 +2677,10 @@ impl sema {
 	// Checks environment-dependent parts of structure instance.
 	// Which is contains fields and generic-type constraints.
 	// If generic instance will be check, errorToken should be passed.
-	fn checkStructEnv(mut &self, mut s: &StructIns, mut prev: &referencer, mut errorToken: &token::Token): (ok: bool) {
+	fn checkStructEnv(mut &self,
+		mut s: &StructIns,
+		mut prev: &referencer,
+		mut errorToken: &token::Token): (ok: bool) {
 		s.fillEnviron()
 
 		// If source is not nil, do not check.
@@ -2765,7 +2770,10 @@ impl sema {
 		return
 	}
 
-	fn precheckStructIns(mut &self, mut s: &StructIns, mut prev: &referencer, mut errorToken: &token::Token): (ok: bool) {
+	fn precheckStructIns(mut &self,
+		mut s: &StructIns,
+		mut prev: &referencer,
+		mut errorToken: &token::Token): (ok: bool) {
 		// Return is source type is still pseudoSource of a strict type alias instance.
 		// Following analysis must be done with real source type.
 		if s.Source == pseudoSource {
@@ -2804,25 +2812,14 @@ impl sema {
 				}
 			}
 		}
-
-		// Check instances even environment-based checking failed,
-		// because prechecked structures are assumes they are
-		// have checked instances for non-generic methods.
-		for (_, mut f) in s.Methods {
-			if len(f.AST.Generics) == 0 {
-				if self.readyToCheckFunc(s, f) == nil {
-					// Avoid checking body of the function instance and etc.
-					f.Instances[0].Flags |= F_CHECKED
-					ok = false
-				}
-			}
-		}
+		// We do not need to precheck for methods.
+		// Eval algorithm will instantiate and reloads for types where it needed.
 		return
 	}
 
 	fn checkStructIns(mut &self, mut s: &StructIns) {
 		for (_, mut f) in s.Methods {
-			self.checkTypeMethod(f)
+			self.checkTypeMethod(s, f)
 		}
 	}
 
@@ -3022,15 +3019,15 @@ impl sema {
 	}
 
 	fn precheckFunc(mut &self, mut f: &Func) {
-		if len(f.AST.Generics) == 0 && len(f.Instances) == 0 {
-			mut ins := f.instanceForce()
-			f.Instances = append(f.Instances, ins)
-			ok := self.reloadFuncInsTypes(ins)
-			ins.Flags |= F_RELOADED
-
-			if ok && hasDirective(f.AST.Directives, directive::Test) {
-				self.checkTestFunc(ins)
-			}
+		if len(f.AST.Generics) != 0 || len(f.Instances) != 0 {
+			return
+		}
+		mut ins := f.instanceForce()
+		f.Instances = append(f.Instances, ins)
+		ok := self.reloadFuncInsTypes(ins)
+		ins.Flags |= F_RELOADED
+		if ok && hasDirective(f.AST.Directives, directive::Test) {
+			self.checkTestFunc(ins)
 		}
 	}
 
