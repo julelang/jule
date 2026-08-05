@@ -56,6 +56,35 @@ impl Once {
 		return Once{}
 	}
 
+	#ready
+	fn ready_Do(*self, f: async fn()) {
+		// Note: Here is an incorrect implementation of Do:
+		//
+		//	if self.done.CompareAndSwap(0, 1, atomic::SeqCst, atomic::SeqCst) {
+		//		f().await
+		//	}
+		//
+		// Do guarantees that when it returns, f has finished.
+		// This implementation would not implement that guarantee:
+		// given two simultaneous calls, the winner of the cas would
+		// call f, and the second would return immediately, without
+		// waiting for the first's call to f to complete.
+		// This is why the slow path falls back to a mutex, and why
+		// the self.done.Store must be delayed until after f returns.
+		ready(self.done.Load(atomic::Acquire) != 0)
+	}
+
+	async fn suspend_Do(*self, f: async fn()) {
+		// Mutex will adjust the budget.
+		// NOTE: budget will remain as is if Mutex's ready path is used.
+		self.m.Lock().await
+		if self.done.Load(atomic::Acquire) == 0 {
+			f().await
+			self.done.Store(1, atomic::Release)
+		}
+		self.m.Unlock()
+	}
+
 	// Calls the function f if and only if Do is being called for the
 	// first time for this instance of Once. In other words, given
 	//
@@ -76,34 +105,9 @@ impl Once {
 	//
 	// If f panics, Do considers it to have returned; future calls of Do return
 	// without calling f.
+	#future
 	async fn Do(*self, f: async fn()) {
-		// Note: Here is an incorrect implementation of Do:
-		//
-		//	if self.done.CompareAndSwap(0, 1, atomic::SeqCst, atomic::SeqCst) {
-		//		f().await
-		//	}
-		//
-		// Do guarantees that when it returns, f has finished.
-		// This implementation would not implement that guarantee:
-		// given two simultaneous calls, the winner of the cas would
-		// call f, and the second would return immediately, without
-		// waiting for the first's call to f to complete.
-		// This is why the slow path falls back to a mutex, and why
-		// the self.done.Store must be delayed until after f returns.
-		if self.done.Load(atomic::Acquire) == 0 {
-			// Outlined slow-path to allow inlining of the fast-path.
-			self.doSlow(f).await
-		}
-	}
-
-	async fn doSlow(*self, f: async fn()) {
-		// Mutex will adjust the budget.
-		self.m.Lock().await
-		if self.done.Load(atomic::Acquire) == 0 {
-			f().await
-			self.done.Store(1, atomic::Release)
-		}
-		self.m.Unlock()
+		future(self.ready_Do, self.suspend_Do)
 	}
 }
 
