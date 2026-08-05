@@ -66,8 +66,14 @@ impl WaitGroup {
 	// Decrements the [WaitGroup] counter by one.
 	fn Done(mut *self) { self.Add(-1) }
 
-	// Blocks until the [WaitGroup] counter is zero.
-	async fn Wait(mut *self) {
+	#ready
+	fn ready_Wait(mut *self) {
+		state := self.state.Load(atomic::Acquire)
+		v := i32(state >> 32)
+		ready(v == 0) // Counter is 0, no need to wait.
+	}
+
+	async fn suspend_Wait(mut *self) {
 		if runtime::adjustbudget() {
 			runtime::yield().await
 		}
@@ -87,6 +93,12 @@ impl WaitGroup {
 				return
 			}
 		}
+	}
+
+	// Blocks until the [WaitGroup] counter is zero.
+	#future
+	async fn Wait(mut *self) {
+		future(self.ready_Wait, self.suspend_Wait)
 	}
 }
 
