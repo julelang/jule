@@ -69,22 +69,16 @@ struct Mutex {
 impl Locker for Mutex {}
 
 impl Mutex {
-	// Locks mutex.
-	// If the lock is already in use, the calling coroutine
-	// blocks until the mutex is available.
-	async fn Lock(*self) {
+	#ready
+	fn ready_Lock(*self) {
+		// Fast path: grab unlocked mutex.
+		ready(atomic::CompareAndSwap(&self.state, 0, mutexLocked, atomic::Acquire, atomic::Relaxed))
+	}
+
+	async fn suspend_Lock(*self) {
 		if runtime::adjustbudget() {
 			runtime::yield().await
 		}
-		// Fast path: grab unlocked mutex.
-		if atomic::CompareAndSwap(&self.state, 0, mutexLocked, atomic::Acquire, atomic::Relaxed) {
-			return
-		}
-		// Slow path (outlined so that the fast path may be inlined).
-		self.lockSlow().await
-	}
-
-	async fn lockSlow(*self) {
 		let mut waitStartTime: i64
 		mut starving := false
 		mut awoke := false
@@ -165,6 +159,14 @@ impl Mutex {
 				old = self.state
 			}
 		}
+	}
+
+	// Locks mutex.
+	// If the lock is already in use, the calling coroutine
+	// blocks until the mutex is available.
+	#future
+	async fn Lock(*self) {
+		future(self.ready_Lock, self.suspend_Lock)
 	}
 
 	// Tries to lock mutwx and reports whether it succeeded.
