@@ -269,18 +269,14 @@ fn cansemacquire(mut &sema: *u32): bool {
 	}
 }
 
-// Waits until sema > 0 and then atomically decrements it.
-// It is intended as a simple sleep primitive for use by the synchronization
-// library and should not be used directly.
-// If lifo is true, queue waiter at the head of wait queue.
-// wg reports whether the semacqure called by a waitgroup.
-#disable nilptr
-async fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
+#ready
+fn ready_semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 	// Easy case.
-	if cansemacquire(sema) {
-		return
-	}
+	ready(cansemacquire(sema))
+}
 
+#disable nilptr
+async fn suspend_semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 	// Harder case:
 	//	increment waiter count
 	//	try cansemacquire one more time, return if succeeded
@@ -311,6 +307,16 @@ async fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 			break
 		}
 	}
+}
+
+// Waits until sema > 0 and then atomically decrements it.
+// It is intended as a simple sleep primitive for use by the synchronization
+// library and should not be used directly.
+// If lifo is true, queue waiter at the head of wait queue.
+// wg reports whether the semacqure called by a waitgroup.
+#future
+async fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
+	future(ready_semacquire, suspend_semacquire)
 }
 
 // Atomically increments sema and notifies a waiting C
@@ -480,18 +486,20 @@ fn notifyListAdd(mut &l: *notifyList): u32 {
 	return atomic::Add(&l.wait, 1, atomic::AcqRel) - 1
 }
 
-// Waits for a notification. If one has been sent since
-// notifyListAdd was called, it returns immediately. Otherwise, it blocks.
+#ready
 #disable nilptr
-async fn notifyListWait(mut &l: *notifyList, t: u32) {
+fn ready_notifyListWait(mut &l: *notifyList, t: u32) {
 	l.lock.lock()
 
 	// Return right away if this ticket has already been notified.
 	if less(t, l.notify) {
 		l.lock.unlock()
-		return
+		ready(true)
 	}
+}
 
+#disable nilptr
+async fn suspend_notifyListWait(mut &l: *notifyList, t: u32) {
 	// Enqueue itself.
 	let mut stackp: parkerList
 	mut p := unsafe { (&parkerList)(&stackp) }
@@ -506,6 +514,13 @@ async fn notifyListWait(mut &l: *notifyList, t: u32) {
 	l.tail = p
 
 	park(&(*p.cp), uintptr(&l.lock), reasonCond).await
+}
+
+// Waits for a notification. If one has been sent since
+// notifyListAdd was called, it returns immediately. Otherwise, it blocks.
+#future
+async fn notifyListWait(mut &l: *notifyList, t: u32) {
+	future(ready_notifyListWait, suspend_notifyListWait)
 }
 
 // Notifies one entry in the list.
