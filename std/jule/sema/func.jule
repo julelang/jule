@@ -254,13 +254,8 @@ impl FuncIns {
 	// See: https://manual.jule.dev/responsiveness/mutability
 	fn EqualFunc(&self, f: &FuncIns, responsive: bool): bool {
 		sAST, oAST := self.Decl.AST, f.Decl.AST
-		if sAST.Flags&ast::F_FALLIBLE != oAST.Flags&ast::F_FALLIBLE {
-			return false
-		}
-		if sAST.Flags&ast::F_UNSAFE != oAST.Flags&ast::F_UNSAFE {
-			return false
-		}
-		if sAST.Flags&ast::F_ASYNC != oAST.Flags&ast::F_ASYNC {
+		const FuncMask = ast::F_FALLIBLE | ast::F_UNSAFE | ast::F_ASYNC
+		if sAST.Flags&FuncMask != oAST.Flags&FuncMask {
 			return false
 		}
 		if self.Decl.IsVoid() != f.Decl.IsVoid() {
@@ -268,8 +263,8 @@ impl FuncIns {
 		}
 		checkParams := fn(p1: &ParamIns, p2: &ParamIns): bool {
 			p1AST, p2AST := p1.Decl.AST, p2.Decl.AST
-			if p1AST.Flags&(ast::F_VARIADIC|ast::F_REFERENCE) !=
-				p2AST.Flags&(ast::F_VARIADIC|ast::F_REFERENCE) {
+			const ParamMask = ast::F_VARIADIC | ast::F_REFERENCE
+			if p1AST.Flags&ParamMask != p2AST.Flags&ParamMask {
 				return false
 			}
 
@@ -391,12 +386,13 @@ impl FuncIns {
 		mut s := strings::Builder{}
 		s.Grow(1 << 5)
 
-		if self.Decl != nil && self.Decl.AST.Flags&ast::F_UNSAFE != 0 {
-			s.WriteString("unsafe ")!
-		}
-
-		if self.Decl != nil && self.Decl.AST.Flags&ast::F_ASYNC != 0 {
-			s.WriteString("async ")!
+		if self.Decl != nil {
+			if self.Decl.AST.Flags&ast::F_UNSAFE != 0 {
+				s.WriteString("unsafe ")!
+			}
+			if self.Decl.AST.Flags&ast::F_ASYNC != 0 {
+				s.WriteString("async ")!
+			}
 		}
 
 		s.WriteString("fn")!
