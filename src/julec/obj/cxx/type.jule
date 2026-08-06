@@ -348,6 +348,7 @@ const (
 	resultFunc         = "f"
 	resultChan         = "c"
 	resultExternPrefix = "e"
+	resultAsyncPrefix  = "r"
 )
 
 struct resultCoder {
@@ -388,6 +389,14 @@ impl resultCoder {
 
 	fn func(mut *self, mut &s: *strings::Builder, mut f: &sema::FuncIns) {
 		s.WriteString(resultFunc)!
+		if f.Decl != nil {
+			if f.Decl.AST.Flags&ast::F_EXTERN != 0 {
+				s.WriteString(resultExternPrefix)!
+			}
+			if f.Decl.AST.Flags&ast::F_ASYNC != 0 {
+				s.WriteString(resultAsyncPrefix)!
+			}
+		}
 		for (_, mut p) in f.Params {
 			self.codeMut(s, p.Type)
 		}
