@@ -117,22 +117,55 @@ impl IR {
 
 	// Returns all structures of main package and used packages.
 	// Ignores external declarations, but appends strict type alias structures also.
+	// If orderDefs is true, orders defines of each package.
 	// Appends used packages first, then the main package.
-	fn GetAllStructures(mut *self): []&sema::Struct {
+	// Appends range data to the Ordered data.
+	fn getAllStructures(mut *self, orderDefs: bool): []&sema::Struct {
+		// For ordering, all structures should be easy to predict.
+		// They must only have dependency from their own package or used packages.
+		//
+		// Structures, since they can be generic, may refer to hard to analysis things.
+		// This occurs because we have internally imported packages such as runtime.
+		// And the runtime package may refer to any define of the program, without dependency.
+		// So we should import all and order them for correct ordering.
+		// However, we can not do this but it is fine.
+		// Because any runtime structure will not use types directly,
+		// they use pointers to types, which is will not cause any
+		// C++ back-end compiler error.
+		//
+		// Another issue is the dependent types to runtime.
+		// If any dependency package, refferred by the runtime package,
+		// should not use runtime-implemented types.
+		// It may introduce ordering issues and cause compile errors.
 		let mut buffer: []&sema::Struct = nil
+		mut n := len(buffer)
 		for (_, mut u) in self.Used {
 			if !u.Extern {
 				self.appendStructs(u.Package, &buffer)
+				if orderDefs {
+					order(self.Importer, buffer[n:], true)
+				}
+				mut ranges := self.Ordered.Ranges[u.Package]
+				ranges[0] = [n, len(buffer)]
+				self.Ordered.Ranges[u.Package] = ranges
+				n = len(buffer)
 			}
 		}
 		self.appendStructs(self.Main, &buffer)
+		if orderDefs {
+			order(self.Importer, buffer[n:], true)
+		}
+		mut ranges := self.Ordered.Ranges[self.Main]
+		ranges[0] = [n, len(buffer)]
+		self.Ordered.Ranges[self.Main] = ranges
 		return buffer
 	}
 
 	fn appendGlobals(*self, mut p: &sema::Package, mut &buffer: *[]&sema::Var) {
 		for (_, mut f) in p.Files {
 			for (_, mut v) in f.Vars {
-				if v.AST.Token != nil && v.AST.Flags&(ast::F_CONST|ast::F_EXTERN) == 0 {
+				if v.AST.Token != nil &&
+					v.AST.Flags&(ast::F_CONST|ast::F_EXTERN) == 0 {
 					*buffer = append(*buffer, v)
 				}
 			}
@@ -143,6 +176,7 @@ impl IR {
 	// Ignores external declarations and constants.
 	// If orderDefs is true, orders defines of each package.
 	// Appends used packages first, then the main package.
+	// Appends range data to the Ordered data.
 	fn GetAllGlobals(mut *self, orderDefs: bool): []&sema::Var {
 		// For ordering, all variables should be easy to predict.
 		// They must only have dependency from their own package or used packages.
@@ -160,6 +194,9 @@ impl IR {
 				if orderDefs {
 					order(self.Importer, buffer[n:], true)
 				}
+				mut ranges := self.Ordered.Ranges[u.Package]
+				ranges[1] = [n, len(buffer)]
+				self.Ordered.Ranges[u.Package] = ranges
 				n = len(buffer)
 			}
 		}
@@ -167,24 +204,22 @@ impl IR {
 		if orderDefs {
 			order(self.Importer, buffer[n:], true)
 		}
+		mut ranges := self.Ordered.Ranges[self.Main]
+		ranges[1] = [n, len(buffer)]
+		self.Ordered.Ranges[self.Main] = ranges
 		return buffer
 	}
 
 	// Orders defines for initialization by dependencies.
 	fn Order(mut *self) {
+		// Initialize ranges map.
+		self.Ordered.Ranges = make(map[&sema::Package][2][2]int)
 		// Get globals with internal ordering enabled.
 		// See the GetAllGlobals for the ordering details.
 		self.Ordered.Globals = self.GetAllGlobals(true)
-
-		// Do not order like globals, because globals always have dependencies
-		// from their own packages or used packages. So analysis is
-		// easy to predict. But structures, since they can be generic, may
-		// refer to hard to analysis things. This occurs because we have
-		// internally imported packages such as runtime. And the runtime package
-		// may refer to any define of the program, without dependency. So,
-		// import all and order them for correct ordering.
-		self.Ordered.Structs = self.GetAllStructures()
-		order(nil, self.Ordered.Structs, false)
+		// Get structures with internal ordering enabled.
+		// See the GetAllStructures for the ordering details.
+		self.Ordered.Structs = self.getAllStructures(true)
 	}
 }
 

@@ -1585,8 +1585,8 @@ impl ObjectCoder {
 		}
 	}
 
-	fn initGlobals(mut &self) {
-		for (_, mut v) in self.ir.Ordered.Globals {
+	fn initGlobals(mut &self, mut globals: []&sema::Var) {
+		for (_, mut v) in globals {
 			// Skip special cases.
 			// This variables initialized by the initializer functions.
 			if v == meta::Program.Runtime.Mainm ||
@@ -1621,11 +1621,30 @@ impl ObjectCoder {
 	}
 
 	fn initCaller(mut &self) {
+		// Generate initializers of packages.
+		obj::IterPackages(self.ir, fn|mut pkg| {
+			self.write("void ")
+			self.ic.packageInit(&self.Buf, pkg)
+			self.write("(void) {\n")
+			self.addIndent()
+			ranges := self.ir.Ordered.Ranges[pkg]
+			mut globals := self.ir.Ordered.Globals[ranges[1][0]:ranges[1][1]]
+			self.initGlobals(globals)
+			self.pushInit(pkg)
+			self.doneIndent()
+			self.write("}\n\n")
+		})
+
+		// Generate general initializer function and call initialize packages.
 		self.write("void " + initCallerIdent + "(void) {\n")
 		self.addIndent()
-		obj::IterPackages(self.ir, fn|mut pkg| self.pushInit(pkg))
+		obj::IterPackages(self.ir, fn|mut pkg| {
+			self.indent()
+			self.ic.packageInit(&self.Buf, pkg)
+			self.write("();\n")
+		})
 		self.doneIndent()
-		self.write("\n}")
+		self.write("}")
 	}
 
 	fn end(mut &self) {
@@ -1679,10 +1698,9 @@ impl ObjectCoder {
 
 		self.ic.funcIns(&self.Buf, meta::Program.Runtime.Init)
 		self.write("();\n\n")
-		self.initGlobals()
-		self.write(`
-	__jule_call_initializers();
-	`)
+		self.indent()
+		self.write("__jule_call_initializers();\n\n")
+		self.indent()
 
 		if env::Test {
 			self.ic.funcIns(&self.Buf, meta::Program.Runtime.Spawnmainc)
