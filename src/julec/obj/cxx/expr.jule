@@ -1819,21 +1819,39 @@ impl exprCoder {
 		}
 		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Value)
 		const Static = false
-		if m.Key != nil {
-			mut f := ins.FindMethod("delete", Static).Instances[0]
-			self.oc.ic.funcIns(&self.oc.Buf, f)
-			self.oc.write("(")
-			self.possibleRefExpr(m.Dest.Model)
-			self.oc.write(".alloc, ")
-			self.possibleRefExpr(m.Key.Model)
-			self.oc.write(")")
-		} else {
+		mut f := ins.FindMethod("delete", Static).Instances[0]
+		self.oc.ic.funcIns(&self.oc.Buf, f)
+		self.oc.write("(")
+		self.possibleRefExpr(m.Dest.Model)
+		self.oc.write(".alloc, ")
+		self.possibleRefExpr(m.Key.Model)
+		self.oc.write(")")
+	}
+
+	fn clearCall(mut &self, mut m: &sema::BuiltinClearCallExpr) {
+		_map := m.Value.Type.Map()
+		if _map != nil {
+			const Static = false
+			mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Value)
 			mut f := ins.FindMethod("clear", Static).Instances[0]
 			self.oc.ic.funcIns(&self.oc.Buf, f)
 			self.oc.write("(")
-			self.possibleRefExpr(m.Dest.Model)
+			self.possibleRefExpr(m.Value.Model)
 			self.oc.write(".alloc)")
+			return
 		}
+		// We have to use mutable memory for the memory argument of clear due to lang spec.
+		if opt::IsZCopyArray(m.Value.Model) {
+			mut ie := m.Value.Model.(&sema::SlicingExpr)
+			mut model := any(&cst::ArrayAsSlice{
+				Expr: ie.Expr.Model,
+			})
+			ie.Expr.Model = unsafe { *(*sema::Expr)(&model) }
+		}
+		self.possibleRefExpr(m.Value.Model)
+		self.oc.write(".fill(")
+		self.initExpr(m.Value.Type.Slice().Value)
+		self.oc.write(")")
 	}
 
 	fn realCall(mut &self, mut m: &sema::BuiltinRealCallExpr) {
@@ -2443,6 +2461,8 @@ impl exprCoder {
 			self.capCall(m.(&sema::BuiltinCapCallExpr))
 		| &sema::BuiltinDeleteCallExpr:
 			self.deleteCall(m.(&sema::BuiltinDeleteCallExpr))
+		| &sema::BuiltinClearCallExpr:
+			self.clearCall(m.(&sema::BuiltinClearCallExpr))
 		| &sema::BuiltinRealCallExpr:
 			self.realCall(m.(&sema::BuiltinRealCallExpr))
 		| &sema::BuiltinImagCallExpr:

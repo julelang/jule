@@ -275,7 +275,13 @@ public:
     }
 
     // Push item to last without allocation checks.
-    inline void __push(const Item &item) { this->_slice[this->_len++] = item; }
+    inline void __push(const Item &item) noexcept {
+        this->_slice[this->_len++] = item;
+    }
+
+    inline void fill(const Item &def) noexcept {
+        std::fill(this->begin(), this->end(), def);
+    }
 
     inline void push(const Item &item) {
         this->alloc_for_append(1);
@@ -283,7 +289,7 @@ public:
     }
 
     // Common template for mutable appendation.
-    template <typename Items> void append(const Items &items) {
+    template <typename Items> void append(const Items &items) noexcept {
         if (items._len == 0) {
             return;
         }

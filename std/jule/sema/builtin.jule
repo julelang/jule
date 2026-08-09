@@ -914,28 +914,31 @@ fn callerDeleteMap(mut e: &eval, mut fc: &ast::CallExpr, mut expr: &Value, mut v
 	if !expr.Mutable {
 		e.pushErr(fc.Args[0].Token, "cannot delete from immutable memory")
 	}
+	if len(fc.Args) < 2 {
+		e.pushErr(fc.Token, "key is missing for map delete")
+		e.pushSuggestion("call like; delete(map, key)")
+		return nil
+	}
 	v = buildVoidValue()
 	mut model := &BuiltinDeleteCallExpr{
 		Dest: expr,
 	}
-	if len(fc.Args) == 2 {
-		mut key := e.evalExpr(fc.Args[1], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
-		match {
-		| key == nil:
+	mut key := e.evalExpr(fc.Args[1], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+	match {
+	| key == nil:
+		return nil
+	| key.Decl:
+		e.pushErr(fc.Args[1].Token, "invalid expression")
+		return nil
+	|:
+		const Reference = false
+		const FirstAssignToDest = false
+		mut keyType := expr.Type.Map().Key
+		if !e.s.checkAssignType(Reference, FirstAssignToDest, keyType, key, fc.Args[1].Token, e.getOwnerRefers()) {
 			return nil
-		| key.Decl:
-			e.pushErr(fc.Args[1].Token, "invalid expression")
-			return nil
-		|:
-			const Reference = false
-			const FirstAssignToDest = false
-			mut keyType := expr.Type.Map().Key
-			if !e.s.checkAssignType(Reference, FirstAssignToDest, keyType, key, fc.Args[1].Token, e.getOwnerRefers()) {
-				return nil
-			}
 		}
-		model.Key = key
 	}
+	model.Key = key
 	v.Model = model
 	return v
 }
@@ -1275,6 +1278,39 @@ fn builtinCallerReady(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 		Status: v,
 	}
 	return ready
+}
+
+fn builtinCallerClear(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value {
+	if len(fc.Args) < 1 {
+		e.pushErr(fc.Token, "memory is missing to clear")
+		e.pushSuggestion("call like; clear(m)")
+		return nil
+	}
+	if len(fc.Args) > 1 {
+		e.pushErr(fc.Token, "passed more argument than expected to clear")
+		e.pushSuggestion("call like; clear(m)")
+	}
+
+	mut dest := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+	if dest == nil {
+		return nil
+	}
+	if !dest.Mutable {
+		e.pushErr(fc.Args[0].Token, "cannot clear immutable memory")
+	}
+	match {
+	| dest.Type.Slice() != nil
+	| dest.Type.Map() != nil:
+		v = buildVoidValue()
+		v.Model = &BuiltinClearCallExpr{
+			Value: dest,
+		}
+		return v
+	|:
+		e.pushErr(fc.Args[0].Token, "invalid type")
+		e.pushSuggestion("expected slice or map")
+		return nil
+	}
 }
 
 fn builtinCallerStdComptimeTypeof(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
@@ -1824,6 +1860,7 @@ fn init() {
 	builtinFuncs["cmplx"] = &FuncIns{caller: builtinCallerCmplx}
 	builtinFuncs["future"] = &FuncIns{caller: builtinCallerFuture}
 	builtinFuncs["ready"] = &FuncIns{caller: builtinCallerReady}
+	builtinFuncs["clear"] = &FuncIns{caller: builtinCallerClear}
 
 	// Initialize built-in functions of the "std/runtime" package.
 	builtinFuncsStdRuntime["Hint"] = &FuncIns{caller: builtinCallerStdRuntimeHint}
