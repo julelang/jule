@@ -12,6 +12,19 @@ use "std/jule/token"
 use "std/slices"
 use "std/strings"
 
+const (
+	// Globals always have dependencies from their own packages or used packages.
+	// So analysis is easy to predict. But structures, since they can be generic,
+	// may refer to hard to analysis things. This occurs because we have
+	// internally imported packages such as runtime. And the runtime package
+	// may refer to any define of the program, without dependency.
+	// So declare them first, then implement all of them after all types.
+	// This is decent because all generic runtime implementations
+	// referred by pointers, no risk for incomplate type errors.
+	// To detect generic runtime implementations, use this custom flag.
+	F_GENERIC_RUNTIME_IMPL = 1 << (ast::F_CUSTOMS_IOTA + iota)
+)
+
 // Intermediate representation of the code for compiler.
 struct IR {
 	Root:    string            // Directory of the root package.
@@ -102,6 +115,9 @@ impl IR {
 	fn appendStructs(*self, mut p: &sema::Package, mut &buffer: *[]&sema::Struct) {
 		for (_, mut f) in p.Files {
 			for (_, mut s) in f.Structs {
+				if len(s.AST.Generics) > 0 && p == self.Runtime.Package {
+					s.AST.Flags |= F_GENERIC_RUNTIME_IMPL
+				}
 				if s.AST.Flags&ast::F_EXTERN == 0 {
 					*buffer = append(*buffer, s)
 				}
@@ -109,6 +125,9 @@ impl IR {
 			for (_, mut ta) in f.TypeAliases {
 				if ta.AST.Flags&ast::F_EXTERN == 0 &&
 					ta.AST.Flags&ast::F_STRICT != 0 {
+					if len(ta.AST.Generics) > 0 && p == self.Runtime.Package {
+						ta.AST.Flags |= F_GENERIC_RUNTIME_IMPL
+					}
 					*buffer = append(*buffer, ta.Type.Kind.(&sema::StructIns).Decl)
 				}
 			}

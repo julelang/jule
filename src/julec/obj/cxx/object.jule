@@ -959,11 +959,28 @@ impl ObjectCoder {
 	}
 
 	fn structureDecls(mut &self) {
+		mut seen := false
 		for (_, mut s) in self.ir.Ordered.Structs {
 			if s.AST.Token != nil {
+				if s.AST.Flags&obj::F_GENERIC_RUNTIME_IMPL != 0 {
+					seen = true
+					continue
+				}
 				self.structureDecl(s)
 				self.write("\n")
 			}
+		}
+		// There is no generic implementation.
+		if !seen {
+			return
+		}
+		// Handle ignored generic implementations.
+		for (_, mut s) in self.ir.Ordered.Structs {
+			if s.AST.Flags&obj::F_GENERIC_RUNTIME_IMPL == 0 {
+				continue
+			}
+			self.structureDecl(s)
+			self.write("\n")
 		}
 	}
 
