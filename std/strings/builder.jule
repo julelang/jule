@@ -118,23 +118,51 @@ impl io::RuneWriter for asyncBuilder {}
 impl io::StringWriter for asyncBuilder {}
 
 impl asyncBuilder {
-	// Implements the io::Writer trait.
-	async fn Write(mut *self, b: []byte)!: (n: int) {
+	#ready
+	fn ready_Write(mut *self, b: []byte)!: (n: int) {
+		ready(true)
 		return (&Builder)(*self).Write(b)?
 	}
 
-	// Implements the io::StringWriter trait.
-	async fn WriteString(mut *self, s: string)!: (n: int) {
+	// Implements the io::Writer trait.
+	#future
+	async fn Write(mut *self, b: []byte)!: (n: int) {
+		future(self.ready_Write, self.Write)
+	}
+
+	#ready
+	fn ready_WriteString(mut *self, s: string)!: (n: int) {
+		ready(true)
 		return (&Builder)(*self).WriteString(s)?
 	}
 
-	// Implements the io::ByteWriter trait.
-	async fn WriteByte(mut *self, b: byte)! {
+	// Implements the io::StringWriter trait.
+	#future
+	async fn WriteString(mut *self, s: string)!: (n: int) {
+		future(self.ready_WriteString, self.WriteString)
+	}
+
+	#ready
+	fn ready_WriteByte(mut *self, b: byte)! {
+		ready(true)
 		(&Builder)(*self).WriteByte(b)?
 	}
 
-	// Implements the io::RuneWriter trait.
-	async fn WriteRune(mut *self, r: rune)!: (n: int) {
+	// Implements the io::ByteWriter trait.
+	#future
+	async fn WriteByte(mut *self, b: byte)! {
+		future(self.ready_WriteByte, self.WriteByte)
+	}
+
+	#ready
+	fn ready_WriteRune(mut *self, r: rune)!: (n: int) {
+		ready(true)
 		return (&Builder)(*self).WriteRune(r)?
+	}
+
+	// Implements the io::RuneWriter trait.
+	#future
+	async fn WriteRune(mut *self, r: rune)!: (n: int) {
+		future(self.ready_WriteRune, self.WriteRune)
 	}
 }
