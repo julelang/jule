@@ -173,39 +173,88 @@ impl io::Seeker for asyncReader {}
 impl io::WriterTo for asyncReader {}
 
 impl asyncReader {
-	// Implements the io::Reader trait.
-	async fn Read(*self, mut b: []byte)!: (n: int) {
+	#ready
+	fn ready_Read(*self, mut b: []byte)!: (n: int) {
+		ready(true)
 		return (&Reader)(*self).Read(b)?
 	}
 
-	// Implements the io::ReaderAt trait.
-	async fn ReadAt(*self, mut b: []byte, off: i64)!: (n: int) {
+	// Implements the io::Reader trait.
+	#future
+	async fn Read(*self, mut b: []byte)!: (n: int) {
+		future(self.ready_Read, self.Read)
+	}
+
+	#ready
+	fn ready_ReadAt(*self, mut b: []byte, off: i64)!: (n: int) {
+		ready(true)
 		return (&Reader)(*self).ReadAt(b, off)?
 	}
 
-	// Implements the io::ByteReader trait.
-	async fn ReadByte(mut *self)!: (byte, int) {
+	// Implements the io::ReaderAt trait.
+	#future
+	async fn ReadAt(*self, mut b: []byte, off: i64)!: (n: int) {
+		future(self.ready_ReadAt, self.ReadAt)
+	}
+
+	#ready
+	fn ready_ReadByte(mut *self)!: (byte, int) {
+		ready(true)
 		return (&Reader)(*self).ReadByte()?
 	}
 
-	// Implements the io::ByteScanner trait.
-	async fn UnreadByte(*self)! {
+	// Implements the io::ByteReader trait.
+	#future
+	async fn ReadByte(mut *self)!: (byte, int) {
+		future(self.ready_ReadByte, self.ReadByte)
+	}
+
+	#ready
+	fn ready_UnreadByte(*self)! {
+		ready(true)
 		(&Reader)(*self).UnreadByte()?
 	}
 
-	// Implements the io::RuneReader trait.
-	async fn ReadRune(*self)!: (ch: rune, size: int) {
+	// Implements the io::ByteScanner trait.
+	#future
+	async fn UnreadByte(*self)! {
+		future(self.ready_UnreadByte, self.UnreadByte)
+	}
+
+	#ready
+	fn ready_ReadRune(*self)!: (ch: rune, size: int) {
+		ready(true)
 		return (&Reader)(*self).ReadRune()?
 	}
 
-	// Implements the io::RuneScanner trait.
-	async fn UnreadRune(*self)! {
+	// Implements the io::RuneReader trait.
+	#future
+	async fn ReadRune(*self)!: (ch: rune, size: int) {
+		future(self.ready_ReadRune, self.ReadRune)
+	}
+
+	#ready
+	fn ready_UnreadRune(*self)! {
+		ready(true)
 		(&Reader)(*self).UnreadRune()?
 	}
 
-	// Implements the io::Seeker trait.
-	async fn Seek(*self, offset: i64, whence: int)!: i64 {
+	// Implements the io::RuneScanner trait.
+	#future
+	async fn UnreadRune(*self)! {
+		future(self.ready_UnreadRune, self.UnreadRune)
+	}
+
+	#ready
+	fn ready_Seek(*self, offset: i64, whence: int)!: i64 {
+		ready(true)
 		return (&Reader)(*self).Seek(offset, whence)?
+	}
+
+	// Implements the io::Seeker trait.
+	#future
+	async fn Seek(*self, offset: i64, whence: int)!: i64 {
+		future(self.ready_Seek, self.Seek)
 	}
 
 	// Implements the io::WriterTo trait.
