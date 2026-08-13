@@ -961,9 +961,14 @@ fn decodeUintRaw(b: []byte): (u64, ok: bool) {
 	return z, true
 }
 
-#disable nilptr
+#disable nilptr boundary
 fn decodeUInt[T](mut &v: *T, b: []byte)! {
 	const t = comptime::Typeof(T)
+
+	// Negative value for unsigned type.
+	if b[0] == '-' {
+		throw errors::New("json: invalid value for type " + t.String() + ": " + unsafe::BytesString(b))
+	}
 
 	z, ok := decodeUintRaw(b)
 	if !ok {
@@ -980,7 +985,7 @@ fn decodeUInt[T](mut &v: *T, b: []byte)! {
 	*v = T(z)
 }
 
-#disable nilptr
+#disable nilptr boundary
 fn decodeInt[T](mut &v: *T, b: []byte)! {
 	const t = comptime::Typeof(T)
 	const Max = 1 << (t.Bits() - 1)
