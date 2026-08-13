@@ -253,7 +253,7 @@ impl decimal {
 		mut i := 0
 		mut n := u64(0)
 		for i < self.dp && i < self.nd; i++ {
-			n = n*10 + u64(self.d[i]-'0')
+			n = (n << 3) + (n << 1) + u64(self.d[i]-'0')
 		}
 		for i < self.dp; i++ {
 			n *= 10
@@ -335,13 +335,13 @@ fn rightShift(mut &a: *decimal, k: uint) {
 				return
 			}
 			for n>>k == 0 {
-				n = n * 10
+				n = (n << 3) + (n << 1) // n = n * 10
 				r++
 			}
 			break
 		}
 		c := uint(a.d[r])
-		n = n*10 + c - '0'
+		n = (n << 3) + (n << 1) + c - '0'
 	}
 	a.dp -= r - 1
 
@@ -354,7 +354,7 @@ fn rightShift(mut &a: *decimal, k: uint) {
 		n &= mask
 		a.d[w] = byte(dig + '0')
 		w++
-		n = n*10 + c - '0'
+		n = (n << 3) + (n << 1) + c - '0'
 	}
 
 	// Put down extra digits.
@@ -367,7 +367,7 @@ fn rightShift(mut &a: *decimal, k: uint) {
 		} else if dig > 0 {
 			a.trunc = true
 		}
-		n = n * 10
+		n = (n << 3) + (n << 1) // n = n * 10
 	}
 
 	a.nd = w

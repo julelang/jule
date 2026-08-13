@@ -162,7 +162,7 @@ fn shr(mut &x: *decimal, s: uint) {
 	for n>>s == 0 && r < len(x.mant) {
 		ch := Word(x.mant[r])
 		r++
-		n = n*10 + ch - '0'
+		n = (n << 3) + (n << 1) + ch - '0'
 	}
 	if n == 0 {
 		// x == 0; shouldn't get here, but handle anyway
@@ -185,7 +185,7 @@ fn shr(mut &x: *decimal, s: uint) {
 		n &= mask // n -= d << s
 		x.mant[w] = byte(d + '0')
 		w++
-		n = n*10 + ch - '0'
+		n = (n << 3) + (n << 1) + ch - '0'
 	}
 
 	// write extra digits that still fit
@@ -194,7 +194,7 @@ fn shr(mut &x: *decimal, s: uint) {
 		n &= mask
 		x.mant[w] = byte(d + '0')
 		w++
-		n = n * 10
+		n = (n << 3) + (n << 1) // n = n * 10
 	}
 	x.mant = x.mant[:w] // the number may be shorter (e.g. 1024 >> 10)
 
@@ -203,7 +203,7 @@ fn shr(mut &x: *decimal, s: uint) {
 		d := n >> s
 		n &= mask
 		x.mant = append(x.mant, byte(d+'0'))
-		n = n * 10
+		n = (n << 3) + (n << 1) // n = n * 10
 	}
 
 	trim(x)
