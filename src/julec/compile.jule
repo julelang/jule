@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "julec/ansi"
 use "julec/env"
-use "julec/handle"
 use "julec/julespec"
+use "julec/log"
 use "julec/obj"
 use "julec/obj/cxx"
 use "julec/obj/meta"
@@ -47,12 +48,12 @@ fn openOutput(path: string): &os::File {
 
 	os::Stat(dir) else {
 		os::Mkdir(dir) else {
-			handle::Throw("a problem occurs when code generation")
+			julecThrow("a problem occurs when code generation")
 		}
 	}
 
 	return os::Create(path) else {
-		handle::Throw("a problem occurs when code generation")
+		julecThrow("a problem occurs when code generation")
 		use nil
 	}
 }
@@ -76,8 +77,8 @@ fn compileIR(compilePath: string, compiler: string, mut compilerArgs: []string) 
 	cmd.Stdout(os::Stdout())!
 	cmd.Stderr(os::Stderr())!
 	cmd.Start() else {
-		handle::AnsiEscape.Print(handle::AnsiRed, "back-end compiler could not used: "+fmt::Sprint(error))
-		handle::Throw("")
+		ansi::Print(ansi::Red, "back-end compiler could not used: "+fmt::Sprint(error))
+		julecThrow("")
 	}
 	status := cmd.Wait()!
 	if status != 0 {
@@ -85,8 +86,8 @@ fn compileIR(compilePath: string, compiler: string, mut compilerArgs: []string) 
 >>> please check errors above
 >>> is this a compiler problem, please report us: https://github.com/julelang/jule/issues/new/choose`
 
-		handle::AnsiEscape.Print(handle::AnsiRed, errorMessage)
-		handle::Throw("")
+		ansi::Print(ansi::Red, errorMessage)
+		julecThrow("")
 	}
 
 	clearObjects(compilePath)
@@ -155,7 +156,7 @@ fn pushCompCmdClang(mut args: []string): []string {
 	return args
 }
 
-fn pushCompCmdGcc(mut args: []string): []string {
+fn pushCompCmdGCC(mut args: []string): []string {
 	// Disable all warnings.
 	args = append(args, "-w")
 
@@ -301,7 +302,7 @@ fn genCompileCmd(sourcePath: string, mut ir: &obj::IR): (compiler: string, args:
 
 	match env::Compiler {
 	| "gcc":
-		args = pushCompCmdGcc(args)
+		args = pushCompCmdGCC(args)
 	| "clang":
 		args = pushCompCmdClang(args)
 	}
@@ -358,7 +359,7 @@ fn applyTargetIndependentOptimizations(mut ir: &obj::IR) {
 fn checkCompilerFlag() {
 	match env::Compiler {
 	| "":
-		handle::Throw("missing option value: --compiler")
+		julecThrow("missing option value: --compiler")
 	| "clang":
 		if env::CompilerPath == "" {
 			env::CompilerPath = "clang++"
@@ -368,19 +369,19 @@ fn checkCompilerFlag() {
 			env::CompilerPath = "g++"
 		}
 	|:
-		handle::Throw("invalid option value for --compiler: " + env::Compiler)
+		julecThrow("invalid option value for --compiler: " + env::Compiler)
 	}
 }
 
 fn checkTargetArch(arch: string) {
 	if arch != dist::AMD64 && arch != dist::ARM64 && arch != dist::I386 {
-		handle::Throw("--target: unsupported/undefined architecture: " + arch)
+		julecThrow("--target: unsupported/undefined architecture: " + arch)
 	}
 }
 
 fn checkTargetOs(os: string) {
 	if os != dist::Windows && os != dist::Linux && os != dist::MacOS {
-		handle::Throw("--target: unsupported/undefined operating system: " + os)
+		julecThrow("--target: unsupported/undefined operating system: " + os)
 	}
 }
 
@@ -390,17 +391,17 @@ fn checkTargetPair(os: string, arch: string) {
 			return
 		}
 	}
-	handle::Throw("invalid target: " + os + "-" + arch)
+	julecThrow("invalid target: " + os + "-" + arch)
 }
 
 fn checkTargetFlag(target: string) {
 	if target == "" {
-		handle::Throw("missing option value: --target")
+		julecThrow("missing option value: --target")
 	}
 
 	parts := strings::Split(target, "-")
 	if len(parts) != 2 {
-		handle::Throw("--target: undefined platform target format: " + target)
+		julecThrow("--target: undefined platform target format: " + target)
 	}
 
 	mut os, mut arch := parts[0], parts[1]
@@ -425,7 +426,7 @@ fn checkTargetFlag(target: string) {
 
 fn checkOptFlag(opt: string) {
 	if opt == "" {
-		handle::Throw("missing option value: --opt")
+		julecThrow("missing option value: --opt")
 	}
 
 	match opt {
@@ -436,7 +437,7 @@ fn checkOptFlag(opt: string) {
 	| "L2":
 		opt::PushOptLevel(opt::L2)
 	|:
-		handle::Throw("--opt: invalid optimization level: " + opt)
+		julecThrow("--opt: invalid optimization level: " + opt)
 	}
 }
 
@@ -446,14 +447,14 @@ fn checkCOMAXPROCS() {
 		return
 	}
 	n := conv::ParseUint(COMAXPROCS, 10, 64) else {
-		handle::Throw("--COMAXPROCS: value is not a valid number: " + COMAXPROCS)
+		julecThrow("--COMAXPROCS: value is not a valid number: " + COMAXPROCS)
 		return // Avoid error.
 	}
 	if n < 1 {
-		handle::Throw("--COMAXPROCS: invalid value: " + COMAXPROCS)
+		julecThrow("--COMAXPROCS: invalid value: " + COMAXPROCS)
 	}
 	if n > u64(i32.Max) {
-		handle::Throw("--COMAXPROCS: value is too large: " + COMAXPROCS)
+		julecThrow("--COMAXPROCS: value is too large: " + COMAXPROCS)
 	}
 	env::COMAXPROCS = i32(n)
 }
@@ -467,7 +468,7 @@ fn checkTags() {
 	env::Tags = make([]string, 0, len(tags))
 	for _, tag in tags {
 		if !julespec::IsName(tag) {
-			handle::Throw("--tags: invalid tag: " + conv::Quote(tag))
+			julecThrow("--tags: invalid tag: " + conv::Quote(tag))
 			continue
 		}
 		env::Tags = append(env::Tags, tag)
@@ -479,7 +480,7 @@ fn checkCppStdFlag() {
 	| "cpp20":
 		break
 	|:
-		handle::Throw("--cppstd: invalid cpp standard: " + env::CppStd)
+		julecThrow("--cppstd: invalid cpp standard: " + env::CppStd)
 	}
 }
 
@@ -523,7 +524,7 @@ fn checkFlags(args: []string): []string {
 	fs.AddVar[bool](unsafe { (&bool)(&opt::StdStrings) }, "opt-std-strings", 0, "Special optimizations for the std/strings package")
 
 	mut content := fs.Parse(args) else {
-		handle::Throw(error.(string))
+		julecThrow(error.(string))
 		use nil // Avoid error.
 	}
 
@@ -550,33 +551,33 @@ fn buildIR(args: []string): &obj::IR {
 	setupSemaFlags(&semaFlags)
 
 	if len(content) == 0 {
-		handle::Throw("missing compile path")
+		julecThrow("missing compile path")
 	} else if len(content) > 1 {
-		handle::Throw("undefined content: " + content[1])
+		julecThrow("undefined content: " + content[1])
 	}
 	mut path := filepath::Abs(content[0]) else {
-		handle::Throw("compile path could not processed because of a problem")
+		julecThrow("compile path could not processed because of a problem")
 		use "" // unreachable
 	}
 
 	// Check standard library.
 	inf := os::Stat(build::PathStdlib()) else {
-		handle::Throw("standard library is not exist")
+		julecThrow("standard library is not exist")
 		return nil // Avoid error.
 	}
 	if !inf.IsDir() {
-		handle::Throw("standard library is not exist")
+		julecThrow("standard library is not exist")
 	}
 
 	mut ir, logs := obj::IR.Build(path, semaFlags)
 
 	if ir == nil && logs == nil {
-		handle::Throw("no file in entry package: " + conv::Quote(path))
+		julecThrow("no file in entry package: " + conv::Quote(path))
 	}
 
 	if logs != nil {
-		handle::Logger.PrintLogs(&logs)
-		handle::Throw("")
+		log::Logs(&logs)
+		julecThrow("")
 	}
 
 	return ir
@@ -602,7 +603,7 @@ fn codegenSingleUnit(mut ir: &obj::IR) {
 
 	mut file := openOutput(compilePath)
 	file.WriteSync(unsafe { oc.Buf.Buf() }) else {
-		handle::Throw("object code could not write")
+		julecThrow("object code could not write")
 	}
 	file.CloseSync()!
 
@@ -627,7 +628,7 @@ fn build(mut args: []string) {
 		const Extern = false
 		meta::Program.EntryPoint = ir.Main.FindFunc(jule::EntryPoint, Extern)
 		if meta::Program.EntryPoint == nil {
-			handle::Throw("entry point missing")
+			julecThrow("entry point missing")
 		}
 	}
 
