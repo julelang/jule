@@ -1597,6 +1597,35 @@ fn builtinCallerStdComptimeIncludeString(mut e: &eval, mut fc: &ast::CallExpr, _
 	}
 }
 
+fn builtinCallerStdComptimeHasTag(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
+	if len(fc.Args) > 1 {
+		e.pushErr(fc.Token, "passed more argument than expected to HasTag")
+		e.pushSuggestion("call like; HasTag(tag)")
+		return nil
+	}
+	if len(fc.Args) == 0 {
+		e.pushErr(fc.Token, "identifier and type is missing for HasTag")
+		e.pushSuggestion("call like; HasTag(tag)")
+		return nil
+	}
+	mut v := e.eval(fc.Args[0], evalDefault)
+	if v == nil {
+		return nil
+	}
+	if !v.IsConst() || !v.Constant.IsString() {
+		e.pushErr(fc.Args[0].Token, "expression must be constant and string")
+		return nil
+	}
+	tag := v.Constant.ReadString()
+	mut cs := constant::NewBool(e.s.importer.HasTag(tag))
+	return &Value{
+		Type:     primBool,
+		Constant: cs,
+		Model:    cs,
+		untyped:  true,
+	}
+}
+
 fn builtinCallerStdRuntimeHint(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	mut result := buildVoidValue()
 
@@ -1878,6 +1907,7 @@ fn init() {
 	builtinFuncsStdComptime["TypeAlias"] = &FuncIns{caller: builtinCallerStdComptimeTypeAlias}
 	builtinFuncsStdComptime["IncludeBytes"] = &FuncIns{caller: builtinCallerStdComptimeIncludeBytes}
 	builtinFuncsStdComptime["IncludeString"] = &FuncIns{caller: builtinCallerStdComptimeIncludeString}
+	builtinFuncsStdComptime["HasTag"] = &FuncIns{caller: builtinCallerStdComptimeHasTag}
 
 	// Initialize built-in functions of the "std/integ" package.
 	builtinFuncsStdInteg["Emit"] = &FuncIns{
