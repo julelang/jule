@@ -5,6 +5,8 @@
 #ifndef __JULE_IMPL_FLAG_HPP
 #define __JULE_IMPL_FLAG_HPP
 
+#include <cassert>
+
 #if __cplusplus == 199711L
 #define __JULE_CPP98
 #elif __cplusplus == 201103L
@@ -24,5 +26,17 @@
 #define __JULE_CONSTEXPR_SINCE_CPP20
 #define __JULE_INLINE_BEFORE_CPP20 inline
 #endif
+
+[[noreturn]] inline void __jule_unreachable(void) noexcept {
+#if !defined(NDEBUG)
+    assert(false && "Unreachable code reached!");
+#endif
+
+#if defined(__GNUC__) || defined(__clang__)
+    __builtin_unreachable();
+#elif defined(_MSC_VER)
+    __assume(0);
+#endif
+}
 
 #endif // ifndef __JULE_IMPL_FLAG_HPP
