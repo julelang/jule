@@ -12,6 +12,7 @@ use "std/jule/directive"
 use "std/jule/log"
 use "std/jule/token"
 use "std/jule/types"
+use "std/runtime"
 use "std/slices"
 use "std/strings"
 use "std/unicode/utf8"
@@ -3652,6 +3653,13 @@ impl missingRetChecker {
 					// Following statements will not be executed, ignore them, if any.
 					// Panic call makes the return value unavailable.
 					return true
+				| &HintExpr:
+					hint := v.Model.(&HintExpr)
+					if hint.Hints&int(runtime::H_UNREACHABLE) != 0 {
+						// Following statements marked as unreachable.
+						// Ignore them, if any.
+						return true
+					}
 				| &FuncCallExpr:
 					// Function call appeared.
 					// We have to check error handler scope, if exist.
