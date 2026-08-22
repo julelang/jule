@@ -277,15 +277,31 @@ impl Cmd {
 	}
 
 	// Starts the specified command and waits for it to complete.
-	// Wait operation is blocking.
-	fn Run(*self)! {
+	async fn Run(*self)! {
 		self.Start()?
-		self.Wait()?
+		self.Wait().await?
+	}
+
+	// Starts the specified command and waits for it to complete.
+	// Wait operation is blocking.
+	fn RunBlocking(*self)! {
+		self.Start()?
+		self.WaitBlocking()?
 	}
 
 	// Clean should call after process completed.
 	// It cleans resources and Cmd will be ready to reuse.
-	fn clean(*self)! {
+	async fn clean(*self)! {
+		for (_, mut f) in self.parentIOFiles {
+			f.Close().await?
+		}
+		self.parentIOFiles = nil
+		self.stdin, self.stdout, self.stderr = nil, nil, nil
+		atomic::Store(&self.started, 0, atomic::Release)
+	}
+
+	// Same as clean, but blocking.
+	fn cleanBlocking(*self)! {
 		for (_, mut f) in self.parentIOFiles {
 			f.CloseSync()?
 		}
@@ -298,13 +314,40 @@ impl Cmd {
 	// The command must have been started by [Cmd.Start].
 	// It releases any resources associated with the [Cmd].
 	// After calling it, Cmd will be ready to reuse.
-	// Wait operation is blocking.
-	fn Wait(*self)!: int {
+	async fn Wait(*self)!: int {
 		if atomic::Load(&self.started, atomic::Acquire) == 0 {
 			panic("std/os: Cmd.Wait: command is not started")
 		}
+		let mut c: int
+		let mut err: any
+		mut cptr := &c
+		mut errptr := &err
+		runtime::Blocking(fn|| {
+			unsafe {
+				*cptr = self.wait() else {
+					*errptr = error
+					return
+				}
+			}
+		}).await
+		if err != nil {
+			unsafe throw err
+		}
+		self.clean().await?
+		return c
+	}
+
+	// Waits for the command to exit.
+	// The command must have been started by [Cmd.Start].
+	// It releases any resources associated with the [Cmd].
+	// After calling it, Cmd will be ready to reuse.
+	// Wait operation is blocking.
+	fn WaitBlocking(*self)!: int {
+		if atomic::Load(&self.started, atomic::Acquire) == 0 {
+			panic("std/os: Cmd.WaitBlocking: command is not started")
+		}
 		c := self.wait()?
-		self.clean()?
+		self.cleanBlocking()?
 		return c
 	}
 
