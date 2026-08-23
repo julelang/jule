@@ -54,7 +54,7 @@ template <typename T> struct __jule_Ptr {
     static __jule_Ptr<T> make(const T &instance, __jule_Uint *ref) noexcept {
         __jule_Ptr<T> buffer;
 
-        buffer.alloc = static_cast<T *>(__jule_malloc(1, sizeof(T)));
+        buffer.alloc = static_cast<T *>(__jule_malloc(sizeof(T)));
         if (!buffer.alloc) {
             __jule_panic((__jule_U8 *)"runtime: memory allocation failed for "
                                       "heap of smart pointer",
@@ -169,7 +169,7 @@ template <typename T> struct __jule_Ptr {
             if (file != nullptr) {
                 const size_t n = strlen(file);
                 char *message = static_cast<char *>(
-                    __jule_malloc(87 + n + 1, sizeof(char)));
+                    __jule_malloc((87 + n + 1) * sizeof(char)));
                 if (!message) {
                     __jule_panic(
                         (__jule_U8

@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/integ"
 use "std/internal/implflags"
 
-extern fn malloc(uint): *unsafe // C's malloc function.
-extern fn free(*unsafe)         // C's free function.
+extern use "<cstdlib>"
 
 const (
 	// _64bit = 1 on 64-bit systems, 0 on 32-bit systems
@@ -62,24 +62,24 @@ let zerobase: uintptr = 0
 
 // Allocates linear memory on the heap and returns it.
 // If it fails, it may return nil pointer or panic.
-// The |n| is non-negative count of elements.
-// The |size| is size in bytes of the single instance of a type which is will be allocated.
-// Panics if |n*size > maxAlloc || n > max(int)|.
-// Returns pointer to the allocation (pointer to the first cell if n>1).
-// The allocated memory will not be initialized by default, it is raw.
+// The |size| is size in bytes of the memory which is will be allocated.
+// Returns pointer to the allocation (pointer to the first cell if it is and array).
+// The allocated memory is raw, it will not be initialized by default.
 //
 // Calling this function, performs allocation size checking as described
 // and panics if conditions are met.
 #export "__jule_malloc"
-fn malloc(n: i64, size: uint): *unsafe {
-	allocSize := uint(n) * size
-	if allocSize > maxAlloc {
-		panic("runtime: malloc: allocation size is exceeds maximum allocation size")
+fn malloc(size: uintptr): *unsafe {
+	if size > maxAlloc {
+		panic("runtime: malloc: allocation size out of range")
 	}
-	return unsafe { extern.malloc(allocSize) }
+
+	return unsafe { integ::Emit[*unsafe]("std::malloc({})", size) }
 }
 
+// Deallocates the memory.
+// The memory should be allocated by malloc.
 #export "__jule_dealloc"
 fn dealloc(p: *unsafe) {
-	unsafe { extern.free(p) }
+	unsafe { integ::Emit("std::free({})", p) }
 }
