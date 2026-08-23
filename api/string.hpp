@@ -34,7 +34,6 @@ public:
                                       "heap-array of string",
                          58);
         }
-        std::uninitialized_fill(buf, buf + len, 0);
         return buf;
     }
 
@@ -85,7 +84,7 @@ public:
         auto buf = __jule_String::alloc(this->_len);
         this->buffer = __jule_String::buffer_t::make(buf);
         this->_slice = buf;
-        (void)std::copy(begin, end, this->_slice);
+        (void)std::uninitialized_copy_n(begin, this->_len, this->_slice);
     }
 
     using Iterator = __jule_U8 *;
@@ -222,8 +221,9 @@ public:
             return *this;
         }
         auto buf = __jule_String::alloc(this->_len + str._len);
-        (void)std::copy(this->begin(), this->end(), buf);
-        (void)std::copy(str.begin(), str.end(), buf + this->_len);
+        (void)std::uninitialized_copy_n(this->begin(), this->_len, buf);
+        (void)std::uninitialized_copy_n(str.begin(), str._len,
+                                        buf + this->_len);
         auto len = this->_len + str._len;
         this->dealloc();
         this->buffer = __jule_String::buffer_t::make(buf);
@@ -241,8 +241,9 @@ public:
         auto buf = __jule_String::alloc(s._len);
         s.buffer = __jule_String::buffer_t::make(buf);
         s._slice = buf;
-        (void)std::copy(this->begin(), this->end(), s._slice);
-        (void)std::copy(str.begin(), str.end(), s._slice + this->_len);
+        (void)std::uninitialized_copy_n(this->begin(), this->_len, s._slice);
+        (void)std::uninitialized_copy_n(str.begin(), str._len,
+                                        s._slice + this->_len);
         return s;
     }
 
