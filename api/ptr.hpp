@@ -6,6 +6,7 @@
 #define __JULE_PTR_HPP
 
 #include <cstring>
+#include <memory>
 
 #include "error.hpp"
 #include "runtime.hpp"
@@ -53,14 +54,13 @@ template <typename T> struct __jule_Ptr {
     static __jule_Ptr<T> make(const T &instance, __jule_Uint *ref) noexcept {
         __jule_Ptr<T> buffer;
 
-        __jule_pseudoMalloc(1, sizeof(T));
-        buffer.alloc = new (std::nothrow) T;
+        buffer.alloc = static_cast<T *>(__jule_malloc(1, sizeof(T)));
         if (!buffer.alloc) {
             __jule_panic((__jule_U8 *)"runtime: memory allocation failed for "
                                       "heap of smart pointer",
                          59);
         }
-        *buffer.alloc = instance;
+        std::construct_at(buffer.alloc, instance);
         buffer.ref = ref;
         return buffer;
     }
@@ -106,7 +106,10 @@ template <typename T> struct __jule_Ptr {
     // Frees memory. Unsafe function, not includes any safety checking for
     // heap allocations are valid or something like that.
     void __free(void) const noexcept {
-        delete this->alloc;
+        if constexpr (!std::is_trivially_destructible_v<T>) {
+            std::destroy_at(this->alloc);
+        }
+        __jule_dealloc(this->alloc);
         this->alloc = nullptr;
 
         __jule_RCFree(this->ref);
@@ -165,7 +168,8 @@ template <typename T> struct __jule_Ptr {
         if (this->operator==(nullptr)) {
             if (file != nullptr) {
                 const size_t n = strlen(file);
-                char *message = new (std::nothrow) char[87 + n + 1];
+                char *message = static_cast<char *>(
+                    __jule_malloc(87 + n + 1, sizeof(char)));
                 if (!message) {
                     __jule_panic(
                         (__jule_U8

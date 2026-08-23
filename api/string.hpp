@@ -27,14 +27,14 @@ public:
     mutable __jule_Int _len = 0;
 
     static __jule_U8 *alloc(const __jule_Int len) noexcept {
-        __jule_pseudoMalloc(len, sizeof(__jule_U8));
-        auto buf = new (std::nothrow) __jule_U8[len];
+        __jule_U8 *buf =
+            static_cast<__jule_U8 *>(__jule_malloc(len, sizeof(__jule_U8)));
         if (!buf) {
             __jule_panic((__jule_U8 *)"runtime: memory allocation failed for "
                                       "heap-array of string",
                          58);
         }
-        std::fill(buf, buf + len, 0);
+        std::uninitialized_fill(buf, buf + len, 0);
         return buf;
     }
 
@@ -111,36 +111,9 @@ public:
 
     constexpr __jule_Bool empty(void) const noexcept { return this->_len == 0; }
 
-    // Frees memory. Unsafe function, not includes any safety checking for
-    // heap allocations are valid or something like that.
-    void __free(void) noexcept {
-        delete[] this->buffer.alloc;
-        this->buffer.alloc = nullptr;
-        this->_slice = nullptr;
-
-        __jule_RCFree(this->buffer.ref);
-        this->buffer.ref = nullptr;
-    }
-
     void dealloc(void) noexcept {
         this->_len = 0;
-#ifdef __JULE_DISABLE__REFERENCE_COUNTING
         this->buffer.dealloc();
-#else
-        if (!this->buffer.ref) {
-            this->buffer.ref = nullptr;
-            this->buffer.alloc = nullptr;
-            this->_slice = nullptr;
-            return;
-        }
-        if (__jule_RCDrop(this->buffer.ref)) {
-            this->buffer.ref = nullptr;
-            this->buffer.alloc = nullptr;
-            this->_slice = nullptr;
-            return;
-        }
-        this->__free();
-#endif // __JULE_DISABLE__REFERENCE_COUNTING
     }
 
     ~__jule_String(void) noexcept { this->dealloc(); }

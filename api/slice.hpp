@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <initializer_list>
+#include <memory>
 
 #include "error.hpp"
 #include "ptr.hpp"
@@ -45,13 +46,16 @@ public:
         return buffer;
     }
 
-    static __jule_Slice<Item> make(const std::initializer_list<Item> &src) {
+    static __jule_Slice<Item> make(std::initializer_list<Item> src) {
+        const std::size_t n = src.size();
+
         __jule_Slice<Item> slice;
-        slice.alloc_new(src.size(), src.size());
-        if (src.size() > 0) {
-            const auto src_begin = src.begin();
-            (void)std::copy(src.begin(), src.end(), slice.begin());
+        slice.alloc_new(n, n);
+
+        if (n != 0) {
+            std::uninitialized_copy_n(src.begin(), n, slice.begin());
         }
+
         return slice;
     }
 
@@ -85,27 +89,39 @@ public:
     // Frees memory. Unsafe function, not includes any safety checking for
     // heap allocations are valid or something like that.
     void __free(void) noexcept {
-        delete[] this->data.alloc;
+        if constexpr (!std::is_trivially_destructible_v<Item>) {
+            Item *p = this->data.alloc;
+            for (std::size_t i = 0; i < this->_cap; ++i) {
+                std::destroy_at(p);
+                ++p;
+            }
+        }
+        __jule_dealloc(this->data.alloc);
         this->data.alloc = nullptr;
         this->_slice = nullptr;
 
         __jule_RCFree(this->data.ref);
         this->data.ref = nullptr;
+
+        this->_len = 0;
+        this->_cap = 0;
     }
 
     void dealloc(void) noexcept {
-        this->_len = 0;
-        this->_cap = 0;
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
         this->data.dealloc();
 #else
         if (!this->data.ref) {
+            this->_len = 0;
+            this->_cap = 0;
             this->data.ref = nullptr;
             this->data.alloc = nullptr;
             this->_slice = nullptr;
             return;
         }
         if (__jule_RCDrop(this->data.ref)) {
+            this->_len = 0;
+            this->_cap = 0;
             this->data.ref = nullptr;
             this->data.alloc = nullptr;
             this->_slice = nullptr;
@@ -118,8 +134,7 @@ public:
     void alloc_new(const __jule_Int &len, const __jule_Int &cap) {
         this->dealloc();
 
-        __jule_pseudoMalloc(cap, sizeof(Item));
-        Item *alloc = new (std::nothrow) Item[cap];
+        Item *alloc = static_cast<Item *>(__jule_malloc(cap, sizeof(Item)));
         if (!alloc) {
             __jule_panic((__jule_U8 *)"runtime: memory allocation failed for "
                                       "heap-array of slice",
@@ -268,7 +283,11 @@ public:
             return;
         }
         __jule_Slice<Item> _new;
-        _new.alloc_new(this->_len, (this->_len + newItems) << 1);
+        // Jule runtime may allocate the new memory with a different capacity,
+        // and initialize default values differently. So we have to allocate
+        // memory with the exact size, because we do not know how to initilize
+        // unused sections like Jule runtime.
+        _new.alloc_new(this->_len, this->_len + newItems);
         (void)std::move(this->_slice, this->_slice + this->_len, _new._slice);
         this->dealloc();
         this->__get_copy(_new);

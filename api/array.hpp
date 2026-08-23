@@ -5,8 +5,6 @@
 #ifndef __JULE_ARRAY_HPP
 #define __JULE_ARRAY_HPP
 
-#include <initializer_list>
-
 #include "error.hpp"
 #include "slice.hpp"
 #include "string.hpp"
@@ -61,8 +59,8 @@ public:
         __jule_Slice<Item> slice;
         slice.alloc_new(0, end - start);
         slice._len = slice._cap;
-        (void)std::copy(this->begin() + start, this->begin() + end,
-                        slice.begin());
+        (void)std::uninitialized_copy(this->begin() + start,
+                                      this->begin() + end, slice.begin());
         return slice;
     }
 

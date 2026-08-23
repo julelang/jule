@@ -4,11 +4,8 @@
 
 use "std/internal/implflags"
 
-// C's free function.
-extern fn free(*unsafe)
-
-// C's malloc function.
-extern fn malloc(uint): *unsafe
+extern fn malloc(uint): *unsafe // C's malloc function.
+extern fn free(*unsafe)         // C's free function.
 
 const (
 	// _64bit = 1 on 64-bit systems, 0 on 32-bit systems
@@ -63,20 +60,26 @@ const (
 // Base pointer for all 0-byte allocations.
 let zerobase: uintptr = 0
 
-// Pseudo memory allocation, for allocation checking and documentation purposes.
-// Any runtime allocation must be follow this implementation documentation.
-// Pseudo allocates linear memory on the heap. The |n| is non-negative count of elements.
+// Allocates linear memory on the heap and returns it.
+// If it fails, it may return nil pointer or panic.
+// The |n| is non-negative count of elements.
 // The |size| is size in bytes of the single instance of a type which is will be allocated.
-// Panics if |n*size > maxAlloc || n > max(int)|, also panics if allocation failed.
+// Panics if |n*size > maxAlloc || n > max(int)|.
 // Returns pointer to the allocation (pointer to the first cell if n>1).
-// The allocated memory will not be initialized by default.
+// The allocated memory will not be initialized by default, it is raw.
 //
 // Calling this function, performs allocation size checking as described
 // and panics if conditions are met.
-#export "__jule_pseudoMalloc"
-fn pseudoMalloc(n: i64, size: uint) {
+#export "__jule_malloc"
+fn malloc(n: i64, size: uint): *unsafe {
 	allocSize := uint(n) * size
 	if allocSize > maxAlloc {
 		panic("runtime: malloc: allocation size is exceeds maximum allocation size")
 	}
+	return unsafe { extern.malloc(allocSize) }
+}
+
+#export "__jule_dealloc"
+fn dealloc(p: *unsafe) {
+	unsafe { extern.free(p) }
 }

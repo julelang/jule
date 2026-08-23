@@ -1936,7 +1936,7 @@ impl exprCoder {
 			return
 		}
 		self.oc.write("; ")
-		self.initCollection(slice.Value, collectionIdent+"._cap")
+		self.initCollection(slice.Value, collectionIdent+"._cap", true)
 		self.oc.write(" " + collectionIdent + "; })")
 	}
 
@@ -2573,8 +2573,12 @@ impl exprCoder {
 	}
 
 	// Assumes collection element kind able to init.
-	fn initCollection(mut &self, mut elem: &sema::Type, size: string) {
-		self.oc.write("std::fill(")
+	fn initCollection(mut &self, mut elem: &sema::Type, size: string, raw: bool) {
+		if raw {
+			self.oc.write("std::uninitialized_fill(")
+		} else {
+			self.oc.write("std::fill(")
+		}
 		self.oc.write(collectionIdent)
 		self.oc.write(".begin(), ")
 		self.oc.write(collectionIdent)
@@ -2594,7 +2598,7 @@ impl exprCoder {
 		self.oc.write("({ auto " + collectionIdent + " = ")
 		self.oc.tc.array(&self.oc.Buf, arr)
 		self.oc.write("(); ")
-		self.initCollection(arr.Value, toStringArraySize(i64(arr.N), 10))
+		self.initCollection(arr.Value, toStringArraySize(i64(arr.N), 10), false)
 		self.oc.write(" " + collectionIdent + "; })")
 	}
 

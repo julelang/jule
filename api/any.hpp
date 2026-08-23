@@ -5,6 +5,8 @@
 #ifndef __JULE_ANY_HPP
 #define __JULE_ANY_HPP
 
+#include <memory>
+
 #include "string.hpp"
 
 struct __jule_TypeMeta {
@@ -36,15 +38,14 @@ public:
     template <typename T>
     __jule_Any(const T &data, __jule_TypeMeta *type) noexcept {
         this->type = type;
-        __jule_pseudoMalloc(1, sizeof(T));
-        T *alloc = new (std::nothrow) T;
+        T *alloc = static_cast<T *>(__jule_malloc(1, sizeof(T)));
         if (!alloc) {
             __jule_panic(
                 (__jule_U8 *)"runtime: memory allocation failed for data of "
                              "dynamic-type\nfile: /api/any.hpp",
                 70);
         }
-        *alloc = data;
+        std::construct_at(alloc, data);
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
         this->data = __jule_Ptr<__jule_Uintptr>::make(
             reinterpret_cast<__jule_Uintptr *>(alloc), nullptr);
