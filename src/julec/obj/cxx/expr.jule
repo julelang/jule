@@ -442,6 +442,7 @@ impl exprCoder {
 	}
 
 	fn shl(mut &self,
+		op: &token::Token,
 		mut l: cst::Expr, mut lt: &sema::Type,
 		mut r: cst::Expr, mut rt: &sema::Type) {
 		const (
@@ -460,7 +461,22 @@ impl exprCoder {
 		self.oc.write(yVar)
 		self.oc.write(" = ")
 		self.possibleRefExpr(r)
-		self.oc.write("; ((")
+		self.oc.write("; ")
+		if types::IsSigInt(rt.String()) {
+			// Generate negative shift amount guard for signed amount operand.
+			self.oc.write("if (")
+			self.oc.write(yVar)
+			self.oc.write(" < 0) __jule_panicString(")
+			stringLitF(&self.oc.Buf, fn|| {
+				self.oc.write("\"runtime: negative shift amount\\nlocation: ")
+				mut len := 41 // runtime error message
+				len += self.oc.locInfo(op)
+				self.oc.write("\"")
+				return len
+			})
+			self.oc.write("); ")
+		}
+		self.oc.write("((")
 		self.oc.tc.kind(&self.oc.Buf, lt)
 		self.oc.write(")(")
 		self.oc.write(yVar)
@@ -474,6 +490,7 @@ impl exprCoder {
 	}
 
 	fn shr(mut &self,
+		op: &token::Token,
 		mut l: cst::Expr, mut lt: &sema::Type,
 		mut r: cst::Expr, mut rt: &sema::Type) {
 		const (
@@ -492,7 +509,25 @@ impl exprCoder {
 		self.oc.write(yVar)
 		self.oc.write(" = ")
 		self.possibleRefExpr(r)
-		self.oc.write("; ((")
+		self.oc.write("; ")
+		if types::IsSigInt(rt.String()) {
+			// Generate negative shift amount guard for signed amount operand.
+			self.oc.write("if (")
+			self.oc.write(yVar)
+			self.oc.write(" < 0) __jule_panicString(")
+			stringLitF(&self.oc.Buf, fn|| {
+				self.oc.write("\"runtime: negative shift amount\\nlocation: ")
+				mut len := 41 // runtime error message
+				len += self.oc.locInfo(op)
+				self.oc.write("\"")
+				return len
+			})
+			self.oc.write("); ")
+		}
+		// The minimum supported C++ standard is C++20 for Jule.
+		// We do not have to handle this operator with extra effort since C++20
+		// guarantees behavior of the operator `>>` is arithmetic right shift.
+		self.oc.write(" ((")
 		self.oc.tc.kind(&self.oc.Buf, lt)
 		self.oc.write(")(")
 		self.oc.write(yVar)
@@ -520,10 +555,10 @@ impl exprCoder {
 				return
 			}
 		| token::SHL:
-			self.shl(m.Left.Model, m.Left.Type, m.Right.Model, m.Right.Type)
+			self.shl(m.Op, m.Left.Model, m.Left.Type, m.Right.Model, m.Right.Type)
 			return
 		| token::SHR:
-			self.shr(m.Left.Model, m.Left.Type, m.Right.Model, m.Right.Type)
+			self.shr(m.Op, m.Left.Model, m.Left.Type, m.Right.Model, m.Right.Type)
 			return
 		}
 		self.unsafeBinary(m)
