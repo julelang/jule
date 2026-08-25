@@ -90,11 +90,7 @@ public:
     // heap allocations are valid or something like that.
     void __free(void) noexcept {
         if constexpr (!std::is_trivially_destructible_v<Item>) {
-            Item *p = this->data.alloc;
-            for (std::size_t i = 0; i < this->_cap; ++i) {
-                std::destroy_at(p);
-                ++p;
-            }
+             std::destroy_n(this->data.alloc, this->_cap);
         }
         __jule_dealloc(this->data.alloc);
         this->data.alloc = nullptr;
