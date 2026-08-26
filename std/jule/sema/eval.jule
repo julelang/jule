@@ -4621,17 +4621,17 @@ impl binaryEval {
 		}
 		// value is valid guaranteed
 
-		const maxShiftCount = bitLimit
+		const maxShiftAmount = bitLimit
 		if self.r.IsConst() {
 			if self.r.Constant.IsInt() {
 				i := self.r.Constant.ReadInt()
-				if i.IsI64() && i.I64() > maxShiftCount ||
-					i.IsU64() && i.U64() > maxShiftCount {
-					self.e.pushErr(self.rt, "invalid shift count: "+i.String())
+				if i.IsI64() && i.I64() > maxShiftAmount ||
+					i.IsU64() && i.U64() > maxShiftAmount {
+					self.e.pushErr(self.rt, "invalid shift amount: "+i.String())
 					return nil
 				}
-			} else if self.r.Constant.IsF64() && self.r.Constant.ReadF64() > maxShiftCount {
-				self.e.pushErr(self.rt, "invalid shift count: "+self.r.Constant.String())
+			} else if self.r.Constant.IsF64() && self.r.Constant.ReadF64() > maxShiftAmount {
+				self.e.pushErr(self.rt, "invalid shift amount: "+self.r.Constant.String())
 				return nil
 			}
 		}
@@ -5202,10 +5202,28 @@ fn findBuiltinsSema(name: string, mut s: &sema): any {
 }
 
 fn isOkForShifting(mut v: &Value): bool {
-	if !v.untyped || !v.IsConst() {
+	if !v.IsConst() {
 		prim := v.Type.Prim()
 		return prim != nil && types::IsInt(prim.String())
 	}
+	// Check for negative shift amount even for typed constants.
+	if !v.untyped {
+		match {
+		| v.Constant.IsInt():
+			i := v.Constant.ReadInt()
+			if i.Sign() == -1 {
+				return false
+			}
+		| v.Constant.IsF64():
+			f := v.Constant.ReadF64()
+			if f < 0 {
+				return false
+			}
+		}
+		prim := v.Type.Prim()
+		return prim != nil && types::IsInt(prim.String())
+	}
+	// Untyped constant, check according to uint semantics.
 	max := types::MaxU(types::Uint)
 	match {
 	| v.Constant.IsInt():
