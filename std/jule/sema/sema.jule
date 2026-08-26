@@ -300,9 +300,9 @@ struct commonSemaMeta {
 	gstructs:          []&StructIns // Generic structs waiting to be checked.
 	comptimeTypeInfos: []&comptimeTypeInfo
 	refcache:          []&ReferenceStack
-	runtime:           &ImportInfo       // Implicitly imported "std/runtime" package.
-	mrc:               missingRetChecker // General missing return statement checker.
-	flags:             int               // General flags.
+	runtime:           &ImportInfo          // Implicitly imported "std/runtime" package.
+	mrc:               missingReturnChecker // General missing return statement checker.
+	flags:             int                  // General flags.
 
 	// Types.
 	runtimeHint: &StructIns // runtime::Hint
@@ -3254,31 +3254,31 @@ impl sema {
 	}
 }
 
-// Memoization state flags for missingRetChecker.
+// Memoization state flags for missingReturnChecker.
 const (
 	_LMEMO_FALSE = 1 << iota
 	_LMEMO_TRUE
 	_LMEMO_CHECKING
 )
 
-struct missingRetChecker {
+struct missingReturnChecker {
 	mut breaked: map[uintptr]bool // break statement seen for iteration or match-case statement
 	mut labels:  map[uintptr]int  // memoization for labels, reports state of label's following statements
 	mut fell:    bool             // fall statement seen
 	mut hard:    bool             // hard register, this should be true for the final report
 }
 
-impl missingRetChecker {
+impl missingReturnChecker {
 	// Resets all data for the new analysis.
 	fn reset(*self) {
 		self.hard = true
 		if self.breaked == nil {
-			self.breaked = map[uintptr]bool{}
+			self.breaked = make(map[uintptr]bool)
 		} else {
 			clear(self.breaked)
 		}
 		if self.labels == nil {
-			self.labels = map[uintptr]int{}
+			self.labels = make(map[uintptr]int)
 		} else {
 			clear(self.labels)
 		}
@@ -3291,26 +3291,89 @@ impl missingRetChecker {
 		if ok {
 			return r&_LMEMO_TRUE != 0
 		}
+		// Label is not memoized yet, so this is the first time.
 		// Temporarily memoize the label to avoid infinite recursion.
 		// Also this data used to catch in-check state:
 		self.labels[laddr] = _LMEMO_CHECKING
 		// Check rest of the statements following label.
-		// With `l.Index+1` skip the current label statement.
-		i := l.Index + 1
+		// With `l.Index+1` skip the current label statement,
+		// because label statement will trigger the memoization.
+		// Save report to the hard register.
+		// So we jumping to below, we have to memoize "false" reports.
+		// Otherwise we may miss "false" reports.
+		//
+		// Example wrong "true" report on pseudo AST:
+		//	╭──────────────────╮
+		//	│ fn foo(): int  { │
+		//	│     if true {    │
+		//	│         goto Bar │ > this branch jumps below, reports no return
+		//	│     }            │
+		//	│     return 0     │ > analysis sees this and assumes function returns
+		//	│ Bar:             │   we have to remember branch's report at this point
+		//	│ }                │
+		//	╰──────────────────╯
+		mut i := l.Index + 1
 		if l.Scope.Traits&ST_INFINITE != 0 {
 			ok = self.checkInfinite(l.Scope.Owner, l.Scope, i)
 		} else {
 			ok = self.checkScope(l.Scope, i)
 		}
+		// If analysis reports true, then assign the result directly.
+		// Otherwise we have to check following statements.
 		if ok {
-			r = _LMEMO_TRUE
-		} else {
-			r = _LMEMO_FALSE
+			// No operation needed for the hard register.
+			// If self.hard is true, we have already true.
+			// Otherwise, we must store the false state.
+			// Just report the current result of analysis.
+			self.labels[laddr] = _LMEMO_TRUE
+			return ok
 		}
-		// Memoize the actual result.
-		self.labels[laddr] = r
-		// Time to return.
-		return ok
+		// Analysis reports false, we have to check following statements.
+		// Otherwise we cannot know label's following situation.
+		//
+		// Example on pseudo AST:
+		//	╭─────────────────────────╮
+		//	│ fn foo(): string {      │
+		//	│     {                   │
+		//	│         goto Keep       │ < jumps to below
+		//	│         return "return" │
+		//	│     Keep:               │ < this label reports false for its own scope here
+		//	│     }                   │   but it is actually wrong
+		//	│     return "return"     │ < because the following statement returns
+		//	│ }                       │   so label should report true.
+		//	╰─────────────────────────╯
+		mut ls := l.Scope
+		for ls != nil {
+			mut ps := ls.Parent
+			// No parent scope and we did not see "true" report.
+			// So this label should report "false".
+			if ps == nil {
+				self.hard = false
+				self.labels[laddr] = _LMEMO_FALSE
+				return false
+			}
+			// Start checking parent scope from the following
+			// statements of the current child scope.
+			i = ls.StmtIndex + 1
+			if ps.Traits&ST_INFINITE != 0 {
+				ok = self.checkInfinite(ps.Owner, ps, i)
+			} else {
+				ok = self.checkScope(ps, i)
+			}
+			// Scope analysis returns true for the parent.
+			// So this label should report "true".
+			if ok {
+				// No operation needed for the hard register.
+				// If self.hard is true, we have already true.
+				// Otherwise, we must store the false state.
+				// Just report the current result of analysis.
+				self.labels[laddr] = _LMEMO_TRUE
+				return true
+			}
+			// Continue to the next parent scope.
+			ls = ps
+		}
+		panic("unreachable")
 	}
 
 	fn memoizeGoto(*self, mut g: &Goto): (ok: bool) {
@@ -3326,83 +3389,7 @@ impl missingRetChecker {
 			r, ok = self.labels[uintptr(g.Label)]
 		}
 		if !ok {
-			// Label is not memoized yet, so this is the first time.
-			// Check scope by label index. Start from label index,
-			// because label statement will trigger the memoization.
-			// Save report to the hard register.
-			// Because label is not checked, even not in in-check state.
-			// So we jumping to below, we have to memoize "false" reports.
-			// Otherwise we may miss "false" reports.
-			//
-			// Example wrong "true" report on pseudo AST:
-			//	╭──────────────────╮
-			//	│ fn foo(): int  { │
-			//	│     if true {    │
-			//	│         goto Bar │ > this branch jumps below, reports no return
-			//	│     }            │
-			//	│     return 0     │ > analysis sees this and assumes function returns
-			//	│ Bar:             │   we have to remember branch's report at this point
-			//	│ }                │
-			//	╰──────────────────╯
-			if g.Label.Scope.Traits&ST_INFINITE != 0 {
-				ok = self.checkInfinite(g.Label.Scope.Owner, g.Label.Scope, g.Label.Index)
-			} else {
-				ok = self.checkScope(g.Label.Scope, g.Label.Index)
-			}
-			// If analysis report is true, then assign the result directly.
-			// Otherwise we have to check following statements.
-			if ok {
-				// No operation needed for the hard register.
-				// If self.hard is true, we have already true.
-				// Otherwise, we must store the false state.
-				// Just report the current result of analysis.
-				return ok
-			} else {
-				// Analysis report is false, we have to check following statements.
-				// Otherwise we cannot know label's following situation.
-				//
-				// Example on pseudo AST:
-				//	╭─────────────────────────╮
-				//	│ fn foo(): string {      │
-				//	│     {                   │
-				//	│         goto Keep       │ < jumps to below
-				//	│         return "return" │
-				//	│     Keep:               │ < this label reports false for its own scope here
-				//	│     }                   │   but it is actually wrong
-				//	│     return "return"     │ < because the following statement returns
-				//	│ }                       │   so label should report true.
-				//	╰─────────────────────────╯
-				mut ls := g.Label.Scope
-				for ls != nil {
-					// No parent scope and we did not see "true" report.
-					// So this label should report "false".
-					if ls.Parent == nil {
-						self.hard = false
-						return false
-					}
-					mut ps := ls.Parent
-					// Start checking parent scope from the following
-					// statements of the current child scope.
-					i := ls.StmtIndex + 1
-					if ps.Traits&ST_INFINITE != 0 {
-						ok = self.checkInfinite(ps.Owner, ps, i)
-					} else {
-						ok = self.checkScope(ps, i)
-					}
-					// Scope analysis returns true for the parent.
-					// So this label should report "true".
-					if ok {
-						// No operation needed for the hard register.
-						// If self.hard is true, we have already true.
-						// Otherwise, we must store the false state.
-						// Just report the current result of analysis.
-						return true
-					}
-					// Continue to the next parent scope.
-					ls = ps
-				}
-				panic("unreachable")
-			}
+			return self.memoizeLabel(g.Label)
 		} else if r&_LMEMO_CHECKING == 0 {
 			// Label is already memoized, report the result.
 			return r&_LMEMO_TRUE != 0
