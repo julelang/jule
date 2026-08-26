@@ -226,6 +226,7 @@ const (
 	EXTUSE_FRAMEWORKS
 	EXTUSE_LIBRARY
 	EXTUSE_FRAMEWORK
+	EXTUSE_SOURCE
 )
 
 // Pushes argument from the "extern use" statement, if needed.
@@ -281,7 +282,7 @@ fn pushExternUseArg(mut args: []string, imp: &sema::ImportInfo, typ: int): []str
 		panic("julec: unhandled extern use kind")
 	}
 	// Source file, append as filepath.
-	if isExternSourceFile(imp.Path) {
+	if typ&EXTUSE_SOURCE != 0 && isExternSourceFile(imp.Path) {
 		return append(args, imp.Path)
 	}
 	return args
@@ -308,6 +309,7 @@ fn genCompileCmd(sourcePath: string, mut ir: &obj::IR): (compiler: string, args:
 	}
 
 	args = pushExternUse(args, ir, EXTUSE_INCLUDE|EXTUSE_LIBRARIES|EXTUSE_FRAMEWORKS)
+	args = pushExternUse(args, ir, EXTUSE_SOURCE)
 
 	// If output name is missing, use "main" by default.
 	Out = strings::TrimSpace(Out)
