@@ -6,6 +6,7 @@ use "julec/env"
 use "julec/obj"
 use "julec/opt/deadcode"
 use "std/jule/ast"
+use "std/jule/directive"
 use "std/jule/sema"
 
 let mut exprEnabled = false
@@ -30,6 +31,11 @@ impl Optimizer {
 	}
 
 	fn optimizeGlobal(mut *self, mut v: &sema::Var) {
+		// Skip "#noinit" variables.
+		if v.AST.Flags&ast::F_STATIC != 0 &&
+			obj::FindDirective(v.AST.Directives, directive::Noinit) != nil {
+			return
+		}
 		if v.AST.Flags&ast::F_EXTERN == 0 {
 			self.optimizeExpr(&v.Value.Model)
 		}
