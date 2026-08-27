@@ -230,6 +230,32 @@ impl directiveChecker {
 		}
 	}
 
+	fn checkNoinit(mut *self, mut d: &ast::Directive) {
+		match type self.o {
+		| &Var:
+			v := self.o.(&Var)
+			if v.AST.Flags&ast::F_EXTERN != 0 {
+				self.s.pushErr(d.Tag, "extern variable does not supports directive: "+d.Tag.Kind)
+				return
+			}
+			if v.AST.Flags&ast::F_CONST != 0 {
+				self.s.pushErr(d.Tag, "constant variable does not supports directive: "+d.Tag.Kind)
+				return
+			}
+			if v.AST.Flags&ast::F_REFERENCE != 0 {
+				self.s.pushErr(d.Tag, "reference variable does not supports directive: "+d.Tag.Kind)
+				return
+			}
+		|:
+			self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
+			self.s.pushSuggestion("declaration must be a sync function")
+			return
+		}
+		if len(d.Args) > 0 {
+			self.s.pushErr(d.Args[0], "the #noinit will not take any arguments")
+		}
+	}
+
 	fn checkDirective(mut *self, mut d: &ast::Directive) {
 		match d.Tag.Kind {
 		| directive::Cdef:
@@ -250,6 +276,8 @@ impl directiveChecker {
 			self.checkFuture(d)
 		| directive::Ready:
 			self.checkReady(d)
+		| directive::Noinit:
+			self.checkNoinit(d)
 		|:
 			self.s.pushErr(d.Tag, "invalid label: "+d.Tag.Kind)
 		}

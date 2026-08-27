@@ -2123,11 +2123,16 @@ impl sema {
 			}
 		}
 
-		if !decl.IsInitialized() {
+		noinit := findDirective(decl.AST.Directives, directive::Noinit) != nil
+		if decl.IsInitialized() {
+			if noinit {
+				self.pushErr(decl.AST.Token, "variable marked as \"#noinit\" but have an initialize expression")
+			}
+		} else {
 			if groupError {
 				self.pushErr(decl.AST.Token, "constant variable must be initialized explicitly")
 			}
-			if decl.AST.Flags&ast::F_EXTERN == 0 && decl.AST.Flags&ast::F_STATIC != 0 {
+			if !noinit && decl.AST.Flags&ast::F_EXTERN == 0 && decl.AST.Flags&ast::F_STATIC != 0 {
 				self.pushErr(decl.AST.Token, "static variable must be initialized explicitly")
 			}
 			if decl.AST.Flags&ast::F_REFERENCE != 0 {
