@@ -1005,8 +1005,18 @@ impl ObjectCoder {
 	// But this parameter not only for anonymous functions.
 	// It also useable as custom identifiers for functions.
 	fn funcHead(mut &self, mut &buf: *strings::Builder, mut f: &sema::FuncIns, ptr: bool, name: string) {
-		if !ptr && opt::Inline && !f.Decl.IsEntryPoint() &&
-			obj::FindDirective(f.Decl.AST.Directives, directive::Export) == nil {
+		// Make function if:
+		//	- inline optimization enabled, and
+		//	- function will not requested as pointer, and
+		//	- function is not entry point, and
+		//	- function is not exported
+		mut inline := opt::Inline && !ptr && !f.Decl.IsEntryPoint() &&
+			obj::FindDirective(f.Decl.AST.Directives, directive::Export) == nil
+		// If inline conditions are not met, check for the #inline directive.
+		// Force it to be inline if function is not requested as pointer if marked as inline.
+		inline = inline || !ptr && obj::FindDirective(f.Decl.AST.Directives, directive::Inline) != nil
+
+		if inline {
 			buf.WriteString("inline ")!
 		}
 		if f.Decl.AST.Flags&ast::F_ASYNC != 0 {
