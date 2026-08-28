@@ -272,7 +272,10 @@ impl directiveChecker {
 				self.s.pushErr(d.Tag, "entry point function cannot be #inline")
 				return
 			}
-			f.Flags |= F_READY
+			if findDirective(f.AST.Directives, directive::Noinline) != nil {
+				self.s.pushErr(d.Tag, "function have the #inline and #noinline directives same time")
+				return
+			}
 		|:
 			self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
 			self.s.pushSuggestion("declaration must be a sync function")
@@ -280,6 +283,36 @@ impl directiveChecker {
 		}
 		if len(d.Args) > 0 {
 			self.s.pushErr(d.Args[0], "the #inline will not take any arguments")
+		}
+	}
+
+	fn checkNoinline(mut *self, mut d: &ast::Directive) {
+		match type self.o {
+		| &Func:
+			mut f := self.o.(&Func)
+			if f.AST.Flags&ast::F_EXTERN != 0 {
+				self.s.pushErr(d.Tag, "extern functions cannot be #noinline")
+				return
+			}
+			if f.IsInit() {
+				self.s.pushErr(d.Tag, "initializer functions cannot be #noinline")
+				return
+			}
+			if f.IsEntryPoint() {
+				self.s.pushErr(d.Tag, "entry point function cannot be #noinline")
+				return
+			}
+			if findDirective(f.AST.Directives, directive::Inline) != nil {
+				self.s.pushErr(d.Tag, "function have the #inline and #noinline directives same time")
+				return
+			}
+		|:
+			self.s.pushErr(d.Tag, "declaration does not supports directive: "+d.Tag.Kind)
+			self.s.pushSuggestion("declaration must be a sync function")
+			return
+		}
+		if len(d.Args) > 0 {
+			self.s.pushErr(d.Args[0], "the #noinline will not take any arguments")
 		}
 	}
 
@@ -307,6 +340,8 @@ impl directiveChecker {
 			self.checkNoinit(d)
 		| directive::Inline:
 			self.checkInline(d)
+		| directive::Noinline:
+			self.checkNoinline(d)
 		|:
 			self.s.pushErr(d.Tag, "invalid label: "+d.Tag.Kind)
 		}

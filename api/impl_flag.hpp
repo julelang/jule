@@ -27,6 +27,14 @@
 #define __JULE_INLINE_BEFORE_CPP20 inline
 #endif
 
+#if defined(_MSC_VER)
+#define __JULE_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+#define __JULE_NOINLINE __attribute__((noinline))
+#else
+#define __JULE_NOINLINE
+#endif
+
 [[noreturn]] inline void __jule_unreachable(void) noexcept {
 #if !defined(NDEBUG)
     assert(false && "Unreachable code reached!");
