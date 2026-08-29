@@ -281,7 +281,7 @@ public:
         __jule_Slice<Item> _new;
         // Jule runtime may allocate the new memory with a different capacity,
         // and initialize default values differently. So we have to allocate
-        // memory with the exact size, because we do not know how to initilize
+        // memory with the exact size, because we do not know how to initialize
         // unused sections like Jule runtime.
         _new.alloc_new(this->_len, this->_len + newItems);
         (void)std::move(this->_slice, this->_slice + this->_len, _new._slice);
