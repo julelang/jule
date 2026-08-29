@@ -50,9 +50,9 @@ fn sett(mut t: &thread) {
 	extern.__jule_ct = (*thread)(t)
 }
 
-// Pointer to the main M, the main program thread.
+// Value of the main M, the main program thread.
 #noinit
-let mut mainm: &thread
+let mut mainm: thread
 
 // Stores total number of logical threads.
 #noinit
@@ -65,10 +65,9 @@ let mut numcpu: int
 // process startup are not reflected.
 fn NumCPU(): int { return numcpu }
 
-// Allocates a new thread and sets state as running.
+// Initializes thread t and sets state as running.
 #disable nilptr
-fn newThread(role: int): &thread {
-	mut t := new(thread)
+fn initThread(mut &t: *thread, role: int) {
 	t.role = role
 
 	// Initialized once and never deallocated if thread waiting for reuse.
@@ -79,7 +78,13 @@ fn newThread(role: int): &thread {
 		// Initialize local random state.
 		trandinit(t)
 	}
+}
 
+// Allocates a new thread and sets state as running.
+#disable nilptr
+fn newThread(role: int): &thread {
+	mut t := new(thread)
+	initThread(&*t, role)
 	return t
 }
 
@@ -94,8 +99,9 @@ fn releaseThread(mut t: &thread) {
 fn threadinit() {
 	// Platform specific initialization.
 	_threadinit()
-
+	// Initialize the main program thread.
+	initThread(&mainm, roleProgram)
 	// Program started by the main thread.
 	// Use `sett(mainm)` to set thread-local &thread data for the main thread.
-	sett(mainm)
+	sett(unsafe { (&thread)(&mainm) })
 }
