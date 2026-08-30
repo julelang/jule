@@ -82,19 +82,20 @@ impl Mutex {
 		let mut waitStartTime: i64
 		mut starving := false
 		mut awoke := false
-		mut iter := 1
+		mut iter := u32(0)
 		mut old := self.state
 		for {
 			// Don't spin in starvation mode, ownership is handed off to waiters
 			// so we won't be able to acquire the mutex anyway.
-			if old&(mutexLocked|mutexStarving) == mutexLocked && iter < 1<<9 {
+			if old&(mutexLocked|mutexStarving) == mutexLocked && runtime::canSpin(iter) {
 				// Active spinning makes sense.
 				// Try to set mutexWoken flag to inform Unlock
 				// to not wake other blocked coroutines.
 				if !awoke && old&mutexWoken == 0 && old>>mutexWaiterShift != 0 {
 					awoke = atomic::CompareAndSwap(&self.state, old, old|mutexWoken, atomic::AcqRel, atomic::Relaxed)
 				}
-				iter <<= 1
+				runtime::doSpin()
+				iter++
 				old = self.state
 				continue
 			}
@@ -154,7 +155,7 @@ impl Mutex {
 					break
 				}
 				awoke = true
-				iter = 1
+				iter = 0
 			} else {
 				old = self.state
 			}

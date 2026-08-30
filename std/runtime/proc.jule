@@ -1479,3 +1479,21 @@ fn resetspinning() {
 	// comment at the top of the file for details.
 	wakep()
 }
+
+#inline
+fn canSpin(iter: u32): bool {
+	// [sync::Mutex] is cooperative, so we are conservative with spinning.
+	// Spin only few times and only if running on a multicore machine and
+	// COMAXPROCS>1 and there is at least one other running P and local runq is empty.
+	// As opposed to runtime mutex we don't do passive spinning here,
+	// because there can be work on global runq or on other Ps.
+	const ActiveSpin = 4
+	if iter >= ActiveSpin || numcpu <= 1 || comaxprocs <= atomic::Load(&sched.npidle, atomic::Acquire)+atomic::Load(&sched.nmspinning, atomic::Acquire)+1 {
+		return false
+	}
+	t := gett()
+	if !runqempty(t.pp) {
+		return false
+	}
+	return true
+}
