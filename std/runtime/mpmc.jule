@@ -48,6 +48,7 @@ impl mpmcQueue {
 
 	#disable boundary nilptr
 	fn enqueue(mut *self, mut &val: *T): (ok: bool, closed: bool) {
+		mut iter := u32(0)
 		for {
 			pos := atomic::Load(&self.enqueuePos, atomic::Relaxed)
 			mut &c := unsafe { &(*(&self.buf[pos&self.capmask])) }
@@ -79,12 +80,12 @@ impl mpmcQueue {
 					return false, false // FULL
 				}
 				// Not guaranteed full → retry
-				osyield()
+				waitSpin(&iter)
 				continue
 			}
 
 			// dif > 0 → another producer ahead
-			osyield()
+			waitSpin(&iter)
 		}
 	}
 
@@ -92,6 +93,7 @@ impl mpmcQueue {
 	// Non-blocking; uses polite backoff on contention.
 	#disable boundary nilptr
 	fn dequeue(mut *self, mut &val: *T): (ok: bool, closed: bool) {
+		mut iter := u32(0)
 		for {
 			// do not immediately return even if isclosed is true
 			// we have to consume all queued data even if it is closed
@@ -119,7 +121,7 @@ impl mpmcQueue {
 				return false, closed
 			} else {
 				// another consumer is ahead / not our turn yet → polite backoff
-				osyield()
+				waitSpin(&iter)
 			}
 		}
 	}
