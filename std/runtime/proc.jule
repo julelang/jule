@@ -331,34 +331,34 @@ impl scheduler {
 	// Marks that a coroutine is about to enter an I/O polling state.
 	// Must be called immediately before the coroutine blocks on I/O.
 	fn enterblock(mut *self) {
-		atomic::Add(&self._ncblock, 1, atomic::Relaxed)
+		atomic::Add(&self._ncblock, 1, atomic::Release)
 	}
 
 	// Marks that a coroutine has exited an I/O polling state.
 	// Must be called immediately after the coroutine finishes polling.
 	fn exitblock(mut *self) {
-		atomic::Add(&self._ncblock, -1, atomic::Relaxed)
+		atomic::Add(&self._ncblock, -1, atomic::Release)
 	}
 
 	// Returns the number of coroutines currently polling for I/O.
 	// Used by the scheduler to make global scheduling decisions.
 	fn ncblocking(*self): int {
-		return atomic::Load(&self._ncblock, atomic::Relaxed)
+		return atomic::Load(&self._ncblock, atomic::Acquire)
 	}
 
 	// Marks that a worker thread is entering a coroutine runner state.
 	fn enterrun(mut *self) {
-		atomic::Add(&self._ncrun, 1, atomic::Relaxed)
+		atomic::Add(&self._ncrun, 1, atomic::Release)
 	}
 
 	// Marks that a worker thread has exited the runner state.
 	fn exitrun(mut *self) {
-		atomic::Add(&self._ncrun, -1, atomic::Relaxed)
+		atomic::Add(&self._ncrun, -1, atomic::Release)
 	}
 
 	// Returns the number of worker threads currently runs a coroutine.
 	fn ncrunning(*self): int {
-		return atomic::Load(&self._ncrun, atomic::Relaxed)
+		return atomic::Load(&self._ncrun, atomic::Acquire)
 	}
 }
 
@@ -418,14 +418,14 @@ fn pidlegetSpinning(): &p {
 fn wakep() {
 	// Be conservative about spinning threads,
 	// only start one if none exist already.
-	if atomic::Load(&sched.nmspinning, atomic::Relaxed) != 0 ||
-		!atomic::CompareAndSwap(&sched.nmspinning, 0, 1, atomic::Relaxed, atomic::Relaxed) {
+	if atomic::Load(&sched.nmspinning, atomic::Acquire) != 0 ||
+		!atomic::CompareAndSwap(&sched.nmspinning, 0, 1, atomic::AcqRel, atomic::Relaxed) {
 		return
 	}
 	sched.mu.lock()
 	mut pp := pidlegetSpinning()
 	if pp == nil {
-		if atomic::Add(&sched.nmspinning, -1, atomic::Relaxed) < 0 {
+		if atomic::Add(&sched.nmspinning, -1, atomic::Release) < 0 {
 			panic("wakep: negative nmspinning")
 		}
 		sched.mu.unlock()
@@ -926,7 +926,7 @@ top:
 	//
 	// Stealing is limited to a small fixed number of attempts to
 	// avoid excessive contention and cache thrashing.
-	if m.spinning || 2*atomic::Load(&sched.nmspinning, atomic::Relaxed) < comaxprocs-atomic::Load(&sched.npidle, atomic::Relaxed) {
+	if m.spinning || 2*atomic::Load(&sched.nmspinning, atomic::Acquire) < comaxprocs-atomic::Load(&sched.npidle, atomic::Acquire) {
 		if !m.spinning {
 			becomeSpinning(m)
 		}
@@ -1028,7 +1028,7 @@ top:
 	wasSpinning := m.spinning
 	if m.spinning {
 		m.spinning = false
-		if atomic::Add(&sched.nmspinning, -1, atomic::Relaxed) < 0 {
+		if atomic::Add(&sched.nmspinning, -1, atomic::Release) < 0 {
 			panic("findRunnable: negative nmspinning")
 		}
 
@@ -1459,7 +1459,7 @@ fn mget(): &thread {
 #disable nilptr
 fn becomeSpinning(mut m: &thread) {
 	m.spinning = true
-	atomic::Add(&sched.nmspinning, 1, atomic::Relaxed)
+	atomic::Add(&sched.nmspinning, 1, atomic::Release)
 	atomic::Store(&sched.needspinning, 0, atomic::Release)
 }
 
