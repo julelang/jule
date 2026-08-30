@@ -5,12 +5,12 @@
 type MemoryOrder: int
 
 const (
-	Relaxed = MemoryOrder(0)
-	Consume = MemoryOrder(1)
-	Acquire = MemoryOrder(2)
-	Release = MemoryOrder(3)
-	AcqRel  = MemoryOrder(4)
-	SeqCst  = MemoryOrder(5)
+	Relaxed: MemoryOrder = iota
+	Consume
+	Acquire
+	Release
+	AcqRel
+	SeqCst
 )
 
 #cdef
@@ -27,6 +27,9 @@ extern unsafe fn __atomic_compare_exchange_n[T](*unsafe, *unsafe, T, int, Memory
 
 #cdef
 extern unsafe fn __atomic_fetch_add[T](*unsafe, T, MemoryOrder): T
+
+#cdef
+extern unsafe fn __atomic_thread_fence(MemoryOrder)
 
 // Atomically stores new value to p with memory order mo, and returns the old value.
 fn Swap[T](mut p: *T, new: T, mo: MemoryOrder): (old: T) {
@@ -106,4 +109,13 @@ fn AddZ[T1, T2](mut p: *T1, delta: T2, mo: MemoryOrder): (new: T2) {
 // T1 is a base pointer type, T2 is the output type.
 fn StoreZ[T1, T2](mut p: *T1, val: T2, mo: MemoryOrder) {
 	unsafe { extern.__atomic_store(p, &val, mo) }
+}
+
+// Fences create synchronization between themselves and
+// atomic operations or fences in other threads.
+// It can be helpful to think of a fence as preventing the compiler and
+// CPU from reordering certain types of memory operations around it,
+// but that is a simplified model which fails to capture some of the nuances.
+fn Fence(mo: MemoryOrder) {
+	unsafe { extern.__atomic_thread_fence(mo) }
 }
