@@ -8,7 +8,12 @@
 #ifndef __JULE_RUNTIME_HPP
 #define __JULE_RUNTIME_HPP
 
+#include "platform.hpp"
 #include "types.hpp"
+
+#if defined(__JULE_OS_WINDOWS)
+#include "<intrin.h>"
+#endif
 
 class __jule_String;
 template <typename Item> class __jule_Slice;
@@ -53,5 +58,28 @@ void __jule_print(__jule_String s);
 void __jule_println(__jule_String s);
 __jule_F64 __jule_NaN(void);
 __jule_F64 __jule_Inf(__jule_Int sign);
+
+static inline void __jule_doSpin(void) noexcept {
+#if defined(_MSC_VER)
+#if defined(_M_ARM64)
+    __yield();
+#else
+    _mm_pause();
+#endif
+#elif (defined(__JULE_ARCH_AMD64) || defined(__JULE_ARCH_I386)) &&             \
+    !defined(_M_ARM64EC)
+    __asm__ volatile("pause" ::: "memory");
+#elif defined(__JULE_ARCH_ARM64) || (defined(__arm__) && __ARM_ARCH >= 7) ||   \
+    defined(_M_ARM64EC)
+    __asm__ volatile("yield" ::: "memory");
+#elif defined(__powerpc__) || defined(__powerpc64__)
+    // No idea if ever been compiled in such archs but ... as precaution.
+    __asm__ volatile("or 27,27,27");
+#elif defined(__sparc__)
+    __asm__ volatile("rd %ccr, %g0 \n\trd %ccr, %g0 \n\trd %ccr, %g0");
+#else
+#error "unsupported target for __jule_spin"
+#endif
+}
 
 #endif // #ifndef __JULE_RUNTIME_HPP

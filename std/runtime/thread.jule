@@ -105,3 +105,29 @@ fn threadinit() {
 	// Use `sett(mainm)` to set thread-local &thread data for the main thread.
 	sett(unsafe { (&thread)(&mainm) })
 }
+
+// Number of cheap CPU-pause spins before
+// escalates to a real runtime/OS scheduler yield.
+const spinThreshold = 100
+
+// Does active spinning.
+fn doSpin() { panic("compiler-implemented") }
+
+// Increases iter and cheks for whether spinning makes sense at the moment.
+// If so, performs cheap CPU-pause, otherwise OS scheduler yield.
+// This works at M level, not C level.
+#disable nilptr
+fn wainSpin(mut &iter: *u32) {
+	*iter++
+	if canSpin(*iter) {
+		doSpin()
+	} else {
+		osyield()
+	}
+}
+
+// Reports whether spinning makes sense at the moment.
+#inline
+fn canSpin(iter: u32): bool {
+	return iter < spinThreshold
+}
