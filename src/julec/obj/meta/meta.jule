@@ -30,6 +30,25 @@ struct StringBuilder {
 	WriteString: &sema::FuncIns
 }
 
+impl StringBuilder {
+	// Collects StringBuilder from IR if possible.
+	fn Collect(mut ir: &obj::IR): &StringBuilder {
+		const Extern = false
+		const Static = false
+		mut p := obj::SelectImport(ir.Used, linkpathStrings)
+		if p == nil {
+			return nil
+		}
+		mut b := p.FindStruct("Builder", Extern).Instances[0]
+		mut meta := new(StringBuilder)
+		const metav = comptime::Valueof(*meta)
+		const for _, f in metav.Type().Decl().Fields() {
+			metav.Field(f.Name()).Unwrap() = b.FindMethod(f.Name(), Static).Instances[0]
+		}
+		return meta
+	}
+}
+
 // Metadata for the runtime package.
 struct Runtime {
 	Asynctime:  &sema::Var
@@ -95,6 +114,89 @@ struct Runtime {
 	C:           &sema::StructIns
 }
 
+impl Runtime {
+	// Collects Runtime from IR if possible.
+	fn Collect(mut ir: &obj::IR): &Runtime {
+		mut p := obj::SelectImport(ir.Used, linkpathRuntime)
+		if p == nil {
+			return nil
+		}
+		mut meta := new(Runtime)
+
+		// Globals.
+		meta.Asynctime = obj::RuntimeFindGlobal(p, "asynctime")
+		meta.Comaxprocs = obj::RuntimeFindGlobal(p, "comaxprocs")
+
+		// Functions.
+		meta.Init = obj::RuntimeFindFunc(p, "__init").Instances[0]
+		meta.Schedule = obj::RuntimeFindFunc(p, "schedule").Instances[0]
+		meta.Park = obj::RuntimeFindFunc(p, "park").Instances[0]
+		meta.Park2 = obj::RuntimeFindFunc(p, "park2").Instances[0]
+		meta.Runtimepark = obj::RuntimeFindFunc(p, "runtimepark").Instances[0]
+		meta.Spawnmainc = obj::RuntimeFindFunc(p, "spawnmainc").Instances[0]
+		meta.Rand = obj::RuntimeFindFunc(p, "rand").Instances[0]
+		meta.Osyield = obj::RuntimeFindFunc(p, "osyield").Instances[0]
+		meta.ToString = obj::RuntimeFindFunc(p, "toString")
+		meta.ArrayCmp = obj::RuntimeFindFunc(p, "arrayCmp")
+		meta.DynAssertAssign = obj::RuntimeFindFunc(p, "dynAssertAssign")
+		meta.Maphash = obj::RuntimeFindFunc(p, "maphash")
+		meta.Fastmemcopy = obj::RuntimeFindFunc(p, "fastmemcopy")
+		meta.FastmemcopyForward = obj::RuntimeFindFunc(p, "fastmemcopy_forward").Instances[0]
+		meta.FastmemcopyBackward = obj::RuntimeFindFunc(p, "fastmemcopy_backward").Instances[0]
+		meta.Prememappend = obj::RuntimeFindFunc(p, "prememappend")
+		meta.Memappend = obj::RuntimeFindFunc(p, "memappend")
+		meta.Emptyselect = obj::RuntimeFindFunc(p, "emptyselect").Instances[0]
+		meta.Runselect = obj::RuntimeFindFunc(p, "runselect").Instances[0]
+		meta.RCAdd = obj::RuntimeFindFunc(p, "_RCAdd").Instances[0]
+		meta.RCLoad = obj::RuntimeFindFunc(p, "_RCLoad").Instances[0]
+		meta.RCDrop = obj::RuntimeFindFunc(p, "_RCDrop").Instances[0]
+		meta.RCAddAtomic = obj::RuntimeFindFunc(p, "_RCAddAtomic").Instances[0]
+		meta.RCLoadAtomic = obj::RuntimeFindFunc(p, "_RCLoadAtomic").Instances[0]
+		meta.RCDropAtomic = obj::RuntimeFindFunc(p, "_RCDropAtomic").Instances[0]
+		meta.RuneCount = obj::RuntimeFindFunc(p, "runeCount").Instances[0]
+		meta.StringBytePtr = obj::RuntimeFindFunc(p, "stringBytePtr").Instances[0]
+		meta.SliceBytePtr = obj::RuntimeFindFunc(p, "sliceBytePtr").Instances[0]
+		meta.StringAsSlice = obj::RuntimeFindFunc(p, "stringAsSlice").Instances[0]
+		meta.SliceAsString = obj::RuntimeFindFunc(p, "sliceAsString").Instances[0]
+		meta.Stopm = obj::RuntimeFindFunc(p, "stopm").Instances[0]
+		meta.CheckNilRef = obj::RuntimeFindFunc(p, "checkNilRef").Instances[0]
+		meta.Cmplx64Eq = obj::RuntimeFindFunc(p, "cmplx64eq").Instances[0]
+		meta.Cmplx64Neg = obj::RuntimeFindFunc(p, "cmplx64neg").Instances[0]
+		meta.Cmplx64Add = obj::RuntimeFindFunc(p, "cmplx64add").Instances[0]
+		meta.Cmplx64Sub = obj::RuntimeFindFunc(p, "cmplx64sub").Instances[0]
+		meta.Cmplx64Mul = obj::RuntimeFindFunc(p, "cmplx64mul").Instances[0]
+		meta.Cmplx64Div = obj::RuntimeFindFunc(p, "cmplx64div").Instances[0]
+		meta.Cmplx128Eq = obj::RuntimeFindFunc(p, "cmplx128eq").Instances[0]
+		meta.Cmplx128Neg = obj::RuntimeFindFunc(p, "cmplx128neg").Instances[0]
+		meta.Cmplx128Add = obj::RuntimeFindFunc(p, "cmplx128add").Instances[0]
+		meta.Cmplx128Sub = obj::RuntimeFindFunc(p, "cmplx128sub").Instances[0]
+		meta.Cmplx128Mul = obj::RuntimeFindFunc(p, "cmplx128mul").Instances[0]
+		meta.Cmplx128Div = obj::RuntimeFindFunc(p, "cmplx128div").Instances[0]
+		meta.Cmplx128cmplx64 = obj::RuntimeFindFunc(p, "cmplx128cmplx64").Instances[0]
+		meta.Cmplx64cmplx128 = obj::RuntimeFindFunc(p, "cmplx64cmplx128").Instances[0]
+		meta.DoSpin = obj::RuntimeFindFunc(p, "doSpin").Instances[0]
+
+		// Structs.
+		meta.Map = obj::RuntimeFindStruct(p, "hmap")
+		meta.MapIterator = obj::RuntimeFindStruct(p, "hmapiterator")
+		meta.Pchan = obj::RuntimeFindStruct(p, "pchan")
+		meta.Cmplx64 = obj::RuntimeFindStruct(p, "_cmplx64").Instances[0]
+		meta.Cmplx128 = obj::RuntimeFindStruct(p, "_cmplx128").Instances[0]
+		meta.Scase = obj::RuntimeFindStruct(p, "scase").Instances[0]
+		meta.C = obj::RuntimeFindStruct(p, "c").Instances[0]
+
+		p = obj::SelectImport(ir.Used, linkpathInternalRuntimeBuiltin)
+		if p == nil {
+			return nil
+		}
+
+		meta.Zprint = obj::RuntimeFindFunc(p, "zprint").Instances[0]
+		meta.Zprintln = obj::RuntimeFindFunc(p, "zprintln").Instances[0]
+
+		return meta
+	}
+}
+
 // Metadata for common objects.
 struct Meta {
 	Runtime:       &Runtime
@@ -106,105 +208,7 @@ struct Meta {
 // Collects whole possible metadata from IR.
 fn Collect(mut ir: &obj::IR): &Meta {
 	mut meta := new(Meta)
-	meta.Runtime = CollectRuntime(ir)
-	meta.StringBuilder = CollectStringBuilder(ir)
-	return meta
-}
-
-// Collects Runtime from IR if possible.
-fn CollectRuntime(mut ir: &obj::IR): &Runtime {
-	mut p := obj::SelectImport(ir.Used, linkpathRuntime)
-	if p == nil {
-		return nil
-	}
-	mut meta := new(Runtime)
-
-	// Globals.
-	meta.Asynctime = obj::RuntimeFindGlobal(p, "asynctime")
-	meta.Comaxprocs = obj::RuntimeFindGlobal(p, "comaxprocs")
-
-	// Functions.
-	meta.Init = obj::RuntimeFindFunc(p, "__init").Instances[0]
-	meta.Schedule = obj::RuntimeFindFunc(p, "schedule").Instances[0]
-	meta.Park = obj::RuntimeFindFunc(p, "park").Instances[0]
-	meta.Park2 = obj::RuntimeFindFunc(p, "park2").Instances[0]
-	meta.Runtimepark = obj::RuntimeFindFunc(p, "runtimepark").Instances[0]
-	meta.Spawnmainc = obj::RuntimeFindFunc(p, "spawnmainc").Instances[0]
-	meta.Rand = obj::RuntimeFindFunc(p, "rand").Instances[0]
-	meta.Osyield = obj::RuntimeFindFunc(p, "osyield").Instances[0]
-	meta.ToString = obj::RuntimeFindFunc(p, "toString")
-	meta.ArrayCmp = obj::RuntimeFindFunc(p, "arrayCmp")
-	meta.DynAssertAssign = obj::RuntimeFindFunc(p, "dynAssertAssign")
-	meta.Maphash = obj::RuntimeFindFunc(p, "maphash")
-	meta.Fastmemcopy = obj::RuntimeFindFunc(p, "fastmemcopy")
-	meta.FastmemcopyForward = obj::RuntimeFindFunc(p, "fastmemcopy_forward").Instances[0]
-	meta.FastmemcopyBackward = obj::RuntimeFindFunc(p, "fastmemcopy_backward").Instances[0]
-	meta.Prememappend = obj::RuntimeFindFunc(p, "prememappend")
-	meta.Memappend = obj::RuntimeFindFunc(p, "memappend")
-	meta.Emptyselect = obj::RuntimeFindFunc(p, "emptyselect").Instances[0]
-	meta.Runselect = obj::RuntimeFindFunc(p, "runselect").Instances[0]
-	meta.RCAdd = obj::RuntimeFindFunc(p, "_RCAdd").Instances[0]
-	meta.RCLoad = obj::RuntimeFindFunc(p, "_RCLoad").Instances[0]
-	meta.RCDrop = obj::RuntimeFindFunc(p, "_RCDrop").Instances[0]
-	meta.RCAddAtomic = obj::RuntimeFindFunc(p, "_RCAddAtomic").Instances[0]
-	meta.RCLoadAtomic = obj::RuntimeFindFunc(p, "_RCLoadAtomic").Instances[0]
-	meta.RCDropAtomic = obj::RuntimeFindFunc(p, "_RCDropAtomic").Instances[0]
-	meta.RuneCount = obj::RuntimeFindFunc(p, "runeCount").Instances[0]
-	meta.StringBytePtr = obj::RuntimeFindFunc(p, "stringBytePtr").Instances[0]
-	meta.SliceBytePtr = obj::RuntimeFindFunc(p, "sliceBytePtr").Instances[0]
-	meta.StringAsSlice = obj::RuntimeFindFunc(p, "stringAsSlice").Instances[0]
-	meta.SliceAsString = obj::RuntimeFindFunc(p, "sliceAsString").Instances[0]
-	meta.Stopm = obj::RuntimeFindFunc(p, "stopm").Instances[0]
-	meta.CheckNilRef = obj::RuntimeFindFunc(p, "checkNilRef").Instances[0]
-	meta.Cmplx64Eq = obj::RuntimeFindFunc(p, "cmplx64eq").Instances[0]
-	meta.Cmplx64Neg = obj::RuntimeFindFunc(p, "cmplx64neg").Instances[0]
-	meta.Cmplx64Add = obj::RuntimeFindFunc(p, "cmplx64add").Instances[0]
-	meta.Cmplx64Sub = obj::RuntimeFindFunc(p, "cmplx64sub").Instances[0]
-	meta.Cmplx64Mul = obj::RuntimeFindFunc(p, "cmplx64mul").Instances[0]
-	meta.Cmplx64Div = obj::RuntimeFindFunc(p, "cmplx64div").Instances[0]
-	meta.Cmplx128Eq = obj::RuntimeFindFunc(p, "cmplx128eq").Instances[0]
-	meta.Cmplx128Neg = obj::RuntimeFindFunc(p, "cmplx128neg").Instances[0]
-	meta.Cmplx128Add = obj::RuntimeFindFunc(p, "cmplx128add").Instances[0]
-	meta.Cmplx128Sub = obj::RuntimeFindFunc(p, "cmplx128sub").Instances[0]
-	meta.Cmplx128Mul = obj::RuntimeFindFunc(p, "cmplx128mul").Instances[0]
-	meta.Cmplx128Div = obj::RuntimeFindFunc(p, "cmplx128div").Instances[0]
-	meta.Cmplx128cmplx64 = obj::RuntimeFindFunc(p, "cmplx128cmplx64").Instances[0]
-	meta.Cmplx64cmplx128 = obj::RuntimeFindFunc(p, "cmplx64cmplx128").Instances[0]
-	meta.DoSpin = obj::RuntimeFindFunc(p, "doSpin").Instances[0]
-
-	// Structs.
-	meta.Map = obj::RuntimeFindStruct(p, "hmap")
-	meta.MapIterator = obj::RuntimeFindStruct(p, "hmapiterator")
-	meta.Pchan = obj::RuntimeFindStruct(p, "pchan")
-	meta.Cmplx64 = obj::RuntimeFindStruct(p, "_cmplx64").Instances[0]
-	meta.Cmplx128 = obj::RuntimeFindStruct(p, "_cmplx128").Instances[0]
-	meta.Scase = obj::RuntimeFindStruct(p, "scase").Instances[0]
-	meta.C = obj::RuntimeFindStruct(p, "c").Instances[0]
-
-	p = obj::SelectImport(ir.Used, linkpathInternalRuntimeBuiltin)
-	if p == nil {
-		return nil
-	}
-
-	meta.Zprint = obj::RuntimeFindFunc(p, "zprint").Instances[0]
-	meta.Zprintln = obj::RuntimeFindFunc(p, "zprintln").Instances[0]
-
-	return meta
-}
-
-// Collects StringBuilder from IR if possible.
-fn CollectStringBuilder(mut ir: &obj::IR): &StringBuilder {
-	const Extern = false
-	const Static = false
-	mut p := obj::SelectImport(ir.Used, linkpathStrings)
-	if p == nil {
-		return nil
-	}
-	mut b := p.FindStruct("Builder", Extern).Instances[0]
-	mut meta := new(StringBuilder)
-	const metav = comptime::Valueof(*meta)
-	const for _, f in metav.Type().Decl().Fields() {
-		metav.Field(f.Name()).Unwrap() = b.FindMethod(f.Name(), Static).Instances[0]
-	}
+	meta.Runtime = Runtime.Collect(ir)
+	meta.StringBuilder = StringBuilder.Collect(ir)
 	return meta
 }
