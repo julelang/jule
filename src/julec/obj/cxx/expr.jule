@@ -1400,8 +1400,7 @@ impl exprCoder {
 		self.oc.write("}")
 	}
 
-	fn funcCall(mut &self, mut m: &sema::FuncCallExpr, ignoreError: bool) {
-		// Compiler implemented functions.
+	fn intrinsic(mut &self, mut m: &sema::FuncCallExpr): bool {
 		match m.Func {
 		| meta::Program.Runtime.Park:
 			self.oc.write("{\n")
@@ -1421,7 +1420,7 @@ impl exprCoder {
 			self.oc.doneIndent()
 			self.oc.indent()
 			self.oc.write("}")
-			return
+			return true
 		| meta::Program.Runtime.Park2:
 			self.oc.write("{\n")
 			self.oc.addIndent()
@@ -1440,7 +1439,7 @@ impl exprCoder {
 			self.oc.doneIndent()
 			self.oc.indent()
 			self.oc.write("}")
-			return
+			return true
 		| meta::Program.Runtime.Runtimepark:
 			self.oc.write("__jule_AsyncAwait __jule_Park{&(")
 			self.possibleRefExpr(m.Args[0])
@@ -1449,19 +1448,31 @@ impl exprCoder {
 			self.oc.write("), ")
 			self.possibleRefExpr(m.Args[1])
 			self.oc.write("}")
-			return
+			return true
 		| meta::Program.Runtime.FastmemcopyForward:
 			self.oc.write("std::copy(")
 			self.args(m)
 			self.oc.write(")")
-			return
+			return true
 		| meta::Program.Runtime.FastmemcopyBackward:
 			self.oc.write("std::copy_backward(")
 			self.args(m)
 			self.oc.write(")")
-			return
+			return true
 		| meta::Program.Runtime.DoSpin:
 			self.oc.write("__jule_doSpin()")
+			return true
+		| meta::Program.Intrinsic.Concurrent:
+			self.oc.meta.concurrent = true
+			return true
+		|:
+			return false
+		}
+	}
+
+	fn funcCall(mut &self, mut m: &sema::FuncCallExpr, ignoreError: bool) {
+		// Check for intrinsic functions.
+		if self.intrinsic(m) {
 			return
 		}
 
