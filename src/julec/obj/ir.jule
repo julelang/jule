@@ -27,10 +27,11 @@ const (
 
 // Intermediate representation of the code for compiler.
 struct IR {
-	Root:    string            // Directory of the root package.
-	Passes:  [][]string        // All unique pass directives.
-	Runtime: &sema::ImportInfo // ImportInfo instance of the "std/runtime" package.
-	Ordered: OrderedDefines    // Ordered defines, nil by default. Initialized by the Order method.
+	Root:      string            // Directory of the root package.
+	Passes:    [][]string        // All unique pass directives.
+	Runtime:   &sema::ImportInfo // ImportInfo instance of the "std/runtime" package.
+	Intrinsic: &sema::ImportInfo // ImportInfo instance of the "std/intrinsic" package.
+	Ordered:   OrderedDefines    // Ordered defines, nil by default. Initialized by the Order method.
 
 	// The importer of the IR.
 	Importer: sema::Importer
@@ -94,6 +95,7 @@ impl IR {
 		// Set up special packages.
 		ir.Main = pkg
 		ir.Runtime = pkg.Files[0].Imports[0] // runtime package
+		ir.Intrinsic = SelectImport(ir.Used, "std/intrinsic")
 
 		return ir, nil
 	}
@@ -115,8 +117,14 @@ impl IR {
 	fn appendStructs(*self, mut p: &sema::Package, mut &buffer: *[]&sema::Struct) {
 		for (_, mut f) in p.Files {
 			for (_, mut s) in f.Structs {
-				if len(s.AST.Generics) > 0 && p == self.Runtime.Package {
-					s.AST.Flags |= F_GENERIC_RUNTIME_IMPL
+				match p {
+				| self.Runtime.Package:
+					if len(s.AST.Generics) > 0 {
+						s.AST.Flags |= F_GENERIC_RUNTIME_IMPL
+					}
+				| self.Intrinsic.Package:
+					// Skip intrinsics.
+					continue
 				}
 				if s.AST.Flags&ast::F_EXTERN == 0 {
 					*buffer = append(*buffer, s)
@@ -125,8 +133,14 @@ impl IR {
 			for (_, mut ta) in f.TypeAliases {
 				if ta.AST.Flags&ast::F_EXTERN == 0 &&
 					ta.AST.Flags&ast::F_STRICT != 0 {
-					if len(ta.AST.Generics) > 0 && p == self.Runtime.Package {
-						ta.AST.Flags |= F_GENERIC_RUNTIME_IMPL
+					match p {
+					| self.Runtime.Package:
+						if len(ta.AST.Generics) > 0 {
+							ta.AST.Flags |= F_GENERIC_RUNTIME_IMPL
+						}
+					| self.Intrinsic.Package:
+						// Skip intrinsics.
+						continue
 					}
 					*buffer = append(*buffer, ta.Type.Kind.(&sema::StructIns).Decl)
 				}
