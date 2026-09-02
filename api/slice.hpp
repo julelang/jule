@@ -5,6 +5,7 @@
 #ifndef __JULE_SLICE_HPP
 #define __JULE_SLICE_HPP
 
+#include <algorithm>
 #include <cstddef>
 #include <initializer_list>
 #include <memory>
@@ -90,7 +91,7 @@ public:
     // heap allocations are valid or something like that.
     void __free(void) noexcept {
         if constexpr (!std::is_trivially_destructible_v<Item>) {
-             std::destroy_n(this->data.alloc, this->_cap);
+            std::destroy_n(this->data.alloc, this->_cap);
         }
         __jule_dealloc(this->data.alloc);
         this->data.alloc = nullptr;

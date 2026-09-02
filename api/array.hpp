@@ -5,6 +5,9 @@
 #ifndef __JULE_ARRAY_HPP
 #define __JULE_ARRAY_HPP
 
+#include <algorithm>
+#include <memory>
+
 #include "error.hpp"
 #include "slice.hpp"
 #include "string.hpp"

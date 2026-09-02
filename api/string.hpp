@@ -9,6 +9,7 @@
 // https://github.com/julelang/jule/issues/121
 
 #include <cstring>
+#include <memory>
 #include <string>
 
 #include "error.hpp"
@@ -17,7 +18,7 @@
 #include "runtime.hpp"
 #include "types.hpp"
 
-// Built-in str type.
+// Built-in string type.
 class __jule_String {
 public:
     using buffer_t = __jule_Ptr<__jule_U8>;
