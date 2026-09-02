@@ -509,10 +509,22 @@ impl scopeCoder {
 			self.oc.addIndent()
 			self.oc.indent()
 			self.oc.write("x = ")
-			self.oc.ec.possibleRefExpr(case.Expr)
-			self.oc.write(";\n")
-			self.oc.indent()
-			self.oc.write("if (x) {\n")
+			mut boolExpr, likely := isBranchPredictionHint(case.Expr)
+			if boolExpr != nil {
+				self.oc.ec.possibleRefExpr(boolExpr)
+				self.oc.write(";\n")
+				self.oc.indent()
+				if likely {
+					self.oc.write("if (x) [[likely]] {\n")
+				} else {
+					self.oc.write("if (x) [[unlikely]] {\n")
+				}
+			} else {
+				self.oc.ec.possibleRefExpr(case.Expr)
+				self.oc.write(";\n")
+				self.oc.indent()
+				self.oc.write("if (x) {\n")
+			}
 			self.oc.addIndent()
 			self.oc.indent()
 			self.scope(case.Scope)
@@ -2486,4 +2498,15 @@ fn returnKw(f: &sema::FuncIns): string {
 		return "return"
 	}
 	return "__jule_AsyncReturn"
+}
+
+fn isBranchPredictionHint(mut x: sema::Expr): (boolExpr: sema::Expr, likely: bool) {
+	mut fc, ok := x.(&sema::FuncCallExpr)
+	if !ok {
+		return nil, false
+	}
+	if fc.Func == meta::Program.Intrinsic.Likely {
+		return fc.Args[0], true
+	}
+	return nil, false
 }
