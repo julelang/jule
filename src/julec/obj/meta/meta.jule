@@ -8,9 +8,8 @@ use "std/jule/sema"
 
 // Linkpath of common packages.
 const (
-	linkpathRuntime                = "std/runtime"
-	linkpathInternalRuntimeBuiltin = "std/internal/runtime/builtin"
-	linkpathStrings                = "std/strings"
+	linkpathRuntime = "std/runtime"
+	linkpathStrings = "std/strings"
 )
 
 // Program metadata for the main IR.
@@ -98,8 +97,8 @@ struct Runtime {
 	FastmemcopyBackward: &sema::FuncIns
 	Prememappend:        &sema::Func
 	Memappend:           &sema::Func
-	Zprint:              &sema::FuncIns // from "std/internal/runtime/builtin"
-	Zprintln:            &sema::FuncIns // from "std/internal/runtime/builtin"
+	Zprint:              &sema::FuncIns
+	Zprintln:            &sema::FuncIns
 	Emptyselect:         &sema::FuncIns
 	Runselect:           &sema::FuncIns
 	RCAdd:               &sema::FuncIns
@@ -201,6 +200,8 @@ impl Runtime {
 		meta.Cmplx128cmplx64 = obj::RuntimeFindFunc(p, "cmplx128cmplx64").Instances[0]
 		meta.Cmplx64cmplx128 = obj::RuntimeFindFunc(p, "cmplx64cmplx128").Instances[0]
 		meta.DoSpin = obj::RuntimeFindFunc(p, "doSpin").Instances[0]
+		meta.Zprint = obj::RuntimeFindFunc(p, "zprint").Instances[0]
+		meta.Zprintln = obj::RuntimeFindFunc(p, "zprintln").Instances[0]
 
 		// Structs.
 		meta.Map = obj::RuntimeFindStruct(p, "hmap")
@@ -210,14 +211,6 @@ impl Runtime {
 		meta.Cmplx128 = obj::RuntimeFindStruct(p, "_cmplx128").Instances[0]
 		meta.Scase = obj::RuntimeFindStruct(p, "scase").Instances[0]
 		meta.C = obj::RuntimeFindStruct(p, "c").Instances[0]
-
-		p = obj::SelectImport(ir.Used, linkpathInternalRuntimeBuiltin)
-		if p == nil {
-			return nil
-		}
-
-		meta.Zprint = obj::RuntimeFindFunc(p, "zprint").Instances[0]
-		meta.Zprintln = obj::RuntimeFindFunc(p, "zprintln").Instances[0]
 
 		return meta
 	}

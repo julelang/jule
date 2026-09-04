@@ -35,7 +35,6 @@ void __jule_RCFree(__jule_Uint *p);
 __jule_Int __jule_compareString(__jule_String *a, __jule_String *b);
 __jule_Int __jule_writeStdout(__jule_Slice<__jule_U8> buf);
 __jule_Int __jule_writeStderr(__jule_Slice<__jule_U8> buf);
-__jule_Int __jule_readStdin(__jule_Slice<__jule_U8> buf);
 void __jule_panic(__jule_U8 *m, __jule_Int n);
 void __jule_panicString(__jule_String m);
 __jule_String __jule_bytesToString(__jule_Slice<__jule_U8> bytes);

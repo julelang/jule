@@ -9,6 +9,11 @@ use "std/sys"
 
 const devNull = "/dev/null"
 
+// File descriptors for the standard out, standard error and standard input.
+let mut stdin = newFile(int(sys::STDIN), poll::File, false)
+let mut stdout = newFile(int(sys::STDOUT), poll::File, false)
+let mut stderr = newFile(int(sys::STDERR), poll::File, false)
+
 fn openFile(path: string, flag: int, perm: FileMode)!: &File {
 	if path == "" {
 		throw sys::ENOENT
@@ -18,10 +23,10 @@ fn openFile(path: string, flag: int, perm: FileMode)!: &File {
 	ignoringEINTR(fn|| {
 		unsafe { *_fd = sys::Open(path, flag|sys::O_CLOEXEC, syscallMode(perm))? }
 	})?
-	return newFile(fd, poll::File, unix::HasNonblockFlag(flag))?
+	return newFile(fd, poll::File, unix::HasNonblockFlag(flag))
 }
 
-fn newFile(fd: int, mut flags: int, nonBlocking: bool)!: &File {
+fn newFile(fd: int, mut flags: int, nonBlocking: bool): &File {
 	mut pfd := &poll::FD{
 		File:          u64(fd),
 		Flags:         flags,

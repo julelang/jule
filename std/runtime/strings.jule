@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/sys"
 use "std/unicode/utf8"
 use "std/unsafe"
 
@@ -105,4 +106,36 @@ unsafe fn runeStep(s: *byte, n: int, mut r: *rune, mut outLen: *int) {
 #export "__jule_runeCount"
 fn runeCount(s: string): int {
 	return utf8::RuneCountString(s)
+}
+
+// Returns bytes written, otherwise (like errors) -1.
+fn write(fd: uintptr, buf: []byte): int {
+	return write1(fd, buf)
+}
+
+// Writes to stdout.
+// Returns written byte count if success, -1 otherwise.
+#export "__jule_writeStdout"
+fn writeStdout(buf: []byte): int {
+	return write(uintptr(sys::STDOUT), buf)
+}
+
+// Writes to stderr.
+// Returns written byte count if success, -1 otherwise.
+#export "__jule_writeStderr"
+fn writeStderr(buf: []byte): int {
+	return write(uintptr(sys::STDERR), buf)
+}
+
+// The runtime implementation of the built-in print function.
+#export "__jule_print"
+fn zprint(s: string) {
+	writeStdout(unsafe::StringBytes(s))
+}
+
+// The runtime implementation of the built-in println function.
+#export "__jule_println"
+fn zprintln(s: string) {
+	writeStdout(unsafe::StringBytes(s))
+	writeStdout(unsafe::StringBytes("\n"))
 }
