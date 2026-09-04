@@ -12,7 +12,7 @@
 #include "types.hpp"
 
 #if defined(__JULE_OS_WINDOWS)
-#include "<intrin.h>"
+#include <intrin.h>
 #endif
 
 class __jule_String;
