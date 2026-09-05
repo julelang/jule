@@ -1,0 +1,18 @@
+// Copyright 2026 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/sys"
+
+fn syscall_Mmap(addr: *unsafe, length: uintptr, prot: int, flags: int, fd: int, offset: i64): *unsafe {
+	page := uintptr(offset / 4096)
+	if offset != i64(page)*4096 {
+		return nil
+	}
+	return syscall_Mmap2(addr, length, prot, flags, fd, page)
+}
+
+fn syscall_Mmap2(addr: *unsafe, length: uintptr, prot: int, flags: int, fd: int, pageOffset: uintptr): *unsafe {
+	r0, _ := syscall(sys::SYS_MMAP2, uintptr(addr), length, uintptr(prot), uintptr(flags), uintptr(fd), pageOffset)
+	return unsafe { (*unsafe)(r0) }
+}

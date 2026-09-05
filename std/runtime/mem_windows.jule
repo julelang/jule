@@ -1,0 +1,72 @@
+// Copyright 2026 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/integ/c"
+
+const (
+	_MEM_COMMIT     = 0x00001000
+	_MEM_RESERVE    = 0x00002000
+	_MEM_RESET      = 0x00080000
+	_MEM_RESET_UNDO = 0x1000000
+
+	_MEM_DECOMMIT = 0x00004000
+	_MEM_RELEASE  = 0x00008000
+
+	_PAGE_EXECUTE           = 0x10
+	_PAGE_EXECUTE_READ      = 0x20
+	_PAGE_EXECUTE_READWRITE = 0x40
+	_PAGE_EXECUTE_WRITECOPY = 0x80
+	_PAGE_NOACCESS          = 0x01
+	_PAGE_READONLY          = 0x02
+	_PAGE_READWRITE         = 0x04
+	_PAGE_WRITECOPY         = 0x08
+	_PAGE_TARGETS_INVALID   = 0x40000000
+	_PAGE_TARGETS_NO_UPDATE = 0x40000000
+)
+
+extern fn VirtualAlloc(*unsafe, uintptr, _DWORD, _DWORD): *unsafe
+extern fn VirtualFree(*unsafe, uintptr, _DWORD): c::Int
+
+#disable nilptr
+fn sysAlloc(size: uintptr, alignment: uintptr, mut &offset: *uintptr, mut &mappedSize: *uintptr): *unsafe {
+	mut mapSize := size + alignment
+	const Flags = _MEM_RESERVE
+	mut ptr := extern.VirtualAlloc(nil, mapSize, Flags, _PAGE_READWRITE)
+	if ptr == nil {
+		return nil
+	}
+	if alignment != 0 {
+		mut padding := uintptr(ptr) & (alignment - 1)
+		if padding != 0 {
+			padding = alignment - padding
+		}
+		const match {
+		| mallocAsserts:
+			assert(padding <= alignment, "runtime: internal failure in padding for malloc")
+			assert(padding%8 == 0, "runtime: internal failure in padding for malloc")
+		}
+		ptr = add(ptr, padding)
+		*offset = padding
+	} else {
+		*offset = 0
+	}
+	*mappedSize = mapSize
+	return ptr
+}
+
+fn sysCommit(addr: *unsafe, size: uintptr): bool {
+	return extern.VirtualAlloc(addr, size, _MEM_COMMIT, _PAGE_READWRITE) == nil
+}
+
+fn sysDecommit(addr: *unsafe, size: uintptr): bool {
+	return extern.VirtualFree(addr, size, _MEM_DECOMMIT) == 0
+}
+
+fn sysFree(mut addr: *unsafe, offset: uintptr, mappedSize: uintptr) {
+	_ = mappedSize // We do not need this on Windows.
+	addr = sub(addr, offset)
+	if extern.VirtualFree(addr, 0, _MEM_RELEASE) == 0 {
+		panic("runtime: failed to unmap virtual memory block")
+	}
+}
