@@ -30,7 +30,7 @@ public:
     static __jule_U8 *alloc(const __jule_Int len) noexcept {
         __jule_U8 *buf =
             static_cast<__jule_U8 *>(__jule_malloc(len * sizeof(__jule_U8)));
-        if (!buf) {
+        if (!buf) [[unlikely]] {
             __jule_panic((__jule_U8 *)"runtime: memory allocation failed for "
                                       "heap-array of string",
                          58);

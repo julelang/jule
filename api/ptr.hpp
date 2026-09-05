@@ -55,7 +55,7 @@ template <typename T> struct __jule_Ptr {
         __jule_Ptr<T> buffer;
 
         buffer.alloc = static_cast<T *>(__jule_malloc(sizeof(T)));
-        if (!buffer.alloc) {
+        if (!buffer.alloc) [[unlikely]] {
             __jule_panic((__jule_U8 *)"runtime: memory allocation failed for "
                                       "heap of smart pointer",
                          59);
@@ -170,7 +170,7 @@ template <typename T> struct __jule_Ptr {
                 const size_t n = strlen(file);
                 char *message = static_cast<char *>(
                     __jule_malloc((87 + n + 1) * sizeof(char)));
-                if (!message) {
+                if (!message) [[unlikely]] {
                     __jule_panic(
                         (__jule_U8
                              *)"runtime: memory allocation failed for invalid "

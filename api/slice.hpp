@@ -132,7 +132,7 @@ public:
         this->dealloc();
 
         Item *alloc = static_cast<Item *>(__jule_malloc(cap * sizeof(Item)));
-        if (!alloc) {
+        if (!alloc) [[unlikely]] {
             __jule_panic((__jule_U8 *)"runtime: memory allocation failed for "
                                       "heap-array of slice",
                          57);
