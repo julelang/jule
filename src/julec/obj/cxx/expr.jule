@@ -1218,34 +1218,30 @@ impl exprCoder {
 		self.oc.write(t)
 		self.oc.write(" *")
 		self.oc.write(argData)
-		self.oc.write(" = new (std::nothrow) ")
+		self.oc.write(" = static_cast<")
 		self.oc.write(t)
-		self.oc.write("; if (!")
+		self.oc.write("*>(__jule_malloc(sizeof(")
+		self.oc.write(t)
+		self.oc.write("))); if (!")
 		self.oc.write(argData)
-		self.oc.write(`) __jule_panic((`)
+		self.oc.write(`) { __jule_panic((`)
 		self.oc.write(typeU8)
-		self.oc.write(`*)"memory allocation failed for coroutine call", 44);` + "\n")
+		self.oc.write(`*)"memory allocation failed for coroutine call", 44); }` + "\n")
 		self.oc.indent()
 
-		// setup function data
+		self.oc.write("std::construct_at(")
 		self.oc.write(argData)
-		self.oc.write("->")
-		self.oc.write(coSpawnArgDataFunc)
-		self.oc.write(" = ")
+		self.oc.write(", ")
+
+		// setup function data
 		self.modelForCall(m.Expr)
-		self.oc.write(";\n")
 
 		// setup argument data
 		for j in m.Func.Params {
-			self.oc.indent()
-			self.oc.write(argData)
-			self.oc.write("->")
-			self.oc.write(coSpawnArgDataParam)
-			self.oc.write(conv::Itoa(j))
-			self.oc.write(" = ")
+			self.oc.write(", ")
 			self.possibleRefExpr(m.Args[j])
-			self.oc.write(";\n")
 		}
+		self.oc.write(");\n")
 		self.oc.indent()
 
 		// spawn coroutine
