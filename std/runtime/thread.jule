@@ -36,6 +36,9 @@ struct thread {
 
 	// Link to the next thread.
 	link: &thread
+
+	// Local thread heap.
+	heap: *heap
 }
 
 // Returns the current thread.
@@ -70,6 +73,11 @@ fn NumCPU(): int { return numcpu }
 fn initThread(mut &t: *thread, role: int) {
 	t.role = role
 
+	// Initialize allocator for thread.
+	// Do it immediately, because thread performs memory allocation in
+	// following statements.
+	mallocThreadInit(t)
+
 	// Initialized once and never deallocated if thread waiting for reuse.
 	t.parker = new(parker)
 	t.parker.init()
@@ -90,20 +98,19 @@ fn newThread(role: int): &thread {
 
 // Releases thread t, releases parker and drops references.
 #disable nilptr
-fn releaseThread(mut t: &thread) {
+fn releaseThread(mut &t: *thread) {
 	t.pp = nil
 	t.role = 0
 	t.parker.release()
+	mallocThreadFinalize(t)
 }
 
 fn threadinit() {
-	// Platform specific initialization.
-	_threadinit()
-	// Initialize the main program thread.
-	initThread(&mainm, roleProgram)
 	// Program started by the main thread.
 	// Use `sett(mainm)` to set thread-local &thread data for the main thread.
 	sett(unsafe { (&thread)(&mainm) })
+	// Initialize the main program thread.
+	initThread(&mainm, roleProgram)
 }
 
 // Number of cheap CPU-pause spins before

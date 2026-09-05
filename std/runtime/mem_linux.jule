@@ -1,0 +1,59 @@
+// Copyright 2026 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/sys"
+
+#disable nilptr
+fn sysAlloc(size: uintptr, alignment: uintptr, mut &offset: *uintptr, mut &mappedSize: *uintptr): *unsafe {
+	mut mapSize := size + alignment
+	const Flags = sys::MAP_PRIVATE | sys::MAP_ANONYMOUS
+	mut ptr := syscall_Mmap(nil, mapSize, sys::PROT_READ|sys::PROT_WRITE, Flags, -1, 0)
+	if ptr == unsafe { (*unsafe)(-1) } {
+		ptr = nil
+	}
+	if ptr == nil {
+		return nil
+	}
+	if alignment != 0 {
+		mut padding := uintptr(ptr) & (alignment - 1)
+		if padding != 0 {
+			padding = alignment - padding
+		}
+		const match {
+		| mallocAsserts:
+			assert(padding <= alignment, "runtime: internal failure in padding for malloc")
+			assert(padding%8 == 0, "runtime: internal failure in padding for malloc")
+		}
+		if padding != 0 {
+			syscall_Munmap(ptr, padding)
+		}
+		ptr = add(ptr, padding)
+		if alignment-padding != 0 {
+			syscall_Munmap(add(ptr, size), alignment-padding)
+		}
+		*offset = 0
+		mapSize = size
+	} else {
+		*offset = 0
+	}
+	*mappedSize = mapSize
+	return ptr
+}
+
+fn sysCommit(addr: *unsafe, size: uintptr): bool {
+	_ = addr // We do not need this on Linux.
+	_ = size // We do not need this on Linux.
+	return false
+}
+
+fn sysDecommit(addr: *unsafe, size: uintptr): bool {
+	return syscall_Madvise(addr, size, sys::MADV_DONTNEED) != 0
+}
+
+fn sysFree(mut addr: *unsafe, offset: uintptr, mappedSize: uintptr) {
+	addr = sub(addr, offset)
+	if syscall_Munmap(addr, mappedSize) != 0 {
+		panic("runtime: failed to unmap virtual memory block")
+	}
+}

@@ -2,10 +2,17 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use "std/integ"
-use "std/internal/implflags"
+// This allocator implementation is adopted from rpmalloc.
+//
+// rpmalloc repository: https://github.com/mjansson/rpmalloc
+// Adapted branch: develop
+// Last commit: 5dacae8ba4ec31100dd2ed4bffd552abbd3cb29f
 
-extern use "<cstdlib>"
+use "std/comptime"
+use "std/internal/implflags"
+use "std/internal/runtime/atomic"
+use "std/intrinsic"
+use "std/mem"
 
 const (
 	// _64bit = 1 on 64-bit systems, 0 on 32-bit systems
@@ -55,7 +62,1481 @@ const (
 	// number of bytes in the address space doesn't actually fit
 	// in a uintptr.
 	maxAlloc = (1 << heapAddrBits) - (1-_64bit)*1
+
+	pageHeaderSize = 128
+	spanHeaderSize = pageHeaderSize
+
+	// Alignment of each heap control structure within a shared mapping. Keeps adjacent
+	// heaps on separate cache lines so cross-thread writes to one heap (threadFree) do
+	// not falsely share with a neighbour heap owned by another thread. Sized for a 128 byte
+	// cache line (Apple Silicon, x86 destructive interference) to cover 64 byte lines too.
+	heapAlignment = 128
+
+	smallGranularity = 16
+
+	smallBlockSizeLimit       = 4 * 1024
+	mediumSmallBlockSizeLimit = 32 * 1024
+	mediumLargeBlockSizeLimit = 256 * 1024
+	largeBlockSizeLimit       = 2 * 1024 * 1024
+
+	smallSizeClassCount       = 73
+	mediumSmallSizeClassCount = 12
+	mediumLargeSizeClassCount = 12
+	largeSizeClassCount       = 12
+	sizeClassCount            = smallSizeClassCount + mediumSmallSizeClassCount + mediumLargeSizeClassCount + largeSizeClassCount
+
+	smallPageSizeShift       = 16
+	smallPageSize            = 1 << smallPageSizeShift
+	smallPageMask            = ^(uintptr(smallPageSize) - 1)
+	mediumSmallPageSizeShift = 20
+	mediumSmallPageSize      = 1 << mediumSmallPageSizeShift
+	mediumSmallPageMask      = ^(uintptr(mediumSmallPageSize) - 1)
+	mediumLargePageSizeShift = 22
+	mediumLargePageSize      = 1 << mediumLargePageSizeShift
+	mediumLargePageMask      = ^(uintptr(mediumLargePageSize) - 1)
+	largePageSizeShift       = 24
+	largePageSize            = 1 << largePageSizeShift
+	largePageMask            = ^(uintptr(largePageSize) - 1)
+
+	spanSize = 256 * 1024 * 1024
+	spanMask = ^uintptr(spanSize - 1)
+
+	// Cache recently freed huge block mappings for reuse instead of paying a
+	// munmap + mmap + page fault round trip per huge allocation cycle. Entries
+	// are bounded by a committed byte budget and unmapped after an idle epoch.
+	// A cached mapping is reused when its size fits the request within the size
+	// class spacing (25% overshoot).
+	hugeCacheSlotCount      = 32
+	hugeCacheCommittedLimit = 128 * 1024 * 1024
+	// Largest single mapping the cache will hold - keeps one rare giant from
+	// monopolizing the committed budget and starving caching of the smaller,
+	// more frequently cycled sizes.
+	hugeCacheEntryLimit = hugeCacheCommittedLimit / 4
+	hugeCacheEpochNs    = 1000 * _Millisecond
+
+	commitOnDemand = true
+
+	// Disable assertions if compiling for production, otherwise enable for debugging.
+	mallocAsserts = !comptime::HasTag("production")
 )
+
+// Memory page type.
+type pageType: u32
+
+const (
+	pageSmall       = iota // 64KiB
+	pageMediumSmall        // 1MiB
+	pageMediumLarge        // 4MiB
+	pageLarge              // 16MiB
+	pageHuge
+)
+
+// Block size class.
+struct sizeClass {
+	//! Size of blocks in this class
+	blockSize: u32
+	//! Number of blocks in each chunk
+	blockCount: u32
+}
+
+// A memory block.
+struct block {
+	// Next block in list.
+	next: *block
+}
+
+const (
+	// Flag set if part of heap full list.
+	_PAGE_IS_FULL: u8 = 1 << iota
+	// Flag set if part of heap free list.
+	_PAGE_IS_FREE
+	// Flag set if blocks are zero initialized.
+	_PAGE_IS_ZERO
+	// Flag set if memory pages have been decommitted.
+	_PAGE_IS_DECOMMITTED
+	// Flag set if containing aligned blocks.
+	// Note: hasAlignedBlock and isFull are read on the cross-thread free path while the
+	// owner thread writes this packed flag word. The owner is the sole writer and the word is
+	// naturally aligned (hardware-atomic access), and the read flags are monotonic/tolerant,
+	// so the read/write race is benign. ThreadSanitizer still reports it.
+	_PAGE_HAS_ALIGNED_BLOCK
+	// Fast combination flag for either huge, fully allocated or has aligned blocks.
+	_PAGE_GENERIC_FREE
+	// Set if the span maps reserve-only (pages commit on demand, may be decommitted),
+	// captured at map time so it survives a config change across a finalize/initialize.
+	_PAGE_COMMIT_ON_DEMAND
+)
+
+// A page contains blocks of a given size.
+struct page {
+	// Size class of blocks.
+	sizeClass: u32
+	// Block size.
+	blockSize: u32
+	// Block count.
+	blockCount: u32
+	// Block initialized count.
+	blockInitialized: u32
+	// Block used count.
+	blockUsed: u32
+	// Page type.
+	pageType: pageType
+	// Flag set for page state.
+	state: u8
+	// log2 of the committed prefix (the page size at the span's map time).
+	// The 6-bit is enough for this field in practice.
+	commitPrefixShift: u8
+	// Local free list count.
+	localFreeCount: u32
+	// Local free list.
+	localFree: *block
+	// Owning heap.
+	heap: *heap
+	// Next page in list.
+	next: *page
+	// Previous page in list.
+	prev: *page
+	// Multithreaded free list, block index is in low 32 bit, list count is high 32 bit.
+	threadFree: u64
+}
+
+// A span contains pages of a given type.
+struct span {
+	// Page header.
+	page: page
+	// Owning heap (do not deduplicate into page.heap - that field is the
+	// owner of page 0 as a memory page and changes if the page is adopted
+	// by another heap, while the span owner must remain stable).
+	heap: *heap
+	// Page address mask.
+	pageAddressMask: uintptr
+	// Number of pages initialized.
+	pageInitialized: u32
+	// Number of pages in use.
+	pageCount: u32
+	// Number of bytes per page.
+	pageSize: u32
+	// Page type.
+	pageType: pageType
+	// Offset to start of mapped memory region.
+	offset: u32
+	// Mapped size.
+	mappedSize: u64
+	// Next span in list.
+	next: *span
+}
+
+// Control structure for a thread heap.
+struct heap {
+	//! Owning thread ID.
+	ownerThread: uintptr
+	// Heap local free list for small size classes.
+	localFree: [sizeClassCount]*block
+	// Available non-full pages for each size class.
+	pageAvailable: [sizeClassCount]*page
+	// Free pages for each page type.
+	pageFree: [4]*page
+	// Free but still committed page count for each page type.
+	pageFreeCommitCount: [4]u32
+	// Multithreaded free list.
+	threadFree: [4]uintptr
+	// Available partially initialized spans for each page type.
+	spanPartial: [4]*span
+	// Spans in full use for each page type.
+	spanUsed: [5]*span
+	// Next heap in queue.
+	next: *heap
+	// Previous heap in queue.
+	prev: *heap
+	// Heap ID.
+	id: u32
+	// Finalization state flag.
+	finalize: u32
+	// Memory map region offset.
+	offset: u32
+	// Memory map size.
+	mappedSize: uintptr
+}
+
+struct hugeCacheSlot {
+	span:   *span
+	freeNs: u64
+}
+
+struct hugeCache {
+	// Cache lock.
+	lock: uintptr
+	// Committed bytes currently cached.
+	committed: uintptr
+	// Cached mappings with their free timestamp.
+	slot: [hugeCacheSlotCount]hugeCacheSlot
+}
+
+// OS memory page size.
+#noinit
+let mut globalPageSize: uintptr
+
+// Threshold number of pages for when free pages are decommitted.
+#noinit
+let mut globalPageFreeOverflow: [5]u32
+
+// Number of pages to retain when free page threshold overflows.
+#noinit
+let mut globalPageFreeRetain: [5]u32
+
+#noinit
+let mut globalHugeCache: hugeCache
+
+// Lock for heap queue.
+#noinit
+let mut globalHeapLock: uintptr
+
+// Released heaps available for reuse.
+// These have been used and may hold caches, so they are.
+#noinit
+let mut globalHeapQueue: *heap
+
+// Pristine, never-used heaps carved from a shared block but not yet handed out.
+#noinit
+let mut globalHeapPristine: *heap
+
+// In use heaps.
+#noinit
+let mut globalHeapUsed: *heap
+
+// Set while a thread is mapping and carving a new shared heap block, so concurrent thread
+// starts wait for the carved heaps to reach a pool instead of each mapping their own block.
+#noinit
+let mut globalHeapCreating: bool
+
+// Heap ID counter.
+#noinit
+let mut globalHeapID: u32
+
+// Size classes.
+#noinit
+let mut globalSizeClass: [sizeClassCount]sizeClass
+
+#inline
+fn heapLockAcquire() {
+	thisLock := uintptr(gett())
+	mut spin := u32(0)
+	for !atomic::CompareAndSwap(&globalHeapLock, 0, thisLock, atomic::SeqCst, atomic::SeqCst) {
+		waitSpin(&spin)
+	}
+}
+
+#inline
+fn heapLockRelease() {
+	const match {
+	| mallocAsserts:
+		assert(atomic::Load(&globalHeapLock, atomic::Relaxed) == uintptr(gett()),
+			"runtime: bad malloc heap lock")
+	}
+	atomic::Store(&globalHeapLock, 0, atomic::Release)
+}
+
+#inline
+unsafe fn heapInitialize(mut block: *unsafe): *heap {
+	mut heap := (*heap)(block)
+	memset(heap, 0, mem::Sizeof(heap))
+	heap.id = atomic::Add(&globalHeapID, 1, atomic::Relaxed)
+	return heap
+}
+
+// A heap control structure is much smaller than the mapping page size (and far smaller than a
+// huge page), so a single page-aligned mapping is carved into as many heaps as fit, the first
+// returned to the caller and the extras queued for reuse. This avoids mapping (and, under huge
+// pages, committing) a whole page per heap. Only the first heap records the mapping offset and
+// size; it owns the shared mapping and is the one heap that unmaps it at finalize.
+//
+// Block creation is serialized through globalHeapCreating: when no heap is available, one thread
+// maps and carves a block while concurrent thread starts wait for the carved heaps to be published,
+// so a startup burst maps a single block instead of one block per thread. Ordinary requests reuse a
+// released heap first, then a pristine carved one.
+unsafe fn heapAllocateNew(): *heap {
+	if globalPageSize == 0 {
+		mut t := gett()
+		mallocThreadInit(&*t)
+	}
+
+	heapLockAcquire()
+	mut spin := u32(0)
+	for {
+		if globalHeapQueue != nil {
+			mut heap := globalHeapQueue
+			globalHeapQueue = heap.next
+			heapLockRelease()
+			return heap
+		}
+		if globalHeapPristine != nil {
+			mut heap := globalHeapPristine
+			globalHeapPristine = heap.next
+			heapLockRelease()
+			return heap
+		}
+		if !globalHeapCreating {
+			break
+		}
+		heapLockRelease()
+		waitSpin(&spin)
+		heapLockAcquire()
+	}
+	globalHeapCreating = true
+	heapLockRelease()
+
+	alignedHeapSize := heapAlignment * ((uintptr(mem::Sizeof(heap)) + (heapAlignment - 1)) / heapAlignment)
+	blockSize := getPageAlignedSize(alignedHeapSize)
+	mut offset := uintptr(0)
+	mut mappedSize := uintptr(0)
+	mut block := (*block)(sysAlloc(blockSize, 0, &offset, &mappedSize))
+	if block != nil && commitOnDemand && sysCommit(block, blockSize) {
+		sysFree(block, offset, mappedSize)
+		block = nil
+	}
+	if block == nil {
+		heapLockAcquire()
+		globalHeapCreating = false
+		heapLockRelease()
+		return nil
+	}
+
+	mut _heap := heapInitialize(block)
+	_heap.offset = u32(offset)
+	_heap.mappedSize = mappedSize
+
+	// Carve the remaining heaps into a local chain, then splice it onto the pristine pool in one
+	// step so the lock is not held across the per-heap initialization. heapInitialize zeroes each
+	// structure, leaving mappedSize == 0 so the extras are not treated as mapping owners. They are
+	// pristine until handed out.
+	heapCount := mappedSize / alignedHeapSize
+	let mut chainHead: *heap = nil
+	let mut chainTail: *heap = nil
+	mut extraHeap := (*heap)(add(_heap, alignedHeapSize))
+	mut iheap := uintptr(1)
+	for iheap < heapCount; iheap++ {
+		heapInitialize(extraHeap)
+		if chainTail == nil {
+			chainTail = extraHeap
+		}
+		extraHeap.next = chainHead
+		chainHead = extraHeap
+		extraHeap = (*heap)(add(extraHeap, alignedHeapSize))
+	}
+
+	heapLockAcquire()
+	if chainTail != nil {
+		chainTail.next = globalHeapPristine
+		globalHeapPristine = chainHead
+	}
+	globalHeapCreating = false
+	heapLockRelease()
+	return _heap
+}
+
+unsafe fn heapAllocate(threadID: uintptr): *heap {
+	mut heap := heapAllocateNew()
+	if heap != nil {
+		heapLockAcquire()
+		heap.next = globalHeapUsed
+		heap.prev = nil
+		if globalHeapUsed != nil {
+			globalHeapUsed.prev = heap
+		}
+		globalHeapUsed = heap
+		heapLockRelease()
+		heap.ownerThread = threadID
+	}
+	return heap
+}
+
+#inline
+unsafe fn heapRelease(mut heap: *heap) {
+	heapLockAcquire()
+	if heap.prev != nil {
+		heap.prev.next = heap.next
+	}
+	if heap.next != nil {
+		heap.next.prev = heap.prev
+	}
+	if globalHeapUsed == heap {
+		globalHeapUsed = heap.next
+	}
+	heap.next = globalHeapQueue
+	globalHeapQueue = heap
+	heapLockRelease()
+}
+
+#inline
+fn hugeCacheLockAcquire() {
+	mut spin := u32(0)
+	for !atomic::CompareAndSwapWeak(&globalHugeCache.lock, 0, 1, atomic::Acquire, atomic::Relaxed) {
+		waitSpin(&spin)
+	}
+}
+
+#inline
+fn hugeCacheLockRelease() {
+	atomic::Store(&globalHugeCache.lock, 0, atomic::Release)
+}
+
+#disable boundary
+unsafe fn hugeCachePurgeAged(now: u64) {
+	let mut purge: [hugeCacheSlotCount]*span
+	mut purgeCount := u32(0)
+	hugeCacheLockAcquire()
+	mut i := u32(0)
+	for i < hugeCacheSlotCount; i++ {
+		mut span := globalHugeCache.slot[i].span
+		if span != nil && now-globalHugeCache.slot[i].freeNs >= hugeCacheEpochNs {
+			globalHugeCache.committed -= uintptr(span.pageCount * span.pageSize)
+			globalHugeCache.slot[i].span = nil
+			purge[purgeCount] = span
+			purgeCount++
+		}
+	}
+	hugeCacheLockRelease()
+	i = 0
+	for i < purgeCount; i++ {
+		sysFree(purge[i], uintptr(purge[i].offset), uintptr(purge[i].mappedSize))
+	}
+}
+
+// Try to cache a freed huge mapping, returns nonzero if cached.
+#disable boundary
+unsafe fn hugeCachePush(mut span: *span): bool {
+	committedSize := uintptr(span.pageCount) * uintptr(span.pageSize)
+	if committedSize > hugeCacheEntryLimit {
+		return false
+	}
+	now := u64(nanotime())
+	hugeCachePurgeAged(now)
+	mut cached := false
+	hugeCacheLockAcquire()
+	if globalHugeCache.committed+committedSize <= hugeCacheCommittedLimit {
+		mut islot := u32(0)
+		for islot < hugeCacheSlotCount; islot++ {
+			if globalHugeCache.slot[islot].span == nil {
+				globalHugeCache.slot[islot].span = span
+				globalHugeCache.slot[islot].freeNs = now
+				globalHugeCache.committed += committedSize
+				cached = true
+				break
+			}
+		}
+	}
+	hugeCacheLockRelease()
+	return cached
+}
+
+// Try to pop a cached huge mapping fitting the requested size (within the
+// size class spacing), returns 0 on miss.
+#disable boundary
+unsafe fn hugeCachePop(allocSize: uintptr): *span {
+	// Racy emptiness peek is fine - a missed entry only costs a fresh mapping.
+	mut empty := true
+	mut i := u32(0)
+	for i < hugeCacheSlotCount; i++ {
+		if globalHugeCache.slot[i].span != nil {
+			empty = false
+			break
+		}
+	}
+	if empty {
+		return nil
+	}
+	sizeLimit := allocSize + (allocSize >> 2)
+	let mut best: *span = nil
+	mut bestSize := uintptr(0)
+	mut bestSlot := u32(0)
+	hugeCacheLockAcquire()
+	i = 0
+	for i < hugeCacheSlotCount; i++ {
+		mut span := globalHugeCache.slot[i].span
+		if span == nil {
+			continue
+		}
+		committedSize := uintptr(span.pageCount) * uintptr(span.pageSize)
+		if committedSize >= allocSize && committedSize <= sizeLimit &&
+			(best == nil || committedSize < bestSize) {
+			best = span
+			bestSize = committedSize
+			bestSlot = i
+		}
+	}
+	if best != nil {
+		globalHugeCache.slot[bestSlot].span = nil
+		globalHugeCache.committed -= bestSize
+	}
+	hugeCacheLockRelease()
+	return best
+}
+
+fn getThreadHeapAllocate(&t: *thread): *heap {
+	return unsafe { heapAllocate(uintptr(t)) }
+}
+
+fn sclass(n: u32): sizeClass {
+	return sizeClass{
+		blockSize:  n * smallGranularity,
+		blockCount: (smallPageSize - pageHeaderSize) / (n * smallGranularity),
+	}
+}
+
+fn msclass(n: u32): sizeClass {
+	return sizeClass{
+		blockSize:  n * smallGranularity,
+		blockCount: (mediumSmallPageSize - pageHeaderSize) / (n * smallGranularity),
+	}
+}
+
+fn mlclass(n: u32): sizeClass {
+	return sizeClass{
+		blockSize:  n * smallGranularity,
+		blockCount: (mediumLargePageSize - pageHeaderSize) / (n * smallGranularity),
+	}
+}
+
+fn lclass(n: u32): sizeClass {
+	return sizeClass{
+		blockSize:  n * smallGranularity,
+		blockCount: (largePageSize - pageHeaderSize) / (n * smallGranularity),
+	}
+}
+
+#inline
+fn getPageType(sizeClass: u32): pageType {
+	match {
+	| sizeClass < smallSizeClassCount:
+		return pageSmall
+	| sizeClass < smallSizeClassCount+mediumSmallSizeClassCount:
+		return pageMediumSmall
+	| sizeClass < smallSizeClassCount+mediumSmallSizeClassCount+mediumLargeSizeClassCount:
+		return pageMediumLarge
+	| sizeClass < sizeClassCount:
+		return pageLarge
+	|:
+		return pageHuge
+	}
+}
+
+#inline
+unsafe fn pageGetSpan(page: *page): *span {
+	return (*span)(uintptr(page) & spanMask)
+}
+
+#inline
+unsafe fn pageGetSize(page: *page): uintptr {
+	match page.pageType {
+	| pageSmall:
+		return smallPageSize
+	| pageMediumSmall:
+		return mediumSmallPageSize
+	| pageMediumLarge:
+		return mediumLargePageSize
+	| pageLarge:
+		return largePageSize
+	|:
+		return uintptr(pageGetSpan(page).pageSize)
+	}
+}
+
+#inline
+fn getPageAlignedSize(mut size: uintptr): uintptr {
+	unalign := size % globalPageSize
+	if unalign != 0 {
+		size += globalPageSize - unalign
+	}
+	return size
+}
+
+#inline
+unsafe fn pageBlockStart(page: *page): *block {
+	return (*block)(add(page, pageHeaderSize))
+}
+
+#inline
+unsafe fn pageBlockRealign(page: *page, _block: *block): *block {
+	blockStart := pageBlockStart(page)
+	blockOffset := u32(uintptr(sub(_block, uintptr(blockStart))))
+	return (*block)(sub(_block, uintptr(blockOffset%page.blockSize)))
+}
+
+#inline
+unsafe fn spanGetPageFromBlock(span: *span, block: *block): *page {
+	return (*page)(uintptr(block) & span.pageAddressMask)
+}
+
+#inline
+#disable shift
+unsafe fn pageCommitMemoryPages(mut page: *page): bool {
+	if page.state&_PAGE_IS_DECOMMITTED == 0 {
+		return false
+	}
+	commitPrefix := uintptr(1) << page.commitPrefixShift
+	extraPage := add(page, commitPrefix)
+	extraPageSize := pageGetSize(page) - commitPrefix
+	if sysCommit(extraPage, extraPageSize) {
+		return true
+	}
+	page.state &= ^_PAGE_IS_DECOMMITTED
+	const match OS != "macos" {
+	| true:
+		// When page is recommitted, the blocks in the second memory page and forward
+		// will be zeroed out by OS - take advantage in zalloc/calloc calls and make sure
+		// blocks in first page is zeroed out.
+		mut firstPage := add(page, pageHeaderSize)
+		memset(firstPage, 0, uint(commitPrefix-pageHeaderSize))
+		page.state |= _PAGE_IS_ZERO
+	}
+	return false
+}
+
+#inline
+#disable shift
+unsafe fn pageDecommitMemoryPages(mut page: *page) {
+	if page.state&_PAGE_IS_DECOMMITTED != 0 {
+		return
+	}
+	// Only reserve-only spans support decommit.
+	if page.state&_PAGE_COMMIT_ON_DEMAND == 0 {
+		return
+	}
+	// Keep the prefix (holding the page header) committed and decommit the rest. The prefix
+	// is the span's fixed map-time page size, so commit and decommit always use the same one.
+	commitPrefix := uintptr(1) << page.commitPrefixShift
+	pageSize := pageGetSize(page)
+	if pageSize <= commitPrefix {
+		return
+	}
+	extraPage := add(page, commitPrefix)
+	extraPageSize := pageSize - commitPrefix
+	if sysDecommit(extraPage, extraPageSize) {
+		return
+	}
+	page.state |= _PAGE_IS_DECOMMITTED
+}
+
+#disable boundary
+unsafe fn heapPageFreeDecommit(mut heap: *heap, pageType: pageType, mut pageRetainCount: u32) {
+	mut page := heap.pageFree[pageType]
+	for page != nil && pageRetainCount != 0; pageRetainCount-- {
+		page = page.next
+	}
+	for page != nil && page.state&_PAGE_IS_DECOMMITTED == 0 {
+		pageDecommitMemoryPages(page)
+		// Decommit can be refused (decommit disabled, page type not larger than the
+		// configured page size, or kernel rejecting decommit of huge page mappings),
+		// in which case remaining pages cannot be decommitted either.
+		if page.state&_PAGE_IS_DECOMMITTED == 0 {
+			break
+		}
+		heap.pageFreeCommitCount[pageType]--
+		page = page.next
+	}
+}
+
+#disable boundary
+unsafe fn pageAvailableToFree(mut page: *page) {
+	const match {
+	| mallocAsserts:
+		assert(page.state&_PAGE_IS_FULL == 0,
+			"runtime: page full flag internal malloc failure")
+		assert(page.state&_PAGE_IS_DECOMMITTED == 0,
+			"runtime: page decommitted flag internal malloc failure")
+	}
+	mut heap := page.heap
+	if heap.pageAvailable[page.sizeClass] == page {
+		heap.pageAvailable[page.sizeClass] = page.next
+	} else {
+		page.prev.next = page.next
+		if page.next != nil {
+			page.next.prev = page.prev
+		}
+	}
+	page.state |= _PAGE_IS_FREE
+	page.state &= ^_PAGE_IS_ZERO
+	page.next = heap.pageFree[page.pageType]
+	heap.pageFree[page.pageType] = page
+	heap.pageFreeCommitCount[page.pageType]++
+	if heap.pageFreeCommitCount[page.pageType] >= globalPageFreeOverflow[page.pageType] {
+		heapPageFreeDecommit(heap, page.pageType, globalPageFreeRetain[page.pageType])
+	}
+}
+
+#disable boundary
+unsafe fn pageAvailableToFull(mut page: *page) {
+	mut heap := page.heap
+	if heap.pageAvailable[page.sizeClass] == page {
+		heap.pageAvailable[page.sizeClass] = page.next
+	} else {
+		page.prev.next = page.next
+		if page.next != nil {
+			page.next.prev = page.prev
+		}
+	}
+	page.state |= _PAGE_IS_FULL | _PAGE_GENERIC_FREE
+	page.state &= ^_PAGE_IS_ZERO
+}
+
+#inline
+unsafe fn pageIsThreadHeap(page: *page): bool {
+	return page.heap.ownerThread == uintptr(gett())
+}
+
+#noinline
+unsafe fn spanDeallocateBlock(mut span: *span, mut page: *page, mut block: *block) {
+	if intrinsic::Unlikely(page.pageType == pageHuge) {
+		if hugeCachePush(span) {
+			return
+		}
+		sysFree(span, uintptr(span.offset), uintptr(span.mappedSize))
+		return
+	}
+
+	if page.state&_PAGE_HAS_ALIGNED_BLOCK != 0 {
+		block = pageBlockRealign(page, block)
+	}
+
+	isThreadLocal := pageIsThreadHeap(page)
+	if intrinsic::Likely(isThreadLocal) {
+		pagePutLocalFreeBlock(page, block)
+	} else {
+		// Multithreaded deallocation, push to deferred deallocation list.
+		pagePutThreadFreeBlock(page, block)
+	}
+}
+
+#inline
+unsafe fn blockDeallocate(mut block: *block) {
+	mut span := (*span)(uintptr(block) & spanMask)
+	mut page := spanGetPageFromBlock(span, block)
+	isThreadLocal := pageIsThreadHeap(page)
+
+	// Optimized path for thread local free with non-huge block in page
+	// that has no aligned blocks.
+	if intrinsic::Likely(isThreadLocal) {
+		if intrinsic::Likely(page.state&_PAGE_GENERIC_FREE == 0) {
+			// Page is not huge, not full and has no aligned block - fast path.
+			block.next = page.localFree
+			page.localFree = block
+			page.localFreeCount++
+			page.blockUsed--
+			if intrinsic::Unlikely(page.blockUsed == 0) {
+				pageAvailableToFree(page)
+			}
+		} else {
+			spanDeallocateBlock(span, page, block)
+		}
+	} else {
+		spanDeallocateBlock(span, page, block)
+	}
+}
+
+#disable boundary
+unsafe fn pageFullToAvailable(mut page: *page) {
+	const match {
+	| mallocAsserts:
+		assert(page.state&_PAGE_IS_FULL != 0,
+			"runtime: page full flag internal malloc failure")
+		assert(page.state&_PAGE_IS_DECOMMITTED == 0,
+			"runtime: page decommitted flag internal malloc failure")
+	}
+	mut heap := page.heap
+	page.next = heap.pageAvailable[page.sizeClass]
+	if page.next != nil {
+		page.next.prev = page
+	}
+	heap.pageAvailable[page.sizeClass] = page
+	page.state &= ^_PAGE_IS_FULL
+	if page.state&_PAGE_HAS_ALIGNED_BLOCK == 0 {
+		page.state &= ^_PAGE_GENERIC_FREE
+	}
+}
+
+#noinline
+#disable boundary
+unsafe fn pagePutThreadFreeBlock(page: *page, mut _block: *block) {
+	atomic::Fence(atomic::Acquire)
+	if page.state&_PAGE_IS_FULL != 0 {
+		// Page is full, put the block in the heap thread free list instead, otherwise
+		// the heap will not pick up the free blocks until a thread local free happens.
+		heap := page.heap
+		mut prevHead := atomic::Load(&heap.threadFree[page.pageType], atomic::Relaxed)
+		_block.next = (*block)(prevHead)
+		mut spin := u32(0)
+		for !atomic::CompareAndSwapWeak(&heap.threadFree[page.pageType], prevHead, uintptr(_block), atomic::Release, atomic::Relaxed) {
+			prevHead = atomic::Load(&heap.threadFree[page.pageType], atomic::Relaxed)
+			_block.next = (*block)(prevHead)
+			waitSpin(&spin)
+		}
+	} else {
+		mut prevThreadFree := atomic::Load(&page.threadFree, atomic::Relaxed)
+		blockIndex := pageBlockIndex(page, _block)
+		const match {
+		| mallocAsserts:
+			assert(pageBlock(page, blockIndex) == _block,
+				"runtime: malloc block pointer is not aligned to start of block")
+		}
+		mut listSize := pageBlockFromThreadFreeList(page, prevThreadFree, &_block.next) + 1
+		mut threadFree := pageBlockToThreadFreeList(blockIndex, listSize)
+		mut spin := u32(0)
+		for !atomic::CompareAndSwapWeak(&page.threadFree, prevThreadFree, threadFree, atomic::Release, atomic::Relaxed) {
+			prevThreadFree = atomic::Load(&page.threadFree, atomic::Relaxed)
+			listSize = pageBlockFromThreadFreeList(page, prevThreadFree, &_block.next) + 1
+			threadFree = pageBlockToThreadFreeList(blockIndex, listSize)
+			waitSpin(&spin)
+		}
+	}
+}
+
+#inline
+unsafe fn pagePutLocalFreeBlock(mut page: *page, mut block: *block) {
+	block.next = page.localFree
+	page.localFree = block
+	page.localFreeCount++
+	page.blockUsed--
+	if intrinsic::Unlikely(page.blockUsed == 0) {
+		pageAvailableToFree(page)
+	} else if intrinsic::Unlikely(page.state&_PAGE_IS_FULL != 0) {
+		pageFullToAvailable(page)
+	}
+}
+
+// Pop a block from the heap local free list.
+#inline
+#disable boundary
+unsafe fn heapPopLocalFree(mut heap: *heap, sizeClass: u32): *block {
+	mut freeList := &heap.localFree[sizeClass]
+	mut block := *freeList
+	if intrinsic::Likely(block != nil) {
+		*freeList = block.next
+	}
+	return block
+}
+
+#disable boundary
+unsafe fn pagePushLocalFreeToHeap(mut page: *page) {
+	// Push the page free list as the fast track list of free blocks for heap.
+	page.heap.localFree[page.sizeClass] = page.localFree
+	page.blockUsed += page.localFreeCount
+	page.localFree = nil
+	page.localFreeCount = 0
+}
+
+#inline
+unsafe fn pageBlockToThreadFreeList(blockIndex: u32, listCount: u32): u64 {
+	return u64(listCount)<<32 | u64(blockIndex)
+}
+
+#inline
+unsafe fn pageBlock(page: *page, blockIndex: u32): *block {
+	return (*block)(add(page, uintptr(pageHeaderSize+(page.blockSize*blockIndex))))
+}
+
+#inline
+unsafe fn pageBlockFromThreadFreeList(page: *page, token: u64, mut block: **block): u32 {
+	blockIndex := u32(token & 0xFFFFFFFF)
+	listCount := u32((token >> 32) & 0xFFFFFFFF)
+	if listCount > 0 {
+		*block = pageBlock(page, blockIndex)
+	} else {
+		*block = nil
+	}
+	return listCount
+}
+
+unsafe fn pageGetLocalFreeBlock(mut page: *page): *block {
+	mut block := page.localFree
+	page.localFree = block.next
+	page.localFreeCount--
+	page.blockUsed++
+	return block
+}
+
+#inline
+unsafe fn pageBlockIndex(page: *page, block: *block): u32 {
+	blockFirst := pageBlockStart(page)
+	return u32((uintptr(block) - uintptr(blockFirst)) / uintptr(page.blockSize))
+}
+
+#noinline
+unsafe fn pageAdoptThreadFreeBlockList(mut page: *page) {
+	if page.localFree != nil {
+		return
+	}
+	mut threadFree := atomic::Load(&page.threadFree, atomic::Relaxed)
+	if threadFree != 0 {
+		// Other threads can only replace with another valid list head, this will never change to 0 in other threads.
+		mut spin := u32(0)
+		for !atomic::CompareAndSwapWeak(&page.threadFree, threadFree, 0, atomic::Acquire, atomic::Relaxed) {
+			threadFree = atomic::Load(&page.threadFree, atomic::Relaxed)
+			waitSpin(&spin)
+		}
+		page.localFreeCount = pageBlockFromThreadFreeList(page, threadFree, &page.localFree)
+		const match {
+		| mallocAsserts:
+			assert(page.localFreeCount <= page.blockUsed,
+				"runtime: page thread free list count internal malloc failure")
+		}
+		page.blockUsed -= page.localFreeCount
+	}
+}
+
+// Get the size class from given size in bytes for tiny blocks (below 16 times the minimum granularity).
+#inline
+fn getSizeClassTiny(size: uintptr): u32 {
+	return (u32(size) + (smallGranularity - 1)) / smallGranularity
+}
+
+// Get the size class from given size in bytes.
+#inline
+#disable shift
+fn getSizeClass(size: uintptr): u32 {
+	mut minBlockCount := (size + (smallGranularity - 1)) / smallGranularity
+	// For sizes up to 64 times the minimum granularity (i.e 1024 bytes)
+	// the size class is equal to number of such blocks.
+	if size <= smallGranularity*64 {
+		const match {
+		| mallocAsserts:
+			assert(uintptr(globalSizeClass[minBlockCount].blockSize) >= size,
+				"runtime: size class misconfiguration for malloc")
+		}
+		if minBlockCount > 0 {
+			return u32(minBlockCount)
+		}
+		return 1
+	}
+	minBlockCount--
+	// Calculate position of most significant bit,
+	// since minBlockCount now guaranteed to be > 64
+	// this position is guaranteed to be >= 6.
+	let mut mostSignificantBit: u32
+	const match {
+	| _64bit == 1:
+		mostSignificantBit = u32(63 - clz64(u64(minBlockCount)))
+	|:
+		mostSignificantBit = u32(31 - clz64(u64(minBlockCount)))
+	}
+	// Class sizes are of the bit format [..]000xxx000[..] where we already have the position of the most significant
+	// bit, now calculate the subclass from the remaining two bits.
+	subclassBits := u32(minBlockCount >> (mostSignificantBit - 2) & 0x03)
+	classIdx := u32((mostSignificantBit<<2)+subclassBits) + 41
+	const match {
+	| mallocAsserts:
+		assert(classIdx >= sizeClassCount || uintptr(globalSizeClass[classIdx].blockSize) >= size,
+			"runtime: size class misconfiguration for malloc")
+		assert(classIdx >= sizeClassCount || uintptr(globalSizeClass[classIdx-1].blockSize) < size,
+			"runtime: size class misconfiguration for malloc")
+	}
+	return classIdx
+}
+
+// Find or allocate a span for the given page type with the given size class.
+#inline
+#disable boundary shift
+unsafe fn heapGetSpan(mut heap: *heap, pageType: pageType): *span {
+	// Fast path, available span for given page type.
+	if intrinsic::Likely(heap.spanPartial[pageType] != nil) {
+		return heap.spanPartial[pageType]
+	}
+
+	// Fallback path, map more memory.
+	mut offset := uintptr(0)
+	mut mappedSize := uintptr(0)
+	mut span := (*span)(sysAlloc(spanSize, spanSize, &offset, &mappedSize))
+	if intrinsic::Likely(span != nil) {
+		const match {
+		| mallocAsserts:
+			assert(uintptr(span)&(spanSize-1) == 0,
+				"runtime: sysAlloc returned a block not aligned to the malloc span size")
+		}
+		mut pageCount := u32(0)
+		mut pageSize := u32(0)
+		mut pageAddressMask := uintptr(0)
+		match pageType {
+		| pageSmall:
+			pageCount = spanSize / smallPageSize
+			pageSize = smallPageSize
+			pageAddressMask = smallPageMask
+		| pageMediumSmall:
+			pageCount = spanSize / mediumSmallPageSize
+			pageSize = mediumSmallPageSize
+			pageAddressMask = mediumSmallPageMask
+		| pageMediumLarge:
+			pageCount = spanSize / mediumLargePageSize
+			pageSize = mediumLargePageSize
+			pageAddressMask = mediumLargePageMask
+		|:
+			pageCount = spanSize / largePageSize
+			pageSize = largePageSize
+			pageAddressMask = largePageMask
+		}
+		// Commit the first page for reserve-only spans (fully committed spans commit nothing
+		// here); record the commit model on the span only after its header is committed.
+		const match {
+		| commitOnDemand:
+			if sysCommit(span, uintptr(pageSize)) {
+				sysFree(span, offset, mappedSize)
+				return nil
+			}
+			span.page.state |= _PAGE_COMMIT_ON_DEMAND
+		}
+		mut commitPrefixShift := u32(0)
+		for uintptr(1)<<commitPrefixShift < globalPageSize {
+			commitPrefixShift++
+		}
+		span.page.commitPrefixShift = u8(commitPrefixShift)
+		span.heap = heap
+		span.pageType = pageType
+		span.pageCount = pageCount
+		span.pageSize = pageSize
+		span.pageAddressMask = pageAddressMask
+		span.offset = u32(offset)
+		span.mappedSize = u64(mappedSize)
+
+		heap.spanPartial[pageType] = span
+	}
+	return span
+}
+
+// Find or allocate a page from the given span.
+#inline
+#disable boundary
+unsafe fn spanAllocatePage(mut span: *span): *page {
+	// Allocate path, initialize a new chunk of memory for a page in the given span.
+	const match {
+	| mallocAsserts:
+		assert(span.pageInitialized < span.pageCount,
+			"runtime: page initialization internal malloc failure")
+	}
+	mut heap := span.heap
+	mut page := (*page)(add(span, uintptr(span.pageSize*span.pageInitialized)))
+
+	// Reserve-only spans commit later pages on demand;
+	// fully committed spans are already committed from
+	// the map and must not be committed per page.
+	if span.pageInitialized != 0 && span.page.state&_PAGE_COMMIT_ON_DEMAND != 0 {
+		if sysCommit(page, uintptr(span.pageSize)) {
+			return nil
+		}
+	}
+	span.pageInitialized++
+
+	page.pageType = span.pageType
+	page.state |= span.page.state & _PAGE_COMMIT_ON_DEMAND
+	page.commitPrefixShift = span.page.commitPrefixShift
+	page.state |= _PAGE_IS_ZERO
+	page.heap = heap
+	const match {
+	| mallocAsserts:
+		assert(pageIsThreadHeap(page), "runtime: malloc page owner thread mismatch")
+	}
+
+	if span.pageInitialized == span.pageCount {
+		// Span fully utilized.
+		const match {
+		| mallocAsserts:
+			assert(span == heap.spanPartial[span.pageType],
+				"runtime: malloc span partial tracking out of sync")
+		}
+		heap.spanPartial[span.pageType] = nil
+
+		span.next = heap.spanUsed[span.pageType]
+		heap.spanUsed[span.pageType] = span
+	}
+
+	return page
+}
+
+#noinline
+unsafe fn pageInitializeBlocks(mut page: *page): *block {
+	const match {
+	| mallocAsserts:
+		assert(page.blockInitialized < page.blockCount,
+			"runtime: block initialization internal malloc failure")
+	}
+	mut _block := pageBlock(page, page.blockInitialized)
+	page.blockInitialized++
+	page.blockUsed++
+
+	if page.pageType == pageSmall && uintptr(page.blockSize) < globalPageSize>>1 {
+		// Link up until next memory page in free list.
+		memoryPageStart := (*unsafe)(uintptr(_block) & ^(globalPageSize - 1))
+		memoryPageNext := add(memoryPageStart, globalPageSize)
+		mut freeBlock := (*block)(add(_block, uintptr(page.blockSize)))
+		mut firstBlock := freeBlock
+		mut lastBlock := freeBlock
+		mut listCount := u32(0)
+		maxListCount := page.blockCount - page.blockInitialized
+		for freeBlock < memoryPageNext && listCount < maxListCount; listCount++ {
+			lastBlock = freeBlock
+			freeBlock.next = (*block)(add(freeBlock, uintptr(page.blockSize)))
+			freeBlock = freeBlock.next
+		}
+		if listCount > 0 {
+			lastBlock.next = nil
+			page.localFree = firstBlock
+			page.blockInitialized += listCount
+			page.localFreeCount = listCount
+		}
+	}
+	return _block
+}
+
+#inline
+#disable boundary
+unsafe fn pageAllocateBlock(mut page: *page, needzero: bool): *block {
+	mut isZero := false
+	let mut block: *block = nil
+	if page.localFree != nil {
+		block = pageGetLocalFreeBlock(page)
+	}
+	if intrinsic::Unlikely(block == nil) {
+		if atomic::Load(&page.threadFree, atomic::Acquire) != 0 {
+			pageAdoptThreadFreeBlockList(page)
+			if page.localFree != nil {
+				block = pageGetLocalFreeBlock(page)
+			} else {
+				block = nil
+			}
+		}
+		if block == nil {
+			block = pageInitializeBlocks(page)
+			isZero = page.state&_PAGE_IS_ZERO != 0
+		}
+	}
+
+	const match {
+	| mallocAsserts:
+		assert(page.blockUsed <= page.blockCount,
+			"runtime: malloc page block use counter out of sync")
+	}
+	if page.localFree != nil && page.heap.localFree[page.sizeClass] == nil {
+		pagePushLocalFreeToHeap(page)
+	}
+
+	// The page might be full when free list has been pushed to heap local free list,
+	// check if there is a thread free list to adopt.
+	if page.blockUsed == page.blockCount {
+		pageAdoptThreadFreeBlockList(page)
+		if page.blockUsed == page.blockCount {
+			// Page is not fully utilized.
+			const match {
+			| mallocAsserts:
+				assert(page.state&_PAGE_IS_FULL == 0,
+					"runtime: malloc page block use counter out of sync with full flag")
+			}
+			pageAvailableToFull(page)
+		}
+	}
+
+	if needzero {
+		if !isZero {
+			memset(block, 0, uint(page.blockSize))
+		} else {
+			*(*uintptr)(block) = 0
+		}
+	}
+
+	return block
+}
+
+#inline
+#disable boundary
+unsafe fn heapMakeFreePageAvailable(mut heap: *heap, sizeClass: u32, mut page: *page): bool {
+	page.sizeClass = sizeClass
+	page.blockSize = globalSizeClass[sizeClass].blockSize
+	page.blockCount = globalSizeClass[sizeClass].blockCount
+	page.blockUsed = 0
+	page.blockInitialized = 0
+	page.localFree = nil
+	page.localFreeCount = 0
+	page.state &= ^(_PAGE_IS_FULL | _PAGE_IS_FREE | _PAGE_HAS_ALIGNED_BLOCK | _PAGE_GENERIC_FREE)
+	page.heap = heap
+	mut head := heap.pageAvailable[sizeClass]
+	page.next = head
+	page.prev = nil
+	atomic::Store(&page.threadFree, 0, atomic::Release)
+	if head != nil {
+		head.prev = page
+	}
+	heap.pageAvailable[sizeClass] = page
+	if page.state&_PAGE_IS_DECOMMITTED != 0 {
+		return pageCommitMemoryPages(page)
+	}
+	return false
+}
+
+#disable boundary
+unsafe fn heapGetPageGeneric(mut _heap: *heap, sizeClass: u32): *page {
+	pageType := getPageType(sizeClass)
+
+	// Check if there is a free page from multithreaded deallocations.
+	mut blockMt := atomic::Load(&_heap.threadFree[pageType], atomic::Relaxed)
+	if intrinsic::Unlikely(blockMt != 0) {
+		mut spin := u32(0)
+		for !atomic::CompareAndSwapWeak(&_heap.threadFree[pageType], blockMt, 0, atomic::Acquire, atomic::Relaxed) {
+			blockMt = atomic::Load(&_heap.threadFree[pageType], atomic::Relaxed)
+			waitSpin(&spin)
+		}
+		mut block := (*block)(blockMt)
+		for block != nil {
+			mut nextBlock := block.next
+			blockDeallocate(block)
+			block = nextBlock
+		}
+		return heapGetPage(_heap, sizeClass)
+	}
+
+	// Check if there is a free page.
+	mut _page := _heap.pageFree[pageType]
+	if intrinsic::Likely(_page != nil) {
+		_heap.pageFree[pageType] = _page.next
+		if _page.state&_PAGE_IS_DECOMMITTED == 0 {
+			const match {
+			| mallocAsserts:
+				assert(_heap.pageFreeCommitCount[pageType] > 0,
+					"runtime: free committed malloc page count out of sync")
+			}
+			_heap.pageFreeCommitCount[pageType]--
+		}
+		if heapMakeFreePageAvailable(_heap, sizeClass, _page) {
+			return nil
+		}
+		return _page
+	}
+	const match {
+	| mallocAsserts:
+		assert(_heap.pageFreeCommitCount[pageType] == 0,
+			"runtime: free committed malloc page count out of sync")
+	}
+
+	if _heap.id == 0 {
+		// Thread has not yet initialized, assign heap and try again.
+		mut t := gett()
+		mallocThreadInit(&*t)
+		return heapGetPage(gett().heap, sizeClass)
+	}
+
+	// Fallback path, find or allocate span for given size class.
+	// If thread was not initialized, the heap for the new span
+	// will be different from the local heap variable in this scope
+	// (which is the default heap) - so use span page heap instead.
+	mut span := heapGetSpan(_heap, pageType)
+	if intrinsic::Likely(span != nil) {
+		_page = spanAllocatePage(span)
+		if heapMakeFreePageAvailable(_page.heap, sizeClass, _page) {
+			return nil
+		}
+	}
+
+	return _page
+}
+
+// Find or allocate a page for the given size class.
+#disable boundary
+unsafe fn heapGetPage(mut heap: *heap, sizeClass: u32): *page {
+	// Fast path, available page for given size class.
+	mut page := heap.pageAvailable[sizeClass]
+	if intrinsic::Likely(page != nil) {
+		return page
+	}
+	return heapGetPageGeneric(heap, sizeClass)
+}
+
+// Generic allocation path from heap pages, spans or new mapping.
+#noinline
+unsafe fn heapAllocateBlockSmallToLarge(mut heap: *heap, sizeClass: u32, needzero: bool): *block {
+	mut page := heapGetPage(heap, sizeClass)
+	if intrinsic::Likely(page != nil) {
+		// Count on the page owner, which may differ from heap when an uninitialized thread is routed
+		// to its real heap, so the allocation and its later free are accounted on the same heap.
+		return pageAllocateBlock(page, needzero)
+	}
+	return nil
+}
+
+// Generic allocation path from heap pages, spans or new mapping.
+#disable boundary
+#noinline
+unsafe fn heapAllocateBlockHuge(mut _heap: *heap, size: uintptr, needzero: bool): *block {
+	if _heap.id == 0 {
+		// Thread has not yet initialized, assign heap and try again.
+		mut t := gett()
+		mallocThreadInit(&*t)
+		_heap = t.heap
+	}
+	allocSize := getPageAlignedSize(size + spanHeaderSize)
+	mut offset := uintptr(0)
+	mut mappedSize := uintptr(0)
+	let mut _block: *unsafe = nil
+	mut fromCache := 0
+	// Reuse a recently freed huge mapping of fitting size if available (the
+	// cached span keeps its own offset/mappedSize/pageCount fields).
+	_block = hugeCachePop(allocSize)
+	if _block != nil {
+		fromCache = 1
+	}
+	if _block == nil {
+		_block = sysAlloc(allocSize, spanSize, &offset, &mappedSize)
+	}
+	if _block != nil {
+		mut span := (*span)(_block)
+		const match {
+		| mallocAsserts:
+			assert(uintptr(span)&(spanSize-1) == 0,
+				"runtime: sysAlloc returned a block not aligned to the malloc span size")
+		}
+		if fromCache == 0 && commitOnDemand && sysCommit(span, allocSize) {
+			sysFree(_block, offset, mappedSize)
+			return nil
+		}
+		span.heap = _heap
+		span.pageType = pageHuge
+		span.pageAddressMask = largePageMask
+		// Huge blocks never use the per-page commit path; set explicitly so a reused cached
+		// mapping carries no stale value.
+		span.page.state &= ^_PAGE_COMMIT_ON_DEMAND
+		if fromCache == 0 {
+			span.pageSize = u32(globalPageSize)
+			span.pageCount = u32(allocSize / globalPageSize)
+			span.offset = u32(offset)
+			span.mappedSize = u64(mappedSize)
+		}
+		span.page.heap = _heap
+		span.page.state |= _PAGE_IS_FULL | _PAGE_GENERIC_FREE
+		span.page.pageType = pageHuge
+		span.next = _heap.spanUsed[pageHuge]
+		_heap.spanUsed[pageHuge] = span
+		mut ptr := add(_block, spanHeaderSize)
+		if needzero {
+			memset(ptr, 0, uint(size))
+		}
+		return (*block)(ptr)
+	}
+	return nil
+}
+
+#disable boundary
+#noinline
+unsafe fn heapAllocateBlockGeneric(mut heap: *heap, size: uintptr, needzero: bool): *block {
+	sizeClass := getSizeClass(size)
+	if intrinsic::Likely(sizeClass < sizeClassCount) {
+		mut block := heapPopLocalFree(heap, sizeClass)
+		if intrinsic::Likely(block != nil) {
+			// Fast track with small block available in heap level local free list; a hit means this
+			// heap owns the block.
+			if needzero {
+				memset(block, 0, uint(globalSizeClass[sizeClass].blockSize))
+			}
+			return block
+		}
+		return heapAllocateBlockSmallToLarge(heap, sizeClass, needzero)
+	}
+	return heapAllocateBlockHuge(heap, size, needzero)
+}
+
+// Find or allocate a block of the given size.
+#inline
+#disable boundary
+unsafe fn heapAllocateBlock(mut heap: *heap, size: uintptr, needzero: bool): *block {
+	if size <= smallGranularity*64 {
+		sizeClass := getSizeClassTiny(size)
+		mut block := heapPopLocalFree(heap, sizeClass)
+		if intrinsic::Likely(block != nil) {
+			// Fast track with small block available in heap level local free list.
+			if needzero {
+				memset(block, 0, uint(globalSizeClass[sizeClass].blockSize))
+			}
+			return block
+		}
+		// The size class is already known - refill directly, skipping the
+		// generic path size class recomputation and dead local free list pop
+		// (small-to-large counts the allocation on the owning heap).
+		return heapAllocateBlockSmallToLarge(heap, sizeClass, needzero)
+	}
+	return heapAllocateBlockGeneric(heap, size, needzero)
+}
+
+#disable boundary
+fn mallocinit() {
+	const match {
+	| mallocAsserts:
+		assert(mem::Sizeof(page) <= pageHeaderSize, "runtime: invalid page header size for malloc")
+		assert(mem::Sizeof(span) <= spanHeaderSize, "runtime: invalid span header size for malloc")
+		assert(mem::Sizeof(heap) <= 4096, "runtime: invalid heap size for malloc")
+	}
+
+	globalHugeCache = hugeCache{}
+	globalHeapLock = 0
+	globalHeapQueue = nil
+	globalHeapPristine = nil
+	globalHeapUsed = nil
+	globalHeapCreating = false
+	globalHeapID = 1
+	globalSizeClass = [
+		sclass(1), sclass(1), sclass(2), sclass(3), sclass(4), sclass(5), sclass(6),
+		sclass(7), sclass(8), sclass(9), sclass(10), sclass(11), sclass(12), sclass(13),
+		sclass(14), sclass(15), sclass(16), sclass(17), sclass(18), sclass(19), sclass(20),
+		sclass(21), sclass(22), sclass(23), sclass(24), sclass(25), sclass(26), sclass(27),
+		sclass(28), sclass(29), sclass(30), sclass(31), sclass(32), sclass(33), sclass(34),
+		sclass(35), sclass(36), sclass(37), sclass(38), sclass(39), sclass(40), sclass(41),
+		sclass(42), sclass(43), sclass(44), sclass(45), sclass(46), sclass(47), sclass(48),
+		sclass(49), sclass(50), sclass(51), sclass(52), sclass(53), sclass(54), sclass(55),
+		sclass(56), sclass(57), sclass(58), sclass(59), sclass(60), sclass(61), sclass(62),
+		sclass(63), sclass(64), sclass(80), sclass(96), sclass(112), sclass(128), sclass(160),
+		sclass(192), sclass(224), sclass(256), msclass(320), msclass(384), msclass(448), msclass(512),
+		msclass(640), msclass(768), msclass(896), msclass(1024), msclass(1280), msclass(1536), msclass(1792),
+		msclass(2048), mlclass(2560), mlclass(3072), mlclass(3584), mlclass(4096), mlclass(5120), mlclass(6144),
+		mlclass(7168), mlclass(8192), mlclass(10240), mlclass(12288), mlclass(14336), mlclass(16384), lclass(20480),
+		lclass(24576), lclass(28672), lclass(32768), lclass(40960), lclass(49152), lclass(57344), lclass(65536),
+		lclass(81920), lclass(98304), lclass(114688), lclass(131072),
+	]
+	globalPageFreeRetain = [4, 2, 1, 1, 0]
+
+	if globalPageSize == 0 {
+		globalPageSize = 4096
+	}
+
+	// Decommit of free pages only applies to page types larger than the configured
+	// page size, disable the free page overflow pass for page types where it can
+	// never apply (always the case when huge pages or a large page size is in use).
+	if smallPageSize > globalPageSize {
+		globalPageFreeOverflow[0] = 16
+	} else {
+		globalPageFreeOverflow[0] = 0xFFFFFFFF
+	}
+	if mediumSmallPageSize > globalPageSize {
+		globalPageFreeOverflow[1] = 8
+	} else {
+		globalPageFreeOverflow[1] = 0xFFFFFFFF
+	}
+	if mediumLargePageSize > globalPageSize {
+		globalPageFreeOverflow[2] = 4
+	} else {
+		globalPageFreeOverflow[2] = 0xFFFFFFFF
+	}
+	if largePageSize > globalPageSize {
+		globalPageFreeOverflow[3] = 2
+	} else {
+		globalPageFreeOverflow[3] = 0xFFFFFFFF
+	}
+	globalPageFreeOverflow[4] = 0
+}
+
+#disable nilptr
+fn mallocThreadInit(mut &t: *thread) {
+	t.heap = getThreadHeapAllocate(t)
+}
+
+#disable nilptr
+fn mallocThreadFinalize(mut &t: *thread) {
+	if t.role&roleProgram != 0 {
+		return
+	}
+	unsafe { heapRelease(t.heap) }
+}
 
 // Allocates linear memory on the heap and returns it.
 // If it fails, it may return nil pointer or panic.
@@ -65,18 +1546,27 @@ const (
 //
 // Calling this function, performs allocation size checking as described
 // and panics if conditions are met.
+#noinline
+#disable nilptr
 #export "__jule_malloc"
 fn malloc(size: uintptr): *unsafe {
-	if size > maxAlloc {
+	if intrinsic::Unlikely(size > maxAlloc) {
 		panic("runtime: malloc: allocation size out of range")
 	}
 
-	return unsafe { integ::Emit[*unsafe]("std::malloc({})", size) }
+	unsafe {
+		mut heap := gett().heap
+		return heapAllocateBlock(heap, size, false)
+	}
 }
 
 // Deallocates the memory.
 // The memory should be allocated by malloc.
+#noinline
 #export "__jule_dealloc"
 fn dealloc(p: *unsafe) {
-	unsafe { integ::Emit("std::free({})", p) }
+	if intrinsic::Unlikely(p == nil) {
+		return
+	}
+	unsafe { blockDeallocate((*block)(*&p)) }
 }
