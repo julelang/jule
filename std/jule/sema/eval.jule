@@ -1616,7 +1616,7 @@ impl eval {
 		}
 	}
 
-	fn castStr(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
+	fn castString(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		if v.Type.Enum() != nil {
 			mut e := v.Type.Enum()
 			if e.Type.Prim() != nil && e.Type.Prim().IsString() {
@@ -1721,9 +1721,9 @@ impl eval {
 			prim := t.Prim()
 			if prim.IsUintptr() {
 				// Ignore case.
-			} else if !self.isUnsafe() {
-				self.pushErr(errorToken, "casting raw-pointer to integer cannot be done without Unsafe Jule")
-				self.pushSuggestion(`cast to uintptr or use unsafe Jule with "unsafe { ... }"`)
+			} else {
+				self.pushErr(errorToken, "casting raw-pointer to integer is not allowed")
+				self.pushSuggestion(`cast to "uintptr" then cast to the integer type you want`)
 			}
 			return
 		}
@@ -1767,7 +1767,7 @@ impl eval {
 		| prim.IsAny():
 			panic("sema: castPrim: any case should be unreachable in this routine")
 		| prim.IsString():
-			self.castStr(t, v, errorToken)
+			self.castString(t, v, errorToken)
 		| prim.IsBool():
 			self.castBool(t, v, errorToken)
 		| types::IsCmplx(prim.Kind):
