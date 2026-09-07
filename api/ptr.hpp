@@ -109,7 +109,7 @@ template <typename T> struct __jule_Ptr {
         if constexpr (!std::is_trivially_destructible_v<T>) {
             std::destroy_at(this->alloc);
         }
-        __jule_dealloc(this->alloc);
+        __jule_free(this->alloc);
         this->alloc = nullptr;
 
         __jule_RCFree(this->ref);

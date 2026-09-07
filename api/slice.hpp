@@ -93,7 +93,7 @@ public:
         if constexpr (!std::is_trivially_destructible_v<Item>) {
             std::destroy_n(this->data.alloc, this->_cap);
         }
-        __jule_dealloc(this->data.alloc);
+        __jule_free(this->data.alloc);
         this->data.alloc = nullptr;
         this->_slice = nullptr;
 
