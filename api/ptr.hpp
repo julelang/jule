@@ -177,10 +177,11 @@ template <typename T> struct __jule_Ptr {
                                "memory dereferencing error of smart pointer",
                         89);
                 }
-                (void)strncpy(message, __JULE_ERROR__INVALID_MEMORY, 49);
-                (void)strncpy(message + 49,
-                              "\nruntime: smart pointer is nil\nfile: ", 37);
-                (void)strncpy(message + 87, file, n);
+                (void)std::strncpy(message, __JULE_ERROR__INVALID_MEMORY, 49);
+                (void)std::strncpy(
+                    message + 49,
+                    "\nruntime: smart pointer is nil\nfile: ", 37);
+                (void)std::strncpy(message + 87, file, n);
                 message[87 + n] = '\0';
                 __jule_panic((__jule_U8 *)message, 87 + n);
             } else {
