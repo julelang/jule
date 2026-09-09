@@ -131,7 +131,8 @@ public:
     void alloc_new(const __jule_Int &len, const __jule_Int &cap) {
         this->dealloc();
 
-        Item *alloc = static_cast<Item *>(__jule_malloc(cap * sizeof(Item)));
+        Item *alloc =
+            static_cast<Item *>(__jule_malloc(cap * sizeof(Item), false));
         if (!alloc) [[unlikely]] {
             __jule_panic((__jule_U8 *)"runtime: memory allocation failed for "
                                       "heap-array of slice",

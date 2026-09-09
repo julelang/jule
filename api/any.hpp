@@ -38,7 +38,7 @@ public:
     template <typename T>
     __jule_Any(const T &data, __jule_TypeMeta *type) noexcept {
         this->type = type;
-        T *alloc = static_cast<T *>(__jule_malloc(sizeof(T)));
+        T *alloc = static_cast<T *>(__jule_malloc(sizeof(T), false));
         if (!alloc) [[unlikely]] {
             __jule_panic(
                 (__jule_U8 *)"runtime: memory allocation failed for data of "
