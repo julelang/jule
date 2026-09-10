@@ -15,9 +15,6 @@ use "std/intrinsic"
 use "std/mem"
 
 const (
-	// _64bit = 1 on 64-bit systems, 0 on 32-bit systems
-	_64bit = 1 << (^uintptr(0) >> 63) / 2
-
 	// The information in the comment is heavily adapted from the Go programming language.
 	//
 	// The number of bits in a heap address. On amd64, addresses are sign-extended
@@ -54,14 +51,14 @@ const (
 	//
 	// On 32-bit platforms, we accept the full 32-bit address
 	// space because doing so is cheap.
-	heapAddrBits = _64bit*48 + (1-_64bit)*32
+	heapAddrBits = implflags::Is64bit*48 + (1-implflags::Is64bit)*32
 
 	// The maximum size of an allocation. On 64-bit,
 	// it's theoretically possible to allocate 1<<heapAddrBits bytes. On
 	// 32-bit, however, this is one less than 1<<32 because the
 	// number of bytes in the address space doesn't actually fit
 	// in a uintptr.
-	maxAlloc = (1 << heapAddrBits) - (1-_64bit)*1
+	maxAlloc = (1 << heapAddrBits) - (1-implflags::Is64bit)*1
 
 	pageHeaderSize = 128
 	spanHeaderSize = pageHeaderSize
@@ -1013,7 +1010,7 @@ fn getSizeClass(size: uintptr): u32 {
 	// this position is guaranteed to be >= 6.
 	let mut mostSignificantBit: u32
 	const match {
-	| _64bit == 1:
+	| implflags::Is64bit == 1:
 		mostSignificantBit = u32(63 - clz64(u64(minBlockCount)))
 	|:
 		mostSignificantBit = u32(31 - clz64(u64(minBlockCount)))
