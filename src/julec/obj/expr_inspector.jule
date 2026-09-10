@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "julec/obj/cst"
 use "std/jule/constant"
 use "std/jule/sema"
 
@@ -210,6 +211,17 @@ impl ExprInspector {
 		| &sema::StructStaticIdentExpr
 		| &sema::RuneExpr:
 			// no-op
+		|:
+			// Check for optimized expressions.
+			mut &m2 := unsafe { &*(*cst::Expr)(m) }
+			match type *m2 {
+			| &cst::UnsafeBinaryExpr:
+				mut b := (*m2).(&cst::UnsafeBinaryExpr)
+				self.inspect(&b.Node.Left.Model)
+				self.inspect(&b.Node.Right.Model)
+			|:
+				// no-op
+			}
 		}
 	}
 
