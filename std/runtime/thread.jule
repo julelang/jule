@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/internal/runtime"
+
 extern let mut __jule_ct: *thread
 
 const (
 	// Thread roles.
 	roleProgram        = 1 << iota // The main thread of the program.
+	roleSysmon                     // The sysmon thread.
 	roleM                          // A machine (M) thread.
 	roleBlockingWorker             // A worker thread for the blocking thread pool.
 )
@@ -93,6 +96,30 @@ fn initThread(mut &t: *thread, role: int) {
 fn newThread(role: int): &thread {
 	mut t := new(thread)
 	initThread(&*t, role)
+	return t
+}
+
+// Allocates a new thread for a new thread-spawn and sets state as running.
+// The returned pointer have no GC integration and it must be freed manually.
+fn newSpawnThread(role: int): &thread {
+	mut t := newThread(role)
+	unsafe {
+		// Must be in non-GC memory because can be referenced
+		// from any runtime system during program lifetime.
+		// Remove RC pointer and disable GC for allocation.
+		// Allocated threads are never will be deallocated, usually.
+		// Some tools like Valgrind may detect as memory leak,
+		// but this was done on purpose.
+		//
+		// However, if the thread will be deallocated, we still have to disable
+		// GC integration because thread allocation may go out of scope after spawn;
+		// since this will trigger deallocation (we cannot pass smartptr to threads),
+		// allocator and other runtime data will be invalid but the thread still
+		// may be running and may or may not use the allocation, which is UB.
+		mut tptr := (*runtime::Smartptr[thread])(&t)
+		_RCFree(tptr.Ref)
+		tptr.Ref = nil
+	}
 	return t
 }
 

@@ -1324,7 +1324,11 @@ fn schedinit() {
 //
 // Since this function never returns, there should be no risk about return value.
 #disable nilptr
-fn sysmon(_: *unsafe) {
+fn sysmon(mut tp: *unsafe) {
+	// Set thread-local data before start.
+	mut t := unsafe { (&thread)((*thread)(tp)) }
+	sett(t)
+
 	for {
 		// Sleep for the next period.
 		threadsleep(_Millisecond * 10)
@@ -1351,7 +1355,8 @@ fn sysmon(_: *unsafe) {
 
 fn sysmoninit() {
 	// Start the sysmon thread.
-	unsafe { threadSpawn((*unsafe)(uintptr(sysmon)), nil) }
+	mut w := newSpawnThread(roleSysmon)
+	unsafe { threadSpawn((*unsafe)(uintptr(sysmon)), (*thread)(w)) }
 }
 
 // Schedules some M to run the P (creates an M if necessary).
@@ -1374,20 +1379,9 @@ fn startm(mut pp: &p, spinning: bool, lockheld: bool) {
 		sched.mu.unlock()
 	}
 	if m == nil {
-		m = newThread(roleM)
+		m = newSpawnThread(roleM)
 		m.pp = pp
 		m.spinning = spinning
-		unsafe {
-			// Must be in non-GC memory because can be referenced
-			// from any runtime system during program lifetime.
-			// Remove RC pointer and disable GC for allocation.
-			// Allocated threads are never will be deallocated.
-			// Some tools like Valgrind may detect as memory leak,
-			// but this was done on purpose.
-			mut mptr := (*runtime::Smartptr[thread])(&m)
-			_RCFree(mptr.Ref)
-			mptr.Ref = nil
-		}
 		ok := unsafe { threadSpawn((*unsafe)(uintptr(schedthread)), (*thread)(m)) }
 		if !ok {
 			panic("runtime: M creation failed")
