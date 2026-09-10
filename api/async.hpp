@@ -89,6 +89,19 @@ struct __jule_RetireNode {
 #endif
 };
 
+#define __JULE_COROUTINE_ALLOCATOR                                             \
+    static void *operator new(std::size_t size) {                              \
+        void *p = __jule_malloc(static_cast<__jule_Uintptr>(size), false);     \
+        if (!p) [[unlikely]] {                                                 \
+            throw std::bad_alloc();                                            \
+        }                                                                      \
+        return p;                                                              \
+    }                                                                          \
+    static void operator delete(void *ptr) noexcept { __jule_free(ptr); }      \
+    static void operator delete(void *ptr, std::size_t) noexcept {             \
+        __jule_free(ptr);                                                      \
+    }
+
 // One retire list per worker thread.
 // This is strictly thread-local and never shared.
 inline constinit thread_local __jule_RetireNode *__jule_retireHead = nullptr;
@@ -216,6 +229,8 @@ struct __jule_Park {
 template <typename T> class __jule_Async {
 public:
     struct promise_type {
+        __JULE_COROUTINE_ALLOCATOR;
+
         // Storage for the returned value.
         std::optional<T> value{};
 
@@ -331,6 +346,8 @@ public:
 class __jule_VoidAsync {
 public:
     struct promise_type {
+        __JULE_COROUTINE_ALLOCATOR;
+
         __jule_cHandle continuation{};
 
         // Persistent trampoline node (allocation-free).
@@ -417,6 +434,8 @@ public:
 class __jule_Coroutine {
 public:
     struct promise_type {
+        __JULE_COROUTINE_ALLOCATOR;
+
         // Embedded retire node, no allocation.
         __jule_RetireNode retire_node;
 
