@@ -56,8 +56,7 @@ impl blockingenv {
 		// Spawn a new one, if possible.
 		if self.nw < self.maxWorkers {
 			self.nw++
-			mut w := newSpawnThread(roleBlockingWorker)
-			ok := unsafe { threadSpawn((*unsafe)(uintptr(blockingWorker)), (*thread)(w)) }
+			ok := unsafe { threadSpawn((*unsafe)(uintptr(blockingWorker)), nil) }
 			if !ok {
 				panic("runtime: blocking worker thread creation failed")
 			}
@@ -76,10 +75,16 @@ let mut blocking: blockingenv
 //
 // Since this function never returns, there should be no risk about return value.
 #disable nilptr
-fn blockingWorker(mut wp: *unsafe) {
+fn blockingWorker(_: *unsafe) {
 	// Set thread-local data before start.
-	mut w := unsafe { (&thread)((*thread)(wp)) }
-	sett(w)
+	// Do not allocate a thread instance on heap,
+	// stack allocation is efficient and enough here.
+	let mut w: thread
+	// Use `sett` to set thread-local &thread data for the thread.
+	// The following thread instance initialization will use it.
+	mut wp := unsafe { (&thread)(&w) }
+	sett(wp)
+	initThread(&w, roleBlockingWorker)
 
 	const MaxSpin = 4
 	mut tried := 0
@@ -103,7 +108,7 @@ fn blockingWorker(mut wp: *unsafe) {
 			// Park the thread and continue it will be continue to run when notified.
 			tried = 0
 			w.link = blocking.widle
-			blocking.widle = w
+			blocking.widle = wp
 			blocking.mu.unlock()
 			w.parker.park()
 			continue

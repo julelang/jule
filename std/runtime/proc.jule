@@ -1324,10 +1324,15 @@ fn schedinit() {
 //
 // Since this function never returns, there should be no risk about return value.
 #disable nilptr
-fn sysmon(mut tp: *unsafe) {
+fn sysmon(_: *unsafe) {
 	// Set thread-local data before start.
-	mut t := unsafe { (&thread)((*thread)(tp)) }
-	sett(t)
+	// Do not allocate a thread instance on heap,
+	// stack allocation is efficient and enough here.
+	let mut t: thread
+	// Use `sett` to set thread-local &thread data for the thread.
+	// The following thread instance initialization will use it.
+	sett(unsafe { (&thread)(&t) })
+	initThread(&t, roleSysmon)
 
 	for {
 		// Sleep for the next period.
@@ -1355,8 +1360,7 @@ fn sysmon(mut tp: *unsafe) {
 
 fn sysmoninit() {
 	// Start the sysmon thread.
-	mut w := newSpawnThread(roleSysmon)
-	unsafe { threadSpawn((*unsafe)(uintptr(sysmon)), (*thread)(w)) }
+	unsafe { threadSpawn((*unsafe)(uintptr(sysmon)), nil) }
 }
 
 // Schedules some M to run the P (creates an M if necessary).
