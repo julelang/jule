@@ -11,39 +11,40 @@ const (
 	// various architectures. 48 bits is enough for all supported
 	// architectures.
 	//
-	// On AMD64, virtual addresses are 48-bit (or 57-bit) numbers sign extended to 64.
-	// We shift the address left 16 to eliminate the sign extended part and make
-	// room in the bottom for the count.
-	addrBits = 48
+	// On AMD64, virtual addresses are 48-bit (or 57-bit) sign-extended.
+	// Other archs are 48-bit zero-extended.
+	//
+	// We use one extra bit to placate systems which simulate amd64 binaries on
+	// an arm64 host. Allocated arm64 addresses could be as high as 1<<48-1,
+	// which would be invalid if we assumed 48-bit sign-extended addresses.
+	// See Go's issue 69255.
+	// (Note that this does not help the other way around, simluating arm64
+	// on amd64, but we don't have that problem at the moment.)
+	addrBits = 48 + 1
 
-	// In addition to the 16 bits taken from the top, we can take 3 from the
-	// bottom, because node must be pointer-aligned, giving a total of 19 bits
-	// of count.
-	tagBits = 64 - addrBits + 3
+	// The number of bits stored in the numeric tag of a taggedPointer.
+	tagBits = 64 - addrBits
 )
 
-// The number of bits stored in the numeric tag of a taggedPointer.
-const taggedPointerBits = tagBits
-
-// Created a taggedPointer from a pointer and a tag.
-// Tag bits that don't fit in the result are discarded.
-fn taggedPointerPack(ptr: *unsafe, tag: uintptr): taggedPointer {
-	return taggedPointer(u64(uintptr(ptr))<<(64-addrBits) | u64(tag&(1<<tagBits-1)))
-}
-
 impl taggedPointer {
+	// Created a taggedPointer from a pointer and a tag.
+	// Tag bits that don't fit in the result are discarded.
+	fn pack(ptr: *unsafe, tag: uintptr): taggedPointer {
+		return taggedPointer(u64(uintptr(ptr))<<tagBits | u64(tag&(1<<tagBits-1)))
+	}
+
 	// Pointer returns the pointer from a taggedPointer.
 	fn pointer(*self): *unsafe {
 		if Arch == "amd64" {
 			// amd64 systems can place the stack above the VA hole, so we need to sign extend
 			// val before unpacking.
-			return unsafe { (*unsafe)(uintptr(i64(*self) >> tagBits << 3)) }
+			return unsafe { (*unsafe)(uintptr(i64(*self) >> tagBits)) }
 		}
-		return unsafe { (*unsafe)(uintptr(*self >> tagBits << 3)) }
+		return unsafe { (*unsafe)(uintptr(*self >> tagBits)) }
 	}
 
 	// Tag returns the tag from a taggedPointer.
 	fn tag(*self): uintptr {
-		return uintptr(*self & (1<<taggedPointerBits - 1))
+		return uintptr(*self & (1<<tagBits - 1))
 	}
 }
