@@ -92,7 +92,7 @@ impl polldescq {
 	}
 }
 
-// polldesc contains 2 binary semaphores, rcp and wcp, to park reader and writer
+// polldesc contains 2 binary semaphores, rc and wc, to park reader and writer
 // coroutines respectively. The semaphore can be in the following states:
 //
 //	pdReady - io readiness notification is pending;
@@ -105,9 +105,11 @@ impl polldescq {
 //	            io notification or timeout/close changes the state to pdReady or pdNil respectively
 //	            and unparks the coroutine.
 //	pdNil - none of the above.
-let mut pdNil = unsafe { (*c)(nil) }
-let mut pdReady = unsafe { (*c)(0x1) }
-let mut pdWait = unsafe { (*c)(0x2) }
+const (
+	pdNil:   uintptr = 0
+	pdReady: uintptr = 1
+	pdWait:  uintptr = 2
+)
 
 // Represents a pollable file descriptor and its runtime state.
 // It encapsulates coroutine coordination, lifetime management, deadlines,
@@ -144,8 +146,8 @@ struct polldesc {
 	atomicInfo: u32
 
 	// Accessed atomically and hold C pointers.
-	rcp: *c // pdReady, pdWait, C waiting for read or pdNil
-	wcp: *c // pdReady, pdWait, C waiting for write or pdNil
+	rc: uintptr // pdReady, pdWait, C waiting for read or pdNil
+	wc: uintptr // pdReady, pdWait, C waiting for write or pdNil
 
 	mu:      mutex // Protects the following fields.
 	closing: bool
@@ -348,35 +350,35 @@ fn eventpollcheckerr(mut pd: &polldesc, mode: i32): int {
 // can hold only a single waiting coroutine for each mode.
 #disable nilptr
 async fn eventpollblock(mut pd: &polldesc, mode: i32, waitio: bool): bool {
-	mut &pdcp := &pd.rcp
+	mut pdc := &pd.rc
 	if mode == 'w' {
-		unsafe { *(&pdcp) = &pd.wcp }
+		pdc = &pd.wc
 	}
 	for {
 		// Consume notification if already ready.
-		if atomic::CompareAndSwap(pdcp, pdReady, pdNil, atomic::AcqRel, atomic::Relaxed) {
+		if atomic::CompareAndSwap(pdc, pdReady, pdNil, atomic::AcqRel, atomic::Relaxed) {
 			return true
 		}
-		if atomic::CompareAndSwap(pdcp, pdNil, pdWait, atomic::AcqRel, atomic::Relaxed) {
+		if atomic::CompareAndSwap(pdc, pdNil, pdWait, atomic::AcqRel, atomic::Relaxed) {
 			break
 		}
 		// Double check that this isn't corrupt; otherwise we'd loop
 		// forever.
-		v := atomic::Load(pdcp, atomic::Acquire)
+		v := atomic::Load(pdc, atomic::Acquire)
 		if v != pdReady && v != pdNil {
 			panic("runtime: double wait")
 		}
 	}
-	// Need to recheck error states after setting pdcp to pdWait.
+	// Need to recheck error states after setting pdc to pdWait.
 	// This is necessary because eventpollunblock/polldesc.setDeadline/eventpolldeadlineimpl
-	// do the opposite: store to closing/rd/wd, publishInfo, load of rcp/wcp.
+	// do the opposite: store to closing/rd/wd, publishInfo, load of rc/wc.
 	if waitio || eventpollcheckerr(pd, mode) == pollNoError {
 		mut m := gett()
-		tg := taggedPointer.pack(pdcp, mutexunlockIOWait)
+		tg := taggedPointer.pack(pdc, mutexunlockIOWait)
 		park2(m.c, tg, reasonIOWait).await
 	}
 	// Be careful to not lose concurrent pdReady notification.
-	old := atomic::Swap(pdcp, pdNil, atomic::AcqRel)
+	old := atomic::Swap(pdc, pdNil, atomic::AcqRel)
 	if old > pdWait {
 		panic("runtime: corrupted polldesc")
 	}
@@ -392,9 +394,9 @@ fn eventpollreset(mut pd: &polldesc, mode: i32): int {
 	}
 	match mode {
 	| 'r':
-		atomic::Store(&pd.rcp, pdNil, atomic::Release)
+		atomic::Store(&pd.rc, pdNil, atomic::Release)
 	| 'w':
-		atomic::Store(&pd.wcp, pdNil, atomic::Release)
+		atomic::Store(&pd.wc, pdNil, atomic::Release)
 	}
 	return pollNoError
 }
@@ -423,13 +425,13 @@ async fn eventpollwaitcanceled(mut pd: &polldesc, mode: i32) {
 
 #disable nilptr
 fn eventpollunblock(mut &pd: *polldesc, mode: i32, ioready: bool, mut &cp: **c, mut &delta: *u32) {
-	mut &pdcp := &pd.rcp
+	mut pdc := &pd.rc
 	if mode == 'w' {
-		unsafe { *(&pdcp) = &pd.wcp }
+		pdc = &pd.wc
 	}
 
 	for {
-		mut old := atomic::Load(pdcp, atomic::Acquire)
+		mut old := atomic::Load(pdc, atomic::Acquire)
 		if old == pdReady {
 			return
 		}
@@ -442,7 +444,7 @@ fn eventpollunblock(mut &pd: *polldesc, mode: i32, ioready: bool, mut &cp: **c, 
 		if ioready {
 			new = pdReady
 		}
-		if atomic::CompareAndSwap(pdcp, old, new, atomic::AcqRel, atomic::Relaxed) {
+		if atomic::CompareAndSwap(pdc, old, new, atomic::AcqRel, atomic::Relaxed) {
 			if old == pdWait {
 				old = pdNil
 				// Do nothing, do not advance delta.
@@ -460,7 +462,6 @@ fn eventpollunblock(mut &pd: *polldesc, mode: i32, ioready: bool, mut &cp: **c, 
 }
 
 // Adds notified coroutines of pd to toRun according to mode.
-// It assumes pd mutex is locked.
 #disable nilptr boundary
 fn eventpollready(mut &pd: *polldesc, mode: i32, mut &toRun: *[prunqsize]*c, mut &i: *u32) {
 	if mode == 'r' || mode == 'r'+'w' {
@@ -546,12 +547,12 @@ fn eventpollnew(fd: u64)!: &polldesc {
 	mut pd := pollcache.alloc()
 	pd.mu.lock()
 
-	wcp := atomic::Load(&pd.wcp, atomic::Acquire)
-	if wcp != pdNil && wcp != pdReady {
+	wc := atomic::Load(&pd.wc, atomic::Acquire)
+	if wc != pdNil && wc != pdReady {
 		panic("runtime: blocked write on free polldesc")
 	}
-	rcp := atomic::Load(&pd.rcp, atomic::Acquire)
-	if rcp != pdNil && rcp != pdReady {
+	rc := atomic::Load(&pd.rc, atomic::Acquire)
+	if rc != pdNil && rc != pdReady {
 		panic("runtime: blocked read on free polldesc")
 	}
 	pd.fd = fd
@@ -561,9 +562,9 @@ fn eventpollnew(fd: u64)!: &polldesc {
 	}
 	pd.closing = false
 	pd.setEventErr(false, 0)
-	atomic::Store(&pd.rcp, pdNil, atomic::Release)
+	atomic::Store(&pd.rc, pdNil, atomic::Release)
 	pd.rd = 0
-	atomic::Store(&pd.wcp, pdNil, atomic::Release)
+	atomic::Store(&pd.wc, pdNil, atomic::Release)
 	pd.wd = 0
 	pd.publishInfo()
 	pd.mu.unlock()
