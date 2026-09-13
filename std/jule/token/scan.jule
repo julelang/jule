@@ -542,7 +542,7 @@ impl Scanner {
 	}
 
 	// Scans and returns new token, reports if EOF.
-	// If and error appeared, returns nil token and not-EOF.
+	// If and error appeared or a token ignored, returns nil token and not-EOF.
 	fn Scan(mut *self): (token: &Token, EOF: bool) {
 		self.skipWhitespace()
 		if self.r == eof {
@@ -577,12 +577,12 @@ impl Scanner {
 				if self.r == '/' {
 					self.scanLineComment(token)
 					if self.opt&Comments == 0 {
-						return self.Scan()
+						return nil, false
 					}
 				} else if self.r == '*' {
 					self.scanRangeComment(token)
 					if self.opt&Comments == 0 {
-						return self.Scan()
+						return nil, false
 					}
 				} else if self.r == '=' {
 					token.ID = QUO_ASSIGN
@@ -914,7 +914,7 @@ Loop:
 		| EOF:
 			break Loop
 		| token == nil:
-			// An error appeared, continue to scan.
+			// An error appeared or token ignored, continue to scan.
 			continue
 		}
 	}
