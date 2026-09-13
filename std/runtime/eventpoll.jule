@@ -225,7 +225,7 @@ impl polldesc {
 		// If we set the new deadline in the past, unblock currently pending IO if any.
 		// Note that publishInfo has already been called, above, immediately after modifying rd and wd.
 		let mut batch: [2]*c
-		mut delta := u32(0)
+		mut delta := i32(0)
 		if self.rd < 0 {
 			eventpollunblock(self, 'r', false, &batch[delta], &delta)
 		}
@@ -239,7 +239,7 @@ impl polldesc {
 		if delta > 1 {
 			unpark(batch[1])
 		}
-		eventpollAdjustWaiters(-i32(delta))
+		eventpollAdjustWaiters(-delta)
 	}
 
 	#disable nilptr boundary
@@ -253,7 +253,7 @@ impl polldesc {
 		self.wseq++
 		self.publishInfo()
 		let mut batch: [2]*c
-		mut delta := u32(0)
+		mut delta := i32(0)
 		eventpollunblock(self, 'r', false, &batch[delta], &delta)
 		eventpollunblock(self, 'w', false, &batch[delta], &delta)
 		if self.rrun {
@@ -271,7 +271,7 @@ impl polldesc {
 		if delta > 1 {
 			unpark(batch[1])
 		}
-		eventpollAdjustWaiters(-i32(delta))
+		eventpollAdjustWaiters(-delta)
 	}
 
 	// Returns the pollInfo corresponding to polldesc.
@@ -424,7 +424,7 @@ async fn eventpollwaitcanceled(mut pd: &polldesc, mode: i32) {
 }
 
 #disable nilptr
-fn eventpollunblock(mut &pd: *polldesc, mode: i32, ioready: bool, mut &cp: **c, mut &delta: *u32) {
+fn eventpollunblock(mut &pd: *polldesc, mode: i32, ioready: bool, mut &cp: **c, mut &delta: *i32) {
 	mut pdc := &pd.rc
 	if mode == 'w' {
 		pdc = &pd.wc
@@ -450,9 +450,7 @@ fn eventpollunblock(mut &pd: *polldesc, mode: i32, ioready: bool, mut &cp: **c, 
 				// Do nothing, do not advance delta.
 				// Following coroutine will be places at this delta slot, if any.
 			} else if old != pdNil {
-				if delta != nil {
-					*delta++
-				}
+				*delta++
 				*cp = unsafe { (*c)(old) }
 				_ready(*cp)
 			}
@@ -463,7 +461,7 @@ fn eventpollunblock(mut &pd: *polldesc, mode: i32, ioready: bool, mut &cp: **c, 
 
 // Adds notified coroutines of pd to toRun according to mode.
 #disable nilptr boundary
-fn eventpollready(mut &pd: *polldesc, mode: i32, mut &toRun: *[prunqsize]*c, mut &i: *u32) {
+fn eventpollready(mut &pd: *polldesc, mode: i32, mut &toRun: *[prunqsize]*c, mut &i: *i32) {
 	if mode == 'r' || mode == 'r'+'w' {
 		eventpollunblock(pd, 'r', true, &(*toRun)[*i], i)
 	}
@@ -486,7 +484,7 @@ fn eventpolldeadlineimpl(mut &pd: *polldesc, seq: uintptr, read: bool, write: bo
 		pd.mu.unlock()
 		return
 	}
-	mut delta := u32(0)
+	mut delta := i32(0)
 	let mut batch: [2]*c
 	if read {
 		if pd.rd <= 0 || !pd.rrun {
@@ -511,7 +509,7 @@ fn eventpolldeadlineimpl(mut &pd: *polldesc, seq: uintptr, read: bool, write: bo
 	if delta > 1 {
 		unpark(batch[1])
 	}
-	eventpollAdjustWaiters(-i32(delta))
+	eventpollAdjustWaiters(-delta)
 }
 
 #disable nilptr

@@ -372,7 +372,7 @@ let mut sched: scheduler
 fn pidleput(mut pp: &p) {
 	pp.link = sched.pidle
 	sched.pidle = pp
-	atomic::Add(&sched.npidle, 1, atomic::Relaxed)
+	atomic::Add(&sched.npidle, 1, atomic::Release)
 }
 
 // Tries to get a P from the pidle list, acquiring ownership.
@@ -383,7 +383,7 @@ fn pidleget(): &p {
 	mut pp := sched.pidle
 	if pp != nil {
 		sched.pidle = pp.link
-		atomic::Add(&sched.npidle, -1, atomic::Relaxed)
+		atomic::Add(&sched.npidle, -1, atomic::Release)
 	}
 	return pp
 }
@@ -562,7 +562,7 @@ fn runqputslow(mut pp: &p, mut c: *c, h: u32, t: u32): bool {
 // Batch is a ring buffer starting at batchHead.
 // Executed only by the owner P.
 #disable nilptr boundary
-fn runqputbatch(mut pp: &p, mut &batch: *[prunqsize]*c, batchHead: u32, mut bsize: u32) {
+fn runqputbatch(mut pp: &p, mut &batch: *[prunqsize]*c, batchHead: i32, mut bsize: i32) {
 	h := atomic::Load(&pp.runqhead, atomic::Acquire)
 	mut t := pp.runqtail
 	mut n := batchHead
@@ -585,12 +585,12 @@ fn runqputbatch(mut pp: &p, mut &batch: *[prunqsize]*c, batchHead: u32, mut bsiz
 // Any remaining C's are added to the current P's local run queue.
 // This may temporarily acquire sched.lock.
 #disable nilptr boundary
-fn injectclist(mut &batch: *[prunqsize]*c, batchStart: u32, bsize: u32) {
+fn injectclist(mut &batch: *[prunqsize]*c, batchStart: i32, bsize: i32) {
 	if batchStart >= bsize {
 		return
 	}
-	startIdle := fn(n: u32) {
-		mut i := u32(0)
+	startIdle := fn(n: i32) {
+		mut i := i32(0)
 		for i < n; i++ {
 			sched.mu.lock()
 
@@ -617,8 +617,8 @@ fn injectclist(mut &batch: *[prunqsize]*c, batchStart: u32, bsize: u32) {
 		return
 	}
 
-	npidle := u32(atomic::Load(&sched.npidle, atomic::Relaxed))
-	mut n := u32(0)
+	npidle := atomic::Load(&sched.npidle, atomic::Acquire)
+	mut n := i32(0)
 	mut i := batchStart
 	for n < npidle && i < bsize {
 		n++
@@ -626,7 +626,7 @@ fn injectclist(mut &batch: *[prunqsize]*c, batchStart: u32, bsize: u32) {
 	}
 	if n > 0 {
 		sched.mu.lock()
-		i = u32(0)
+		i = 0
 		for i < n; i++ {
 			sched.runq.push((*batch)[batchStart+i])
 		}
@@ -1088,13 +1088,13 @@ top:
 		if m.pp == nil {
 			if bn > 0 {
 				injectclist(&toRun, 0, bn)
-				eventpollAdjustWaiters(-i32(bn))
+				eventpollAdjustWaiters(-bn)
 			}
 		} else {
 			if bn > 0 {
 				coro = toRun[0]
 				runqputbatch(pp, &toRun, 1, bn)
-				eventpollAdjustWaiters(-i32(bn))
+				eventpollAdjustWaiters(-bn)
 				return
 			}
 			if wasSpinning {
