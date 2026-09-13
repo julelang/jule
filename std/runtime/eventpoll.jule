@@ -222,7 +222,7 @@ impl polldesc {
 		}
 		// If we set the new deadline in the past, unblock currently pending IO if any.
 		// Note that publishInfo has already been called, above, immediately after modifying rd and wd.
-		let mut batch: [2]c
+		let mut batch: [2]*c
 		mut delta := u32(0)
 		if self.rd < 0 {
 			eventpollunblock(self, 'r', false, &batch[delta], &delta)
@@ -232,10 +232,10 @@ impl polldesc {
 		}
 		self.mu.unlock()
 		if delta > 0 {
-			unpark(&batch[0])
+			unpark(batch[0])
 		}
 		if delta > 1 {
-			unpark(&batch[1])
+			unpark(batch[1])
 		}
 		eventpollAdjustWaiters(-i32(delta))
 	}
@@ -250,7 +250,7 @@ impl polldesc {
 		self.rseq++
 		self.wseq++
 		self.publishInfo()
-		let mut batch: [2]c
+		let mut batch: [2]*c
 		mut delta := u32(0)
 		eventpollunblock(self, 'r', false, &batch[delta], &delta)
 		eventpollunblock(self, 'w', false, &batch[delta], &delta)
@@ -264,10 +264,10 @@ impl polldesc {
 		}
 		self.mu.unlock()
 		if delta > 0 {
-			unpark(&batch[0])
+			unpark(batch[0])
 		}
 		if delta > 1 {
-			unpark(&batch[1])
+			unpark(batch[1])
 		}
 		eventpollAdjustWaiters(-i32(delta))
 	}
@@ -342,11 +342,6 @@ fn eventpollcheckerr(mut pd: &polldesc, mode: i32): int {
 	return pollNoError
 }
 
-struct eventpollIOData {
-	c:    *c
-	pdcp: **c
-}
-
 // Returns true if IO is ready, or false if timed out or closed
 // waitio - wait only for completed IO, ignore errors
 // Concurrent calls to eventpollblock in the same mode are forbidden, as polldesc
@@ -377,10 +372,8 @@ async fn eventpollblock(mut pd: &polldesc, mode: i32, waitio: bool): bool {
 	// do the opposite: store to closing/rd/wd, publishInfo, load of rcp/wcp.
 	if waitio || eventpollcheckerr(pd, mode) == pollNoError {
 		mut m := gett()
-		mut mc := m.c
-		mut iod := eventpollIOData{c: &mc, pdcp: pdcp}
-		tg := taggedPointer.pack(&iod, mutexunlockIOWait)
-		park2(&mc, tg, reasonIOWait).await
+		tg := taggedPointer.pack(pdcp, mutexunlockIOWait)
+		park2(m.c, tg, reasonIOWait).await
 	}
 	// Be careful to not lose concurrent pdReady notification.
 	old := atomic::Swap(pdcp, pdNil, atomic::AcqRel)
@@ -429,7 +422,7 @@ async fn eventpollwaitcanceled(mut pd: &polldesc, mode: i32) {
 }
 
 #disable nilptr
-fn eventpollunblock(mut &pd: *polldesc, mode: i32, ioready: bool, mut &cp: *c, mut &delta: *u32) {
+fn eventpollunblock(mut &pd: *polldesc, mode: i32, ioready: bool, mut &cp: **c, mut &delta: *u32) {
 	mut &pdcp := &pd.rcp
 	if mode == 'w' {
 		unsafe { *(&pdcp) = &pd.wcp }
@@ -458,8 +451,8 @@ fn eventpollunblock(mut &pd: *polldesc, mode: i32, ioready: bool, mut &cp: *c, m
 				if delta != nil {
 					*delta++
 				}
-				*cp = unsafe { *(*c)(old) }
-				_ready(cp)
+				*cp = unsafe { (*c)(old) }
+				_ready(*cp)
 			}
 			return
 		}
@@ -469,7 +462,7 @@ fn eventpollunblock(mut &pd: *polldesc, mode: i32, ioready: bool, mut &cp: *c, m
 // Adds notified coroutines of pd to toRun according to mode.
 // It assumes pd mutex is locked.
 #disable nilptr boundary
-fn eventpollready(mut &pd: *polldesc, mode: i32, mut &toRun: *[prunqsize]c, mut &i: *u32) {
+fn eventpollready(mut &pd: *polldesc, mode: i32, mut &toRun: *[prunqsize]*c, mut &i: *u32) {
 	if mode == 'r' || mode == 'r'+'w' {
 		eventpollunblock(pd, 'r', true, &(*toRun)[*i], i)
 	}
@@ -493,7 +486,7 @@ fn eventpolldeadlineimpl(mut &pd: *polldesc, seq: uintptr, read: bool, write: bo
 		return
 	}
 	mut delta := u32(0)
-	let mut batch: [2]c
+	let mut batch: [2]*c
 	if read {
 		if pd.rd <= 0 || !pd.rrun {
 			panic("runtime: inconsistent read deadline")
@@ -512,10 +505,10 @@ fn eventpolldeadlineimpl(mut &pd: *polldesc, seq: uintptr, read: bool, write: bo
 	}
 	pd.mu.unlock()
 	if delta > 0 {
-		unpark(&batch[0])
+		unpark(batch[0])
 	}
 	if delta > 1 {
-		unpark(&batch[1])
+		unpark(batch[1])
 	}
 	eventpollAdjustWaiters(-i32(delta))
 }

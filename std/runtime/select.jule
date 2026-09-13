@@ -250,7 +250,7 @@ unsafe async fn suspend_runselect(
 
 	// There is no waiter in the queue.
 	// We have to park this coroutine, eventually.
-	mut tc := gett().c
+	mut c := gett().c
 	// Allocate and prepare a parker per operation.
 	// Use round-robin iteration to achieve randomness.
 	mut parkers := make([]&chanlist, nrecv+nsend)
@@ -281,7 +281,7 @@ unsafe async fn suspend_runselect(
 		}
 
 		// Prepare and enqeueue parker.
-		parker.cp = &tc
+		parker.c = c
 		parker.ticket = parkerSelect
 		parker.state = state // Use shared state pointer for all parkers.
 		parker.stack = case.data
@@ -303,12 +303,12 @@ unsafe async fn suspend_runselect(
 	//
 	// To avoid this, we use a tagged pointer so that when the `park` function
 	// attempts to unlock a mutex, the runtime can detect that this is not a real
-	// mutex and update `tc.race` to `0` instead.
-	// By setting the `tc.race` field to `selectParking` before parking and before
+	// mutex and update `c.race` to `0` instead.
+	// By setting the `c.race` field to `selectParking` before parking and before
 	// releasing the locks, we guarantee that any thread attempting to wake the
 	// coroutine will observe this state. This forces it to wait until parking
 	// completes, i.e., until the state becomes `0`.
-	tp := taggedPointer.pack(&tc, mutexunlockSelect)
+	tp := taggedPointer.pack(c, mutexunlockSelect)
 
 	// Park and try iteration.
 	// First, parks the coroutine.
@@ -316,11 +316,12 @@ unsafe async fn suspend_runselect(
 	// If a channel notified spuriously, try again and park it, if it fails.
 	for {
 		// See the comment of tp.
-		atomic::Store(&tc.race, selectParking, atomic::Release)
+		atomic::Store(&c.race, selectParking, atomic::Release)
 
 		// Unlock channels and park the coroutine.
 		unlockchans(chans, nchan)
-		park2(&tc, tp, reasonSelect).await
+		gett().c = nil
+		park2(c, tp, reasonSelect).await
 
 		// Look for the selected channel.
 		for i, parker in parkers {
@@ -476,6 +477,6 @@ async fn emptyselect() {
 	// Use `gett().c` for park handle, because scheduler will destroy
 	// the coroutine after empty select.
 	mut m := gett()
-	park(&m.c, 0, reasonSelect|reasonSelectEmpty).await
+	park(m.c, 0, reasonSelect|reasonSelectEmpty).await
 	panic("unreachable")
 }

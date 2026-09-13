@@ -279,18 +279,21 @@ fn mutexunlock(mu: u64): bool {
 		blocking.mu.unlock()
 		return true
 	| mutexunlockIOWait:
-		mut &iod := unsafe { &(*(*eventpollIOData)(tp.pointer())) }
-		r := atomic::CompareAndSwap(iod.pdcp, pdWait, iod.c, atomic::AcqRel, atomic::Relaxed)
+		mut m := gett()
+		mut &pdcp := unsafe { &(*(**c)(tp.pointer())) }
+		r := atomic::CompareAndSwap(pdcp, pdWait, m.c, atomic::AcqRel, atomic::Relaxed)
 		if r {
 			// Bump the count of coroutines waiting for the poller.
 			// The scheduler uses this to decide whether to block
 			// waiting for the poller if there is nothing else to do.
-			eventpollAdjustWaiters(1)
+			eventpollAdjustWaiters(+1)
 		}
+		m.c = nil
 		return r
 	| mutexunlockYield:
 		mut m := gett()
-		runqput(m.pp, &m.c, false)
+		runqput(m.pp, m.c, false)
+		m.c = nil
 		return true
 	}
 

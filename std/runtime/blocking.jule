@@ -7,7 +7,7 @@ use "std/intrinsic"
 // A blocking job.
 struct blockingJob {
 	job:  fn()
-	cp:   &c
+	c:    *c
 	link: &blockingJob
 }
 
@@ -116,8 +116,8 @@ fn blockingWorker(_: *unsafe) {
 		tried = 0
 		// Do job and unpark the coroutine (if exist), it is ready to go.
 		job.job()
-		if job.cp != nil {
-			unpark(&(*job.cp))
+		if job.c != nil {
+			unpark(job.c)
 		}
 	}
 }
@@ -141,8 +141,8 @@ fn blockinginit() {
 #disable nilptr
 async fn Blocking(job: fn()) {
 	mut m := gett()
-	mc := m.c
-	mut bj := blockingJob{job: job, cp: unsafe { (&c)(&mc) }}
+	mut bj := blockingJob{job: job, c: m.c}
+	m.c = nil
 	mut bjp := unsafe { (&blockingJob)(&bj) }
 	blocking.mu.lock()
 	if blocking.head == nil {
@@ -157,7 +157,7 @@ async fn Blocking(job: fn()) {
 	// The `blocking.mu` will be released after park due to `mutexunlockJobAdd`.
 	tp := taggedPointer.pack(nil, mutexunlockJobAdd)
 	sched.enterblock()
-	park2(&(*bj.cp), tp, reasonBlocking).await
+	park2(bj.c, tp, reasonBlocking).await
 	sched.exitblock()
 }
 

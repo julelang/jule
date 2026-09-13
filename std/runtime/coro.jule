@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+// TODO: use free list for coroutines if it makes sense
+
+use "std/mem"
+
 // Jule coroutine handle type.
 #typedef
 extern struct __jule_cHandle {
@@ -57,11 +61,13 @@ struct c {
 // Creates new C with the handle.
 // Ready for the resume call.
 #disable nilptr boundary
-fn newc(h: cHandle): c {
-	let mut c: c
-	c.state |= coroSuspended
-	c.handle = h
-	return c
+fn newc(h: cHandle): *c {
+	unsafe {
+		mut c := (*c)(malloc(uintptr(mem::Sizeof(c)), true))
+		c.state |= coroSuspended
+		c.handle = h
+		return c
+	}
 }
 
 // Appends the main C of the program.
@@ -69,8 +75,7 @@ fn newc(h: cHandle): c {
 #disable nilptr
 fn spawnmainc(h: cHandle) {
 	mut m := gett()
-	m.pp.runnext.used = true
-	m.pp.runnext.c = newc(h)
+	m.pp.runnext = newc(h)
 }
 
 // A low level API function for Jule Cs.
@@ -82,7 +87,7 @@ fn spawnmainc(h: cHandle) {
 async fn cospawn(h: cHandle) {
 	mut c := newc(h)
 	mut m := gett()
-	overflow := runqput(m.pp, &c, true)
+	overflow := runqput(m.pp, c, true)
 	wakep()
 	// If an overflow occurs in the global runnable queue, yield this C.
 	// This allows the runtime to wait briefly before creating more
@@ -93,28 +98,37 @@ async fn cospawn(h: cHandle) {
 	}
 }
 
-// Resumes execution of cp.
+// Resumes execution of c.
 #disable nilptr
-fn resume(&cp: *c) {
-	cp.handle.resume()
+fn resume(c: *c) {
+	unsafe { c.handle.resume() }
 }
 
-// Reports whether cp done.
+// Reports whether c done.
 #disable nilptr
-fn done(&cp: *c): bool {
-	return cp.handle.done()
+fn done(c: *c): bool {
+	return unsafe { c.handle.done() }
 }
 
-// Closes cp, releases memory.
+// Closes c, releases memory.
 #disable nilptr
-fn close(&cp: *c) {
-	cp.handle.destroy()
+fn close(mut c: *c) {
+	unsafe {
+		c.state &= ^(coroRunning | coroSuspended)
+		c.state |= coroClosed
+		c.handle.destroy()
+	}
+}
+
+// Deallocates c.
+fn freec(c: *c) {
+	free(c)
 }
 
 // A coroq C.
 struct coroqc {
 	// The C.
-	c: c
+	c: *c
 
 	// Pointer to the previous corotuine.
 	prev: &coroqc
@@ -132,11 +146,11 @@ struct coroq {
 }
 
 impl coroq {
-	// Appends cp to the queue.
+	// Appends c to the queue.
 	#disable nilptr
-	fn push(mut *self, mut &cp: *c) {
+	fn push(mut *self, mut c: *c) {
 		mut qc := new(coroqc)
-		qc.c = *cp
+		qc.c = c
 		self.pushq(qc)
 	}
 

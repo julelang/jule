@@ -285,23 +285,23 @@ const (
 
 // Fires the timer t.
 // If t is an internal timer, it invokes its routine immediately and
-// returns fireInternalTimer. In this case, cp is not used.
+// returns fireInternalTimer. In this case, c is nil.
 //
 // Otherwise, t is either a user timer or a coroutine-wrapped internal timer.
 // Such timers are associated with a coroutine; the coroutine state is written
-// to cp and fireCTimer is returned. The timer will then be fired when the
-// scheduler executes the coroutine referenced by cp.
-fn fire(mut t: &timer, mut &cp: *c): int {
+// to c and fireCTimer is returned. The timer will then be fired when the
+// scheduler executes the coroutine referenced by c.
+fn fire(mut t: &timer): (*c, int) {
 	if t.ifunc != nil {
 		// This timer is an runtime internal timer associated with
 		// a raw function to be invoked when timer fired.
 		t.unlockAndFire()
-		return fireInternalTimer
+		return nil, fireInternalTimer
 	} else {
 		// The timer associated with a coroutine,
 		// let the scheduler handle this.
-		*cp = unsafe { *(*c)(t.arg) }
+		mut c := unsafe { (*c)(t.arg) }
 		t.mu.unlock()
-		return fireCTimer
+		return c, fireCTimer
 	}
 }
