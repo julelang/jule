@@ -219,8 +219,13 @@ struct __jule_Park {
     bool await_ready(void) const noexcept { return false; }
 
     bool await_suspend(__jule_cHandle h) const noexcept {
+        __jule_cHandle old = *out;
         *out = h;
-        return __jule_mutexUnlock(mu);
+        bool suspend = __jule_mutexUnlock(mu);
+        if (!suspend) {
+            *out = old;
+        }
+        return suspend;
     }
 
     void await_resume(void) const noexcept {}

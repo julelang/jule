@@ -287,8 +287,15 @@ fn mutexunlock(mu: u64): bool {
 			// The scheduler uses this to decide whether to block
 			// waiting for the poller if there is nothing else to do.
 			eventpollAdjustWaiters(+1)
+			m.c = nil
+		} else {
+			// Restore coroutine state.
+			_ready(m.c)
+			unsafe {
+				m.c.state &= ^(coroSuspended | coroClosed)
+				m.c.state |= coroRunning
+			}
 		}
-		m.c = nil
 		return r
 	| mutexunlockYield:
 		mut m := gett()

@@ -201,26 +201,25 @@ retry:
 		| sys::EVFILT_WRITE:
 			mode += 'w'
 		}
-		if mode == 0 {
-			continue
-		}
-		let mut &pd: *polldesc = nil
-		let mut tag: uintptr
-		if runtime::PtrSize == 4 {
-			// No sequence protection on 32-bit systems.
-			// See eventpollopen for details.
-			unsafe { *(&pd) = &(*(*polldesc)(ev.udata)) }
-			tag = 0
-		} else {
-			tp := taggedPointer(uintptr(ev.udata))
-			unsafe { *(&pd) = &(*(*polldesc)(tp.pointer())) }
-			tag = tp.tag()
-			if atomic::Load(&pd.fdseq, atomic::Acquire) != tag {
-				continue // stale
+		if mode != 0 {
+			let mut &pd: *polldesc = nil
+			let mut tag: uintptr
+			if runtime::PtrSize == 4 {
+				// No sequence protection on 32-bit systems.
+				// See eventpollopen for details.
+				unsafe { *(&pd) = &(*(*polldesc)(ev.udata)) }
+				tag = 0
+			} else {
+				tp := taggedPointer(uintptr(ev.udata))
+				unsafe { *(&pd) = &(*(*polldesc)(tp.pointer())) }
+				tag = tp.tag()
+				if atomic::Load(&pd.fdseq, atomic::Acquire) != tag {
+					continue // stale
+				}
 			}
+			pd.setEventErr(ev.flags == sys::EV_ERROR, tag)
+			eventpollready(pd, mode, toRun, &b)
 		}
-		pd.setEventErr(ev.flags == sys::EV_ERROR, tag)
-		eventpollready(pd, mode, toRun, &b)
 	}
 	return b
 }
@@ -251,7 +250,7 @@ fn isWakeup(&ev: *keventt): bool {
 
 fn processWakeupEvent(kq: i32, isBlocking: bool) {
 	if !isBlocking {
-		// Got a wrong thread, relay
+		// Got a wrong thread, relay.
 		wakeEventpoll(kq)
 	}
 }

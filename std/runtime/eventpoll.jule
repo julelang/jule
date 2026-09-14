@@ -560,8 +560,10 @@ fn eventpollnew(fd: u64)!: &polldesc {
 	}
 	pd.closing = false
 	pd.setEventErr(false, 0)
+	pd.rseq++
 	atomic::Store(&pd.rc, pdNil, atomic::Release)
 	pd.rd = 0
+	pd.wseq++
 	atomic::Store(&pd.wc, pdNil, atomic::Release)
 	pd.wd = 0
 	pd.publishInfo()
@@ -578,8 +580,19 @@ fn eventpollnew(fd: u64)!: &polldesc {
 // previously obtained from eventpollnew, is closed.
 #disable nilptr
 fn eventpollfree(mut pd: &polldesc) {
-	pollcache.free(pd)
+	if !pd.closing {
+		panic("runtime: close polldesc w/o unblock")
+	}
+	wc := atomic::Load(&pd.wc, atomic::Acquire)
+	if wc != pdNil && wc != pdReady {
+		panic("runtime: blocked write on closing polldesc")
+	}
+	rc := atomic::Load(&pd.rc, atomic::Acquire)
+	if rc != pdNil && rc != pdReady {
+		panic("runtime: blocked read on closing polldesc")
+	}
 	eventpollclose(pd.fd)
+	pollcache.free(pd)
 }
 
 // Adds delta to sched._ncpoll.
