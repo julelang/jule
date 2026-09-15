@@ -11,34 +11,48 @@ impl netFD {
 	#disable nilptr
 	fn connect(mut *self, ipv: int, sockaddr: uintptr, socksize: sys::Socklen, timeout: time::Duration)! {
 		h := self.Handle()
-		// ConnectEx supports only connection-oriented sockets (e.g. TCP).
-		// UDP (SOCK_DGRAM) is not supported.
-		// For UDP, use connect(), which only sets the default peer address.
-		// Since UDP has no connection handshake, connect timeouts are not applicable.
-		if self.pfd.Flags&poll::SocketNoConn != 0 {
+		if timeout == 0 {
 			sys::Connect(h, sockaddr, socksize)?
 			return
 		}
-		// Use ConnectEx API for overlapped connection-oriented sockets.
-		// ConnectEx does NOT implicitly bind the socket.
-		// The socket MUST be explicitly bound before calling ConnectEx,
-		// unlike connect(), which performs an implicit bind if needed.
-		if ipv == 4 {
-			mut addr := sys::RawSockaddrInet4{}
-			addr.Family = sys::AF_INET
-			sys::Bind(h, uintptr(&addr), socksize) else {
-				self.Close()?
+		mut tv, ok := timevalFromDuration(timeout)
+		if !ok {
+			throw ErrInvalidTimeout
+		}
+		if tv.Sec == 0 && tv.Usec == 0 {
+			sys::Connect(h, sockaddr, socksize)?
+			return
+		}
+		closeSocketBlockingMode(h)?
+		sys::Connect(h, sockaddr, socksize) else {
+			if error != sys::WSAEWOULDBLOCK {
+				openSocketBlockingMode(h)?
 				throw error
 			}
-		} else {
-			mut addr := sys::RawSockaddrInet6{}
-			addr.Family = sys::AF_INET6
-			sys::Bind(h, uintptr(&addr), socksize) else {
-				self.Close()?
+			mut fdW := sys::FdSet{}
+			mut fdE := sys::FdSet{}
+			fdW.Zero()
+			fdW.Set(h)
+			fdE.Zero()
+			fdE.Set(h)
+			res := sys::Select(0, nil, &fdW, &fdE, &tv) else {
+				openSocketBlockingMode(h)?
 				throw error
+			}
+			if res == 0 {
+				// Timeout.
+				openSocketBlockingMode(h)?
+				throw ErrTimeout
+			}
+			if fdE.IsSet(h) {
+				mut opt := 0
+				mut optLen := sys::Socklen(mem::Sizeof(opt))
+				sys::Getsockopt(h, sys::SOL_SOCKET, sys::SO_ERROR, uintptr(&opt), optLen)!
+				openSocketBlockingMode(h)?
+				throw int(opt)
 			}
 		}
-		sys::Connect(h, sockaddr, socksize)?
+		openSocketBlockingMode(h)?
 		// Refresh socket properties.
 		sys::Setsockopt(h, sys::SOL_SOCKET, sys::SO_UPDATE_CONNECT_CONTEXT, 0, 0)?
 	}
