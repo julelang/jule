@@ -479,7 +479,7 @@ impl encoder {
 }
 
 impl io::WriteCloser for encoder {
-	async fn Write(mut *self, p: []byte)!: (n: int) {
+	fn Write(mut *self, p: []byte)!: (n: int) {
 		if self.err != nil {
 			unsafe throw self.err
 		}
@@ -499,7 +499,7 @@ impl io::WriteCloser for encoder {
 				return
 			}
 			self.enc.Encode(out, buf)
-			self.w.Write(out[:4]).await else {
+			self.w.Write(out[:4]) else {
 				self.err = error
 			}
 			if self.err != nil {
@@ -519,7 +519,7 @@ impl io::WriteCloser for encoder {
 				nn -= nn % 3
 			}
 			self.enc.Encode(out, p[:nn])
-			self.w.Write(out[0 : nn/3*4]).await else {
+			self.w.Write(out[0 : nn/3*4]) else {
 				self.err = error
 			}
 			if self.err != nil {
@@ -541,12 +541,12 @@ impl io::WriteCloser for encoder {
 
 	// Flushes any pending output from the encoder.
 	// It is an error to call Write after calling Close.
-	async fn Close(mut *self)! {
+	fn Close(mut *self)! {
 		// If there's anything left in the buffer, flush it out
 		if self.err == nil && self.nbuf > 0 {
 			mut buf, mut out := self.getBufOut()
 			self.enc.Encode(out[:], buf[:self.nbuf])
-			self.w.Write(out[:self.enc.EncodedLen(self.nbuf)]).await else {
+			self.w.Write(out[:self.enc.EncodedLen(self.nbuf)]) else {
 				self.err = error
 			}
 			self.nbuf = 0
@@ -569,7 +569,7 @@ struct decoder {
 }
 
 impl io::Reader for decoder {
-	async fn Read(mut *self, mut p: []byte)!: (n: int) {
+	fn Read(mut *self, mut p: []byte)!: (n: int) {
 		// Use leftover decoded output from last read.
 		if len(self.out) > 0 {
 			n = copy(p, self.out)
@@ -595,7 +595,7 @@ impl io::Reader for decoder {
 			if nn > len(buf) {
 				nn = len(buf)
 			}
-			self.nbuf += self.r.Read(buf[self.nbuf:nn]).await else {
+			self.nbuf += self.r.Read(buf[self.nbuf:nn]) else {
 				self.readErr = error
 				break
 			}
@@ -701,8 +701,8 @@ struct newlineFilteringReader {
 }
 
 impl io::Reader for newlineFilteringReader {
-	async fn Read(mut *self, mut p: []byte)!: int {
-		mut n := self.wrapped.Read(p).await?
+	fn Read(mut *self, mut p: []byte)!: int {
+		mut n := self.wrapped.Read(p)?
 		for n > 0 {
 			mut offset := 0
 			for i, b in p[:n] {
@@ -717,7 +717,7 @@ impl io::Reader for newlineFilteringReader {
 				return offset
 			}
 			// Previous buffer entirely whitespace, read again
-			n = self.wrapped.Read(p).await?
+			n = self.wrapped.Read(p)?
 		}
 		return n
 	}

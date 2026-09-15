@@ -62,12 +62,12 @@ fn testStdEncodingDecode(t: &testing::T) {
 }
 
 #test
-async fn testStdEncoder(t: &testing::T) {
+fn testStdEncoder(t: &testing::T) {
 	for _, case in encodeDecodeMap {
 		mut sb := new(strings::Builder)
-		mut enc := NewEncoder(StdEncoding, sb.Async())
-		enc.Write(case[0]).await!
-		enc.Close().await!
+		mut enc := NewEncoder(StdEncoding, sb)
+		enc.Write(case[0])!
+		enc.Close()!
 		r := unsafe { sb.Buf() }
 		d := case[1]
 		if !bytesequal(r, d) {
@@ -78,19 +78,19 @@ async fn testStdEncoder(t: &testing::T) {
 }
 
 #test
-async fn testEncoderBuffering(t: &testing::T) {
+fn testEncoderBuffering(t: &testing::T) {
 	input := []byte(bigtest[0])
 	mut bs := 1
 	for bs <= 12; bs++ {
 		mut bb := new(strings::Builder)
-		mut encoder := NewEncoder(StdEncoding, bb.Async())
+		mut encoder := NewEncoder(StdEncoding, bb)
 		mut pos := 0
 		for pos < len(input); pos += bs {
 			mut end := pos + bs
 			if end > len(input) {
 				end = len(input)
 			}
-			n := encoder.Write(input[pos:end]).await else {
+			n := encoder.Write(input[pos:end]) else {
 				t.Errorf("Write({}) gave error {}, want nil", input[pos:end], error)
 				continue
 			}
@@ -99,7 +99,7 @@ async fn testEncoderBuffering(t: &testing::T) {
 				continue
 			}
 		}
-		encoder.Close().await else {
+		encoder.Close() else {
 			t.Errorf("Close gave error {}, want nil", error)
 			continue
 		}
@@ -112,12 +112,12 @@ async fn testEncoderBuffering(t: &testing::T) {
 }
 
 #test
-async fn testStdDecoder(t: &testing::T) {
+fn testStdDecoder(t: &testing::T) {
 	for _, case in encodeDecodeMap {
 		mut sr := strings::Reader.New(string(case[1]))
-		mut dec := NewDecoder(StdEncoding, sr.Async())
+		mut dec := NewDecoder(StdEncoding, sr)
 		mut buf := make([]byte, StdEncoding.DecodedLen(len(case[1])))
-		n := dec.Read(buf).await else {
+		n := dec.Read(buf) else {
 			if error != io::EOF {
 				t.Errorf("unexpected error {}", error)
 				continue
@@ -134,16 +134,16 @@ async fn testStdDecoder(t: &testing::T) {
 }
 
 #test
-async fn testDecoderBuffering(t: &testing::T) {
+fn testDecoderBuffering(t: &testing::T) {
 	mut bs := 1
 	for bs <= 12; bs++ {
-		mut decoder := NewDecoder(StdEncoding, strings::Reader.New(bigtest[1]).Async())
+		mut decoder := NewDecoder(StdEncoding, strings::Reader.New(bigtest[1]))
 		mut buf := make([]byte, len(bigtest[0])+12)
 		let mut total: int
 		let mut n: int
 		let mut err: any
 		for total < len(bigtest[0]) && err == nil {
-			n = decoder.Read(buf[total : total+bs]).await else {
+			n = decoder.Read(buf[total : total+bs]) else {
 				if error == io::EOF {
 					break
 				}
@@ -289,7 +289,7 @@ fn testDecodedLen(t: &testing::T) {
 }
 
 #test
-async fn testBig(t: &testing::T) {
+fn testBig(t: &testing::T) {
 	n := 3*1000 + 1
 	mut raw := make([]byte, n)
 	const alpha = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -298,8 +298,8 @@ async fn testBig(t: &testing::T) {
 		raw[i] = alpha[i%len(alpha)]
 	}
 	mut sb := new(strings::Builder)
-	mut w := NewEncoder(StdEncoding, sb.Async())
-	nn := w.Write(raw).await else {
+	mut w := NewEncoder(StdEncoding, sb)
+	nn := w.Write(raw) else {
 		t.Errorf("Encoder.Write(raw) error = {} want nil", error)
 		return
 	}
@@ -307,12 +307,12 @@ async fn testBig(t: &testing::T) {
 		t.Errorf("Encoder.Write(raw) = {} want {}", nn, n)
 		return
 	}
-	w.Close().await else {
+	w.Close() else {
 		t.Errorf("Encoder.Close() = {} want nil", error)
 		return
 	}
 	mut sr := strings::Reader.New(sb.String())
-	decoded := io::ReadAll(NewDecoder(StdEncoding, sr.Async())).await else {
+	decoded := io::ReadAll(NewDecoder(StdEncoding, sr)) else {
 		t.Errorf("io::ReadAll(NewDecoder(...)): {}", error)
 		return
 	}
@@ -358,7 +358,7 @@ fn testNewLineCharacters(t: &testing::T) {
 }
 
 #test
-async fn testDecoderGoIssue4779(t: &testing::T) {
+fn testDecoderGoIssue4779(t: &testing::T) {
 	encoded := `CP/EAT8AAAEF
 AQEBAQEBAAAAAAAAAAMAAQIEBQYHCAkKCwEAAQUBAQEBAQEAAAAAAAAAAQACAwQFBgcICQoLEAAB
 BAEDAgQCBQcGCAUDDDMBAAIRAwQhEjEFQVFhEyJxgTIGFJGhsUIjJBVSwWIzNHKC0UMHJZJT8OHx
@@ -377,14 +377,14 @@ bqbPb06551Y4
 `
 	encodedShort := strings::ReplaceAll(encoded, "\n", "")
 
-	mut dec := NewDecoder(StdEncoding, strings::Reader.New(encoded).Async())
-	res1 := io::ReadAll(dec).await else {
+	mut dec := NewDecoder(StdEncoding, strings::Reader.New(encoded))
+	res1 := io::ReadAll(dec) else {
 		t.Errorf("ReadAll failed: {}", error)
 		return
 	}
 
-	dec = NewDecoder(StdEncoding, strings::Reader.New(encodedShort).Async())
-	res2 := io::ReadAll(dec).await else {
+	dec = NewDecoder(StdEncoding, strings::Reader.New(encodedShort))
+	res2 := io::ReadAll(dec) else {
 		t.Errorf("ReadAll failed: {}", error)
 		return
 	}
