@@ -23,7 +23,7 @@ struct threadpool {
 	head:  &threadpoolJob
 	tail:  &threadpoolJob
 	nw:    i32     // Count of the created worker threads.
-	widle: &thread // Parkers of the idle workers waiting for work.
+	widle: *thread // Parkers of the idle workers waiting for work.
 }
 
 impl threadpool {
@@ -47,9 +47,11 @@ impl threadpool {
 		// We have a cached worker thread. Notify it.
 		if self.widle != nil {
 			mut w := self.widle
-			self.widle = w.link
-			w.link = nil
-			w.parker.unpark()
+			unsafe {
+				self.widle = w.link
+				w.link = nil
+				w.parker.unpark()
+			}
 			return
 		}
 		// Spawn a new one, if possible.
@@ -107,7 +109,7 @@ fn threadpoolWorker(_: *unsafe) {
 			// Park the thread and continue it will be continue to run when notified.
 			tried = 0
 			w.link = globalThreadPool.widle
-			globalThreadPool.widle = wp
+			globalThreadPool.widle = &w
 			globalThreadPool.mu.unlock()
 			w.parker.park()
 			continue
