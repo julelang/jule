@@ -28,7 +28,6 @@ use "std/strings"
 let mut OutDir = "dist"
 let mut OutName = "ir.cpp"
 let mut Out = ""
-let mut COMAXPROCS = "default"
 let mut RawTags = ""
 
 let targets = map[string][]string{
@@ -443,24 +442,6 @@ fn checkOptFlag(opt: string) {
 	}
 }
 
-fn checkCOMAXPROCS() {
-	if COMAXPROCS == "default" {
-		env::COMAXPROCS = 0
-		return
-	}
-	n := conv::ParseUint(COMAXPROCS, 10, 64) else {
-		julecThrow("--COMAXPROCS: value is not a valid number: " + COMAXPROCS)
-		return // Avoid error.
-	}
-	if n < 1 {
-		julecThrow("--COMAXPROCS: invalid value: " + COMAXPROCS)
-	}
-	if n > u64(i32.Max) {
-		julecThrow("--COMAXPROCS: value is too large: " + COMAXPROCS)
-	}
-	env::COMAXPROCS = i32(n)
-}
-
 fn checkTags() {
 	if len(RawTags) == 0 {
 		env::Tags = nil
@@ -492,7 +473,6 @@ fn checkFlags(args: []string): []string {
 
 	mut fs := flag::Set.New()
 
-	fs.AddVar[string](unsafe { (&string)(&COMAXPROCS) }, "COMAXPROCS", 0, "Maximum number of Ps that can execute coroutines")
 	fs.AddVar[string](unsafe { (&string)(&opt) }, "opt", 0, "Optimization level")
 	fs.AddVar[string](unsafe { (&string)(&target) }, "target", 0, "Target system")
 	fs.AddVar[string](unsafe { (&string)(&Out) }, "out", 'o', "Output identifier")
@@ -534,7 +514,6 @@ fn checkFlags(args: []string): []string {
 	checkCppStdFlag()
 	checkTargetFlag(target)
 	checkOptFlag(opt)
-	checkCOMAXPROCS()
 	checkTags()
 
 	return content
