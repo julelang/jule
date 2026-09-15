@@ -7,7 +7,6 @@ use "std/intrinsic"
 // A blocking job.
 struct blockingJob {
 	job:  fn()
-	c:    *c
 	link: &blockingJob
 }
 
@@ -114,51 +113,13 @@ fn blockingWorker(_: *unsafe) {
 			continue
 		}
 		tried = 0
-		// Do job and unpark the coroutine (if exist), it is ready to go.
 		job.job()
-		if job.c != nil {
-			unpark(job.c)
-		}
 	}
 }
 
 fn blockinginit() {
 	blocking = blockingenv{}
 	blocking.maxWorkers = i32(NumCPU())
-}
-
-// Executes the given job on the blocking thread pool,
-// isolating a potentially blocking operation from the scheduler.
-//
-// The scheduler does NOT automatically detect or offload blocking operations.
-// If a blocking call (e.g. file I/O or FFI) is executed directly,
-// the underlying scheduler thread (M) will block.
-//
-// Use this function when you want to explicitly prevent
-// a blocking operation from stalling scheduler progress.
-//
-// This function is opt-in and never used implicitly by the runtime.
-#disable nilptr
-async fn Blocking(job: fn()) {
-	mut m := gett()
-	mut bj := blockingJob{job: job, c: m.c}
-	m.c = nil
-	mut bjp := unsafe { (&blockingJob)(&bj) }
-	blocking.mu.lock()
-	if blocking.head == nil {
-		blocking.head = bjp
-		blocking.tail = blocking.head
-	} else {
-		blocking.tail.link = bjp
-		blocking.tail = bjp
-	}
-	// We use the tagged pointer to call `blocking.wakew` after adding
-	// a new job to the queue. It is done by mutex-unlock algorithm.
-	// The `blocking.mu` will be released after park due to `mutexunlockJobAdd`.
-	tp := taggedPointer.pack(nil, mutexunlockJobAdd)
-	sched.enterblock()
-	park2(bj.c, tp, reasonBlocking).await
-	sched.exitblock()
 }
 
 // Designed for CPU-bound work, where each task is executed on a thread pool.
