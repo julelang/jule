@@ -90,7 +90,14 @@ impl FD {
 					throw error
 				}
 			| self.Flags&(Socket|SocketNoConn) != 0:
-				panic("unsupported")
+				handle := NetHandle(self.File)
+				nn = execIO(operation{
+					bufSize: len(b),
+					op: fn|| {
+						sys::Send(handle, b, 0)?
+						return len(b)
+					},
+				})?
 			|:
 				panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Write")
 			}
@@ -199,7 +206,11 @@ impl FD {
 		| self.Flags&(File|Pipe) != 0:
 			n = self.readFile(buf)?
 		| self.Flags&(Socket|SocketNoConn) != 0:
-			panic("unsupported")
+			handle := NetHandle(self.File)
+			n = execIO(operation{
+				bufSize: len(buf),
+				op:      fn|| sys::Recv(handle, buf, 0)?,
+			})?
 		|:
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Read")
 		}
