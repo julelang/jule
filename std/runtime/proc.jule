@@ -294,6 +294,9 @@ struct scheduler {
 	// Time to which current poll is sleeping.
 	pollUntil: i64
 
+	// 1 if some P doing non-blocking eventpoll
+	eventpolling: u32
+
 	// Number of worker threads currently spinning (actively searching
 	// for runnable coroutines instead of sleeping).
 	nmspinning:   i32
@@ -898,10 +901,13 @@ top:
 	// This eventpoll is only an optimization before we resort to stealing.
 	// We can safely skip it if there are no waiters or a thread is blocked
 	// in eventpoll already.
-	if sched.ncpolling() > 0 && atomic::Load(&sched.lastpoll, atomic::Acquire) != pollCheckIn {
+	if sched.ncpolling() > 0 &&
+		atomic::Load(&sched.lastpoll, atomic::Acquire) != pollCheckIn &&
+		atomic::Swap(&sched.eventpolling, 1, atomic::AcqRel) == 0 {
 		// eventpoll guarantees len(toRun) <= local run queue capacity.
 		let mut toRun: [prunqsize]*c
 		bn := eventpoll(0, &toRun) // Use 0-delay to perform a non-blocking poll.
+		atomic::Store(&sched.eventpolling, 0, atomic::Release)
 		// If any coroutines are ready, return the first and enqueue the rest.
 		// Timers possibly expired here will be handled in a later iteration.
 		if bn > 0 {
