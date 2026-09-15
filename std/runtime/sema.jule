@@ -380,8 +380,7 @@ fn tsemacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 	mut root := semtable_rootFor(sema)
 	let mut stackp: parkerList
 	mut p := unsafe { (&parkerList)(&stackp) }
-	p.parker = new(parker)
-	p.parker.init()
+	p.parker = gett().parker
 	for {
 		root.lock.lock()
 		// Add ourselves to nwait to disable "easy case" in semrelease.
@@ -390,17 +389,14 @@ fn tsemacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 		if cansemacquire(sema) {
 			atomic::Add(&root.nwait, ^u32(0), atomic::AcqRel)
 			root.lock.unlock()
-			p.parker.release() // Release memory.
 			break
 		}
 		// Any semrelease after the cansemacquire knows we're waiting
 		// (we set nwait above), so go to sleep.
 		root.queue(sema, p, lifo)
-		root.lock.unlock()
-		p.parker.park()
+		tpark(&*p.parker, uintptr(&root.lock), reason)
 		// Try to acquire semaphore before enqueue again.
 		if p.ticket != 0 || cansemacquire(sema) {
-			p.parker.release() // Release memory.
 			break
 		}
 	}
@@ -504,9 +500,8 @@ async fn suspend_notifyListWait(mut &l: *notifyList, t: u32) {
 	// Enqueue itself.
 	let mut stackp: parkerList
 	mut p := unsafe { (&parkerList)(&stackp) }
-	mut m := gett()
-	p.c = m.c
-	m.c = nil
+	mut thread := gett()
+	p.parker = thread.parker
 	p.ticket = t
 	if l.tail == nil {
 		l.head = p
@@ -515,7 +510,7 @@ async fn suspend_notifyListWait(mut &l: *notifyList, t: u32) {
 	}
 	l.tail = p
 
-	park(p.c, uintptr(&l.lock), reasonCond).await
+	tpark2(&*thread, &*p.parker, u64(uintptr(&l.lock)), reasonCond)
 }
 
 // Waits for a notification. If one has been sent since
