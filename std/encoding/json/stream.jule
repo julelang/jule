@@ -25,7 +25,7 @@ impl Encoder {
 	//
 	// See the documentation for [Encode] for details about the
 	// conversion of Jule values to JSON.
-	async fn Encode[T](*self, v: T)! {
+	fn Encode[T](*self, v: T)! {
 		if self.err != nil {
 			unsafe throw self.err
 		}
@@ -50,7 +50,7 @@ impl Encoder {
 		self.enc.buf.writeByte('\n')
 
 		data := self.enc.buf.bytes()
-		self.w.Write(data).await else {
+		self.w.Write(data) else {
 			self.err = error
 			throw error
 		}
@@ -111,7 +111,7 @@ impl Decoder {
 	// See the documentation for [Decode] for details about
 	// the conversion of JSON into a Jule value.
 	#disable boundary
-	async fn Decode[T](*self, mut &v: *T)!: int {
+	fn Decode[T](*self, mut &v: *T)!: int {
 		if v == nil {
 			panic("std/encoding/json: destination type reference pointer is nil")
 		}
@@ -121,7 +121,7 @@ impl Decoder {
 		}
 
 		// Read whole value into buffer.
-		n := self.readValue().await?
+		n := self.readValue()?
 		self.d.setbuf(self.buf[self.scanp : self.scanp+n])
 		self.scanp += n
 
@@ -146,7 +146,7 @@ impl Decoder {
 	// Reads a JSON value into buffer.
 	// It returns the length of the encoding.
 	#disable nilptr boundary
-	async fn readValue(*self)!: int {
+	fn readValue(*self)!: int {
 		self.d.scan.reset()
 
 		mut scanp := self.scanp
@@ -194,14 +194,14 @@ impl Decoder {
 			}
 
 			n := scanp - self.scanp
-			err = self.refill().await
+			err = self.refill()
 			scanp = self.scanp + n
 		}
 		return scanp - self.scanp
 	}
 
 	#disable nilptr boundary
-	async fn refill(*self): any {
+	fn refill(*self): any {
 		// Make room to read more into the buffer.
 		// First slide down data already consumed.
 		if self.scanp > 0 {
@@ -220,7 +220,7 @@ impl Decoder {
 		}
 
 		// Read. Delay error for next iteration (after scan).
-		n := self.r.Read(self.buf[len(self.buf):cap(self.buf)]).await else {
+		n := self.r.Read(self.buf[len(self.buf):cap(self.buf)]) else {
 			return error
 		}
 		self.buf = self.buf[0 : len(self.buf)+n]

@@ -96,15 +96,15 @@ let scanTests: []scanTest = [
 ]
 
 #test
-async fn testDecoderDecode(t: &testing::T) {
+fn testDecoderDecode(t: &testing::T) {
 	let mut v: Value
 	for i, test in scanTests {
-		mut r := strings::Reader.New(test.input).Async()
+		mut r := strings::Reader.New(test.input)
 		dec := Decoder.New(r)
 		mut n := test.n
 		for n > 0; n-- {
 			let mut err: any
-			dec.Decode(&v).await else { err = error }
+			dec.Decode(&v) else { err = error }
 			if n > 1 && err != nil {
 				t.Errorf("#{} unexpected error: {}", i, err)
 				break
@@ -115,7 +115,7 @@ async fn testDecoderDecode(t: &testing::T) {
 			}
 		}
 		if !test.err {
-			dec.Decode(&v).await else {
+			dec.Decode(&v) else {
 				if error == io::EOF {
 					continue
 				}
@@ -133,59 +133,59 @@ struct enctestobj {
 }
 
 struct encoderTest {
-	encode: async fn(enc: &Encoder)!
+	encode: fn(enc: &Encoder)!
 	out:    string
 }
 
 let encoderTests: []encoderTest = [
 	{
-		encode: async fn|enc| enc.Encode(123).await?,
+		encode: fn|enc| enc.Encode(123)?,
 		out:    "123\n",
 	},
 	{
-		encode: async fn|enc| enc.Encode(123.456).await?,
+		encode: fn|enc| enc.Encode(123.456)?,
 		out:    "123.456\n",
 	},
 	{
-		encode: async fn|enc| enc.Encode("hello world").await?,
+		encode: fn|enc| enc.Encode("hello world")?,
 		out:    "\"hello world\"\n",
 	},
 	{
-		encode: async fn|enc| enc.Encode((&int)(nil)).await?,
+		encode: fn|enc| enc.Encode((&int)(nil))?,
 		out:    "null\n",
 	},
 	{
-		encode: async fn|enc| enc.Encode([1, 2, 3, 4, 5]).await?,
+		encode: fn|enc| enc.Encode([1, 2, 3, 4, 5])?,
 		out:    "[1,2,3,4,5]\n",
 	},
 	{
-		encode: async fn|enc| enc.Encode(enctestobj{Foo: 123, Bar: 456}).await?,
+		encode: fn|enc| enc.Encode(enctestobj{Foo: 123, Bar: 456})?,
 		out:    "{\"foo\":123,\"bar\":456}\n",
 	},
 	{
-		encode: async fn|enc| {
-			enc.Encode(enctestobj{Foo: 123, Bar: 456}).await?
-			enc.Encode(enctestobj{Foo: 123, Bar: 456}).await?
+		encode: fn|enc| {
+			enc.Encode(enctestobj{Foo: 123, Bar: 456})?
+			enc.Encode(enctestobj{Foo: 123, Bar: 456})?
 		},
 		out: "{\"foo\":123,\"bar\":456}\n{\"foo\":123,\"bar\":456}\n",
 	},
 	{
-		encode: async fn|enc| {
-			enc.Encode(enctestobj{Foo: 123, Bar: 456}).await?
-			enc.Encode(enctestobj{Foo: 123, Bar: 456}).await?
-			enc.Encode((&int)(nil)).await?
-			enc.Encode([1, 2, 3, 4, 5]).await?
+		encode: fn|enc| {
+			enc.Encode(enctestobj{Foo: 123, Bar: 456})?
+			enc.Encode(enctestobj{Foo: 123, Bar: 456})?
+			enc.Encode((&int)(nil))?
+			enc.Encode([1, 2, 3, 4, 5])?
 		},
 		out: "{\"foo\":123,\"bar\":456}\n{\"foo\":123,\"bar\":456}\nnull\n[1,2,3,4,5]\n",
 	},
 ]
 
 #test
-async fn testEncoderEncode(t: &testing::T) {
+fn testEncoderEncode(t: &testing::T) {
 	for i, test in encoderTests {
 		mut w := new(strings::Builder)
-		enc := Encoder.New(w.Async())
-		test.encode(enc).await else {
+		enc := Encoder.New(w)
+		test.encode(enc) else {
 			t.Errorf("#{} unexpected error: {}", i, error)
 			continue
 		}
@@ -203,16 +203,16 @@ struct testobj {
 }
 
 #test
-async fn testDisallowUnknownFields(t: &testing::T) {
+fn testDisallowUnknownFields(t: &testing::T) {
 	let mut v: testobj
 	s := `{"Foo": 120}{"Foo": 123, "bar": "baz"}`
-	dec := Decoder.New(strings::Reader.New(s).Async())
+	dec := Decoder.New(strings::Reader.New(s))
 	dec.DisallowUnknownFields()
-	dec.Decode(&v).await else {
+	dec.Decode(&v) else {
 		t.Errorf("unexpected error at first read")
 		return
 	}
-	dec.Decode(&v).await else {
+	dec.Decode(&v) else {
 		return
 	}
 	t.Errorf("expected error at second read")
