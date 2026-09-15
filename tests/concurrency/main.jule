@@ -2,24 +2,25 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/runtime"
 use "std/sync"
 use "std/sync/atomic"
 
 let mut n = atomic::Int(0)
 
-async fn addToN(mut wg: &sync::WaitGroup) {
+fn addToN(mut wg: &sync::WaitGroup) {
 	n.Add(1, atomic::Relaxed)
 	wg.Done()
 }
 
-async fn main() {
+fn main() {
 	mut wg := sync::WaitGroup.New()
 	const Total = 1_000_000
 	mut j := 0
 	for j < Total; j++ {
 		wg.Add(1)
-		co addToN(wg)
+		runtime::Task(fn|| addToN(wg))
 	}
-	wg.Wait().await
+	wg.Wait()
 	println(n.Load(atomic::Relaxed))
 }
