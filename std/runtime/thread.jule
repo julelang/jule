@@ -45,7 +45,7 @@ struct thread {
 	// Local thread heap.
 	heap: *heap
 	// Parker of the thread.
-	parker: &parker
+	parker: parker
 	// Local random state.
 	rand:      randmach
 	cheaprand: u64
@@ -91,7 +91,6 @@ fn initThread(mut &t: *thread, role: int) {
 	mallocThreadInit(t)
 
 	// Initialized once and never deallocated if thread waiting for reuse.
-	t.parker = new(parker)
 	t.parker.init()
 
 	if role == roleProgram || role == roleSpawn || role == roleThreadPoolWorker {
@@ -138,7 +137,6 @@ fn releaseThread(mut &t: *thread) {
 	t.role = 0
 	t.state = 0
 	t.parker.release()
-	t.parker = nil
 	t.link = nil
 	mallocThreadFinalize(t)
 }

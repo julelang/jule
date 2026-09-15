@@ -290,7 +290,7 @@ fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 	mut root := semtable_rootFor(sema)
 	let mut stackp: parkerList
 	mut p := unsafe { (&parkerList)(&stackp) }
-	p.parker = gett().parker
+	p.parker = unsafe { (&parker)(&gett().parker) }
 	for {
 		root.lock.lock()
 		// Add ourselves to nwait to disable "easy case" in semrelease.
@@ -411,7 +411,7 @@ fn notifyListWait(mut &l: *notifyList, t: u32) {
 	let mut stackp: parkerList
 	mut p := unsafe { (&parkerList)(&stackp) }
 	mut _t := gett()
-	p.parker = _t.parker
+	p.parker = unsafe { (&parker)(&_t.parker) }
 	p.ticket = t
 	if l.tail == nil {
 		l.head = p
