@@ -27,14 +27,14 @@ const rwmutexMaxReaders = 1 << 30
 // call to RLock, and the corresponding call to [RWMutex.RUnlock] “synchronizes before”
 // the n+1'th call to Lock.
 struct RWMutex {
-	w:               Mutex       // held if there are pending writers
+	w:               Mutex2      // held if there are pending writers
 	mut writerSem:   u32         // semaphore for writers to wait for completing readers
 	mut readerSem:   u32         // semaphore for readers to wait for completing writers
 	mut readerCount: atomic::I32 // number of pending readers
 	mut readerWait:  atomic::I32 // number of departing readers
 }
 
-impl Locker for RWMutex {}
+impl Locker2 for RWMutex {}
 
 impl RWMutex {
 	#ready
@@ -154,14 +154,14 @@ impl RWMutex {
 
 	// Returns a [Locker] interface that implements
 	// the [Locker.Lock] and [Locker.Unlock] methods by calling RLock and RUnlock.
-	fn RLocker(mut &self): Locker {
+	fn RLocker(mut &self): Locker2 {
 		return rlocker(self)
 	}
 }
 
 type rlocker: &RWMutex
 
-impl Locker for rlocker {
+impl Locker2 for rlocker {
 	async fn Lock(*self) { (&RWMutex)(*self).RLock().await }
 	fn Unlock(*self) { (&RWMutex)(*self).RUnlock() }
 }

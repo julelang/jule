@@ -10,6 +10,11 @@ use "std/sync/atomic"
 // Jule synchronization primitives used, such as Mutex or RWMutex.
 // Custom implementations are responsible to ensure fairness.
 trait Locker {
+	fn Lock(*self)
+	fn Unlock(*self)
+}
+
+trait Locker2 {
 	async fn Lock(*self)
 	fn Unlock(*self)
 }
@@ -61,14 +66,14 @@ const (
 // So, a locked Mutex is not associated with a particular coroutine.
 // It is allowed for one coroutine to lock a Mutex and then
 // arrange for another coroutine to unlock it.
-struct Mutex {
+struct Mutex2 {
 	mut state: i32
 	mut sema:  u32
 }
 
-impl Locker for Mutex {}
+impl Locker2 for Mutex2 {}
 
-impl Mutex {
+impl Mutex2 {
 	#ready
 	fn ready_Lock(*self) {
 		// Fast path: grab unlocked mutex.
@@ -232,5 +237,48 @@ impl Mutex {
 			// so new coming coroutine will not acquire it.
 			runtime::semrelease(&self.sema, true)
 		}
+	}
+}
+
+// A Mutex is a mutual exclusion lock.
+// The zero value for a Mutex is an unlocked mutex.
+//
+// Mutextes are uses internal mutability and internal states.
+// Locking, unlocking and etc is not mutable operations.
+// But there is no internal mutable memory, so mutexes are not use shared memory.
+// Therefore, for correct use, a mutex instance should not be copied after first use.
+// Otherwise internal state will be copied and not mutated by other instances.
+//
+// This mutex implementation will not check ownership of the mutex.
+// So, a locked Mutex is not associated with a particular thread.
+// It is allowed for one thread to lock a Mutex and then
+// arrange for another thread to unlock it.
+struct Mutex {
+	inner: runtime::mutex
+}
+
+impl Locker for Mutex {}
+
+impl Mutex {
+	// Locks mutex.
+	// If the lock is already in use, the calling thread
+	// blocks until the mutex is available.
+	fn Lock(*self) {
+		self.inner.lock()
+	}
+
+	// Tries to lock mutwx and reports whether it succeeded.
+	//
+	// Note that while correct uses of TryLock do exist, they are rare,
+	// and use of TryLock is often a sign of a deeper problem
+	// in a particular use of mutexes.
+	fn TryLock(*self): bool {
+		return self.inner.tryLock()
+	}
+
+	// Unlocks mutex.
+	// It is a runtime error if mutex is not locked on entry to Unlock.
+	fn Unlock(*self) {
+		self.inner.unlock()
 	}
 }

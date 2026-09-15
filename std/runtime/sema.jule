@@ -483,25 +483,21 @@ fn notifyListAdd(mut &l: *notifyList): u32 {
 	return atomic::Add(&l.wait, 1, atomic::AcqRel) - 1
 }
 
-#ready
-#disable nilptr
-fn ready_notifyListWait(mut &l: *notifyList, t: u32) {
+// Waits for a notification. If one has been sent since
+// notifyListAdd was called, it returns immediately. Otherwise, it blocks.
+fn notifyListWait(mut &l: *notifyList, t: u32) {
 	l.lock.lock()
-
 	// Return right away if this ticket has already been notified.
 	if less(t, l.notify) {
 		l.lock.unlock()
-		ready(true)
+		return
 	}
-}
 
-#disable nilptr
-async fn suspend_notifyListWait(mut &l: *notifyList, t: u32) {
 	// Enqueue itself.
 	let mut stackp: parkerList
 	mut p := unsafe { (&parkerList)(&stackp) }
-	mut thread := gett()
-	p.parker = thread.parker
+	mut _t := gett()
+	p.parker = _t.parker
 	p.ticket = t
 	if l.tail == nil {
 		l.head = p
@@ -510,14 +506,7 @@ async fn suspend_notifyListWait(mut &l: *notifyList, t: u32) {
 	}
 	l.tail = p
 
-	tpark2(&*thread, &*p.parker, u64(uintptr(&l.lock)), reasonCond)
-}
-
-// Waits for a notification. If one has been sent since
-// notifyListAdd was called, it returns immediately. Otherwise, it blocks.
-#future
-async fn notifyListWait(mut &l: *notifyList, t: u32) {
-	future(ready_notifyListWait, suspend_notifyListWait)
+	tpark2(&*_t, &*p.parker, u64(uintptr(&l.lock)), reasonCond)
 }
 
 // Notifies one entry in the list.
@@ -568,7 +557,7 @@ fn notifyListNotifyOne(mut &l: *notifyList) {
 			}
 			l.lock.unlock()
 			s.next = nil
-			unpark(s.c)
+			s.parker.unpark()
 			return
 		}
 	}
@@ -604,7 +593,7 @@ fn notifyListNotifyAll(mut &l: *notifyList) {
 	for s != nil {
 		mut next := s.next
 		s.next = nil
-		unpark(s.c)
+		s.parker.unpark()
 		s = next
 	}
 }

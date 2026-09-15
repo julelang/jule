@@ -7,7 +7,7 @@ use "std/sync"
 use "std/sync/atomic"
 use "std/testing"
 
-async fn hammerMutex(m: &sync::Mutex, loops: int, mut c: &int) {
+fn hammerMutex(m: &sync::Mutex, loops: int, mut c: &int) {
 	mut i := 0
 	for i < loops; i++ {
 		if i%3 == 0 {
@@ -16,17 +16,17 @@ async fn hammerMutex(m: &sync::Mutex, loops: int, mut c: &int) {
 			}
 			continue
 		}
-		m.Lock().await
+		m.Lock()
 		m.Unlock()
 	}
 	atomic::Add(&(*c), 1, atomic::SeqCst)
 }
 
 #test
-async fn testMutex(t: &testing::T) {
+fn testMutex(t: &testing::T) {
 	m := new(sync::Mutex)
 
-	m.Lock().await
+	m.Lock()
 	if m.TryLock() {
 		t.Errorf("TryLock succeeded with mutex locked")
 		return
@@ -42,9 +42,9 @@ async fn testMutex(t: &testing::T) {
 	mut i := 0
 	const N = 10
 	for i < N; i++ {
-		co hammerMutex(m, 1000, c)
+		runtime::Task(fn|| hammerMutex(m, 1000, c))
 	}
 	for atomic::Load(&(*c), atomic::SeqCst) != N {
-		runtime::Yield().await
+		runtime::osyield()
 	}
 }

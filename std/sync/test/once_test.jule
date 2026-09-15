@@ -15,8 +15,8 @@ impl one {
 	}
 }
 
-async fn run(t: &testing::T, once: &sync::Once, mut o: &one, mut c: &int) {
-	once.Do(async fn|| o.Increment()).await
+fn run(t: &testing::T, once: &sync::Once, mut o: &one, mut c: &int) {
+	once.Do(fn|| o.Increment())
 	if *o != 1 {
 		t.Errorf("once failed inside run: {} is not 1", *o)
 	}
@@ -24,17 +24,17 @@ async fn run(t: &testing::T, once: &sync::Once, mut o: &one, mut c: &int) {
 }
 
 #test
-async fn testOnce(t: &testing::T) {
+fn testOnce(t: &testing::T) {
 	mut o := new(one)
 	mut once := new(sync::Once)
 	mut c := new(int)
 	const N = 10
 	mut i := 0
 	for i < N; i++ {
-		co run(t, once, o, c)
+		runtime::Task(fn|| run(t, once, o, c))
 	}
 	for atomic::Load(&(*c), atomic::SeqCst) != N {
-		runtime::Yield().await
+		runtime::osyield()
 	}
 	if *o != 1 {
 		t.Errorf("once failed outside run: {} is not 1", *o)
