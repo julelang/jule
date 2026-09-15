@@ -269,103 +269,13 @@ fn cansemacquire(mut &sema: *u32): bool {
 	}
 }
 
-#ready
-fn ready_semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
-	// Easy case.
-	ready(cansemacquire(sema))
-}
-
-#disable nilptr
-async fn suspend_semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
-	// Harder case:
-	//	increment waiter count
-	//	try cansemacquire one more time, return if succeeded
-	//	enqueue itself as a waiter
-	//	sleep
-	//	(waiter descriptor is dequeued by signaler)
-	mut root := semtable_rootFor(sema)
-	let mut stackp: parkerList
-	mut p := unsafe { (&parkerList)(&stackp) }
-	for {
-		root.lock.lock()
-		// Add ourselves to nwait to disable "easy case" in semrelease.
-		atomic::Add(&root.nwait, 1, atomic::AcqRel)
-		// Check cansemacquire to avoid missed wakeup.
-		if cansemacquire(sema) {
-			atomic::Add(&root.nwait, ^u32(0), atomic::AcqRel)
-			root.lock.unlock()
-			break
-		}
-		// Any semrelease after the cansemacquire knows we're waiting
-		// (we set nwait above), so go to sleep.
-		root.queue(sema, p, lifo)
-		mut t := gett()
-		p.c = t.c
-		t.c = nil
-		park(p.c, uintptr(&root.lock), reason).await
-		// Try to acquire semaphore before enqueue again.
-		if p.ticket != 0 || cansemacquire(sema) {
-			break
-		}
-	}
-}
-
 // Waits until sema > 0 and then atomically decrements it.
 // It is intended as a simple sleep primitive for use by the synchronization
 // library and should not be used directly.
 // If lifo is true, queue waiter at the head of wait queue.
 // wg reports whether the semacqure called by a waitgroup.
-#future
-async fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
-	future(ready_semacquire, suspend_semacquire)
-}
-
-// Atomically increments sema and notifies a waiting C
-// if one is blocked in semacquire.
-// It is intended as a simple wakeup primitive for use by the synchronization
-// library and should not be used directly.
-// If handoff is true, tries to pass count directly to the first waiter.
 #disable nilptr
-fn semrelease(mut &sema: *u32, handoff: bool) {
-	mut root := semtable_rootFor(sema)
-	atomic::Add(sema, 1, atomic::AcqRel)
-
-	// Easy case: no waiters?
-	// This check must happen after the atomicAdd, to avoid a missed wakeup
-	// (see loop in semacquire).
-	if atomic::Load(&root.nwait, atomic::Acquire) == 0 {
-		return
-	}
-
-	// Harder case: search for a waiter and wake it.
-	root.lock.lock()
-	if atomic::Load(&root.nwait, atomic::Acquire) == 0 {
-		// The count is already consumed by another coroutine,
-		// so no need to wake up another coroutine.
-		root.lock.unlock()
-		return
-	}
-
-	mut p := root.dequeue(sema)
-	if p != nil {
-		atomic::Add(&root.nwait, ^u32(0), atomic::AcqRel)
-	}
-	root.lock.unlock()
-	// May be slow or even yield, so unlock first.
-	if p != nil {
-		if p.ticket != 0 {
-			panic("runtime: invalid semaphore ticket")
-		}
-		if handoff && cansemacquire(sema) {
-			p.ticket = 1
-		}
-		unpark(p.c)
-	}
-}
-
-// Same as semacquire, but based-on thread parking instead of C parking.
-#disable nilptr
-fn tsemacquire(mut &sema: *u32, lifo: bool, reason: u32) {
+fn semacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 	// Easy case.
 	if cansemacquire(sema) {
 		return
@@ -402,9 +312,13 @@ fn tsemacquire(mut &sema: *u32, lifo: bool, reason: u32) {
 	}
 }
 
-// Same as semrelease, but based-on thread parking instead of C parking.
+// Atomically increments sema and notifies a waiting thread
+// if one is blocked in semacquire.
+// It is intended as a simple wakeup primitive for use by the synchronization
+// library and should not be used directly.
+// If handoff is true, tries to pass count directly to the first waiter.
 #disable nilptr
-fn tsemrelease(mut &sema: *u32, handoff: bool) {
+fn semrelease(mut &sema: *u32, handoff: bool) {
 	mut root := semtable_rootFor(sema)
 	atomic::Add(sema, 1, atomic::AcqRel)
 

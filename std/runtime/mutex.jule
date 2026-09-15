@@ -124,7 +124,7 @@ impl mutex {
 				if waitStartTime == 0 {
 					waitStartTime = nanotime()
 				}
-				tsemacquire(&self.sema, queueLifo, reasonMutex)
+				semacquire(&self.sema, queueLifo, reasonMutex)
 				starving = starving || nanotime()-waitStartTime > starvationThresholdNs
 				old = self.state
 				if old&mutexStarving != 0 {
@@ -203,7 +203,7 @@ impl mutex {
 				new = (old - 1<<mutexWaiterShift) | mutexWoken
 				{
 					if atomic::CompareAndSwap(&self.state, old, new, atomic::AcqRel, atomic::Relaxed) {
-						tsemrelease(&self.sema, false)
+						semrelease(&self.sema, false)
 						return
 					}
 				}
@@ -215,7 +215,7 @@ impl mutex {
 			// Note: mutexLocked is not set, the waiter will set it after wakeup.
 			// But mutex is still considered locked if mutexStarving is set,
 			// so new coming thread will not acquire it.
-			tsemrelease(&self.sema, true)
+			semrelease(&self.sema, true)
 		}
 	}
 }

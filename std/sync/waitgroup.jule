@@ -60,7 +60,7 @@ impl WaitGroup {
 		// Reset waiters count to 0.
 		self.state.Store(0, atomic::Release)
 		for w != 0; w-- {
-			runtime::tsemrelease(&self.sema, false)
+			runtime::semrelease(&self.sema, false)
 		}
 	}
 
@@ -78,7 +78,7 @@ impl WaitGroup {
 			}
 			// Increment waiters count.
 			if self.state.CompareAndSwap(state, state+1, atomic::AcqRel, atomic::Acquire) {
-				runtime::tsemacquire(&self.sema, false, runtime::reasonWaitGroup)
+				runtime::semacquire(&self.sema, false, runtime::reasonWaitGroup)
 				if self.state.Load(atomic::Acquire) != 0 {
 					panic("std/sync: WaitGroup is reused before previous Wait has returned")
 				}

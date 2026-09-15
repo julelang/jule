@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/runtime"
 use "std/sync"
 use "std/sync/atomic"
 use "std/testing"
 
-async fn reader(mut rwm: &sync::RWMutex, numIterations: int, mut activity: &i32, cdone: chan bool) {
+fn reader(mut rwm: &sync::RWMutex, numIterations: int, mut activity: &i32, cdone: chan bool) {
 	mut i := 0
 	for i < numIterations; i++ {
-		rwm.RLock().await
+		rwm.RLock()
 		n := atomic::Add(&(*activity), 1, atomic::SeqCst)
 		if n < 1 || n >= 10000 {
 			rwm.RUnlock()
@@ -24,10 +25,10 @@ async fn reader(mut rwm: &sync::RWMutex, numIterations: int, mut activity: &i32,
 	cdone <- true
 }
 
-async fn writer(mut rwm: &sync::RWMutex, numIterations: int, mut activity: &i32, cdone: chan bool) {
+fn writer(mut rwm: &sync::RWMutex, numIterations: int, mut activity: &i32, cdone: chan bool) {
 	mut i := 0
 	for i < numIterations; i++ {
-		rwm.Lock().await
+		rwm.Lock()
 		n := atomic::Add(&(*activity), 10000, atomic::SeqCst)
 		if n != 10000 {
 			rwm.Unlock()
@@ -42,19 +43,19 @@ async fn writer(mut rwm: &sync::RWMutex, numIterations: int, mut activity: &i32,
 	cdone <- true
 }
 
-async fn hammerRWMutex(numReaders: int, numIterations: int) {
+fn hammerRWMutex(numReaders: int, numIterations: int) {
 	// Number of active readers + 10000 * number of active writers.
 	mut activity := new(i32)
 	mut rwm := new(sync::RWMutex)
 	cdone := make(chan bool)
-	co writer(rwm, numIterations, activity, cdone)
+	runtime::Task(fn|| writer(rwm, numIterations, activity, cdone))
 	mut i := 0
 	for i < numReaders/2; i++ {
-		co reader(rwm, numIterations, activity, cdone)
+		runtime::Task(fn|| reader(rwm, numIterations, activity, cdone))
 	}
-	co writer(rwm, numIterations, activity, cdone)
+	runtime::Task(fn|| writer(rwm, numIterations, activity, cdone))
 	for i < numReaders; i++ {
-		co reader(rwm, numIterations, activity, cdone)
+		runtime::Task(fn|| reader(rwm, numIterations, activity, cdone))
 	}
 	// Wait for the 2 writers and all readers to finish.
 	i = 0
@@ -64,9 +65,9 @@ async fn hammerRWMutex(numReaders: int, numIterations: int) {
 }
 
 #test
-async fn testRWMutex(t: &testing::T) {
+fn testRWMutex(t: &testing::T) {
 	m := sync::RWMutex{}
-	m.Lock().await
+	m.Lock()
 	if m.TryLock() {
 		t.Errorf("TryLock succeeded with mutex locked")
 		return
@@ -97,16 +98,16 @@ async fn testRWMutex(t: &testing::T) {
 	m.RUnlock()
 	m.RUnlock()
 	n := 1000
-	hammerRWMutex(1, n).await
-	hammerRWMutex(3, n).await
-	hammerRWMutex(10, n).await
-	hammerRWMutex(1, n).await
-	hammerRWMutex(3, n).await
-	hammerRWMutex(10, n).await
-	hammerRWMutex(1, n).await
-	hammerRWMutex(3, n).await
-	hammerRWMutex(10, n).await
-	hammerRWMutex(5, n).await
+	hammerRWMutex(1, n)
+	hammerRWMutex(3, n)
+	hammerRWMutex(10, n)
+	hammerRWMutex(1, n)
+	hammerRWMutex(3, n)
+	hammerRWMutex(10, n)
+	hammerRWMutex(1, n)
+	hammerRWMutex(3, n)
+	hammerRWMutex(10, n)
+	hammerRWMutex(5, n)
 }
 
 #test
@@ -116,16 +117,16 @@ async fn testRLocker(t: &testing::T) {
 	rlocked := make(chan bool, 1)
 	rl := wl.RLocker()
 	n := 10
-	co async fn() {
+	runtime::Task(fn|| {
 		mut i := 0
 		for i < n; i++ {
-			rl.Lock().await
-			rl.Lock().await
+			rl.Lock()
+			rl.Lock()
 			rlocked <- true
-			wl.Lock().await
+			wl.Lock()
 			wlocked <- true
 		}
-	}()
+	})
 	mut i := 0
 	for i < n; i++ {
 		<-rlocked

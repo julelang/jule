@@ -587,25 +587,25 @@ struct field {
 
 // Field cache data for structure types and associated RWMutex.
 let mut fieldMap = map[uintptr][]field{}
-let mut fieldMapLock = runtime::rwmutex{}
+let mut fieldMapLock = sync::RWMutex{}
 
 // Returns field cache data for the structure type T.
 // If the structure is not cached yet, it will cache it.
 #disable nilptr boundary
 fn cachedFields[T](): []field {
 	const t = comptime::Typeof(T)
-	fieldMapLock.rLock()
+	fieldMapLock.RLock()
 	mut cache, mut exist := fieldMap[t.Hash()]
-	fieldMapLock.rUnlock()
+	fieldMapLock.RUnlock()
 	if exist {
 		return cache
 	}
 	// There is no cache for type type T, cache it.
-	fieldMapLock.lock()
+	fieldMapLock.Lock()
 	// Last check with write lock before cache.
 	cache, exist := fieldMap[t.Hash()]
 	if exist {
-		fieldMapLock.unlock()
+		fieldMapLock.Unlock()
 		return cache
 	}
 	// Computing a field offset via a nil (zero) pointer is undefined behavior in C/C++.
@@ -657,7 +657,7 @@ fn cachedFields[T](): []field {
 	cache = cache[:n]
 	// Save the cache and return.
 	fieldMap[t.Hash()] = cache
-	fieldMapLock.unlock()
+	fieldMapLock.Unlock()
 	return cache
 }
 
