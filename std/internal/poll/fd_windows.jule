@@ -322,7 +322,7 @@ impl FD {
 	fn Accept(mut *self, sockaddr: uintptr, &addrsize: *sys::Socklen)!: NetHandle {
 		h := uintptr(self.File)
 		for {
-			return sys::Accept(h, sockaddr, addrsize) else {
+			sock := sys::Accept(h, sockaddr, addrsize) else {
 				// Sometimes we see WSAECONNRESET and ERROR_NETNAME_DELETED is
 				// returned here. These happen if connection reset is received
 				// before Accept could complete. These errors relate to new
@@ -334,6 +334,12 @@ impl FD {
 				}
 				throw error
 			}
+			// Inherit properties of the listening socket.
+			sys::Setsockopt(sock, sys::SOL_SOCKET, sys::SO_UPDATE_ACCEPT_CONTEXT, uintptr(&self.File), sys::Socklen(mem::Sizeof(self.File))) else {
+				sys::CloseSocket(sys::Handle(sock)) else {}
+				throw error
+			}
+			return sock
 		}
 	}
 

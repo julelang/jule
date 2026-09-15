@@ -8,12 +8,28 @@ use "std/internal/sys/windows"
 use "std/mem"
 use "std/sys"
 
-fn lastErrorCode(): sys::Errno {
-	return sys::Errno(sys::WSAGetLastError())
+fn syssocket(domain: int, typ: int, proto: int)!: poll::NetHandle {
+	sock := sys::WSASocket(domain, typ, proto, nil, 0, windows::WSA_FLAG_OVERLAPPED|windows::WSA_FLAG_NO_HANDLE_INHERIT)?
+	return poll::NetHandle(sock)
 }
 
-fn syssocket(domain: int, typ: int, proto: int)!: poll::NetHandle {
-	return sys::WSASocket(domain, typ, proto, nil, 0, windows::WSA_FLAG_OVERLAPPED|windows::WSA_FLAG_NO_HANDLE_INHERIT)?
+fn setSocketBlockingMode(handle: poll::NetHandle, mode: c::UnsignedLong)! {
+	FIONBIO := 0x80000000 | (unsafe { (c::Long)(mem::Sizeof(c::UnsignedLong) & 0x7F) } << 16) | ('f' << 8) | 126
+	size := u32(mem::Sizeof(u32))
+	r := u32(0)
+	unsafe {
+		if sys::WSAIoctl(sys::Handle(handle), u32(FIONBIO), (*byte)(&mode), size, nil, 0, &r) == sys::SOCKET_ERROR {
+			throw sys::Errno(sys::WSAGetLastError())
+		}
+	}
+}
+
+fn closeSocketBlockingMode(handle: poll::NetHandle)! {
+	setSocketBlockingMode(handle, 1)?
+}
+
+fn openSocketBlockingMode(handle: poll::NetHandle)! {
+	setSocketBlockingMode(handle, 0)?
 }
 
 fn maxListenerBacklog(): int {
@@ -24,10 +40,10 @@ fn maxListenerBacklog(): int {
 }
 
 fn setDefaultSockopts(handle: poll::NetHandle)! {
-	// On Windows, overlapped mode is non-blocking and async.
+	// On Windows, overlapped mode is non-blocking.
 	// Created sockets use WSA_FLAG_NO_HANDLE_INHERIT,
 	// which is equals to CloseOnExec on UNIX.
-	// Nothing to do.
+	closeSocketBlockingMode(handle)?
 }
 
 fn setDefaultListenerSockopts(handle: poll::NetHandle)! {

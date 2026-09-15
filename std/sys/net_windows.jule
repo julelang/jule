@@ -28,9 +28,9 @@ extern let WSASocketW: *unsafe
 extern let WSAAccept: *unsafe
 
 extern unsafe fn select(int, *extern.fd_set, *extern.fd_set, *extern.fd_set, *extern.timeval): int
-extern unsafe fn bind(Handle, *extern.sockaddr, Socklen): int
-extern unsafe fn connect(Handle, *extern.sockaddr, Socklen): int
-extern fn listen(Handle, int): int
+extern unsafe fn bind(uintptr, *extern.sockaddr, Socklen): int
+extern unsafe fn connect(uintptr, *extern.sockaddr, Socklen): int
+extern fn listen(uintptr, int): int
 extern unsafe fn accept(uintptr, *extern.sockaddr, *c::Int): uintptr
 extern unsafe fn send(uintptr, *c::Char, Socklen, int): int
 extern unsafe fn recv(uintptr, *c::Char, Socklen, int): int
@@ -39,8 +39,8 @@ extern unsafe fn sendto(uintptr, *c::Char, int, int, *extern.sockaddr, c::Int): 
 extern fn closesocket(Handle): int
 extern unsafe fn WSAStartup(u16, mut _: *extern.WSADATA): int
 extern unsafe fn getsockopt(Handle, int, int, *c::Char, *c::Int): int
-extern unsafe fn setsockopt(Handle, int, int, *c::Char, int): int
-extern unsafe fn getsockname(Handle, *extern.sockaddr, *c::Int): int
+extern unsafe fn setsockopt(uintptr, int, int, *c::Char, int): int
+extern unsafe fn getsockname(uintptr, *extern.sockaddr, *c::Int): int
 extern unsafe fn WSAIoctl(Handle, extern.DWORD, *unsafe, extern.DWORD, *unsafe, extern.DWORD, *extern.DWORD, *unsafe, *unsafe): int
 
 // C's WSADATA struct.
@@ -68,21 +68,21 @@ fn WSASocket(domain: int, typ: int, proto: int, &protinfo: *WSAProtocolInfo, gro
 	return
 }
 
-fn Bind(s: Handle, addr: uintptr, addrlen: Socklen)! {
+fn Bind(s: uintptr, addr: uintptr, addrlen: Socklen)! {
 	r := unsafe { extern.bind(s, (*extern.sockaddr)(addr), addrlen) }
 	if r == SOCKET_ERROR {
 		throw Errno(WSAGetLastError())
 	}
 }
 
-fn Connect(s: Handle, addr: uintptr, addrlen: Socklen)! {
+fn Connect(s: uintptr, addr: uintptr, addrlen: Socklen)! {
 	r := unsafe { extern.connect(s, (*extern.sockaddr)(addr), addrlen) }
 	if r == SOCKET_ERROR {
 		throw Errno(WSAGetLastError())
 	}
 }
 
-fn Listen(s: Handle, backlog: int)! {
+fn Listen(s: uintptr, backlog: int)! {
 	r := extern.listen(s, backlog)
 	if r == SOCKET_ERROR {
 		throw Errno(WSAGetLastError())
@@ -147,14 +147,14 @@ fn Getsockopt(s: Handle, level: int, name: int, val: Handle, vallen: Socklen)! {
 	}
 }
 
-fn Setsockopt(s: Handle, level: int, name: int, val: uintptr, vallen: Socklen)! {
+fn Setsockopt(s: uintptr, level: int, name: int, val: uintptr, vallen: Socklen)! {
 	r := unsafe { extern.setsockopt(s, level, name, (*c::Char)(val), int(vallen)) }
 	if r == SOCKET_ERROR {
 		throw Errno(WSAGetLastError())
 	}
 }
 
-fn Getsockname(fd: Handle, addr: uintptr, addrlen: Socklen)! {
+fn Getsockname(fd: uintptr, addr: uintptr, addrlen: Socklen)! {
 	addrlen2 := unsafe { c::Int(addrlen) }
 	r := unsafe { extern.getsockname(fd, (*extern.sockaddr)(addr), &addrlen2) }
 	if r == SOCKET_ERROR {

@@ -45,12 +45,6 @@ impl netFD {
 
 	#disable nilptr
 	fn accept(mut *self, ipv: int)!: (fd: &netFD, addr: &TCPAddr) {
-		sockfact := fn()!: poll::NetHandle {
-			if ipv == 4 {
-				return syssocket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)?
-			}
-			return syssocket(sys::AF_INET6, sys::SOCK_STREAM, sys::IPPROTO_TCP)?
-		}
 		let mut h: poll::NetHandle
 		let mut ip: IP
 		let mut port: int
@@ -58,7 +52,7 @@ impl netFD {
 		| 4:
 			mut sockaddr := sys::RawSockaddrInet4{}
 			mut sockaddrlen := sys::Socklen(mem::Sizeof(sockaddr))
-			h = self.pfd.Accept(sockfact, uintptr(&sockaddr), &sockaddrlen)?
+			h = self.pfd.Accept(uintptr(&sockaddr), &sockaddrlen)?
 			// Address will be handled by poll::FD.
 			ip = make(IP, IPv4Len)
 			copy(ip, IP(sockaddr.Addr[:]))
@@ -66,7 +60,7 @@ impl netFD {
 		| 6:
 			mut sockaddr := sys::RawSockaddrInet6{}
 			mut sockaddrlen := sys::Socklen(mem::Sizeof(sockaddr))
-			h = self.pfd.Accept(sockfact, uintptr(&sockaddr), &sockaddrlen)?
+			h = self.pfd.Accept(uintptr(&sockaddr), &sockaddrlen)?
 			// Address will be handled by poll::FD.
 			ip = make(IP, IPv6Len)
 			copy(ip, IP(sockaddr.Addr[:]))
