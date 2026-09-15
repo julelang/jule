@@ -390,9 +390,9 @@ impl scopeParser {
 		return chain
 	}
 
-	fn buildCoCallStmt(mut *self, mut tokens: []&token::Token): &ast::Expr {
+	fn buildSpawnCallStmt(mut *self, mut tokens: []&token::Token): &ast::Expr {
 		token := tokens[0]
-		tokens = tokens[1:] // Start 1 to skip "co" token.
+		tokens = tokens[1:] // Start 1 to skip "spawn" token.
 		if len(tokens) == 0 {
 			self.pushErr(token, "invalid syntax")
 			return nil
@@ -403,7 +403,7 @@ impl scopeParser {
 		}
 		match type e.Data {
 		| &ast::CallExpr:
-			e.Data.(&ast::CallExpr).Flags |= ast::F_CO
+			e.Data.(&ast::CallExpr).Flags |= ast::F_SPAWN
 		|:
 			self.pushErr(token, "co statement must have function call expression")
 		}
@@ -1209,8 +1209,8 @@ impl scopeParser {
 			return self.buildContStmt(stmt.tokens)
 		| token::IF:
 			return self.buildIfElseChain(stmt.tokens)
-		| token::CO:
-			return self.buildCoCallStmt(stmt.tokens)
+		| token::SPAWN:
+			return self.buildSpawnCallStmt(stmt.tokens)
 		| token::GOTO:
 			return self.buildGoto(stmt.tokens)
 		| token::FALL:

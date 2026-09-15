@@ -244,7 +244,14 @@ impl ObjectCoder {
 		self.coSpawnObj.WriteByte('\n')!
 
 		// Declare function.
-		self.coSpawnObj.WriteString("__jule_Coroutine ")!
+		match {
+		| dist::IsWindows(build::OS):
+			self.coSpawnObj.WriteString("unsigned long ")!
+		| dist::IsUnix(build::OS):
+			self.coSpawnObj.WriteString("void *")!
+		|:
+			panic("cxx: pushCoSpawn: unimeplemented operating system for return type")
+		}
 		self.coSpawnObj.WriteString(coSpawnPrefix + coSpawnMethodSuffix)!
 		self.coSpawnObj.WriteString(is)!
 		const argData = "__jule_argdata"
@@ -263,9 +270,18 @@ impl ObjectCoder {
 		self.coSpawnObj.WriteString(argData)!
 		self.coSpawnObj.WriteString("_param;\n")!
 
+		// allocate thread instance on stack
+		self.coSpawnObj.WriteByte(indentKind)!
+		self.tc.structureIns(&self.coSpawnObj, meta::Program.Runtime.Thread)
+		self.coSpawnObj.WriteString(" __thread_ctx;\n")!
+
+		// begin runtime thread
+		self.coSpawnObj.WriteByte(indentKind)!
+		self.ic.funcIns(&self.coSpawnObj, meta::Program.Runtime.BeginThread)
+		self.coSpawnObj.WriteString("(&__thread_ctx);\n")!
+
 		// call the function
 		self.coSpawnObj.WriteByte(indentKind)!
-		self.coSpawnObj.WriteString("__jule_AsyncAwait ")!
 		self.coSpawnObj.WriteString(argData)!
 		self.coSpawnObj.WriteString("->")!
 		self.coSpawnObj.WriteString(coSpawnArgDataFunc)!
@@ -293,13 +309,18 @@ impl ObjectCoder {
 		self.coSpawnObj.WriteString(argData)!
 		self.coSpawnObj.WriteString(");\n")!
 		self.coSpawnObj.WriteByte(indentKind)!
+		self.ic.funcIns(&self.coSpawnObj, meta::Program.Runtime.CloseThread)
+		self.coSpawnObj.WriteString("(&__thread_ctx);\n")!
+		self.coSpawnObj.WriteByte(indentKind)!
 
 		// final return
-		self.coSpawnObj.WriteString("__jule_AsyncReturn")!
-		if f.Decl.IsVoid() {
-			self.coSpawnObj.WriteString(";\n")!
-		} else {
-			self.coSpawnObj.WriteString(" {};\n")!
+		match {
+		| build::OS == dist::Windows:
+			self.coSpawnObj.WriteString("return 0;\n")!
+		| dist::IsUnix(build::OS):
+			self.coSpawnObj.WriteString("return NULL;\n")!
+		|:
+			panic("cxx: pushCoSpawn: unimeplemented operating system for return type")
 		}
 		self.coSpawnObj.WriteString("}\n")!
 
@@ -340,7 +361,7 @@ impl ObjectCoder {
 
 	fn pushAnonFunc(mut &self, mut m: &sema::AnonFuncExpr): (name: string) {
 		self.meta.concurrent = self.meta.concurrent ||
-			m.Func.Flags&sema::F_CALLED_CO != 0
+			m.Func.Flags&sema::F_CALLED_SPAWN != 0
 
 		closure := obj::IsClosure(m)
 		if closure {
@@ -1046,7 +1067,7 @@ impl ObjectCoder {
 
 	fn funcDeclIns(mut &self, mut f: &sema::FuncIns, ptr: bool) {
 		self.meta.concurrent = self.meta.concurrent ||
-			f.Flags&sema::F_CALLED_CO != 0
+			f.Flags&sema::F_CALLED_SPAWN != 0
 		self.indent()
 		self.funcHead(&self.Buf, f, ptr, "")
 		self.paramsIns(&self.Buf, f)

@@ -1204,7 +1204,7 @@ impl exprCoder {
 		}
 	}
 
-	fn coFuncCall(mut &self, mut m: &sema::FuncCallExpr) {
+	fn spawnFuncCall(mut &self, mut m: &sema::FuncCallExpr) {
 		self.oc.write("{\n")
 		self.oc.addIndent()
 		self.oc.indent()
@@ -1242,12 +1242,12 @@ impl exprCoder {
 		self.oc.indent()
 
 		// spawn thread
-		self.oc.write("__jule_AsyncAwait __jule_cospawn(")
+		self.oc.ic.funcIns(&self.oc.Buf, meta::Program.Runtime.ThreadSpawn)
+		self.oc.write("((void*)")
 		self.oc.write(coSpawnPrefix + coSpawnMethodSuffix + i)
-		self.oc.write("(")
-		self.oc.write("(void*)")
+		self.oc.write(", (void*)")
 		self.oc.write(argData)
-		self.oc.write(").handle);\n")
+		self.oc.write(");\n")
 		self.oc.doneIndent()
 		self.oc.indent()
 		self.oc.write("}")
@@ -1459,10 +1459,10 @@ impl exprCoder {
 			return
 		}
 
-		if m.IsCo {
+		if m.IsSpawn {
 			// Do not check for errors,
 			// fallible functions cannot be called with co.
-			self.coFuncCall(m)
+			self.spawnFuncCall(m)
 			return
 		}
 		if m.Func.IsBuiltin() ||

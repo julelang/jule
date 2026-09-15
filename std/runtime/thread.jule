@@ -9,8 +9,7 @@ extern let mut __jule_ct: *thread
 const (
 	// Thread roles.
 	roleProgram          = 1 << iota // The main thread of the program.
-	roleSysmon                       // The sysmon thread.
-	roleM                            // A machine (M) thread.
+	roleSpawn                        // A user thread.
 	roleThreadPoolWorker             // A worker thread for the thread pool.
 
 	// State flags of threads.
@@ -95,7 +94,7 @@ fn initThread(mut &t: *thread, role: int) {
 	t.parker = new(parker)
 	t.parker.init()
 
-	if role == roleProgram || role == roleM {
+	if role == roleProgram || role == roleSpawn || role == roleThreadPoolWorker {
 		// Initialize local random state.
 		trandinit(t)
 	}
@@ -142,6 +141,23 @@ fn releaseThread(mut &t: *thread) {
 	t.parker = nil
 	t.link = nil
 	mallocThreadFinalize(t)
+}
+
+// This routine is called by the runtime before start execution of the thread.
+// Usually invoked for "spawn" threads.
+#disable nilptr
+fn beginThread(mut &t: *thread) {
+	// Use `sett` to set thread-local &thread data for the thread.
+	sett(unsafe { (&thread)(t) })
+	initThread(t, roleSpawn)
+}
+
+// This routine is called by the runtime before return (destroy) from the thread.
+// Usually invoked for "spawn" threads.
+#disable nilptr
+fn closeThread(mut &t: *thread) {
+	releaseThread(t)
+	t.state = threadClosed
 }
 
 fn threadinit() {

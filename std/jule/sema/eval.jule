@@ -2118,8 +2118,8 @@ impl eval {
 		} else if len(fc.Args) > 1 {
 			self.pushErr(fc.Args[1].Token, "passed more value to cast than expected")
 			self.pushSuggestion("cast like; Type(value)")
-		} else if fc.Flags&ast::F_CO != 0 {
-			self.pushErr(fc.Token, "concurrent call is undefined for casting expressions")
+		} else if fc.Flags&ast::F_SPAWN != 0 {
+			self.pushErr(fc.Token, "thread call is undefined for casting expressions")
 			*v = nil
 			return
 		} else if fc.Handler != nil {
@@ -2143,9 +2143,9 @@ impl eval {
 		mut f: &FuncIns,
 		mut fc: &ast::CallExpr,
 		mut &v: *&Value,
-		IsCo: bool) {
-		if IsCo {
-			self.pushErr(fc.Token, "built-in functions canot be called with `co`")
+		IsSpawn: bool) {
+		if IsSpawn {
+			self.pushErr(fc.Token, "built-in functions canot be called with `spawn`")
 		}
 		if !fc.Unhandled() { // Error handled?
 			// Built-in functions are not fallible.
@@ -2158,19 +2158,19 @@ impl eval {
 		(*v).Mutable = true
 	}
 
-	fn checkFuncOfConcurrentCall(mut *self, f: &FuncIns, errorToken: &token::Token) {
+	fn checkFuncOfSpawnCall(mut *self, f: &FuncIns, errorToken: &token::Token) {
 		if self.isUnsafe() {
 			return
 		}
 		for _, p in f.Params {
 			if p.Decl.IsSelf() {
 				if !p.Decl.IsSmartptr() {
-					self.pushErr(errorToken, `concurrent calls with methods having a "self" receiver parameter are not allowed in safe Jule`)
-					self.pushSuggestion(`use "&self" receiver parameter instead, or unsafe Jule with "unsafe { ... }" to make concurrent calls`)
+					self.pushErr(errorToken, `spawn calls with methods having a "self" receiver parameter are not allowed in safe Jule`)
+					self.pushSuggestion(`use "&self" receiver parameter instead, or unsafe Jule with "unsafe { ... }" to make spawn calls`)
 				}
 			} else if p.Decl.AST.Flags&ast::F_REFERENCE != 0 {
-				self.pushErr(errorToken, "concurrent calls with functions with reference parameter(s) are not allowed in safe Jule")
-				self.pushSuggestion(`use unsafe Jule with "unsafe { ... }" to make concurrent calls`)
+				self.pushErr(errorToken, "spawn calls with functions with reference parameter(s) are not allowed in safe Jule")
+				self.pushSuggestion(`use unsafe Jule with "unsafe { ... }" to make spawn calls`)
 				return
 			}
 		}
@@ -2212,10 +2212,10 @@ impl eval {
 	fn callFunc(mut &self, mut fc: &ast::CallExpr, mut &v: *&Value) {
 		mut f := (*v).Type.Func()
 
-		IsCo := fc.Flags&ast::F_CO != 0
+		IsSpawn := fc.Flags&ast::F_SPAWN != 0
 
 		if f.IsBuiltin() {
-			self.callBuiltinFunc(f, fc, v, IsCo)
+			self.callBuiltinFunc(f, fc, v, IsSpawn)
 			return
 		}
 
@@ -2331,18 +2331,18 @@ impl eval {
 		}
 
 		mut model := &FuncCallExpr{
-			Token: fc.Token,
-			Func:  f,
-			Expr:  callModel,
-			Args:  fcac.argModels,
-			IsCo:  IsCo,
+			Token:   fc.Token,
+			Func:    f,
+			Expr:    callModel,
+			Args:    fcac.argModels,
+			IsSpawn: IsSpawn,
 		}
 		(*v).Model = model
 		(*v).Mutable = true
 
 		if f.Decl.AST.Flags&ast::F_FALLIBLE != 0 {
-			if IsCo {
-				self.s.pushErr(fc.Token, "concurrent calls are not allowed to fallible functions")
+			if IsSpawn {
+				self.s.pushErr(fc.Token, "spawn calls are not allowed to fallible functions")
 				self.s.pushSuggestion("handle the fallible function in a separate function or anonymous function")
 			}
 			match {
@@ -2385,9 +2385,9 @@ impl eval {
 			self.pushErr(fc.Token, "non-fallible functions cannot be handled like fallible functions")
 		}
 
-		if model.IsCo {
-			model.Func.Flags |= F_AS_ANON | F_CALLED_CO
-			self.checkFuncOfConcurrentCall(model.Func, fc.Token)
+		if model.IsSpawn {
+			model.Func.Flags |= F_AS_ANON | F_CALLED_SPAWN
+			self.checkFuncOfSpawnCall(model.Func, fc.Token)
 		}
 	}
 
