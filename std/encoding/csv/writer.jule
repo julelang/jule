@@ -108,23 +108,23 @@ impl Writer {
 
 	// Writes a single CSV record along with any necessary quoting.
 	// A record is a slice of strings with each string being one field.
-	async fn Write(mut *self, record: []string)! {
+	fn Write(mut *self, record: []string)! {
 		if !validDelim(self.Comma) {
 			throw errInvalidDelim
 		}
 		for (n, mut field) in record {
 			if n > 0 {
-				self.w.WriteRune(self.Comma).await?
+				self.w.WriteRune(self.Comma)?
 			}
 
 			// If we don't have to have a quoted field then just
 			// write out the field and continue to the next field.
 			if !self.fieldNeedsQuotes(field) {
-				self.w.WriteString(field).await?
+				self.w.WriteString(field)?
 				continue
 			}
 
-			self.w.WriteByte('"').await?
+			self.w.WriteByte('"')?
 
 			for len(field) > 0 {
 				// Search for special characters.
@@ -134,48 +134,48 @@ impl Writer {
 				}
 
 				// Copy verbatim everything before the special character.
-				self.w.WriteString(field[:i]).await?
+				self.w.WriteString(field[:i])?
 				field = field[i:]
 
 				// Encode the special character.
 				if len(field) > 0 {
 					match field[0] {
 					| '"':
-						self.w.WriteString(`""`).await?
+						self.w.WriteString(`""`)?
 					| '\r':
 						if !self.UseCRLF {
-							self.w.WriteByte('\r').await?
+							self.w.WriteByte('\r')?
 						}
 					| '\n':
 						if self.UseCRLF {
-							self.w.WriteString("\r\n").await?
+							self.w.WriteString("\r\n")?
 						} else {
-							self.w.WriteByte('\n').await?
+							self.w.WriteByte('\n')?
 						}
 					}
 					field = field[1:]
 				}
 			}
 
-			self.w.WriteByte('"').await?
+			self.w.WriteByte('"')?
 		}
 		if self.UseCRLF {
-			self.w.WriteString("\r\n").await?
+			self.w.WriteString("\r\n")?
 		} else {
-			self.w.WriteByte('\n').await?
+			self.w.WriteByte('\n')?
 		}
 	}
 
 	// Writes any buffered data to the underlying io::Writer.
-	async fn Flush(mut *self)! {
-		self.w.Flush().await?
+	fn Flush(mut *self)! {
+		self.w.Flush()?
 	}
 
 	// Writes multiple CSV records using [Writer.Write].
-	async fn WriteAll(mut *self, records: [][]string)! {
+	fn WriteAll(mut *self, records: [][]string)! {
 		for _, record in records {
-			self.Write(record).await?
+			self.Write(record)?
 		}
-		self.w.Flush().await?
+		self.w.Flush()?
 	}
 }

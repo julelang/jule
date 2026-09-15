@@ -223,12 +223,12 @@ impl Reader {
 	// If there is no data left to be read, read returns nil.
 	// If [self.ReuseRecord] is true, the returned slice may be shared
 	// between multiple calls to read.
-	async fn Read(mut *self)!: (record: []string) {
+	fn Read(mut *self)!: (record: []string) {
 		if self.ReuseRecord {
-			record = self.readRecord(self.lastRecord).await?
+			record = self.readRecord(self.lastRecord)?
 			self.lastRecord = record
 		} else {
-			record = self.readRecord(nil).await?
+			record = self.readRecord(nil)?
 		}
 		return
 	}
@@ -251,9 +251,9 @@ impl Reader {
 
 	// Reads all the remaining records from r.
 	// Each record is a slice of fields.
-	async fn ReadAll(mut *self)!: (records: [][]string) {
+	fn ReadAll(mut *self)!: (records: [][]string) {
 		for {
-			mut record := self.readRecord(nil).await else {
+			mut record := self.readRecord(nil) else {
 				if error == io::EOF {
 					return
 				}
@@ -266,17 +266,17 @@ impl Reader {
 	// Reads the next line (with the trailing endline).
 	// If EOF is hit without a trailing endline, it will be omitted.
 	// The result is only valid until the next call to readLine.
-	async fn readLine(mut *self)!: []byte {
+	fn readLine(mut *self)!: []byte {
 		mut _EOF := false
-		mut line, mut full := self.r.ReadSlice('\n').await?
-		self.r.Read(nil).await else {
+		mut line, mut full := self.r.ReadSlice('\n')?
+		self.r.Read(nil) else {
 			// Detect if reached to EOF.
 			_EOF = error == io::EOF
 		}
 		if full {
 			self.rawBuffer = append(self.rawBuffer[:0], line...)
 			for full {
-				line, full = self.r.ReadSlice('\n').await else {
+				line, full = self.r.ReadSlice('\n') else {
 					if error == io::EOF {
 						_EOF = true
 						break
@@ -305,7 +305,7 @@ impl Reader {
 		return line
 	}
 
-	async fn readRecord(mut *self, mut dst: []string)!: []string {
+	fn readRecord(mut *self, mut dst: []string)!: []string {
 		if self.Comma == self.Comment ||
 			!validDelim(self.Comma) ||
 			(self.Comment != 0 && !validDelim(self.Comment)) {
@@ -315,7 +315,7 @@ impl Reader {
 		// Read line (automatically skipping past empty lines and any comments).
 		let mut line: []byte
 		for {
-			line = self.readLine().await?
+			line = self.readLine()?
 			if self.Comment != 0 && nextRune(line) == self.Comment {
 				continue // Skip comment lines
 			}
@@ -423,7 +423,7 @@ impl Reader {
 						// Hit end of line (copy all data so far).
 						self.recordBuffer = append(self.recordBuffer, line...)
 						pos.col += len(line)
-						line = self.readLine().await else {
+						line = self.readLine() else {
 							if error != io::EOF {
 								throw error
 							}
