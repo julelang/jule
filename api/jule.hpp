@@ -18,7 +18,6 @@ CONFIGURATION DEFINES
 
 #include "any.hpp"
 #include "array.hpp"
-#include "async.hpp"
 #include "error.hpp"
 #include "fallible.hpp"
 #include "fn.hpp"

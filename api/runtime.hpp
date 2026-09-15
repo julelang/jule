@@ -18,6 +18,26 @@
 class __jule_String;
 template <typename Item> class __jule_Slice;
 
+class __jule_thread;
+
+// Each OS thread executing Jule code has a TLS pointer to its associated
+// runtime thread object.
+//
+// Historically, this field was a smart pointer.
+// However, due to a toolchain bug in Windows, it's supposed to be a trivial
+// type. See: https://github.com/mstorsjo/llvm-mingw/issues/541
+inline constinit thread_local __jule_thread *__jule_ct = nullptr;
+
+static inline void __jule_compilerBarrier(void) noexcept {
+#if defined(__clang__) || defined(__GNUC__)
+    asm volatile("");
+#elif defined(_MSC_VER)
+    __nop();
+#else
+    std::atomic_signal_fence(std::memory_order_relaxed);
+#endif
+}
+
 __jule_Bool __jule_ptrEqual(void *a, void *b);
 __jule_String __jule_ptrToString(void *p);
 __jule_String __jule_boolToString(__jule_Bool b);

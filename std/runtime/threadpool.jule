@@ -4,32 +4,32 @@
 
 use "std/intrinsic"
 
-// A blocking job.
-struct blockingJob {
+// A thread pool job.
+struct threadpoolJob {
 	job:  fn()
-	link: &blockingJob
+	link: &threadpoolJob
 }
 
-// Environment for the blocking thread pool.
-// Implements a worker thread pool for blocking tasks.
+// Environment for the thread pool.
+// Implements a worker thread pool for tasks.
 // See "Thread synchronization" comment of the scheduler.
 //
 // This is also an ordinary thread pool.
 // Sync or async programs may use this for thread-based concurrency.
-struct blockingenv {
+struct threadpool {
 	maxWorkers: i32 // Constant once initialized.
 
 	mu:    mutex
-	head:  &blockingJob
-	tail:  &blockingJob
+	head:  &threadpoolJob
+	tail:  &threadpoolJob
 	nw:    i32     // Count of the created worker threads.
 	widle: &thread // Parkers of the idle workers waiting for work.
 }
 
-impl blockingenv {
+impl threadpool {
 	// Gets a job from queues.
 	#disable nilptr boundary
-	fn getjob(mut *self, mut &job: *&blockingJob) {
+	fn getjob(mut *self, mut &job: *&threadpoolJob) {
 		self.mu.lock()
 		if self.head != nil {
 			*job = self.head
@@ -41,7 +41,7 @@ impl blockingenv {
 	}
 
 	// Wakes a worker thread, if needed.
-	// The `blocking.mu` must be locked and it will not release it before return.
+	// The `threadpool.mu` must be locked and will not be releases before return.
 	#disable nilptr
 	fn wakew(mut *self) {
 		// We have a cached worker thread. Notify it.
@@ -55,9 +55,9 @@ impl blockingenv {
 		// Spawn a new one, if possible.
 		if self.nw < self.maxWorkers {
 			self.nw++
-			ok := unsafe { threadSpawn((*unsafe)(uintptr(blockingWorker)), nil) }
+			ok := unsafe { threadSpawn((*unsafe)(uintptr(threadpoolWorker)), nil) }
 			if !ok {
-				panic("runtime: blocking worker thread creation failed")
+				panic("runtime: thead pool worker thread creation failed")
 			}
 		}
 	}
@@ -65,16 +65,16 @@ impl blockingenv {
 
 // Initialized by the runtime.
 #noinit
-let mut blocking: blockingenv
+let mut globalThreadPool: threadpool
 
-// A blocking thread pool worker.
+// A thread pool worker.
 //
 // The operating system thread API passes a pointer to the function when calling it.
 // In the final stage, this function's signature fits with the OS thread API.
 //
 // Since this function never returns, there should be no risk about return value.
 #disable nilptr
-fn blockingWorker(_: *unsafe) {
+fn threadpoolWorker(_: *unsafe) {
 	// Set thread-local data before start.
 	// Do not allocate a thread instance on heap,
 	// stack allocation is efficient and enough here.
@@ -83,32 +83,32 @@ fn blockingWorker(_: *unsafe) {
 	// The following thread instance initialization will use it.
 	mut wp := unsafe { (&thread)(&w) }
 	sett(wp)
-	initThread(&w, roleBlockingWorker)
+	initThread(&w, roleThreadPoolWorker)
 
 	const MaxSpin = 4
 	mut tried := 0
 	for {
-		let mut job: &blockingJob
-		blocking.getjob(&job)
+		let mut job: &threadpoolJob
+		globalThreadPool.getjob(&job)
 		if job == nil {
 			// No job to run.
 			// Under high contention, new job may be available since last lookup.
 			// Try again if reasonable.
-			if tried < MaxSpin && (!asynctime || sched.ncrunning() > 0) {
+			if tried < MaxSpin {
 				tried++
 				continue
 			}
-			blocking.mu.lock()
+			globalThreadPool.mu.lock()
 			// A job is enqueued, try again.
-			if blocking.head != nil {
-				blocking.mu.unlock()
+			if globalThreadPool.head != nil {
+				globalThreadPool.mu.unlock()
 				continue
 			}
 			// Park the thread and continue it will be continue to run when notified.
 			tried = 0
-			w.link = blocking.widle
-			blocking.widle = wp
-			blocking.mu.unlock()
+			w.link = globalThreadPool.widle
+			globalThreadPool.widle = wp
+			globalThreadPool.mu.unlock()
 			w.parker.park()
 			continue
 		}
@@ -117,15 +117,15 @@ fn blockingWorker(_: *unsafe) {
 	}
 }
 
-fn blockinginit() {
-	blocking = blockingenv{}
-	blocking.maxWorkers = i32(NumCPU())
+fn threadpoolinit() {
+	globalThreadPool = threadpool{}
+	globalThreadPool.maxWorkers = i32(NumCPU())
 }
 
 // Designed for CPU-bound work, where each task is executed on a thread pool.
-// This thread pool may be shared with the pool used by the [Blocking].
 // It is designed to enable synchronous programs to perform concurrent
 // computations for CPU-bound tasks without thread management concerns.
+// Uses a common thread pool for all jobs.
 #disable nilptr
 fn Task(job: fn()) {
 	// We need this compiler hint for sync programs.
@@ -137,18 +137,15 @@ fn Task(job: fn()) {
 
 	// We will use heap allocation because this is not a blocking call.
 	// Therefore, we need heap allocation to avoid deallocation when scope ends.
-	mut bj := &blockingJob{job: job}
-	blocking.mu.lock()
-	if blocking.head == nil {
-		blocking.head = bj
-		blocking.tail = blocking.head
+	mut bj := &threadpoolJob{job: job}
+	globalThreadPool.mu.lock()
+	if globalThreadPool.head == nil {
+		globalThreadPool.head = bj
+		globalThreadPool.tail = globalThreadPool.head
 	} else {
-		blocking.tail.link = bj
-		blocking.tail = bj
+		globalThreadPool.tail.link = bj
+		globalThreadPool.tail = bj
 	}
-	// We use the tagged pointer to call `blocking.wakew` after adding
-	// a new job to the queue. It is done by mutex-unlock algorithm.
-	// The `blocking.mu` will be released due to `mutexunlockJobAdd`.
-	tp := taggedPointer.pack(0, mutexunlockJobAdd)
-	mutexunlock(u64(tp))
+	globalThreadPool.wakew()
+	globalThreadPool.mu.unlock()
 }

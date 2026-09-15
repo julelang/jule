@@ -1678,23 +1678,12 @@ impl ObjectCoder {
 	}
 
 	fn end(mut &self) {
-		asyncRuntime := env::Test || meta::Program.EntryPoint.AST.Flags&ast::F_ASYNC != 0
-		self.meta.concurrent = self.meta.concurrent || asyncRuntime
-
 		self.addIndent()
 
 		if !env::Test {
 			// Write the fake main function.
-			if asyncRuntime {
-				self.write("__jule_Coroutine ")
-			} else {
-				self.write("void ")
-			}
-			self.write("__jule_fake_main(void) {\n")
+			self.write("void __jule_fake_main(void) {\n")
 			self.indent()
-			if asyncRuntime {
-				self.write("__jule_AsyncAwait ")
-			}
 			self.ic.func(&self.Buf, meta::Program.EntryPoint)
 			self.write("(")
 			if meta::Program.EntryPoint.Instances[0].Flags&sema::F_AS_ANON != 0 {
@@ -1713,19 +1702,6 @@ impl ObjectCoder {
 	__jule_envp = reinterpret_cast<__jule_U8**>(envp);
 
 	`)
-		// Initialize the "asynctime" runtime variable.
-		self.ic.var(&self.Buf, meta::Program.Runtime.Asynctime)
-		self.write(" = ")
-		self.ec.boolean(asyncRuntime)
-		self.write(";\n")
-		self.indent()
-		// Initialize the "comaxprocs" runtime variable.
-		self.ic.var(&self.Buf, meta::Program.Runtime.Comaxprocs)
-		self.write(" = ")
-		itoa(&self.Buf, i64(env::COMAXPROCS))
-		self.write(";\n")
-		self.indent()
-
 		self.ic.funcIns(&self.Buf, meta::Program.Runtime.Init)
 		self.write("();\n\n")
 		self.indent()
@@ -1733,23 +1709,9 @@ impl ObjectCoder {
 		self.indent()
 
 		if env::Test {
-			self.ic.funcIns(&self.Buf, meta::Program.Runtime.Spawnmainc)
-			self.write("(test_point().handle);\n")
+			self.write("test_point();\n")
 		} else {
-			if asyncRuntime {
-				self.ic.funcIns(&self.Buf, meta::Program.Runtime.Spawnmainc)
-				self.write("(")
-			}
-			self.write("__jule_fake_main()")
-			if asyncRuntime {
-				self.write(".handle)")
-			}
-			self.write(";\n")
-		}
-		if asyncRuntime {
-			self.indent()
-			self.ic.funcIns(&self.Buf, meta::Program.Runtime.Schedule)
-			self.write("();")
+			self.write("__jule_fake_main();\n")
 		}
 
 		self.write(`

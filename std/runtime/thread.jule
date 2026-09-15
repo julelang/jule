@@ -8,10 +8,10 @@ extern let mut __jule_ct: *thread
 
 const (
 	// Thread roles.
-	roleProgram        = 1 << iota // The main thread of the program.
-	roleSysmon                     // The sysmon thread.
-	roleM                          // A machine (M) thread.
-	roleBlockingWorker             // A worker thread for the blocking thread pool.
+	roleProgram          = 1 << iota // The main thread of the program.
+	roleSysmon                       // The sysmon thread.
+	roleM                            // A machine (M) thread.
+	roleThreadPoolWorker             // A worker thread for the thread pool.
 
 	// State flags of coroutines.
 	threadRunning = 1 << iota
@@ -52,13 +52,6 @@ struct thread {
 	cheaprand: u64
 	// Link to the next thread.
 	link: &thread
-
-	// The P owned by the thread.
-	pp: &p
-	// Current coroutine of the thread.
-	c: *c
-	// Actively searching for runnable coroutines instead of sleeping.
-	spinning: bool
 }
 
 // Returns the current thread.
@@ -143,9 +136,11 @@ fn newSpawnThread(role: int): &thread {
 // Releases thread t, releases parker and drops references.
 #disable nilptr
 fn releaseThread(mut &t: *thread) {
-	t.pp = nil
 	t.role = 0
+	t.state = 0
 	t.parker.release()
+	t.parker = nil
+	t.link = nil
 	mallocThreadFinalize(t)
 }
 
