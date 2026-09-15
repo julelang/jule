@@ -2,31 +2,32 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/runtime"
 use "std/sync/atomic"
 use "std/time"
 
-async fn checkTiming() {
+fn checkTiming() {
 	mut x := new(int)
-	co async fn() {
-		time::Sleep(1 * time::Millisecond).await
+	runtime::Task(fn() {
+		time::Sleep(1 * time::Millisecond)
 		atomic::Store(&*x, 1, atomic::Release)
-	}()
-	time::Sleep(2 * time::Millisecond).await
+	})
+	time::Sleep(2 * time::Millisecond)
 	if atomic::Load(&*x, atomic::Acquire) != 1 {
-		panic("coroutine runs before earlier timer")
+		panic("thread runs before earlier timer")
 	}
 }
 
-async fn checkDuration() {
+fn checkDuration() {
 	timestamp := time::Instant.Now()
-	time::Sleep(10 * time::Nanosecond).await
+	time::Sleep(10 * time::Nanosecond)
 	elapsed := timestamp.Since()
 	if elapsed < 10*time::Nanosecond {
 		panic("sleep timer fired earlier than expected")
 	}
 }
 
-async fn main() {
-	checkTiming().await
-	checkDuration().await
+fn main() {
+	checkTiming()
+	checkDuration()
 }
