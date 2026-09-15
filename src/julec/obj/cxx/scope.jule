@@ -2414,20 +2414,7 @@ impl scopeCoder {
 			self.oc.write(anonFuncCtxSuffix + " *" + closureCtxIdent +
 				" = (" + name + anonFuncCtxSuffix + "*)(" + ctxParamIdent + ");\n")
 		}
-
-		// Anonymous function may have different runtime model.
-		oldAsync := self.oc.Flags & F_ASYNC
-		if m.Func.Decl.AST.Flags&ast::F_ASYNC != 0 {
-			self.oc.Flags |= F_ASYNC
-		} else {
-			self.oc.Flags &= ^F_ASYNC
-		}
-
 		self.commonFuncScope(m.Func, false)
-
-		// Restore old runtime model.
-		self.oc.Flags |= oldAsync
-
 		self.oc.doneIndent()
 		self.oc.indent()
 		self.oc.write("}")
@@ -2454,11 +2441,6 @@ impl scopeCoder {
 			self.oc.Flags = obj::HasDirectiveArg(disable, "boundary", self.oc.Flags, F_DISABLE_BOUNDARY)
 			self.oc.Flags = obj::HasDirectiveArg(disable, "nilptr", self.oc.Flags, F_DISABLE_NILPTR)
 			self.oc.Flags = obj::HasDirectiveArg(disable, "shift", self.oc.Flags, F_DISABLE_SHIFT)
-		}
-		if f.Decl.AST.Flags&ast::F_ASYNC != 0 {
-			self.oc.Flags |= F_ASYNC
-		} else {
-			self.oc.Flags &= ^F_ASYNC
 		}
 
 		self.oc.write("{\n")
@@ -2494,10 +2476,7 @@ fn isIterCopyOptimizable(val: &sema::Value, v: &sema::Var): bool {
 }
 
 fn returnKw(f: &sema::FuncIns): string {
-	if f.Decl == nil || f.Decl.AST.Flags&ast::F_ASYNC == 0 {
-		return "return"
-	}
-	return "__jule_AsyncReturn"
+	return "return"
 }
 
 fn isBranchPredictionHint(mut x: sema::Expr): (boolExpr: sema::Expr, likely: bool) {

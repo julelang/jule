@@ -244,17 +244,7 @@ impl typeCoder {
 		if f.Result != nil && f.Result.Tuple() != nil {
 			self.oc.pushResultIns(f)
 		}
-		if f.Decl.AST.Flags&ast::F_ASYNC != 0 {
-			if f.Decl.IsVoid() && f.Decl.AST.Flags&ast::F_FALLIBLE == 0 {
-				buf.WriteString("__jule_VoidAsync")!
-			} else {
-				buf.WriteString("__jule_Async<")!
-				self.funcInsResult(buf, f)
-				buf.WriteByte('>')!
-			}
-		} else {
-			self.funcInsResult(buf, f)
-		}
+		self.funcInsResult(buf, f)
 		if len(f.Params) == 0 {
 			return
 		}
@@ -348,7 +338,6 @@ const (
 	resultFunc         = "f"
 	resultChan         = "c"
 	resultExternPrefix = "e"
-	resultAsyncPrefix  = "r"
 )
 
 struct resultCoder {
@@ -392,9 +381,6 @@ impl resultCoder {
 		if f.Decl != nil {
 			if f.Decl.AST.Flags&ast::F_EXTERN != 0 {
 				s.WriteString(resultExternPrefix)!
-			}
-			if f.Decl.AST.Flags&ast::F_ASYNC != 0 {
-				s.WriteString(resultAsyncPrefix)!
 			}
 		}
 		for (_, mut p) in f.Params {

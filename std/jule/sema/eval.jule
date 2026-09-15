@@ -141,12 +141,6 @@ impl eval {
 		return ok
 	}
 
-	// Reports whether evaluated expression is in async scope.
-	fn isAsync(mut *self): bool {
-		mut sc, ok := self.lookup.(&scopeChecker)
-		return ok && sc.isAsync()
-	}
-
 	fn applyNumericPrefix(mut *self, mut v: &Value): bool {
 		if v == nil ||
 			!v.IsConst() ||
@@ -2145,32 +2139,14 @@ impl eval {
 		}
 	}
 
-	fn checkForAsyncRuntimeMeasurements(mut &self,
-		f: &FuncIns, fc: &ast::CallExpr, IsCo: bool, Await: bool) {
-		if !f.IsBuiltin() && f.Decl.AST.Flags&ast::F_ASYNC != 0 {
-			if !IsCo && !Await {
-				self.pushErr(fc.Token, "`async` function call must be either concurrent or awaited")
-				self.pushSuggestion("use `co myFunc()` for concurrent execution or `myFunc().await` to wait for the result")
-			} else if IsCo && Await {
-				self.pushErr(fc.Token, "concurrent calls cannot be awaited")
-			} else if self.isGlobal() {
-				self.pushErr(fc.Token, "`async` function calls are not allowed at global scope")
-			} else if !self.isAsync() {
-				self.pushErr(fc.Token, "`async` functions can only be called from within an `async` scope")
-			}
-		} else if IsCo {
-			self.pushErr(fc.Token, "only `async` functions can be called with `co`")
-		} else if Await {
-			self.pushErr(fc.Token, "only `async` functions can be awaited")
-		}
-	}
-
 	fn callBuiltinFunc(mut &self,
-		mut f: &FuncIns, mut fc: &ast::CallExpr, mut &v: *&Value,
-		IsCo: bool, Await: bool) {
-		// Check for async runtime measurements.
-		self.checkForAsyncRuntimeMeasurements(f, fc, IsCo, Await)
-
+		mut f: &FuncIns,
+		mut fc: &ast::CallExpr,
+		mut &v: *&Value,
+		IsCo: bool) {
+		if IsCo {
+			self.pushErr(fc.Token, "built-in functions canot be called with `co`")
+		}
 		if !fc.Unhandled() { // Error handled?
 			// Built-in functions are not fallible.
 			self.pushErr(fc.Token, "non-fallible function cannot be handled like fallible functions")
@@ -2237,10 +2213,9 @@ impl eval {
 		mut f := (*v).Type.Func()
 
 		IsCo := fc.Flags&ast::F_CO != 0
-		Await := fc.Flags&ast::F_AWAIT != 0
 
 		if f.IsBuiltin() {
-			self.callBuiltinFunc(f, fc, v, IsCo, Await)
+			self.callBuiltinFunc(f, fc, v, IsCo)
 			return
 		}
 
@@ -2361,13 +2336,9 @@ impl eval {
 			Expr:  callModel,
 			Args:  fcac.argModels,
 			IsCo:  IsCo,
-			Await: Await,
 		}
 		(*v).Model = model
 		(*v).Mutable = true
-
-		// Check for async runtime measurements.
-		self.checkForAsyncRuntimeMeasurements(f, fc, IsCo, Await)
 
 		if f.Decl.AST.Flags&ast::F_FALLIBLE != 0 {
 			if IsCo {

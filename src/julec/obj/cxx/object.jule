@@ -98,7 +98,6 @@ const (
 	F_DISABLE_BOUNDARY = 1 << (iota - 1) // Disable boundary checking.
 	F_DISABLE_NILPTR                     // Disable nil pointer checking.
 	F_DISABLE_SHIFT                      // Disable shift amount checking.
-	F_ASYNC                              // Enable async runtime mode.
 
 	// All disable flags.
 	F_DISABLE = F_DISABLE_BOUNDARY | F_DISABLE_NILPTR | F_DISABLE_SHIFT
@@ -1030,17 +1029,7 @@ impl ObjectCoder {
 				}
 			}
 		}
-		if f.Decl.AST.Flags&ast::F_ASYNC != 0 {
-			if f.Decl.IsVoid() && f.Decl.AST.Flags&ast::F_FALLIBLE == 0 {
-				buf.WriteString("__jule_VoidAsync")!
-			} else {
-				buf.WriteString("__jule_Async<")!
-				self.tc.funcInsResult(buf, f)
-				buf.WriteByte('>')!
-			}
-		} else {
-			self.tc.funcInsResult(buf, f)
-		}
+		self.tc.funcInsResult(buf, f)
 		if ptr {
 			buf.WriteString("(*")!
 			self.ic.funcIns(buf, f)
@@ -1325,12 +1314,7 @@ impl ObjectCoder {
 				self.addIndent()
 				self.write("{\n")
 				self.indent()
-				if m.AST.Flags&ast::F_ASYNC != 0 {
-					if !m.IsVoid() || m.AST.Flags&ast::F_FALLIBLE != 0 {
-						self.write("__jule_AsyncReturn ")
-					}
-					self.write("__jule_AsyncAwait ")
-				} else if m.AST.Flags&ast::F_FALLIBLE != 0 || !m.IsVoid() {
+				if m.AST.Flags&ast::F_FALLIBLE != 0 || !m.IsVoid() {
 					self.write("return ")
 				}
 				// Generate function identifier using the instance.
