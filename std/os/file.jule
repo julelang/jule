@@ -99,7 +99,7 @@ fn Create(path: string)!: &File {
 // Reads bytes of file.
 // First, learns byte-size of file.
 // Then reads bytes and returns buffer.
-async fn ReadFile(path: string)!: []byte {
+fn ReadFile(path: string)!: []byte {
 	mut f := Open(path)?
 	info := Stat(path)?
 
@@ -122,50 +122,9 @@ async fn ReadFile(path: string)!: []byte {
 
 	mut data := make([]byte, 0, size)
 	for {
-		n := f.Read(data[len(data):cap(data)]).await else {
+		n := f.Read(data[len(data):cap(data)]) else {
 			if error == io::EOF {
-				f.Close().await?
-				return data
-			}
-			throw error
-		}
-		data = data[:len(data)+n]
-		if len(data) >= cap(data) {
-			mut d := append(data[:cap(data)], 0)
-			data = d[:len(data)]
-		}
-	}
-}
-
-// Sync variant of [ReadFile].
-// It is provided for blocking operations and must be used carefully
-// in an async runtime; it blocks the thread, not the coroutine.
-fn ReadFileSync(path: string)!: []byte {
-	mut f := Open(path)?
-	info := Stat(path)?
-
-	let mut size: int
-	size64 := info.Size()
-	if i64(int(size64)) == size64 {
-		size = int(size64)
-	}
-	size++ // one byte for final read at EOF
-
-	// Following information adopted from Go:
-	//
-	// If a file claims a small size, read at least 512 bytes.
-	// In particular, files in Linux's /proc claim size 0 but
-	// then do not work right if read in small pieces,
-	// so an initial read of 1 byte would not work correctly.
-	if size < 512 {
-		size = 512
-	}
-
-	mut data := make([]byte, 0, size)
-	for {
-		n := f.ReadSync(data[len(data):cap(data)]) else {
-			if error == io::EOF {
-				f.CloseSync()?
+				f.Close()?
 				return data
 			}
 			throw error
@@ -184,19 +143,10 @@ fn ReadFileSync(path: string)!: []byte {
 // Since requires multiple system calls to complete, a failure mid-operation
 // can leave the file in a partially written state.
 // Calls internally `File.Open`, `File.Write`, `File.Close` and forwards any error.
-async fn WriteFile(path: string, data: []byte, perm: FileMode)! {
+fn WriteFile(path: string, data: []byte, perm: FileMode)! {
 	mut f := OpenFile(path, O_WRONLY|O_CREATE|O_TRUNC, perm)?
-	f.Write(data).await?
-	f.Close().await?
-}
-
-// Sync variant of [WriteFile].
-// It is provided for blocking operations and must be used carefully
-// in an async runtime; it blocks the thread, not the coroutine.
-fn WriteFileSync(path: string, data: []byte, perm: FileMode)! {
-	mut f := OpenFile(path, O_WRONLY|O_CREATE|O_TRUNC, perm)?
-	f.WriteSync(data)?
-	f.CloseSync()?
+	f.Write(data)?
+	f.Close()?
 }
 
 impl File {
@@ -206,81 +156,15 @@ impl File {
 		return self.fd.File
 	}
 
-	// Reports whether treating the file descriptor as async is the correct
-	// approach. If the fd has the potential to exhibit non-blocking behavior,
-	// it should be handled with async API. Behavior in sync API is undefined.
-	// However, this is not a definitive guarantee that the fd is non-blocking.
-	fn ShouldAsync(*self): bool {
-		return self.fd.ShouldAsync()
-	}
-
-	// Sets the read and write deadlines for a File.
-	// It is equivalent to calling both SetReadDeadline and SetWriteDeadline.
-	//
-	// Only some kinds of files support setting a deadline. Calls to SetDeadline
-	// for files that do not support deadlines will return ErrNoDeadline.
-	// On most systems ordinary files do not support deadlines, but pipes do.
-	//
-	// A deadline is an absolute time after which I/O operations fail with an
-	// error instead of blocking. The deadline applies to all future and pending
-	// I/O, not just the immediately following call to Read or Write.
-	// After a deadline has been exceeded, the connection can be refreshed
-	// by setting a deadline in the future.
-	//
-	// If the deadline is exceeded a call to Read or Write or to other I/O
-	// methods will return an error that wraps ErrDeadlineExceeded.
-	//
-	// An idle timeout can be implemented by repeatedly extending
-	// the deadline after successful Read or Write calls.
-	//
-	// A zero value means I/O operations will not time out.
-	fn SetDeadline(mut *self, deadline: time::Duration)! {
-		if !self.ShouldAsync() {
-			throw poll::ErrNoDeadline
-		}
-		self.fd.SetDeadline(deadline)
-	}
-
-	// Sets the deadline for future Read calls and any
-	// currently-blocked Read call.
-	// A zero value means Read will not time out.
-	// Not all files support setting deadlines; see SetDeadline.
-	fn SetReadDeadline(mut *self, deadline: time::Duration)! {
-		if !self.ShouldAsync() {
-			throw poll::ErrNoDeadline
-		}
-		self.fd.SetReadDeadline(deadline)
-	}
-
-	// Sets the deadline for any future Write calls and any
-	// currently-blocked Write call.
-	// Even if Write times out, it may return n > 0, indicating that
-	// some of the data was successfully written.
-	// A zero value means Write will not time out.
-	// Not all files support setting deadlines; see SetDeadline.
-	fn SetWriteDeadline(mut *self, deadline: time::Duration)! {
-		if !self.ShouldAsync() {
-			throw poll::ErrNoDeadline
-		}
-		self.fd.SetWriteDeadline(deadline)
-	}
-
 	// Writes bytes to handle and returns written byte count.
 	// The number of bytes written can never exceed the length of the buf.
-	async fn Write(mut *self, buf: []byte)!: (n: int) {
-		return self.fd.Write(buf).await?
-	}
-
-	// Sync variant of [Write].
-	// It is provided for blocking operations and must be used carefully
-	// in an async runtime; it blocks the thread, not the coroutine.
-	fn WriteSync(mut *self, buf: []byte)!: (n: int) {
-		return self.fd.WriteSync(buf)?
+	fn Write(mut *self, buf: []byte)!: (n: int) {
+		return self.fd.Write(buf)?
 	}
 
 	// Like Write, but writes the contents of string s rather than a slice of bytes.
-	async fn WriteString(mut *self, s: string)!: (n: int) {
-		return self.Write(unsafe::StringBytes(s)).await?
+	fn WriteString(mut *self, s: string)!: (n: int) {
+		return self.Write(unsafe::StringBytes(s))?
 	}
 
 	// Read bytes to buffer from handle and returns read byte count.
@@ -288,47 +172,33 @@ impl File {
 	// If the buf is larger than the number of bytes that can be read,
 	// the buffer will not cause an overflow. Offset will be shifted
 	// by the number of bytes read.
-	async fn Read(mut *self, mut buf: []byte)!: (n: int) {
-		return self.fd.Read(buf).await?
-	}
-
-	// Sync variant of [Write].
-	// It is provided for blocking operations and must be used carefully
-	// in an async runtime; it blocks the thread, not the coroutine.
-	fn ReadSync(mut *self, mut buf: []byte)!: (n: int) {
-		return self.fd.ReadSync(buf)?
+	fn Read(mut *self, mut buf: []byte)!: (n: int) {
+		return self.fd.Read(buf)?
 	}
 
 	// Sets offset to next Read/Write operation and returns the new offset.
 	// whence: 0 (io::SeekStart) means, relative to the whence of the file, 1 (io::SeekCurrent)
 	// means relative to the current offset, and 2 (io::SeekEnd) means relative to end.
-	async fn Seek(mut *self, offset: i64, whence: int)!: i64 {
-		return self.fd.Seek(offset, whence).await?
+	fn Seek(mut *self, offset: i64, whence: int)!: i64 {
+		return self.fd.Seek(offset, whence)?
 	}
 
 	// Commits the current contents of the file to stable storage.
 	// Typically, this means flushing the file system's in-memory copy
 	// of recently written data to disk.
-	async fn Sync(mut *self)! {
-		self.fd.Fsync().await?
+	fn Sync(mut *self)! {
+		self.fd.Fsync()?
 	}
 
 	// Changes the size of the file.
 	// It does not change the I/O offset.
-	async fn Truncate(mut *self, size: i64)! {
-		self.fd.Ftruncate(size).await?
+	fn Truncate(mut *self, size: i64)! {
+		self.fd.Ftruncate(size)?
 	}
 
 	// Closes file handle.
-	async fn Close(mut *self)! {
-		self.fd.Close().await?
-	}
-
-	// Sync variant of [Close].
-	// It is provided for blocking operations and must be used carefully
-	// in an async runtime; it blocks the thread, not the coroutine.
-	fn CloseSync(mut *self)! {
-		self.fd.CloseSync()?
+	fn Close(mut *self)! {
+		self.fd.Close()?
 	}
 }
 

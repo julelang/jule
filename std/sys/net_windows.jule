@@ -31,7 +31,8 @@ extern unsafe fn select(int, *extern.fd_set, *extern.fd_set, *extern.fd_set, *ex
 extern unsafe fn bind(Handle, *extern.sockaddr, Socklen): int
 extern unsafe fn connect(Handle, *extern.sockaddr, Socklen): int
 extern fn listen(Handle, int): int
-extern unsafe fn accept(Handle, *extern.sockaddr, *c::Int): Handle
+extern unsafe fn accept(uintptr, *extern.sockaddr, *c::Int): uintptr
+extern unsafe fn send(uintptr, *c::Char, Socklen, int): int
 extern unsafe fn recv(uintptr, *c::Char, Socklen, int): int
 extern unsafe fn recvfrom(uintptr, *c::Char, int, int, *extern.sockaddr, *c::Int): int
 extern unsafe fn sendto(uintptr, *c::Char, int, int, *extern.sockaddr, c::Int): int
@@ -164,6 +165,45 @@ fn Getsockname(fd: Handle, addr: uintptr, addrlen: Socklen)! {
 fn Select(nfd: int, mut &r: *FdSet, mut &w: *FdSet, mut &e: *FdSet, mut &timeout: *Timeval)!: (n: int) {
 	n = unsafe { extern.select(nfd, (*extern.fd_set)(r), (*extern.fd_set)(w), (*extern.fd_set)(e), (*extern.timeval)(timeout)) }
 	if n < 0 {
+		throw Errno(WSAGetLastError())
+	}
+	return
+}
+
+fn Recv(s: uintptr, mut buf: []byte, flags: int)!: (n: int) {
+	n = unsafe { extern.recv(s, (*c::Char)(&buf[0]), Socklen(len(buf)), flags) }
+	if n == SOCKET_ERROR {
+		throw Errno(WSAGetLastError())
+	}
+	return
+}
+
+fn Recvfrom(s: uintptr, mut p: []byte, flags: int, from: uintptr, fromlen: Socklen)!: (n: int) {
+	fromlen2 := unsafe { c::Int(fromlen) }
+	n = unsafe { extern.recvfrom(s, (*c::Char)(&p[0]), len(p), flags, (*extern.sockaddr)(from), &fromlen2) }
+	if n == SOCKET_ERROR {
+		throw Errno(WSAGetLastError())
+	}
+	return
+}
+
+fn Send(s: uintptr, buf: []byte, flags: int)! {
+	r := unsafe { extern.send(s, (*c::Char)(&buf[0]), Socklen(len(buf)), flags) }
+	if r == SOCKET_ERROR {
+		throw Errno(WSAGetLastError())
+	}
+}
+
+fn Sendto(s: uintptr, buf: []byte, flags: int, to: uintptr, addrlen: Socklen)! {
+	r := unsafe { extern.sendto(s, (*c::Char)(&buf[0]), len(buf), flags, (*extern.sockaddr)(to), c::Int(addrlen)) }
+	if r == SOCKET_ERROR {
+		throw Errno(WSAGetLastError())
+	}
+}
+
+fn Accept(s: uintptr, addr: uintptr, &addrlen: *Socklen)!: (fd: uintptr) {
+	fd = unsafe { extern.accept(s, (*extern.sockaddr)(addr), (*c::Int)(addrlen)) }
+	if fd == uintptr(INVALID_SOCKET) {
 		throw Errno(WSAGetLastError())
 	}
 	return

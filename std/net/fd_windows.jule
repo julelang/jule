@@ -46,7 +46,7 @@ impl netFD {
 				throw error
 			}
 		}
-		self.pfd.ConnectEx(sockaddr, socksize).await?
+		sys::Connect(h, sockaddr, socksize)?
 		// Refresh socket properties.
 		sys::Setsockopt(h, sys::SOL_SOCKET, sys::SO_UPDATE_CONNECT_CONTEXT, 0, 0)?
 	}
@@ -66,7 +66,7 @@ impl netFD {
 		| 4:
 			mut sockaddr := sys::RawSockaddrInet4{}
 			mut sockaddrlen := sys::Socklen(mem::Sizeof(sockaddr))
-			h = self.pfd.Accept(sockfact, uintptr(&sockaddr), &sockaddrlen).await?
+			h = self.pfd.Accept(sockfact, uintptr(&sockaddr), &sockaddrlen)?
 			// Address will be handled by poll::FD.
 			ip = make(IP, IPv4Len)
 			copy(ip, IP(sockaddr.Addr[:]))
@@ -74,7 +74,7 @@ impl netFD {
 		| 6:
 			mut sockaddr := sys::RawSockaddrInet6{}
 			mut sockaddrlen := sys::Socklen(mem::Sizeof(sockaddr))
-			h = self.pfd.Accept(sockfact, uintptr(&sockaddr), &sockaddrlen).await?
+			h = self.pfd.Accept(sockfact, uintptr(&sockaddr), &sockaddrlen)?
 			// Address will be handled by poll::FD.
 			ip = make(IP, IPv6Len)
 			copy(ip, IP(sockaddr.Addr[:]))

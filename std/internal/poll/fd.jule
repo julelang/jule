@@ -34,12 +34,12 @@ const (
 
 impl FD {
 	// Returns new FD by file and kind.
-	fn New(file: u64, flags: int, pollable: bool)!: &FD {
+	fn New(file: u64, flags: int)!: &FD {
 		mut f := &FD{
 			File:  file,
 			Flags: flags,
 		}
-		f.Init(pollable)?
+		f.Init()?
 		return f
 	}
 
@@ -54,72 +54,26 @@ impl FD {
 	}
 
 	// Like Read, but wraps the recvfrom syscall.
-	async fn ReadV4(mut *self, mut buf: []byte, addr: sys::RawSockaddrInet4)!: (n: int) {
+	fn ReadV4(mut *self, mut buf: []byte, addr: sys::RawSockaddrInet4)!: (n: int) {
 		addrLen := mem::Sizeof(addr)
-		return self.ReadV(buf, uintptr(&addr), sys::Socklen(addrLen)).await?
+		return self.ReadV(buf, uintptr(&addr), sys::Socklen(addrLen))?
 	}
 
 	// Like Read, but wraps the recvfrom syscall.
-	async fn ReadV6(mut *self, mut buf: []byte, addr: sys::RawSockaddrInet6)!: (n: int) {
+	fn ReadV6(mut *self, mut buf: []byte, addr: sys::RawSockaddrInet6)!: (n: int) {
 		addrLen := mem::Sizeof(addr)
-		return self.ReadV(buf, uintptr(&addr), sys::Socklen(addrLen)).await?
+		return self.ReadV(buf, uintptr(&addr), sys::Socklen(addrLen))?
 	}
 
 	// Like Write, but wraps the sendto syscall.
-	async fn WriteV4(mut *self, buf: []byte, addr: sys::RawSockaddrInet4)!: (n: int) {
+	fn WriteV4(mut *self, buf: []byte, addr: sys::RawSockaddrInet4)!: (n: int) {
 		addrLen := mem::Sizeof(addr)
-		return self.WriteV(buf, uintptr(&addr), sys::Socklen(addrLen)).await?
+		return self.WriteV(buf, uintptr(&addr), sys::Socklen(addrLen))?
 	}
 
 	// Like Write, but wraps the sendo syscall.
-	async fn WriteV6(mut *self, buf: []byte, addr: sys::RawSockaddrInet6)!: (n: int) {
+	fn WriteV6(mut *self, buf: []byte, addr: sys::RawSockaddrInet6)!: (n: int) {
 		addrLen := mem::Sizeof(addr)
-		return self.WriteV(buf, uintptr(&addr), sys::Socklen(addrLen)).await?
+		return self.WriteV(buf, uintptr(&addr), sys::Socklen(addrLen))?
 	}
-
-	// Like Read, but wraps the recvfrom syscall.
-	fn ReadV4Sync(mut *self, mut buf: []byte, addr: sys::RawSockaddrInet4)!: (n: int) {
-		addrLen := mem::Sizeof(addr)
-		return self.ReadVSync(buf, uintptr(&addr), sys::Socklen(addrLen))?
-	}
-
-	// Like Read, but wraps the recvfrom syscall.
-	fn ReadV6Sync(mut *self, mut buf: []byte, addr: sys::RawSockaddrInet6)!: (n: int) {
-		addrLen := mem::Sizeof(addr)
-		return self.ReadVSync(buf, uintptr(&addr), sys::Socklen(addrLen))?
-	}
-
-	// Like Write, but wraps the sendto syscall.
-	fn WriteV4Sync(mut *self, buf: []byte, addr: sys::RawSockaddrInet4)!: (n: int) {
-		addrLen := mem::Sizeof(addr)
-		return self.WriteVSync(buf, uintptr(&addr), sys::Socklen(addrLen))?
-	}
-
-	// Like Write, but wraps the sendo syscall.
-	fn WriteV6Sync(mut *self, buf: []byte, addr: sys::RawSockaddrInet6)!: (n: int) {
-		addrLen := mem::Sizeof(addr)
-		return self.WriteVSync(buf, uintptr(&addr), sys::Socklen(addrLen))?
-	}
-
-	// Reports whether treating the file descriptor as async is the correct
-	// approach. If the fd has the potential to exhibit non-blocking behavior,
-	// it should be handled with async API. Behavior in sync API is undefined.
-	// However, this is not a definitive guarantee that the fd is non-blocking.
-	fn ShouldAsync(*self): bool {
-		return self.pollable
-	}
-}
-
-fn convertError(errcode: int, isFile: bool)! {
-	match errcode {
-	| runtime::pollNoError:
-		panic("convertError: pollNoError")
-	| runtime::pollErrClosing:
-		errClosing(isFile)?
-	| runtime::pollErrTimeout:
-		throw ErrDeadlineExceeded
-	| runtime::pollErrNotPollable:
-		throw ErrNotPollable
-	}
-	panic("unreachable")
 }
