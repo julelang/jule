@@ -180,42 +180,137 @@ fn parseName(msg: []byte, mut offset: int)!: (string, int) {
 	return name, original
 }
 
+// Skips a (potentially compressed) DNS name starting at position pos
+// and returns the offset immediately following the name in the original stream.
+// Zero-allocation; includes safeguards against pointer loops and excessively long names.
+#disable boundary
+fn skipName(msg: []byte, pos: int): (next: int, ok: bool) {
+	if pos < 0 || pos >= len(msg) {
+		return 0, false
+	}
+
+	mut p := pos
+	mut end := -1
+	mut jumps := 0
+	mut consumed := 0
+
+	const maxJumps = 32
+	const maxNameLen = 255
+
+	for {
+		if p >= len(msg) {
+			return 0, false
+		}
+		ln := msg[p]
+
+		if ln&0xC0 == 0xC0 {
+			if p+1 >= len(msg) {
+				return 0, false
+			}
+			if end == -1 {
+				end = p + 2
+			}
+			jumps++
+			if jumps > maxJumps {
+				return 0, false
+			}
+			ptr := (int(ln&0x3F) << 8) | int(msg[p+1])
+			if ptr >= len(msg) {
+				return 0, false
+			}
+			p = ptr
+			continue
+		}
+
+		if ln&0xC0 != 0 {
+			return 0, false
+		}
+
+		if ln == 0 {
+			p++
+			if end == -1 {
+				end = p
+			}
+			break
+		}
+
+		consumed += int(ln) + 1
+		if consumed > maxNameLen {
+			return 0, false
+		}
+		p++
+		if p+int(ln) > len(msg) {
+			return 0, false
+		}
+		p += int(ln)
+	}
+
+	return end, true
+}
+
+// Returns the transaction ID from the message header and verifies
+// that it is actually a response packet (QR=1). If the QR bit is not set, the packet
+// is rejected as non-response data (e.g., a query, stale, or spoofed response).
 #disable boundary
 fn parseResponseHead(msg: []byte): (id: u16, ok: bool) {
 	if len(msg) < 12 {
-		// short response
+		// Short response.
 		return 0, false
 	}
 	id = binary::BigEndian.DecodeU16(msg[0:bigEndianU16Size])
+	flags := binary::BigEndian.DecodeU16(msg[2 : 2+bigEndianU16Size])
+	if flags&0x8000 == 0 {
+		// QR bit is not set: this is a query, not a response.
+		return id, false
+	}
 	return id, true
 }
 
-// Parses the DNS response and returns IPAddr list with zone info if applicable.
+// Parses the DNS response and returns an IPAddr list with zone info if applicable.
+// Only records matching the target query type (A or AAAA) are accepted. This prevents
+// returning an address from the wrong family if a server/relay incorrectly responds
+// to an AAAA query with an A record.
 #disable boundary
-fn parseResponseBody(msg: []byte): ([]IPAddr, ok: bool) {
-	qdCount := binary::BigEndian.DecodeU16(msg[4 : 4+bigEndianU16Size])
-	anCount := binary::BigEndian.DecodeU16(msg[6 : 6+bigEndianU16Size])
-	mut pos := 12
-
-	// Skip questions.
-	mut i := 0
-	for i < int(qdCount); i++ {
-		_, next := parseName(msg, pos) else {
-			return nil, false
-		}
-		pos = next + 4
+fn parseResponseBody(msg: []byte): (addrs: []IPAddr, ok: bool) {
+	if len(msg) < 12 {
+		return nil, false
 	}
 
-	let mut addrs: []IPAddr
-	i = 0
-	for i < int(anCount); i++ {
-		_, next := parseName(msg, pos) else {
+	qdCount := binary::BigEndian.DecodeU16(msg[4 : 4+bigEndianU16Size])
+
+	mut pos := 12
+
+	// Skip Question section.
+	mut i := 0
+	for i < int(qdCount); i++ {
+		next, nok := skipName(msg, pos)
+		if !nok {
 			return nil, false
 		}
 		pos = next
-		if pos+10 > len(msg) {
-			// invalid RR
+		if pos+4 > len(msg) {
 			return nil, false
+		}
+		pos += 4
+	}
+
+	// Scan Answer + Authority + Additional sections
+	// Do NOT rely on header count fields (ANCOUNT/NSCOUNT/ARCOUNT); some servers
+	// or relays misreport these numbers (e.g., EDNS0 OPT records appearing in
+	// answer position and distorting ANCOUNT). Instead, continue scanning RRs
+	// until the buffer ends. An iteration cap prevents infinite loops on malformed
+	// or malicious data.
+	const maxRR = 64
+	i = 0
+	for i < maxRR && pos < len(msg); i++ {
+		next, nok := skipName(msg, pos)
+		if !nok {
+			break
+		}
+		pos = next
+		if pos+10 > len(msg) {
+			// Invalid RR.
+			break
 		}
 
 		typ := binary::BigEndian.DecodeU16(msg[pos : pos+bigEndianU16Size])
@@ -223,17 +318,18 @@ fn parseResponseBody(msg: []byte): ([]IPAddr, ok: bool) {
 		rdlen := binary::BigEndian.DecodeU16(msg[pos+8 : pos+8+bigEndianU16Size])
 		pos += 10
 
-		if class != 1 {
-			continue
-		}
-
 		if pos+int(rdlen) > len(msg) {
-			// invalid RDLENGTH
-			return nil, false
+			// Invalid RDLENGTH.
+			break
 		}
 
 		rdata := msg[pos : pos+int(rdlen)]
 		pos += int(rdlen)
+
+		if class != 1 {
+			// Non-IN class (e.g., OPT payload-size field): skip.
+			continue
+		}
 
 		match typ {
 		| _QTYPE_A:
@@ -244,14 +340,14 @@ fn parseResponseBody(msg: []byte): ([]IPAddr, ok: bool) {
 		| _QTYPE_AAAA:
 			if rdlen == IPv6Len {
 				// If link-local, return with empty zone and let caller decide what to do.
-				mut ip := make(IP, len(rdata))
+				mut ip := make(IP, IPv6Len)
 				copy(ip, rdata)
 				addrs = append(addrs, IPAddr{IP: ip, Zone: ""})
 			}
 		}
 	}
 
-	return addrs, true
+	return addrs, len(addrs) > 0
 }
 
 // Looks up the addresses and the canonical name for the given host from static host.
