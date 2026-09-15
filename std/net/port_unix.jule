@@ -6,17 +6,17 @@ use "std/internal/byteslite"
 use "std/internal/conv"
 use "std/sync"
 
-let onceReadServices = sync::Once{}
+let onceReadServices = sync::BlockingOnce{}
 
 #disable boundary
-async fn readServices() {
+fn readServices() {
 	mut file, mut ok := open("/etc/services")
 	if !ok {
 		return
 	}
 
-	mut line, ok := file.readLine().await
-	for ok; line, ok = file.readLine().await {
+	mut line, ok := file.readLine()
+	for ok; line, ok = file.readLine() {
 		// "http 80/tcp www www-http # World Wide Web HTTP"
 		mut i := byteslite::IndexByteString(line, '#')
 		if i >= 0 {
@@ -44,18 +44,18 @@ async fn readServices() {
 			}
 		}
 	}
-	file.close().await
+	file.close()
 }
 
-async fn _lookupPort(network: Network, service: string)!: (port: int) {
+fn _lookupPort(network: Network, service: string)!: (port: int) {
 	if DefaultResolver.PreferJule {
-		onceReadServices.Do(readServices).await
+		onceReadServices.Do(readServices)
 		return juleLookupPortMap(network, service)?
 	} else {
 		return integLookupPortMap(network, service) else {
 			// If integrated lookup fails, first check to see whether we
 			// have the answer baked-in to the net package.
-			onceReadServices.Do(readServices).await
+			onceReadServices.Do(readServices)
 			return juleLookupPortMap(network, service)?
 		}
 	}

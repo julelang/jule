@@ -32,8 +32,8 @@ impl UDPConn {
 	// In addition, any bind and listening error will be thrown as error.
 	//
 	// See the [Dial] function for a description of the addr parameter.
-	async fn Bind(addr: string)!: &UDPConn {
-		return udpBind(Network.UDP, addr).await?
+	fn Bind(addr: string)!: &UDPConn {
+		return udpBind(Network.UDP, addr)?
 	}
 
 	// Connects to UDP listener by given address.
@@ -42,41 +42,41 @@ impl UDPConn {
 	// In addition, any bind and listening error will be thrown as error.
 	//
 	// See the [Dial] function for a description of the addr parameter.
-	async fn Dial(addr: string)!: &UDPConn {
-		return udpDial(Network.UDP, addr).await?
+	fn Dial(addr: string)!: &UDPConn {
+		return udpDial(Network.UDP, addr)?
 	}
 
 	// Reads data from the connection.
 	// Read can be made to time out and return an error after a fixed
 	// time limit; see SetDeadline and SetReadDeadline.
-	async fn Read(mut *self, mut buf: []byte)!: (n: int) {
+	fn Read(mut *self, mut buf: []byte)!: (n: int) {
 		if self.fd == nil {
 			panic("net: UDPConn.Read: connection is closed")
 		}
 		if self.connect {
-			return self.fd.Read(buf).await?
+			return self.fd.Read(buf)?
 		}
 		if self.v6 {
-			return self.fd.ReadV6(buf, self.sockaddr6).await?
+			return self.fd.ReadV6(buf, self.sockaddr6)?
 		} else {
-			return self.fd.ReadV4(buf, self.sockaddr4).await?
+			return self.fd.ReadV4(buf, self.sockaddr4)?
 		}
 	}
 
 	// Writes data to the connection.
 	// Write can be made to time out and return an error after a fixed
 	// time limit; see SetDeadline and SetWriteDeadline.
-	async fn Write(mut *self, buf: []byte)!: (n: int) {
+	fn Write(mut *self, buf: []byte)!: (n: int) {
 		if self.fd == nil {
 			panic("net: UDPConn.Write: connection is closed")
 		}
 		if self.connect {
-			return self.fd.Write(buf).await?
+			return self.fd.Write(buf)?
 		}
 		if self.v6 {
-			return self.fd.WriteV6(buf, self.sockaddr6).await?
+			return self.fd.WriteV6(buf, self.sockaddr6)?
 		} else {
-			return self.fd.WriteV4(buf, self.sockaddr4).await?
+			return self.fd.WriteV4(buf, self.sockaddr4)?
 		}
 	}
 
@@ -148,18 +148,18 @@ impl UDPConn {
 	// Closes connection.
 	// Any blocked Read or Write operations will be unblocked and return errors.
 	// Close may or may not block until any buffered data is sent.
-	async fn Close(mut *self)! {
+	fn Close(mut *self)! {
 		if self.fd == nil {
 			return
 		}
-		self.fd.Close().await?
+		self.fd.Close()?
 		self.fd = nil
 		self.v6 = false
 	}
 }
 
-async fn udpBind(network: Network, addr: string)!: &UDPConn {
-	mut connAddr := UDPAddr.Resolve(network, addr).await?
+fn udpBind(network: Network, addr: string)!: &UDPConn {
+	mut connAddr := UDPAddr.Resolve(network, addr)?
 	mut conn := UDPConn{
 		Addr: connAddr,
 	}
@@ -167,11 +167,11 @@ async fn udpBind(network: Network, addr: string)!: &UDPConn {
 		match network {
 		| UDP | UDP4:
 			conn.sockaddr4 = sys::RawSockaddrInet4{}
-			conn.fd = socketipv4(false, uintptr(&conn.sockaddr4), connAddr, sys::SOCK_DGRAM, 0).await?
+			conn.fd = socketipv4(false, uintptr(&conn.sockaddr4), connAddr, sys::SOCK_DGRAM, 0)?
 		| UDP6:
 			conn.v6 = true
 			conn.sockaddr6 = sys::RawSockaddrInet6{}
-			conn.fd = socketipv6(false, uintptr(&conn.sockaddr6), connAddr, sys::SOCK_DGRAM, 0).await?
+			conn.fd = socketipv6(false, uintptr(&conn.sockaddr6), connAddr, sys::SOCK_DGRAM, 0)?
 		|:
 			throw &AddrError{Err: "invalid network: " + string(network)}
 		}
@@ -183,21 +183,21 @@ async fn udpBind(network: Network, addr: string)!: &UDPConn {
 			}
 			conn.v6 = true
 			conn.sockaddr6 = sys::RawSockaddrInet6{}
-			conn.fd = socketipv6(false, uintptr(&conn.sockaddr6), connAddr, sys::SOCK_DGRAM, 0).await?
+			conn.fd = socketipv6(false, uintptr(&conn.sockaddr6), connAddr, sys::SOCK_DGRAM, 0)?
 		} else {
 			if network == Network.UDP6 {
 				throw &AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr}
 			}
 			conn.Addr.IP = ipv4
 			conn.sockaddr4 = sys::RawSockaddrInet4{}
-			conn.fd = socketipv4(false, uintptr(&conn.sockaddr4), connAddr, sys::SOCK_DGRAM, 0).await?
+			conn.fd = socketipv4(false, uintptr(&conn.sockaddr4), connAddr, sys::SOCK_DGRAM, 0)?
 		}
 	}
 	return new(UDPConn, conn)
 }
 
-async fn udpDial(network: Network, addr: string)!: &UDPConn {
-	mut connAddr := UDPAddr.Resolve(network, addr).await?
+fn udpDial(network: Network, addr: string)!: &UDPConn {
+	mut connAddr := UDPAddr.Resolve(network, addr)?
 	mut conn := UDPConn{
 		Addr:    connAddr,
 		connect: true,
@@ -206,10 +206,10 @@ async fn udpDial(network: Network, addr: string)!: &UDPConn {
 		match network {
 		| UDP | UDP4:
 			conn.sockaddr4 = sys::RawSockaddrInet4{}
-			conn.fd = socketipv4(true, uintptr(&conn.sockaddr4), connAddr, sys::SOCK_DGRAM, 0).await?
+			conn.fd = socketipv4(true, uintptr(&conn.sockaddr4), connAddr, sys::SOCK_DGRAM, 0)?
 		| UDP6:
 			conn.sockaddr6 = sys::RawSockaddrInet6{}
-			conn.fd = socketipv6(true, uintptr(&conn.sockaddr6), connAddr, sys::SOCK_DGRAM, 0).await?
+			conn.fd = socketipv6(true, uintptr(&conn.sockaddr6), connAddr, sys::SOCK_DGRAM, 0)?
 		|:
 			throw &AddrError{Err: "invalid network: " + string(network)}
 		}
@@ -221,14 +221,14 @@ async fn udpDial(network: Network, addr: string)!: &UDPConn {
 			}
 			conn.v6 = true
 			conn.sockaddr6 = sys::RawSockaddrInet6{}
-			conn.fd = socketipv6(true, uintptr(&conn.sockaddr6), connAddr, sys::SOCK_DGRAM, 0).await?
+			conn.fd = socketipv6(true, uintptr(&conn.sockaddr6), connAddr, sys::SOCK_DGRAM, 0)?
 		} else {
 			if network == Network.UDP6 {
 				throw &AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr}
 			}
 			conn.Addr.IP = ipv4
 			conn.sockaddr4 = sys::RawSockaddrInet4{}
-			conn.fd = socketipv4(true, uintptr(&conn.sockaddr4), connAddr, sys::SOCK_DGRAM, 0).await?
+			conn.fd = socketipv4(true, uintptr(&conn.sockaddr4), connAddr, sys::SOCK_DGRAM, 0)?
 		}
 	}
 	return new(UDPConn, conn)

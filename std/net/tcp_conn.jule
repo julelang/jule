@@ -30,33 +30,33 @@ impl TCPConn {
 	// In addition, any bind and listening error will be thrown as error.
 	//
 	// See the [Dial] function for a description of the addr parameter.
-	async fn Dial(addr: string)!: &TCPConn {
-		return tcpDial(Network.TCP, addr, 0).await?
+	fn Dial(addr: string)!: &TCPConn {
+		return tcpDial(Network.TCP, addr, 0)?
 	}
 
 	// Same as TCPListener.Dial, but uses timeout.
-	async fn DialTimeout(addr: string, timeout: time::Duration)!: &TCPConn {
-		return tcpDial(Network.TCP, addr, timeout).await?
+	fn DialTimeout(addr: string, timeout: time::Duration)!: &TCPConn {
+		return tcpDial(Network.TCP, addr, timeout)?
 	}
 
 	// Reads data from the connection.
 	// Read can be made to time out and return an error after a fixed
 	// time limit; see SetDeadline and SetReadDeadline.
-	async fn Read(mut *self, mut buf: []byte)!: int {
+	fn Read(mut *self, mut buf: []byte)!: int {
 		if self.fd == nil {
 			panic("net: TCPConn.Read: connection is closed")
 		}
-		return self.fd.Read(buf).await?
+		return self.fd.Read(buf)?
 	}
 
 	// Writes data to the connection.
 	// Write can be made to time out and return an error after a fixed
 	// time limit; see SetDeadline and SetWriteDeadline.
-	async fn Write(mut *self, buf: []byte)!: int {
+	fn Write(mut *self, buf: []byte)!: int {
 		if self.fd == nil {
 			panic("net: TCPConn.Write: connection is closed")
 		}
-		return self.fd.Write(buf).await?
+		return self.fd.Write(buf)?
 	}
 
 	// Sets the read and write deadlines associated
@@ -138,28 +138,28 @@ impl TCPConn {
 	// Closes connection.
 	// Any blocked Read or Write operations will be unblocked and return errors.
 	// Close may or may not block until any buffered data is sent.
-	async fn Close(mut *self)! {
+	fn Close(mut *self)! {
 		if self.fd == nil {
 			return
 		}
-		self.fd.Close().await?
+		self.fd.Close()?
 		self.fd = nil
 		self.v6 = false
 	}
 }
 
-async fn tcpDial(network: Network, addr: string, mut timeout: time::Duration)!: &TCPConn {
-	mut tcpAddr := TCPAddr.Resolve(network, addr).await?
+fn tcpDial(network: Network, addr: string, mut timeout: time::Duration)!: &TCPConn {
+	mut tcpAddr := TCPAddr.Resolve(network, addr)?
 	mut fd := (&netFD)(nil)
 	mut v6 := false
 	if tcpAddr.IP.Empty() {
 		match network {
 		| TCP | TCP4:
 			mut sockaddr := sys::RawSockaddrInet4{}
-			fd = socketipv4(true, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, timeout).await?
+			fd = socketipv4(true, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, timeout)?
 		| TCP6:
 			mut sockaddr := sys::RawSockaddrInet6{}
-			fd = socketipv6(true, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, timeout).await?
+			fd = socketipv6(true, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, timeout)?
 		|:
 			throw &AddrError{Err: "invalid network: " + string(network)}
 		}
@@ -171,14 +171,14 @@ async fn tcpDial(network: Network, addr: string, mut timeout: time::Duration)!: 
 			}
 			v6 = true
 			mut sockaddr := sys::RawSockaddrInet6{}
-			fd = socketipv6(true, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, timeout).await?
+			fd = socketipv6(true, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, timeout)?
 		} else {
 			if network == Network.TCP6 {
 				throw &AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr}
 			}
 			tcpAddr.IP = ipv4
 			mut sockaddr := sys::RawSockaddrInet4{}
-			fd = socketipv4(true, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, timeout).await?
+			fd = socketipv4(true, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, timeout)?
 		}
 	}
 	return newTCPConn(&TCPConn{

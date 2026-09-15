@@ -87,17 +87,17 @@ trait Conn {
 // Common listener behavior.
 trait Listener {
 	io::Closer
-	async fn Accept(*self)!: Conn
+	fn Accept(*self)!: Conn
 	fn Network(*self): Network
 }
 
-let mut maxListenerBacklogCacheInit = sync::Once{}
+let mut maxListenerBacklogCacheInit = sync::BlockingOnce{}
 let mut maxListenerBacklogCache = 0
 
 // Caching wrapper around maxListenerBacklog.
-async fn listenerBacklog(): int {
-	maxListenerBacklogCacheInit.Do(async fn|| {
-		maxListenerBacklogCache = maxListenerBacklog().await
-	}).await
+fn listenerBacklog(): int {
+	maxListenerBacklogCacheInit.Do(fn|| {
+		maxListenerBacklogCache = maxListenerBacklog()
+	})
 	return maxListenerBacklogCache
 }

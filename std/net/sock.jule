@@ -15,10 +15,10 @@ use "std/time"
 // If the network parameter is points UDP network, function will panic.
 //
 // See the [Dial] function for a description of the network and addr parameters.
-async fn Listen(network: Network, addr: string)!: Listener {
+fn Listen(network: Network, addr: string)!: Listener {
 	match network {
 	| TCP | TCP4 | TCP6:
-		return tcpBind(network, addr).await?
+		return tcpBind(network, addr)?
 	|:
 		throw &AddrError{Err: "invalid network: " + string(network)}
 	}
@@ -29,8 +29,8 @@ async fn Listen(network: Network, addr: string)!: Listener {
 // Just for UDP networks.
 //
 // See the [Dial] function for a description of the network and addr parameters.
-async fn ListenUDP(network: Network, addr: string)!: &UDPConn {
-	return udpBind(network, addr).await?
+fn ListenUDP(network: Network, addr: string)!: &UDPConn {
+	return udpBind(network, addr)?
 }
 
 // Connects to the address on the named network.
@@ -72,20 +72,20 @@ async fn ListenUDP(network: Network, addr: string)!: &UDPConn {
 //	is converted to IPv4 successfully, will use Udp4, otherwise IPv6 and Udp6 preferred.
 //
 // It will forward any error from network connectors.
-async fn Dial(network: Network, addr: string)!: Conn {
-	return DialTimeout(network, addr, 0).await?
+fn Dial(network: Network, addr: string)!: Conn {
+	return DialTimeout(network, addr, 0)?
 }
 
 // Same as Dial, but uses timeout.
 // For UDP networks, timeout will be ignored.
 // Timeout precision is microseconds.
 // If the timeout is below one microsecond it will be ignored.
-async fn DialTimeout(network: Network, addr: string, timeout: time::Duration)!: Conn {
+fn DialTimeout(network: Network, addr: string, timeout: time::Duration)!: Conn {
 	match network {
 	| TCP | TCP4 | TCP6:
-		return tcpDial(network, addr, timeout).await?
+		return tcpDial(network, addr, timeout)?
 	| UDP | UDP4 | UDP6:
-		return udpDial(network, addr).await?
+		return udpDial(network, addr)?
 	|:
 		throw &AddrError{Err: "invalid network: " + string(network)}
 	}
@@ -95,15 +95,15 @@ fn getSocketAddr(handle: poll::NetHandle, addr: uintptr, len: sys::Socklen)! {
 	sys::Getsockname(handle, addr, len)?
 }
 
-async fn socketipv4(remote: bool, sockaddr: uintptr, mut addr: addr, typ: int, timeout: time::Duration)!: &netFD {
-	return socket(remote, sockaddr, addr, sys::AF_INET, typ, timeout).await?
+fn socketipv4(remote: bool, sockaddr: uintptr, mut addr: addr, typ: int, timeout: time::Duration)!: &netFD {
+	return socket(remote, sockaddr, addr, sys::AF_INET, typ, timeout)?
 }
 
-async fn socketipv6(remote: bool, sockaddr: uintptr, mut addr: addr, typ: int, timeout: time::Duration)!: &netFD {
-	return socket(remote, sockaddr, addr, sys::AF_INET6, typ, timeout).await?
+fn socketipv6(remote: bool, sockaddr: uintptr, mut addr: addr, typ: int, timeout: time::Duration)!: &netFD {
+	return socket(remote, sockaddr, addr, sys::AF_INET6, typ, timeout)?
 }
 
-async fn socket(remote: bool, sockaddr: uintptr, mut addr: addr, domain: int, typ: int, timeout: time::Duration)!: (fd: &netFD) {
+fn socket(remote: bool, sockaddr: uintptr, mut addr: addr, domain: int, typ: int, timeout: time::Duration)!: (fd: &netFD) {
 	let mut proto: int
 	match typ {
 	| sys::SOCK_STREAM:
@@ -146,7 +146,7 @@ async fn socket(remote: bool, sockaddr: uintptr, mut addr: addr, domain: int, ty
 		copy(addr6.Addr[:], ip)
 	}
 	setDefaultSockopts(sock) else {
-		fd.Close().await else {}
+		fd.Close() else {}
 		throw error
 	}
 	if remote {
@@ -154,27 +154,27 @@ async fn socket(remote: bool, sockaddr: uintptr, mut addr: addr, domain: int, ty
 		// Timeout is actually implemented like deadline but temporary.
 		// It will be cleared before connect return.
 		fd.init() else {
-			fd.Close().await else {}
+			fd.Close() else {}
 			throw error
 		}
-		fd.connect(sockv, sockaddr, sockaddrlen, timeout).await else {
-			fd.Close().await else {}
+		fd.connect(sockv, sockaddr, sockaddrlen, timeout) else {
+			fd.Close() else {}
 			throw error
 		}
 	} else {
 		sys::Bind(sock, sockaddr, sockaddrlen) else {
-			fd.Close().await else {}
+			fd.Close() else {}
 			throw error
 		}
 		match typ {
 		| sys::SOCK_STREAM:
 			setDefaultListenerSockopts(sock) else {
-				fd.Close().await else {}
+				fd.Close() else {}
 				throw error
 			}
-			backlog := listenerBacklog().await
+			backlog := listenerBacklog()
 			sys::Listen(sock, backlog) else {
-				fd.Close().await else {}
+				fd.Close() else {}
 				throw error
 			}
 		| sys::SOCK_DGRAM:
@@ -183,9 +183,16 @@ async fn socket(remote: bool, sockaddr: uintptr, mut addr: addr, domain: int, ty
 			panic("unreachable")
 		}
 		fd.init() else {
-			fd.Close().await else {}
+			fd.Close() else {}
 			throw error
 		}
 	}
 	return fd
+}
+
+fn timevalFromDuration(timeout: time::Duration): (tv: sys::Timeval, ok: bool) {
+	sec := i64(timeout.Seconds())
+	usec := i64((timeout - time::Duration(i64(time::Second)*sec)).Microseconds())
+	ok = sys::NewTimeval(sec, usec, &tv)
+	return
 }

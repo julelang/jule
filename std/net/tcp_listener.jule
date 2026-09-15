@@ -24,17 +24,17 @@ impl TCPListener {
 	// In addition, any bind and listening error will be thrown as error.
 	//
 	// See the [Dial] function for a description of the addr parameter.
-	async fn Bind(addr: string)!: &TCPListener {
-		return tcpBind(Network.TCP, addr).await?
+	fn Bind(addr: string)!: &TCPListener {
+		return tcpBind(Network.TCP, addr)?
 	}
 
 	// Accepts incoming connection, returns &TCPConn.
 	// Panics if connection is closed.
-	async fn Accept(*self)!: Conn {
+	fn Accept(*self)!: Conn {
 		if self.fd == nil {
 			panic("net: TCPListener.Accept: connection is not open")
 		}
-		mut fd, mut addr := self.fd.accept(self.ipv).await?
+		mut fd, mut addr := self.fd.accept(self.ipv)?
 		return newTCPConn(&TCPConn{fd: fd, Addr: addr})
 	}
 
@@ -54,18 +54,18 @@ impl TCPListener {
 	}
 
 	// Closes connection.
-	async fn Close(mut *self)! {
+	fn Close(mut *self)! {
 		if self.fd == nil {
 			return
 		}
-		self.fd.Close().await?
+		self.fd.Close()?
 		self.fd = nil
 		self.ipv = 0
 	}
 }
 
-async fn tcpBind(network: Network, addr: string)!: &TCPListener {
-	mut tcpAddr := TCPAddr.Resolve(network, addr).await?
+fn tcpBind(network: Network, addr: string)!: &TCPListener {
+	mut tcpAddr := TCPAddr.Resolve(network, addr)?
 	mut fd := (&netFD)(nil)
 	let mut ipv: int
 	if tcpAddr.IP.Empty() {
@@ -73,11 +73,11 @@ async fn tcpBind(network: Network, addr: string)!: &TCPListener {
 		| TCP | TCP4:
 			ipv = 4
 			mut sockaddr := sys::RawSockaddrInet4{}
-			fd = socketipv4(false, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, 0).await?
+			fd = socketipv4(false, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, 0)?
 		| TCP6:
 			ipv = 6
 			mut sockaddr := sys::RawSockaddrInet6{}
-			fd = socketipv6(false, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, 0).await?
+			fd = socketipv6(false, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, 0)?
 		|:
 			throw &AddrError{Err: "invalid network: " + string(network)}
 		}
@@ -89,7 +89,7 @@ async fn tcpBind(network: Network, addr: string)!: &TCPListener {
 			}
 			ipv = 6
 			mut sockaddr := sys::RawSockaddrInet6{}
-			fd = socketipv6(false, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, 0).await?
+			fd = socketipv6(false, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, 0)?
 		} else {
 			if network == Network.TCP6 {
 				throw &AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr}
@@ -97,7 +97,7 @@ async fn tcpBind(network: Network, addr: string)!: &TCPListener {
 			ipv = 4
 			tcpAddr.IP = ipv4
 			mut sockaddr := sys::RawSockaddrInet4{}
-			fd = socketipv4(false, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, 0).await?
+			fd = socketipv4(false, uintptr(&sockaddr), tcpAddr, sys::SOCK_STREAM, 0)?
 		}
 	}
 	return &TCPListener{
