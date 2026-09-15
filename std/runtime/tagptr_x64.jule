@@ -29,18 +29,18 @@ const (
 impl taggedPointer {
 	// Created a taggedPointer from a pointer and a tag.
 	// Tag bits that don't fit in the result are discarded.
-	fn pack(ptr: *unsafe, tag: uintptr): taggedPointer {
+	fn pack(ptr: uintptr, tag: uintptr): taggedPointer {
 		return taggedPointer(u64(uintptr(ptr))<<tagBits | u64(tag&(1<<tagBits-1)))
 	}
 
 	// Pointer returns the pointer from a taggedPointer.
-	fn pointer(*self): *unsafe {
+	fn pointer(*self): uintptr {
 		if Arch == "amd64" {
-			// amd64 systems can place the stack above the VA hole, so we need to sign extend
-			// val before unpacking.
-			return unsafe { (*unsafe)(uintptr(i64(*self) >> tagBits)) }
+			// amd64 systems can place the stack above the VA hole,
+			// so we need to sign extend val before unpacking.
+			return uintptr(i64(*self) >> tagBits)
 		}
-		return unsafe { (*unsafe)(uintptr(*self >> tagBits)) }
+		return uintptr(*self >> tagBits)
 	}
 
 	// Tag returns the tag from a taggedPointer.
