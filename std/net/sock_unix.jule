@@ -3,7 +3,9 @@
 // license that can be found in the LICENSE file.
 
 use "std/internal/poll"
+use "std/mem"
 use "std/sys"
+use "std/time"
 
 fn syssocket(domain: int, typ: int, proto: int)!: poll::NetHandle {
 	return sys::Socket(domain, typ, proto)?
@@ -12,4 +14,12 @@ fn syssocket(domain: int, typ: int, proto: int)!: poll::NetHandle {
 fn setDefaultSockopts(handle: poll::NetHandle)! {
 	sys::CloseOnExec(handle)
 	sys::SetNonblock(handle, false)?
+}
+
+fn setSocketTimeout(handle: poll::NetHandle, scope: int, timeout: time::Duration)! {
+	tv, ok := timevalFromDuration(timeout)
+	if !ok {
+		throw ErrInvalidTimeout
+	}
+	sys::Setsockopt(handle, sys::SOL_SOCKET, scope, uintptr(&tv), sys::Socklen(mem::Sizeof(tv)))?
 }

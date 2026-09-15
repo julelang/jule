@@ -4,11 +4,14 @@
 
 use "std/internal/poll"
 use "std/mem"
+use "std/runtime"
 use "std/sys"
 use "std/time"
 
 struct netFD {
-	pfd: &poll::FD
+	pfd:           &poll::FD
+	readDeadline:  i64
+	writeDeadline: i64
 }
 
 impl netFD {
@@ -21,16 +24,14 @@ impl netFD {
 		return poll::NetHandle(self.pfd.File)
 	}
 
-	fn SetDeadline(mut *self, mut deadline: time::Duration) {
-		//self.pfd.SetDeadline(deadline)
+	fn SetReadTimeout(mut *self, mut timeout: time::Duration)! {
+		timeout = newTimeout("SetReadTimeout", timeout)
+		setSocketTimeout(self.Handle(), sys::SO_RCVTIMEO, timeout)?
 	}
 
-	fn SetReadDeadline(mut *self, mut deadline: time::Duration) {
-		//self.pfd.SetReadDeadline(deadline)
-	}
-
-	fn SetWriteDeadline(mut *self, mut deadline: time::Duration) {
-		//self.pfd.SetWriteDeadline(deadline)
+	fn SetWriteTimeout(mut *self, mut timeout: time::Duration)! {
+		timeout = newTimeout("SetWriteTimeout", timeout)
+		setSocketTimeout(self.Handle(), sys::SO_SNDTIMEO, timeout)?
 	}
 
 	// Wrapper for [poll::FD.Write].
@@ -93,4 +94,16 @@ fn newFD(h: poll::NetHandle, flags: int, sotype: int): &netFD {
 	return &netFD{
 		pfd: pfd,
 	}
+}
+
+fn newTimeout(caller: string, timeout: time::Duration): time::Duration {
+	if timeout < time::Millisecond {
+		return 0
+	}
+	const _40Days = 40 * (24 * time::Hour)
+	if timeout > _40Days {
+		panic(caller + ": timeout exceeds 40 days")
+	}
+	milliseconds := timeout / time::Millisecond
+	return milliseconds * time::Millisecond
 }
