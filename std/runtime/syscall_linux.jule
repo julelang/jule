@@ -9,19 +9,6 @@ use "std/sys"
 
 const _NO_ERROR = 0
 
-#typedef
-extern struct epoll_data {
-	_u64: u64 `#export:"u64"`
-}
-
-#typedef
-extern struct epoll_event {
-	events: u32
-	data:   extern.epoll_data
-}
-
-type epollEvent = extern.epoll_event
-
 fn syscall(num: uintptr, arg1: uintptr, arg2: uintptr, arg3: uintptr, arg4: uintptr, arg5: uintptr, arg6: uintptr): (r: uintptr, err: sys::Errno) {
 	err = _NO_ERROR
 	r0, e0 := syscall::Syscall(num, arg1, arg2, arg3, arg4, arg5, arg6)
@@ -30,26 +17,6 @@ fn syscall(num: uintptr, arg1: uintptr, arg2: uintptr, arg3: uintptr, arg4: uint
 		err = sys::Errno(e0)
 	}
 	return
-}
-
-fn syscall_EpollCreate1(flags: i32): (fd: i32, errno: sys::Errno) {
-	r1, e := syscall(sys::SYS_EPOLL_CREATE1, uintptr(flags), 0, 0, 0, 0, 0)
-	return i32(r1), e
-}
-
-fn syscall_EpollWait(epfd: i32, mut &events: *epollEvent, maxev: i32, waitms: i32): (n: i32, sys::Errno) {
-	r1, e := syscall(sys::SYS_EPOLL_PWAIT, uintptr(epfd), uintptr(events), uintptr(maxev), uintptr(waitms), 0, 0)
-	return i32(r1), e
-}
-
-fn syscall_EpollCtl(epfd: i32, op: i32, fd: i32, mut &event: *epollEvent): (errno: sys::Errno) {
-	_, e := syscall(sys::SYS_EPOLL_CTL, uintptr(epfd), uintptr(op), uintptr(fd), uintptr(event), 0, 0)
-	return e
-}
-
-fn syscall_Eventfd(initval: i32, flags: i32): (fd: i32, errno: sys::Errno) {
-	r1, e := syscall(sys::SYS_EVENTFD2, uintptr(initval), uintptr(flags), 0, 0, 0, 0)
-	return i32(r1), e
 }
 
 fn syscall_Write(fd: uintptr, p: *unsafe, n: i32): (i32, sys::Errno) {
