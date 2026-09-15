@@ -7,27 +7,27 @@ use "std/strings"
 use "std/testing"
 
 #test
-async fn testMultiReader(t: &testing::T) {
+fn testMultiReader(t: &testing::T) {
 	let mut mr: io::Reader
 	let mut buf: []byte
 	mut nread := 0
 	mut &_buf := &buf // for closure
 	mut &_mr := &mr   // for closure
 	mut &_nread := &nread
-	withFooBar := async fn(tests: async fn()) {
+	withFooBar := fn(tests: fn()) {
 		mut r1 := strings::Reader.New("foo ")
 		mut r2 := strings::Reader.New("")
 		mut r3 := strings::Reader.New("bar")
 		unsafe {
-			*_mr = io::MultiReader(r1.Async(), r2.Async(), r3.Async())
+			*_mr = io::MultiReader(r1, r2, r3)
 			*_buf = make([]byte, 20)
 		}
-		tests().await
+		tests()
 	}
-	expectRead := async fn(size: int, expected: string, eof: bool) {
+	expectRead := fn(size: int, expected: string, eof: bool) {
 		unsafe {
 			*_nread++
-			n := (*_mr).Read((*_buf)[0:size]).await else {
+			n := (*_mr).Read((*_buf)[0:size]) else {
 				if eof {
 					if error != io::EOF {
 						t.Errorf("expected EOF, found {}", error)
@@ -55,30 +55,30 @@ async fn testMultiReader(t: &testing::T) {
 			*_buf = (*_buf)[n:]
 		}
 	}
-	withFooBar(async fn() {
-		expectRead(2, "fo", false).await
-		expectRead(5, "o ", false).await
-		expectRead(5, "bar", false).await
-		expectRead(5, "", true).await
-	}).await
-	withFooBar(async fn() {
-		expectRead(4, "foo ", false).await
-		expectRead(1, "b", false).await
-		expectRead(3, "ar", false).await
-		expectRead(1, "", true).await
-	}).await
-	withFooBar(async fn() {
-		expectRead(5, "foo ", false).await
-	}).await
+	withFooBar(fn() {
+		expectRead(2, "fo", false)
+		expectRead(5, "o ", false)
+		expectRead(5, "bar", false)
+		expectRead(5, "", true)
+	})
+	withFooBar(fn() {
+		expectRead(4, "foo ", false)
+		expectRead(1, "b", false)
+		expectRead(3, "ar", false)
+		expectRead(1, "", true)
+	})
+	withFooBar(fn() {
+		expectRead(5, "foo ", false)
+	})
 }
 
 // Test that MultiReader copies the input slice and is insulated from future modification.
 #test
-async fn testMultiReaderCopy(t: &testing::T) {
-	mut slice := []io::Reader([strings::Reader.New("hello world").Async()])
+fn testMultiReaderCopy(t: &testing::T) {
+	mut slice := []io::Reader([strings::Reader.New("hello world")])
 	mut r := io::MultiReader(slice...)
 	slice[0] = nil
-	data := io::ReadAll(r).await else {
+	data := io::ReadAll(r) else {
 		t.Errorf("unexpected error: {}", error)
 		return
 	}
@@ -91,7 +91,7 @@ async fn testMultiReaderCopy(t: &testing::T) {
 type byteAndEOFReader: byte
 
 impl io::Reader for byteAndEOFReader {
-	async fn Read(mut *self, mut p: []byte)!: int {
+	fn Read(mut *self, mut p: []byte)!: int {
 		if len(p) == 0 {
 			// Read(0 bytes) is useless. We expect no such useless
 			// calls in this test.
@@ -108,8 +108,8 @@ impl io::Reader for byteAndEOFReader {
 
 // This used to yield bytes forever; Go's issue 16795.
 #test
-async fn testMultiReaderSingleByteWithEOF(t: &testing::T) {
-	got := io::ReadAll(io::LimitedReader.New(io::MultiReader(byteAndEOFReader('a'), byteAndEOFReader('b')), 10)).await!
+fn testMultiReaderSingleByteWithEOF(t: &testing::T) {
+	got := io::ReadAll(io::LimitedReader.New(io::MultiReader(byteAndEOFReader('a'), byteAndEOFReader('b')), 10))!
 	const want = "ab"
 	if string(got) != want {
 		t.Errorf("got {}; want {}", got, want)
@@ -120,17 +120,17 @@ async fn testMultiReaderSingleByteWithEOF(t: &testing::T) {
 // chain continues to return EOF on its final read, rather than
 // yielding a (0, EOF).
 #test
-async fn testMultiReaderFinalEOF(t: &testing::T) {
-	mut r := io::MultiReader(strings::Reader.New("").Async(), byteAndEOFReader('a'))
+fn testMultiReaderFinalEOF(t: &testing::T) {
+	mut r := io::MultiReader(strings::Reader.New(""), byteAndEOFReader('a'))
 	mut buf := make([]byte, 2)
-	mut n := r.Read(buf).await else {
+	mut n := r.Read(buf) else {
 		t.Errorf("unexpected error: {}", error)
 		use 1
 	}
 	if n != 1 {
 		t.Errorf("got {}; want 1", n)
 	}
-	r.Read(buf).await else {
+	r.Read(buf) else {
 		if error != io::EOF {
 			t.Errorf("unexpected error: {}, expected EOF", error)
 		}
@@ -140,18 +140,18 @@ async fn testMultiReaderFinalEOF(t: &testing::T) {
 }
 
 #test
-async fn testInterleavedMultiReader(t: &testing::T) {
+fn testInterleavedMultiReader(t: &testing::T) {
 	mut r1 := strings::Reader.New("123")
 	mut r2 := strings::Reader.New("45678")
 
-	mut mr1 := io::MultiReader(r1.Async(), r2.Async())
+	mut mr1 := io::MultiReader(r1, r2)
 	mut mr2 := io::MultiReader(mr1)
 
 	mut buf := make([]byte, 4)
 
 	// Have mr2 use mr1's []Readers.
 	// Consume r1 (and clear it for GC to handle) and consume part of r2.
-	mut n := io::ReadFull(mr2, buf).await else {
+	mut n := io::ReadFull(mr2, buf) else {
 		t.Errorf("unexpected error: {}", error)
 		use 0
 	}
@@ -162,7 +162,7 @@ async fn testInterleavedMultiReader(t: &testing::T) {
 
 	// Consume the rest of r2 via mr1.
 	// This should not panic even though mr2 cleared r1.
-	n = io::ReadFull(mr1, buf).await else {
+	n = io::ReadFull(mr1, buf) else {
 		t.Errorf("unexpected error: {}", error)
 		use 0
 	}
