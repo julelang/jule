@@ -174,9 +174,9 @@ fn threadinit() {
 // If the parker is not nil, parks suspended thread.
 // The thread can be made runnable again by calling [parker.unpark].
 #disable nilptr
-fn tpark(mut &parker: *parker, mu: uintptr, mut reason: u32) {
+fn park(mut &parker: *parker, mu: uintptr, mut reason: u32) {
 	mut t := gett()
-	tpark2(&*t, parker, u64(mu), reason)
+	park2(&*t, parker, mu, reason)
 }
 
 // Suspends the thread t and yields the CPU.
@@ -186,7 +186,7 @@ fn tpark(mut &parker: *parker, mu: uintptr, mut reason: u32) {
 // The thread can be made runnable again by calling [parker.unpark].
 // The thread-mutex must be acquired, this function will release it.
 #disable nilptr
-fn tpark2(mut &t: *thread, mut &parker: *parker, mu: u64, mut reason: u32) {
+fn park2(mut &t: *thread, mut &parker: *parker, mu: uintptr, mut reason: u32) {
 	t.state &= ^(threadRunning | threadClosed)
 	t.state |= threadSuspended | reason
 	mutexunlock(mu)
