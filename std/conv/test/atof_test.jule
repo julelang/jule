@@ -496,7 +496,7 @@ fn _testAtof(t: &testing::T, opt: bool) {
 	for i < len(atoftests); i++ {
 		test := atoftests[i]
 		let mut err: any
-		mut out := conv::ParseFloat(test.input, 64) else {
+		mut out := conv::ParseFloat(test.input, 64) catch {
 			err = error
 			use 0
 		}
@@ -507,7 +507,7 @@ fn _testAtof(t: &testing::T, opt: bool) {
 		}
 
 		if f64(f32(out)) == out {
-			out = conv::ParseFloat(test.input, 32) else {
+			out = conv::ParseFloat(test.input, 32) catch {
 				err = error
 				use 0
 			}
@@ -525,7 +525,7 @@ fn _testAtof(t: &testing::T, opt: bool) {
 	}
 	for _, test in atof32tests {
 		let mut err: any
-		out := conv::ParseFloat(test.input, 32) else {
+		out := conv::ParseFloat(test.input, 32) catch {
 			err = error
 			use 0
 		}
@@ -553,7 +553,7 @@ fn testAtofSlow(t: &testing::T) { _testAtof(t, false) }
 fn testAtofRandom(t: &testing::T) {
 	initAtof()
 	for _, test in atofRandomTests {
-		x := conv::ParseFloat(test.s, 64) else { use 0 }
+		x := conv::ParseFloat(test.s, 64) catch { use 0 }
 		match {
 		| x == test.x:
 		| math::IsNaN(test.x) && math::IsNaN(x):
@@ -588,7 +588,7 @@ fn testRoundTrip(t: &testing::T) {
 			t.Errorf("no-opt FormatFloat({}) = {}, want {}", tt.f, s, tt.s)
 		}
 		let mut err: any
-		mut f := conv::ParseFloat(tt.s, 64) else {
+		mut f := conv::ParseFloat(tt.s, 64) catch {
 			err = error
 			use tt.f
 		}
@@ -600,7 +600,7 @@ fn testRoundTrip(t: &testing::T) {
 		if s != tt.s {
 			t.Errorf("opt FormatFloat({}) = {}, want {}", tt.f, s, tt.s)
 		}
-		f = conv::ParseFloat(tt.s, 64) else {
+		f = conv::ParseFloat(tt.s, 64) catch {
 			err = error
 			use tt.f
 		}
@@ -625,7 +625,7 @@ fn testRoundTrip32(t: &testing::T) {
 		s := conv::FormatFloat(f64(f), 'g', -1, 32)
 
 		let mut err: any
-		parsed := conv::ParseFloat(s, 32) else {
+		parsed := conv::ParseFloat(s, 32) catch {
 			err = error
 			use 0
 		}
@@ -653,7 +653,7 @@ fn testParseFloatIncorrectBitSize(t: &testing::T) {
 	)
 
 	for _, bitSize in [0, 10, 100, 128] {
-		f := conv::ParseFloat(s, bitSize) else {
+		f := conv::ParseFloat(s, bitSize) catch {
 			t.Errorf("ParseFloat({}, {}) gave error {}", s, bitSize, error)
 			continue
 		}

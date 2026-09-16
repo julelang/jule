@@ -253,7 +253,7 @@ impl Reader {
 	// Each record is a slice of fields.
 	fn ReadAll(mut *self)!: (records: [][]string) {
 		for {
-			mut record := self.readRecord(nil) else {
+			mut record := self.readRecord(nil) catch {
 				if error == io::EOF {
 					return
 				}
@@ -269,14 +269,14 @@ impl Reader {
 	fn readLine(mut *self)!: []byte {
 		mut _EOF := false
 		mut line, mut full := self.r.ReadSlice('\n')?
-		self.r.Read(nil) else {
+		self.r.Read(nil) catch {
 			// Detect if reached to EOF.
 			_EOF = error == io::EOF
 		}
 		if full {
 			self.rawBuffer = append(self.rawBuffer[:0], line...)
 			for full {
-				line, full = self.r.ReadSlice('\n') else {
+				line, full = self.r.ReadSlice('\n') catch {
 					if error == io::EOF {
 						_EOF = true
 						break
@@ -423,7 +423,7 @@ impl Reader {
 						// Hit end of line (copy all data so far).
 						self.recordBuffer = append(self.recordBuffer, line...)
 						pos.col += len(line)
-						line = self.readLine() else {
+						line = self.readLine() catch {
 							if error != io::EOF {
 								throw error
 							}

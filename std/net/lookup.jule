@@ -394,22 +394,22 @@ fn lookupParallel(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype1: u16, qt
 	write := fn(mut &buf: *[]byte, id: u16, qtype: u16): (ok: bool) {
 		binary::BigEndian.PutU16((*buf)[idPos:], id)       // Write id to buf.
 		binary::BigEndian.PutU16((*buf)[qtypePos:], qtype) // Write current qtype to buf.
-		conn.Write(*buf) else { return false }
+		conn.Write(*buf) catch { return false }
 		return true
 	}
 
 	read := fn(mut &buf: *[]byte, mut &results: *[]IPAddr): (id: u16, ok: bool) {
 		let mut n: int
 		if conf.useTCP {
-			n = io::ReadFull(conn, (*buf)[:bigEndianU16Size]) else { use 0 }
+			n = io::ReadFull(conn, (*buf)[:bigEndianU16Size]) catch { use 0 }
 			if n > 0 {
 				ln := binary::BigEndian.DecodeU16((*buf)[:bigEndianU16Size])
 				growBuffer(buf, int(ln))
-				n = io::ReadFull(conn, *buf) else { use 0 }
+				n = io::ReadFull(conn, *buf) catch { use 0 }
 			}
 		} else {
 			for {
-				n = conn.Read((*buf)[:maxDNSPacketSize]) else { use 0 }
+				n = conn.Read((*buf)[:maxDNSPacketSize]) catch { use 0 }
 				break
 			}
 		}
@@ -481,18 +481,18 @@ fn lookupSingle(mut &buf: *[]byte, mut conn: Conn, idPos: int, qtype: u16, qtype
 
 	mut attempt := 0
 	for attempt < conf.attempts; attempt++ {
-		conn.Write(*buf) else { continue }
+		conn.Write(*buf) catch { continue }
 
 		let mut n: int
 		if conf.useTCP {
-			n = io::ReadFull(conn, (*buf)[:bigEndianU16Size]) else { use 0 }
+			n = io::ReadFull(conn, (*buf)[:bigEndianU16Size]) catch { use 0 }
 			if n > 0 {
 				ln := binary::BigEndian.DecodeU16((*buf)[:bigEndianU16Size])
 				growBuffer(buf, int(ln))
-				n = io::ReadFull(conn, *buf) else { use 0 }
+				n = io::ReadFull(conn, *buf) catch { use 0 }
 			}
 		} else {
-			n = conn.Read((*buf)[:maxDNSPacketSize]) else { use 0 }
+			n = conn.Read((*buf)[:maxDNSPacketSize]) catch { use 0 }
 		}
 		if n <= 0 {
 			continue
@@ -598,7 +598,7 @@ fn juleLookupIP(net: Network, host: string)!: []IPAddr {
 		if isFQDN || dots >= conf.ndots {
 			mut results, ok := lookupQuery(&buf, conn, net, host)?
 			if ok {
-				conn.Close() else {}
+				conn.Close() catch {}
 				return results
 			}
 		}
@@ -606,12 +606,12 @@ fn juleLookupIP(net: Network, host: string)!: []IPAddr {
 			fqdn := baseName + "." + suffix
 			mut results, ok := lookupQuery(&buf, conn, net, fqdn)?
 			if ok {
-				conn.Close() else {}
+				conn.Close() catch {}
 				return results
 			}
 		}
 
-		conn.Close() else {}
+		conn.Close() catch {}
 	}
 
 	throw errors::New("resolution failed for " + host)
@@ -626,7 +626,7 @@ fn lookupIPAddr(net: Network, host: string)!: []IPAddr {
 	}
 
 	// If parseAddr can parse host, it is a literal.
-	mut ip := parseAddr(host) else {
+	mut ip := parseAddr(host) catch {
 		// Host is not literal.
 		// We need to lookup DNS and resolve the IP.
 		if DefaultResolver.PreferJule {
@@ -648,7 +648,7 @@ const maxPortBufSize = len("mobility-header") + 10
 fn juleLookupPortMap(network: Network, service: string)!: (port: int) {
 	match network {
 	| IP: // no hints
-		return lookupPortMapWithNetwork(Network.TCP, Network.IP, service) else {
+		return lookupPortMapWithNetwork(Network.TCP, Network.IP, service) catch {
 			return lookupPortMapWithNetwork(Network.UDP, Network.IP, service)?
 		}
 	| TCP | TCP4 | TCP6:

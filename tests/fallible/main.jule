@@ -49,14 +49,14 @@ fn anonForward()! {
 
 fn anonForward1()! {
 	fn()! {
-		err() else { throw error }
+		err() catch { throw error }
 	}()?
 }
 
 fn closureForward()! {
 	fn()! {
 		err()?
-	}() else {
+	}() catch {
 		fn()! {
 			throw error
 		}()?
@@ -66,9 +66,9 @@ fn closureForward()! {
 fn closureForward1()! {
 	fn()! {
 		throw "cf1"
-	}() else {
+	}() catch {
 		fn()! {
-			err() else {
+			err() catch {
 				throw error
 			}
 		}()?
@@ -78,7 +78,7 @@ fn closureForward1()! {
 fn closureForward2()! {
 	fn()! {
 		throw "cf2"
-	}() else {
+	}() catch {
 		fn()! {
 			throw error
 		}()?
@@ -93,13 +93,13 @@ fn deferTestForwarding()!: (x: int) {
 	}
 	return fn()!: int {
 		throw "arbitrary error"
-	}() else {
+	}() catch {
 		throw error
 	}
 }
 
 fn init() {
-	deferTestForwarding() else {}
+	deferTestForwarding() catch {}
 	if !deferWorks {
 		panic("deferred call did not executed")
 	}
@@ -107,55 +107,55 @@ fn init() {
 	// Test dynamic-type handling.
 	let mut x: any
 	x = successRet()!
-	x = failRet() else {
+	x = failRet() catch {
 		use 20
 	}
 
 	// Test integer arithmetic assignment.
 	let mut z: int = 30
-	z += failRet() else { use 20 }
+	z += failRet() catch { use 20 }
 	if z != 50 {
 		panic("expected 50")
 	}
 
 	// Test float arithmetic assignment.
 	let mut k: f64 = 30
-	k /= failRet1() else { use 0 }
+	k /= failRet1() catch { use 0 }
 	if k != math::Inf(+1) {
 		panic("expected +Inf")
 	}
 }
 
 fn main() {
-	successVoid() else {
+	successVoid() catch {
 		panic("successVoid failed, should be success")
 	}
-	failVoid() else {
+	failVoid() catch {
 		println("handled error of failVoid")
 	}
 
-	successRet() else {
+	successRet() catch {
 		panic("successRet failed, should be success")
 	}
-	failRet() else {
+	failRet() catch {
 		println("handled error of failRet")
 	}
 
-	successRet1() else {
+	successRet1() catch {
 		panic("successRet1 failed, should be success")
 	}
-	failRet1() else {
+	failRet1() catch {
 		println("handled error of failRet1")
 	}
 
-	successRet2() else {
+	successRet2() catch {
 		panic("success_ret2 failed, should be success")
 	}
-	failRet2() else {
+	failRet2() catch {
 		println("handled error of failRet2")
 	}
 
-	anonForward() else {
+	anonForward() catch {
 		if error != "bar" {
 			panic("expected \"bar\"")
 		}
@@ -163,7 +163,7 @@ fn main() {
 	}
 	panic("expected error for anonForward")
 AF:
-	anonForward1() else {
+	anonForward1() catch {
 		if error != "bar" {
 			panic("expected \"bar\"")
 		}
@@ -171,7 +171,7 @@ AF:
 	}
 	panic("expected error for anonForward1")
 AF1:
-	closureForward() else {
+	closureForward() catch {
 		if error != "bar" {
 			panic("expected \"bar\"")
 		}
@@ -179,7 +179,7 @@ AF1:
 	}
 	panic("expected error for closureForward")
 CF:
-	closureForward1() else {
+	closureForward1() catch {
 		if error != "bar" {
 			panic("expected \"bar\"")
 		}
@@ -187,7 +187,7 @@ CF:
 	}
 	panic("expected error for closureForward1")
 CF1:
-	closureForward2() else {
+	closureForward2() catch {
 		if error != "cf2" {
 			panic("expected \"bar\"")
 		}

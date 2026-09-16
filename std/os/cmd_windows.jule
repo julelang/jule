@@ -267,7 +267,7 @@ fn findExecutable(file: string, exts: []string)!: string {
 		return file
 	}
 	if hasExt(file) {
-		chkStat(file) else { goto Keep }
+		chkStat(file) catch { goto Keep }
 		return file
 	Keep:
 		// Keep checking exts below, so that programs with weird names
@@ -275,7 +275,7 @@ fn findExecutable(file: string, exts: []string)!: string {
 	}
 	for _, e in exts {
 		f := file + e
-		chkStat(f) else { continue }
+		chkStat(f) catch { continue }
 		return f
 	}
 	if hasExt(file) {
@@ -348,7 +348,7 @@ fn lookPath(file: string)!: string {
 // Implements lookPath for the given PATHEXT list.
 fn _lookPath(file: string, exts: []string)!: string {
 	if strings::ContainsAny(file, `:\/`) {
-		return findExecutable(file, exts) else { throw &lookpathError{file, error} }
+		return findExecutable(file, exts) catch { throw &lookpathError{file, error} }
 	}
 
 	// On Windows, creating the NoDefaultCurrentDirectoryInExePath
@@ -362,7 +362,7 @@ fn _lookPath(file: string, exts: []string)!: string {
 	// See also go.dev/issue/43947.
 	_, found := LookupEnv("NoDefaultCurrentDirectoryInExePath")
 	if !found {
-		f := findExecutable(filepathlite::Join(".", file), exts) else { use "><" }
+		f := findExecutable(filepathlite::Join(".", file), exts) catch { use "><" }
 		if f != "><" {
 			return f
 		}
@@ -378,7 +378,7 @@ fn _lookPath(file: string, exts: []string)!: string {
 			continue
 		}
 
-		f := findExecutable(filepathlite::Join(dir, file), exts) else { continue }
+		f := findExecutable(filepathlite::Join(dir, file), exts) catch { continue }
 		if dotErr != nil {
 			// https://go.dev/issue/53536: if we resolved a relative path implicitly,
 			// and it is the same executable that would be resolved from the explicit %PATH%,
@@ -387,13 +387,13 @@ fn _lookPath(file: string, exts: []string)!: string {
 			//
 			// Otherwise, return the errDot for the implicit path as soon as we find
 			// out that the explicit one doesn't match.
-			dotfi := Lstat(dotf) else {
+			dotfi := Lstat(dotf) catch {
 				if dotErr != nil {
 					unsafe throw dotErr
 				}
 				return dotf
 			}
-			fi := Lstat(f) else {
+			fi := Lstat(f) catch {
 				if dotErr != nil {
 					unsafe throw dotErr
 				}

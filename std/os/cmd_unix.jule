@@ -57,28 +57,28 @@ impl Cmd {
 			}
 
 			if self.Dir != "" {
-				os::Chdir(self.Dir) else {
+				os::Chdir(self.Dir) catch {
 					writeErrAndExit(error.(sys::Errno))
 				}
 			}
 
-			cmdsetenv(&env) else {
+			cmdsetenv(&env) catch {
 				writeErrAndExit(error.(sys::Errno))
 			}
 
 			// Call dup for standard input/output if they are different.
 			if stdin.fd.File != u64(sys::STDIN) {
-				sys::Dup2(int(stdin.fd.File), int(sys::STDIN)) else { writeErrAndExit(error.(sys::Errno)) }
+				sys::Dup2(int(stdin.fd.File), int(sys::STDIN)) catch { writeErrAndExit(error.(sys::Errno)) }
 			}
 			if stdout.fd.File != u64(sys::STDOUT) {
-				sys::Dup2(int(stdout.fd.File), int(sys::STDOUT)) else { writeErrAndExit(error.(sys::Errno)) }
+				sys::Dup2(int(stdout.fd.File), int(sys::STDOUT)) catch { writeErrAndExit(error.(sys::Errno)) }
 			}
 			if stderr.fd.File != u64(sys::STDERR) {
-				sys::Dup2(int(stderr.fd.File), int(sys::STDERR)) else { writeErrAndExit(error.(sys::Errno)) }
+				sys::Dup2(int(stderr.fd.File), int(sys::STDERR)) catch { writeErrAndExit(error.(sys::Errno)) }
 			}
 
 			// Time to run.
-			sys::Exec(path, args, env) else {
+			sys::Exec(path, args, env) catch {
 				writeErrAndExit(error.(sys::Errno))
 			}
 			// If execvp was successful, this statement would not be reached.
@@ -100,7 +100,7 @@ impl Cmd {
 	}
 
 	fn kill(*self)! {
-		sys::Kill(self.attrs.pid, 1) else {
+		sys::Kill(self.attrs.pid, 1) catch {
 			self.attrs.pid = invalidPid
 			throw error
 		}
@@ -125,7 +125,7 @@ fn findExecutable(file: string)! {
 	if m.IsDir() {
 		throw sys::Errno(sys::EISDIR)
 	}
-	unix::Eaccess(file, unix::X_OK) else {
+	unix::Eaccess(file, unix::X_OK) catch {
 		// ENOSYS means Eaccess is not available or not implemented.
 		// EPERM can be returned by Linux containers employing seccomp.
 		// In both cases, fall back to checking the permission bits.
@@ -145,7 +145,7 @@ fn findExecutable(file: string)! {
 // Otherwise, on success, the result is an absolute path.
 fn lookPath(file: string)!: string {
 	if byteslite::IndexByteString(file, '/') != -1 {
-		findExecutable(file) else {
+		findExecutable(file) catch {
 			throw &lookpathError{file, error}
 		}
 		return file
@@ -157,7 +157,7 @@ fn lookPath(file: string)!: string {
 			dir = "."
 		}
 		path = filepathlite::Join(dir, file)
-		findExecutable(path) else { continue }
+		findExecutable(path) catch { continue }
 		if !filepathlite::IsAbs(path) {
 			throw &lookpathError{file, errDot}
 		}

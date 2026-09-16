@@ -76,14 +76,14 @@ impl FD {
 			mut nn := 0
 			match {
 			| self.Flags&Console != 0:
-				nn = self.writeConsole(b) else {
+				nn = self.writeConsole(b) catch {
 					if n > 0 {
 						return n
 					}
 					throw error
 				}
 			| self.Flags&(File|Pipe) != 0:
-				nn = self.writeFile(b) else {
+				nn = self.writeFile(b) catch {
 					if n > 0 {
 						return n
 					}
@@ -247,7 +247,7 @@ impl FD {
 
 	// Reads from file handle into buf, returns read byte count.
 	fn readFile(mut *self, mut buf: []byte)!: (n: int) {
-		return sys::ReadFile(sys::Handle(self.File), buf) else {
+		return sys::ReadFile(sys::Handle(self.File), buf) catch {
 			if error == sys::ERROR_BROKEN_PIPE {
 				// Work around ERROR_BROKEN_PIPE is returned on reading EOF from stdin.
 				return 0
@@ -333,7 +333,7 @@ impl FD {
 	fn Accept(mut *self, sockaddr: uintptr, &addrsize: *sys::Socklen)!: NetHandle {
 		h := uintptr(self.File)
 		for {
-			sock := sys::Accept(h, sockaddr, addrsize) else {
+			sock := sys::Accept(h, sockaddr, addrsize) catch {
 				// Sometimes we see WSAECONNRESET and ERROR_NETNAME_DELETED is
 				// returned here. These happen if connection reset is received
 				// before Accept could complete. These errors relate to new
@@ -346,8 +346,8 @@ impl FD {
 				throw error
 			}
 			// Inherit properties of the listening socket.
-			sys::Setsockopt(sock, sys::SOL_SOCKET, sys::SO_UPDATE_ACCEPT_CONTEXT, uintptr(&self.File), sys::Socklen(mem::Sizeof(self.File))) else {
-				sys::CloseSocket(sys::Handle(sock)) else {}
+			sys::Setsockopt(sock, sys::SOL_SOCKET, sys::SO_UPDATE_ACCEPT_CONTEXT, uintptr(&self.File), sys::Socklen(mem::Sizeof(self.File))) catch {
+				sys::CloseSocket(sys::Handle(sock)) catch {}
 				throw error
 			}
 			return sock
@@ -394,7 +394,7 @@ struct operation {
 
 // Executes a single IO operation o.
 fn execIO(o: operation)!: int {
-	return o.op() else {
+	return o.op() catch {
 		// More data available. Return back the size of received data.
 		if error == sys::ERROR_MORE_DATA || error == windows::WSAEMSGSIZE {
 			return o.bufSize

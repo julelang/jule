@@ -534,7 +534,7 @@ impl URL {
 	// In general, code should call EscapedPath instead of reading self.RawPath directly.
 	fn EscapedPath(*self): string {
 		if self.RawPath != "" && validEncoded(self.RawPath, encodingPath) {
-			p := unescape(self.RawPath, encodingPath) else { goto skip }
+			p := unescape(self.RawPath, encodingPath) catch { goto skip }
 			if p == self.Path {
 				return self.RawPath
 			}
@@ -554,7 +554,7 @@ impl URL {
 	// In general, code should call EscapedFragment instead of reading self.RawFragment directly.
 	fn EscapedFragment(*self): string {
 		if self.RawFragment != "" && validEncoded(self.RawFragment, encodingFragment) {
-			f := unescape(self.RawFragment, encodingFragment) else { goto skip }
+			f := unescape(self.RawFragment, encodingFragment) catch { goto skip }
 			if f == self.Fragment {
 				return self.RawFragment
 			}
@@ -1078,13 +1078,13 @@ fn parse(rawURL: string, viaRequest: bool)!: &URL {
 fn Parse(rawURL: string)!: &URL {
 	// Cut off #frag
 	u, frag, _ := strings::Cut(rawURL, "#")
-	mut url := parse(u, false) else {
+	mut url := parse(u, false) catch {
 		throw &Error{"parse", u, error}
 	}
 	if frag == "" {
 		return url
 	}
-	url.setFragment(frag) else {
+	url.setFragment(frag) catch {
 		throw &Error{"parse", rawURL, error}
 	}
 	return url
@@ -1096,7 +1096,7 @@ fn Parse(rawURL: string)!: &URL {
 // a #fragment suffix.
 // (Web browsers strip #fragment before sending the URL to a web server.)
 fn ParseRequestURI(rawURL: string)!: &URL {
-	return parse(rawURL, true) else {
+	return parse(rawURL, true) catch {
 		throw &Error{"parse", rawURL, error}
 	}
 }

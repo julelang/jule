@@ -25,8 +25,8 @@ impl netFD {
 		}
 
 		sys::SetNonblock(fd, true)?
-		defer { sys::SetNonblock(fd, false) else {} }
-		sys::Connect(fd, sockaddr, socksize) else {
+		defer { sys::SetNonblock(fd, false) catch {} }
+		sys::Connect(fd, sockaddr, socksize) catch {
 			if error == sys::EISCONN {
 				return
 			}
@@ -37,7 +37,7 @@ impl netFD {
 			fds.Zero()
 			fds.Set(fd)
 			for {
-				res := sys::Select(fd+1, nil, &fds, nil, &tv) else {
+				res := sys::Select(fd+1, nil, &fds, nil, &tv) catch {
 					if error != sys::EINTR {
 						throw error
 					}
@@ -91,8 +91,8 @@ impl netFD {
 		}
 		addr = &TCPAddr{IP: ip, Port: port}
 		fd = newFD(h, poll::Socket, sys::SOCK_STREAM)
-		fd.init() else {
-			fd.Close() else {}
+		fd.init() catch {
+			fd.Close() catch {}
 			throw error
 		}
 		return

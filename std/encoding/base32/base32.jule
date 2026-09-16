@@ -462,7 +462,7 @@ struct decoder {
 
 fn readEncodedData(mut r: io::Reader, mut buf: []byte, min: int, expectsPadding: bool)!: (n: int) {
 	for n < min {
-		nn := r.Read(buf[n:]) else {
+		nn := r.Read(buf[n:]) catch {
 			if error == io::EOF {
 				// Data was read, less than min bytes could be read.
 				if n < min && n > 0 {
@@ -521,7 +521,7 @@ impl io::Reader for decoder {
 
 		mut buf := unsafe::Slice(&self.buf[0], len(self.buf), len(self.buf))
 
-		nn = readEncodedData(self.r, buf[self.nbuf:nn], min, expectsPadding) else {
+		nn = readEncodedData(self.r, buf[self.nbuf:nn], min, expectsPadding) catch {
 			self.err = error
 			unsafe throw self.err
 		}
@@ -542,7 +542,7 @@ impl io::Reader for decoder {
 		if nw > len(p) {
 			mut outbuf := unsafe::Slice(&self.outbuf[0], len(self.outbuf), len(self.outbuf))
 
-			nw, self.end = self.enc.decode(outbuf[0:], buf[0:nr]) else {
+			nw, self.end = self.enc.decode(outbuf[0:], buf[0:nr]) catch {
 				self.err = error
 				unsafe throw self.err
 			}
@@ -550,7 +550,7 @@ impl io::Reader for decoder {
 			n = copy(p, self.out)
 			self.out = self.out[n:]
 		} else {
-			n, self.end = self.enc.decode(p, buf[0:nr]) else {
+			n, self.end = self.enc.decode(p, buf[0:nr]) catch {
 				self.err = error
 				unsafe throw self.err
 			}

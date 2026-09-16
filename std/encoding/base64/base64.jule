@@ -499,7 +499,7 @@ impl io::WriteCloser for encoder {
 				return
 			}
 			self.enc.Encode(out, buf)
-			self.w.Write(out[:4]) else {
+			self.w.Write(out[:4]) catch {
 				self.err = error
 			}
 			if self.err != nil {
@@ -519,7 +519,7 @@ impl io::WriteCloser for encoder {
 				nn -= nn % 3
 			}
 			self.enc.Encode(out, p[:nn])
-			self.w.Write(out[0 : nn/3*4]) else {
+			self.w.Write(out[0 : nn/3*4]) catch {
 				self.err = error
 			}
 			if self.err != nil {
@@ -546,7 +546,7 @@ impl io::WriteCloser for encoder {
 		if self.err == nil && self.nbuf > 0 {
 			mut buf, mut out := self.getBufOut()
 			self.enc.Encode(out[:], buf[:self.nbuf])
-			self.w.Write(out[:self.enc.EncodedLen(self.nbuf)]) else {
+			self.w.Write(out[:self.enc.EncodedLen(self.nbuf)]) catch {
 				self.err = error
 			}
 			self.nbuf = 0
@@ -595,7 +595,7 @@ impl io::Reader for decoder {
 			if nn > len(buf) {
 				nn = len(buf)
 			}
-			self.nbuf += self.r.Read(buf[self.nbuf:nn]) else {
+			self.nbuf += self.r.Read(buf[self.nbuf:nn]) catch {
 				self.readErr = error
 				break
 			}
@@ -604,7 +604,7 @@ impl io::Reader for decoder {
 		if self.nbuf < 4 {
 			if self.enc.padChar == NoPadding && self.nbuf > 0 {
 				// Decode final fragment, without padding.
-				nw := self.enc.Decode(outbuf[:], buf[:self.nbuf]) else {
+				nw := self.enc.Decode(outbuf[:], buf[:self.nbuf]) catch {
 					self.err = error
 					throw error
 				}
@@ -630,7 +630,7 @@ impl io::Reader for decoder {
 		nr := self.nbuf / 4 * 4
 		mut nw := self.nbuf / 4 * 3
 		if nw > len(p) {
-			nw = self.enc.Decode(outbuf[:], buf[:nr]) else {
+			nw = self.enc.Decode(outbuf[:], buf[:nr]) catch {
 				self.err = error
 				throw error
 			}
@@ -638,7 +638,7 @@ impl io::Reader for decoder {
 			n = copy(p, self.out)
 			self.out = self.out[n:]
 		} else {
-			n = self.enc.Decode(p, buf[:nr]) else {
+			n = self.enc.Decode(p, buf[:nr]) catch {
 				self.err = error
 				throw error
 			}

@@ -3911,7 +3911,7 @@ fn Getgroups()!: (gids: []int) {
 }
 
 fn isGroupMember(gid: int): bool {
-	groups := Getgroups() else {
+	groups := Getgroups() catch {
 		return false
 	}
 	for _, gid2 in groups {
@@ -3925,7 +3925,7 @@ fn isGroupMember(gid: int): bool {
 fn isCapDacOverrideSet(): bool {
 	hdr := CapUserHeader{Version: LINUX_CAPABILITY_VERSION_3}
 	let mut data: [2]CapUserData
-	Capget(hdr, &data[0]) else {
+	Capget(hdr, &data[0]) catch {
 		return false
 	}
 	return data[0].Effective&(1<<CAP_DAC_OVERRIDE) != 0
@@ -3936,7 +3936,7 @@ fn Faccessat(dirfd: int, path: string, mut mode: u32, flags: int)! {
 		faccessat(dirfd, path, mode)?
 	}
 
-	Faccessat2(dirfd, path, mode, flags) else {
+	Faccessat2(dirfd, path, mode, flags) catch {
 		if error != EPERM {
 			throw error
 		}

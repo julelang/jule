@@ -45,13 +45,13 @@ fn init() {
 fn openOutput(path: string): &os::File {
 	dir := filepath::Dir(path)
 
-	os::Stat(dir) else {
-		os::Mkdir(dir) else {
+	os::Stat(dir) catch {
+		os::Mkdir(dir) catch {
 			julecThrow("a problem occurs when code generation")
 		}
 	}
 
-	return os::Create(path) else {
+	return os::Create(path) catch {
 		julecThrow("a problem occurs when code generation")
 		use nil
 	}
@@ -59,7 +59,7 @@ fn openOutput(path: string): &os::File {
 
 // Remove generated objects for compilation.
 fn clearObjects(compilePath: string) {
-	os::Remove(compilePath) else {
+	os::Remove(compilePath) catch {
 		println("a problem occurs when object cleaning")
 		return
 	}
@@ -67,7 +67,7 @@ fn clearObjects(compilePath: string) {
 	// All created objects are cleaned.
 	// So, deletes directory if empty after cleaned all objects,
 	// if not, leaves the directory.
-	os::Rmdir(OutDir) else {}
+	os::Rmdir(OutDir) catch {}
 }
 
 // Compile generated IR.
@@ -75,7 +75,7 @@ fn compileIR(compilePath: string, compiler: string, mut compilerArgs: []string) 
 	mut cmd := os::Cmd.New(compiler, compilerArgs...)
 	cmd.Stdout(os::Stdout())!
 	cmd.Stderr(os::Stderr())!
-	cmd.Start() else {
+	cmd.Start() catch {
 		ansi::Print(ansi::Red, "back-end compiler could not used: "+fmt::Sprint(error))
 		julecThrow("")
 	}
@@ -505,7 +505,7 @@ fn checkFlags(args: []string): []string {
 	fs.AddVar[bool](unsafe { (&bool)(&opt::Len) }, "opt-len", 0, "Len optimizations")
 	fs.AddVar[bool](unsafe { (&bool)(&opt::StdStrings) }, "opt-std-strings", 0, "Special optimizations for the std/strings package")
 
-	mut content := fs.Parse(args) else {
+	mut content := fs.Parse(args) catch {
 		julecThrow(error.(string))
 		use nil // Avoid error.
 	}
@@ -536,13 +536,13 @@ fn buildIR(args: []string): &obj::IR {
 	} else if len(content) > 1 {
 		julecThrow("undefined content: " + content[1])
 	}
-	mut path := filepath::Abs(content[0]) else {
+	mut path := filepath::Abs(content[0]) catch {
 		julecThrow("compile path could not processed because of a problem")
 		use "" // unreachable
 	}
 
 	// Check standard library.
-	inf := os::Stat(build::PathStdlib()) else {
+	inf := os::Stat(build::PathStdlib()) catch {
 		julecThrow("standard library is not exist")
 		return nil // Avoid error.
 	}
@@ -583,7 +583,7 @@ fn codegenSingleUnit(mut ir: &obj::IR) {
 	}
 
 	mut file := openOutput(compilePath)
-	file.Write(unsafe { oc.Buf.Buf() }) else {
+	file.Write(unsafe { oc.Buf.Buf() }) catch {
 		julecThrow("object code could not write")
 	}
 	file.Close()!

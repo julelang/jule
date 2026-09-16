@@ -143,7 +143,7 @@ impl Reader {
 		// Read new data: try a limited number of times.
 		mut i := maxConsecutiveEmptyReads
 		for i > 0; i-- {
-			n := self.rd.Read(self.buf[self.w:]) else {
+			n := self.rd.Read(self.buf[self.w:]) catch {
 				self.err = error
 				return
 			}
@@ -274,7 +274,7 @@ impl Reader {
 			if len(p) >= len(self.buf) {
 				// Large read, empty buffer.
 				// Read directly into p to avoid copy.
-				n = self.rd.Read(p) else {
+				n = self.rd.Read(p) catch {
 					self.err = error
 					unsafe throw self.readErr()
 				}
@@ -291,7 +291,7 @@ impl Reader {
 			// Do not use self.fill, which will loop.
 			self.r = 0
 			self.w = 0
-			n = self.rd.Read(self.buf) else {
+			n = self.rd.Read(self.buf) catch {
 				self.err = error
 				unsafe throw self.readErr()
 			}
@@ -577,7 +577,7 @@ impl Reader {
 
 		for self.r < self.w {
 			// self.r < self.w => buffer is not empty
-			m := self.writeBuf(w) else {
+			m := self.writeBuf(w) catch {
 				if n > 0 {
 					return n
 				}
@@ -684,7 +684,7 @@ impl Writer {
 		if self.n == 0 {
 			return
 		}
-		n := self.wr.Write(self.buf[0:self.n]) else {
+		n := self.wr.Write(self.buf[0:self.n]) catch {
 			self.err = error
 			unsafe throw self.err
 		}
@@ -718,14 +718,14 @@ impl Writer {
 			if self.Buffered() == 0 {
 				// Large write, empty buffer.
 				// Write directly from p to avoid copy.
-				n = self.wr.Write(p) else {
+				n = self.wr.Write(p) catch {
 					self.err = error
 					use 0
 				}
 			} else {
 				n = copy(self.buf[self.n:], p)
 				self.n += n
-				self.Flush() else {}
+				self.Flush() catch {}
 			}
 			nn += n
 			unsafe { *(&p) = (*(&p))[n:] }
@@ -786,7 +786,7 @@ impl Writer {
 			let mut n: int
 			n = copy(self.buf[self.n:], s)
 			self.n += n
-			self.Flush() else {}
+			self.Flush() catch {}
 			nn += n
 			s = s[n:]
 		}
@@ -811,7 +811,7 @@ impl Writer {
 			}
 			mut nr := 0
 			for nr < maxConsecutiveEmptyReads {
-				m = r.Read(self.buf[self.n:]) else {
+				m = r.Read(self.buf[self.n:]) catch {
 					if error == io::EOF {
 						// If we filled the buffer exactly, flush preemptively.
 						if self.Available() == 0 {

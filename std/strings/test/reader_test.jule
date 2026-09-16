@@ -34,7 +34,7 @@ fn testReader(t: &testing::T) {
 
 	for i, tt in tests {
 		let mut err: any
-		pos := r.Seek(tt.off, tt.seek) else {
+		pos := r.Seek(tt.off, tt.seek) catch {
 			err = error
 			use 0
 		}
@@ -52,7 +52,7 @@ fn testReader(t: &testing::T) {
 		}
 		mut buf := make([]byte, tt.n)
 		err = nil
-		mut n := r.Read(buf) else {
+		mut n := r.Read(buf) catch {
 			err = error
 			use 0
 		}
@@ -71,14 +71,14 @@ fn testReader(t: &testing::T) {
 fn testReadAfterBigSeek(t: &testing::T) {
 	mut r := strings::Reader.New("0123456789")
 	let mut err: any
-	r.Seek(1<<31+5, io::SeekStart) else {
+	r.Seek(1<<31+5, io::SeekStart) catch {
 		err = error
 	}
 	if err != nil {
 		t.Errorf("{}", err)
 	}
 	err = nil
-	n := r.Read(make([]byte, 10)) else {
+	n := r.Read(make([]byte, 10)) catch {
 		err = error
 		use -1
 	}
@@ -87,7 +87,7 @@ fn testReadAfterBigSeek(t: &testing::T) {
 		return
 	}
 	err = nil
-	z := r.Read(make([]byte, 10)) else {
+	z := r.Read(make([]byte, 10)) catch {
 		err = error
 		use -1
 	}
@@ -117,7 +117,7 @@ fn testReaderAt(t: &testing::T) {
 	for i, tt in tests {
 		mut b := make([]byte, tt.n)
 		let mut err: any
-		mut rn := r.ReadAt(b, tt.off) else {
+		mut rn := r.ReadAt(b, tt.off) catch {
 			err = error
 			use 0
 		}
@@ -148,7 +148,7 @@ fn testReaderLenSize(t: &testing::T) {
 fn testReaderReset(t: &testing::T) {
 	mut r := strings::Reader.New("世界")
 	let mut err: any
-	r.ReadRune() else {
+	r.ReadRune() catch {
 		err = error
 	}
 	if err != nil {
@@ -158,14 +158,14 @@ fn testReaderReset(t: &testing::T) {
 	const want = "abcdef"
 	r.Reset(want)
 	err = nil
-	r.UnreadRune() else {
+	r.UnreadRune() catch {
 		err = error
 	}
 	if err == nil {
 		t.Errorf("UnreadRune: expected error, got nil")
 	}
 	err = nil
-	buf := io::ReadAll(r) else {
+	buf := io::ReadAll(r) catch {
 		err = error
 		use nil
 	}

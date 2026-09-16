@@ -27,7 +27,7 @@ fn testMultiReader(t: &testing::T) {
 	expectRead := fn(size: int, expected: string, eof: bool) {
 		unsafe {
 			*_nread++
-			n := (*_mr).Read((*_buf)[0:size]) else {
+			n := (*_mr).Read((*_buf)[0:size]) catch {
 				if eof {
 					if error != io::EOF {
 						t.Errorf("expected EOF, found {}", error)
@@ -78,7 +78,7 @@ fn testMultiReaderCopy(t: &testing::T) {
 	mut slice := []io::Reader([strings::Reader.New("hello world")])
 	mut r := io::MultiReader(slice...)
 	slice[0] = nil
-	data := io::ReadAll(r) else {
+	data := io::ReadAll(r) catch {
 		t.Errorf("unexpected error: {}", error)
 		return
 	}
@@ -123,14 +123,14 @@ fn testMultiReaderSingleByteWithEOF(t: &testing::T) {
 fn testMultiReaderFinalEOF(t: &testing::T) {
 	mut r := io::MultiReader(strings::Reader.New(""), byteAndEOFReader('a'))
 	mut buf := make([]byte, 2)
-	mut n := r.Read(buf) else {
+	mut n := r.Read(buf) catch {
 		t.Errorf("unexpected error: {}", error)
 		use 1
 	}
 	if n != 1 {
 		t.Errorf("got {}; want 1", n)
 	}
-	r.Read(buf) else {
+	r.Read(buf) catch {
 		if error != io::EOF {
 			t.Errorf("unexpected error: {}, expected EOF", error)
 		}
@@ -151,7 +151,7 @@ fn testInterleavedMultiReader(t: &testing::T) {
 
 	// Have mr2 use mr1's []Readers.
 	// Consume r1 (and clear it for GC to handle) and consume part of r2.
-	mut n := io::ReadFull(mr2, buf) else {
+	mut n := io::ReadFull(mr2, buf) catch {
 		t.Errorf("unexpected error: {}", error)
 		use 0
 	}
@@ -162,7 +162,7 @@ fn testInterleavedMultiReader(t: &testing::T) {
 
 	// Consume the rest of r2 via mr1.
 	// This should not panic even though mr2 cleared r1.
-	n = io::ReadFull(mr1, buf) else {
+	n = io::ReadFull(mr1, buf) catch {
 		t.Errorf("unexpected error: {}", error)
 		use 0
 	}

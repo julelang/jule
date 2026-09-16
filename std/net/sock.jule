@@ -145,34 +145,33 @@ fn socket(remote: bool, sockaddr: uintptr, mut addr: addr, domain: int, typ: int
 		ip := addr.ip().To16()
 		copy(addr6.Addr[:], ip)
 	}
-	setDefaultSockopts(sock) else {
-		fd.Close() else {}
+	setDefaultSockopts(sock) catch {
+		fd.Close() catch {}
 		throw error
 	}
 	if remote {
-		fd.connect(sockv, sockaddr, sockaddrlen, timeout) else {
-			println("ah")
-			fd.Close() else {}
+		fd.connect(sockv, sockaddr, sockaddrlen, timeout) catch {
+			fd.Close() catch {}
 			throw error
 		}
-		fd.init() else {
-			fd.Close() else {}
+		fd.init() catch {
+			fd.Close() catch {}
 			throw error
 		}
 	} else {
-		sys::Bind(sock, sockaddr, sockaddrlen) else {
-			fd.Close() else {}
+		sys::Bind(sock, sockaddr, sockaddrlen) catch {
+			fd.Close() catch {}
 			throw error
 		}
 		match typ {
 		| sys::SOCK_STREAM:
-			setDefaultListenerSockopts(sock) else {
-				fd.Close() else {}
+			setDefaultListenerSockopts(sock) catch {
+				fd.Close() catch {}
 				throw error
 			}
 			backlog := listenerBacklog()
-			sys::Listen(sock, backlog) else {
-				fd.Close() else {}
+			sys::Listen(sock, backlog) catch {
+				fd.Close() catch {}
 				throw error
 			}
 		| sys::SOCK_DGRAM:
@@ -180,8 +179,8 @@ fn socket(remote: bool, sockaddr: uintptr, mut addr: addr, domain: int, typ: int
 		|:
 			panic("unreachable")
 		}
-		fd.init() else {
-			fd.Close() else {}
+		fd.init() catch {
+			fd.Close() catch {}
 			throw error
 		}
 	}

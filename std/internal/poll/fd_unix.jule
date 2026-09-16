@@ -57,7 +57,7 @@ impl FD {
 				max = n + maxRW
 			}
 			part := buf[n:max]
-			nn := ignoringEINTRIO2(sys::Write, int(self.File), part) else {
+			nn := ignoringEINTRIO2(sys::Write, int(self.File), part) catch {
 				if n > 0 {
 					return n
 				}
@@ -95,7 +95,7 @@ impl FD {
 			return 0
 		}
 		for {
-			sys::Sendto(int(self.File), buf, 0, addr, addrLen) else {
+			sys::Sendto(int(self.File), buf, 0, addr, addrLen) catch {
 				if error == sys::EINTR {
 					continue
 				}
@@ -145,7 +145,7 @@ impl FD {
 			return 0
 		}
 		for {
-			n = sys::Recvfrom(int(self.File), buf, 0, addr, addrLen) else {
+			n = sys::Recvfrom(int(self.File), buf, 0, addr, addrLen) catch {
 				if error == sys::EINTR {
 					continue
 				}
@@ -174,7 +174,7 @@ impl FD {
 	// Wraps the accept network call.
 	fn Accept(mut *self, addr: uintptr, mut &addrlen: *sys::Socklen)!: NetHandle {
 		for {
-			h := sys::Accept(NetHandle(self.File), addr, addrlen) else {
+			h := sys::Accept(NetHandle(self.File), addr, addrlen) catch {
 				match error {
 				| sys::EINTR:
 					continue
@@ -193,13 +193,13 @@ impl FD {
 					// This is likely due to a bug in xnu kernels,
 					// where instead of ECONNABORTED error socket
 					// is accepted, but has no address.
-					sys::Close(h) else {}
+					sys::Close(h) catch {}
 					throw sys::ECONNABORTED
 				}
 			}
 			sys::CloseOnExec(h)
-			sys::SetNonblock(h, false) else {
-				sys::Close(h) else {}
+			sys::SetNonblock(h, false) catch {
+				sys::Close(h) catch {}
 				throw error
 			}
 			return h
@@ -216,7 +216,7 @@ impl FD {
 // It is like ignoringEINTR, but just for IO calls.
 fn ignoringEINTRIO(f: fn(fd: int, mut p: []byte)!: int, fd: int, mut p: []byte)!: int {
 	for {
-		return f(fd, p) else {
+		return f(fd, p) catch {
 			if error != sys::EINTR {
 				throw error
 			}
@@ -228,7 +228,7 @@ fn ignoringEINTRIO(f: fn(fd: int, mut p: []byte)!: int, fd: int, mut p: []byte)!
 // It is like ignoringEINTRIO, but immutable.
 fn ignoringEINTRIO2(f: fn(fd: int, p: []byte)!: int, fd: int, p: []byte)!: int {
 	for {
-		return f(fd, p) else {
+		return f(fd, p) catch {
 			if error != sys::EINTR {
 				throw error
 			}

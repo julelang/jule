@@ -603,7 +603,7 @@ let urltests: []urlTest = [
 #test
 fn testParse(t: &testing::T) {
 	for _, c in urltests {
-		let u = Parse(c.input) else {
+		let u = Parse(c.input) catch {
 			t.Errorf("Parse({}) thrown error", c.input)
 			continue
 		}
@@ -661,7 +661,7 @@ let parseRequestURLTests: []parseRequestURLTest = [
 #test
 fn testParseRequestURI(t: &testing::T) {
 	for _, test in parseRequestURLTests {
-		ParseRequestURI(test.url) else {
+		ParseRequestURI(test.url) catch {
 			if test.expectedValid {
 				t.Errorf("ParseRequestURI({}) gave error {}; want no error", test.url, error)
 			}
@@ -672,7 +672,7 @@ fn testParseRequestURI(t: &testing::T) {
 		}
 	}
 
-	url := ParseRequestURI(pathThatLooksSchemeRelative) else {
+	url := ParseRequestURI(pathThatLooksSchemeRelative) catch {
 		t.Errorf("Unexpected error {}", error)
 		return
 	}
@@ -724,7 +724,7 @@ let stringURLTests: []strUrlTest = [
 #test
 fn testURLString(t: &testing::T) {
 	for _, tt in urltests {
-		u := Parse(tt.input) else {
+		u := Parse(tt.input) catch {
 			t.Errorf("Parse({}) returned error {}", tt.input, error)
 			continue
 		}
@@ -1011,7 +1011,7 @@ let resolveReferenceTests: []resolveReferenceTest = [
 #test
 fn testResolveReference(t: &testing::T) {
 	mustParse := fn(url: string): &URL {
-		return Parse(url) else {
+		return Parse(url) catch {
 			t.Errorf("Parse({}) got err {}", url, error)
 			use nil
 		}
@@ -1032,7 +1032,7 @@ fn testResolveReference(t: &testing::T) {
 			t.Errorf("Expected URL.ResolveReference to return new URL instance.")
 		}
 		// Test the convenience wrapper too.
-		url = base.Parse(test.rel) else {
+		url = base.Parse(test.rel) catch {
 			t.Errorf("URL({}).Parse({}) failed: {}", test.base, test.rel, error)
 			use nil
 		}
@@ -1051,7 +1051,7 @@ fn testResolveReference(t: &testing::T) {
 			t.Errorf("ResolveReference failed to resolve opaque URL:\n\tgot  {}\n\twant {}", url.String(), opaque.String())
 		}
 		// Test the convenience wrapper with an opaque URL too.
-		url = base.Parse("scheme:opaque") else {
+		url = base.Parse("scheme:opaque") catch {
 			t.Errorf(`URL({}).Parse("scheme:opaque") failed: {}`, test.base, error)
 			use nil
 		}
@@ -1229,7 +1229,7 @@ let parseTests: []parseTest = [
 fn testParseQuery(t: &testing::T) {
 	for _, test in parseTests {
 		mut err := any(nil)
-		form := ParseQuery(test.query) else {
+		form := ParseQuery(test.query) catch {
 			err = error
 			use nil
 		}
@@ -1434,7 +1434,7 @@ fn testParseErrors(t: &testing::T) {
 		{"cache_object/:foo/bar", false},
 	])
 	for _, tt in tests {
-		u := Parse(tt.input) else {
+		u := Parse(tt.input) catch {
 			if !tt.wantErr {
 				t.Errorf("Parse({}) = {}; want no error", tt.input, error)
 			}
@@ -1448,7 +1448,7 @@ fn testParseErrors(t: &testing::T) {
 
 #test
 fn testStarRequest(t: &testing::T) {
-	u := Parse("*") else {
+	u := Parse("*") catch {
 		t.Errorf("{}", error)
 		return
 	}
@@ -1711,7 +1711,7 @@ fn testJoinPath(t: &testing::T) {
 			wantErr = "non-nil error"
 		}
 		{
-			out := JoinPath(tt.base, tt.elem...) else {
+			out := JoinPath(tt.base, tt.elem...) catch {
 				if tt.out != "" {
 					t.Errorf("JoinPath({}, {}) = {}, want {}", tt.base, tt.elem, error, wantErr)
 				}
@@ -1721,7 +1721,7 @@ fn testJoinPath(t: &testing::T) {
 				t.Errorf("JoinPath({}, {}) = {}, want {}", tt.base, tt.elem, out, tt.out)
 			}
 		}
-		mut u := Parse(tt.base) else {
+		mut u := Parse(tt.base) catch {
 			if tt.out != "" {
 				t.Errorf("Parse({}).JoinPath({}) = {}, want {}", tt.base, tt.elem, error, wantErr)
 			}

@@ -90,7 +90,7 @@ fn testEncoderBuffering(t: &testing::T) {
 			if end > len(input) {
 				end = len(input)
 			}
-			n := encoder.Write(input[pos:end]) else {
+			n := encoder.Write(input[pos:end]) catch {
 				t.Errorf("Write({}) gave error {}, want nil", input[pos:end], error)
 				continue
 			}
@@ -99,7 +99,7 @@ fn testEncoderBuffering(t: &testing::T) {
 				continue
 			}
 		}
-		encoder.Close() else {
+		encoder.Close() catch {
 			t.Errorf("Close gave error {}, want nil", error)
 			continue
 		}
@@ -117,7 +117,7 @@ fn testStdDecoder(t: &testing::T) {
 		mut sr := strings::Reader.New(string(case[1]))
 		mut dec := NewDecoder(StdEncoding, sr)
 		mut buf := make([]byte, StdEncoding.DecodedLen(len(case[1])))
-		n := dec.Read(buf) else {
+		n := dec.Read(buf) catch {
 			if error != io::EOF {
 				t.Errorf("unexpected error {}", error)
 				continue
@@ -143,7 +143,7 @@ fn testDecoderBuffering(t: &testing::T) {
 		let mut n: int
 		let mut err: any
 		for total < len(bigtest[0]) && err == nil {
-			n = decoder.Read(buf[total : total+bs]) else {
+			n = decoder.Read(buf[total : total+bs]) catch {
 				if error == io::EOF {
 					break
 				}
@@ -196,7 +196,7 @@ let decodeCorruptTests: []decodeCorruptTest = [
 #test
 fn testDecodeCorrupt(t: &testing::T) {
 	for i, test in decodeCorruptTests {
-		StdEncoding.AppendDecode(nil, []byte(test.input)) else {
+		StdEncoding.AppendDecode(nil, []byte(test.input)) catch {
 			if test.offset == -1 {
 				t.Errorf("#{} expected no error, found error", i)
 				continue
@@ -299,7 +299,7 @@ fn testBig(t: &testing::T) {
 	}
 	mut sb := new(strings::Builder)
 	mut w := NewEncoder(StdEncoding, sb)
-	nn := w.Write(raw) else {
+	nn := w.Write(raw) catch {
 		t.Errorf("Encoder.Write(raw) error = {} want nil", error)
 		return
 	}
@@ -307,12 +307,12 @@ fn testBig(t: &testing::T) {
 		t.Errorf("Encoder.Write(raw) = {} want {}", nn, n)
 		return
 	}
-	w.Close() else {
+	w.Close() catch {
 		t.Errorf("Encoder.Close() = {} want nil", error)
 		return
 	}
 	mut sr := strings::Reader.New(sb.String())
-	decoded := io::ReadAll(NewDecoder(StdEncoding, sr)) else {
+	decoded := io::ReadAll(NewDecoder(StdEncoding, sr)) catch {
 		t.Errorf("io::ReadAll(NewDecoder(...)): {}", error)
 		return
 	}
@@ -346,7 +346,7 @@ fn testNewLineCharacters(t: &testing::T) {
 		"c3VyZQ=\r\n\r\n=",
 	]
 	for _, e in examples {
-		buf := StdEncoding.DecodeString(e) else {
+		buf := StdEncoding.DecodeString(e) catch {
 			t.Errorf("Decode({}) failed: {}", e, error)
 			continue
 		}
@@ -378,13 +378,13 @@ bqbPb06551Y4
 	encodedShort := strings::ReplaceAll(encoded, "\n", "")
 
 	mut dec := NewDecoder(StdEncoding, strings::Reader.New(encoded))
-	res1 := io::ReadAll(dec) else {
+	res1 := io::ReadAll(dec) catch {
 		t.Errorf("ReadAll failed: {}", error)
 		return
 	}
 
 	dec = NewDecoder(StdEncoding, strings::Reader.New(encodedShort))
-	res2 := io::ReadAll(dec) else {
+	res2 := io::ReadAll(dec) catch {
 		t.Errorf("ReadAll failed: {}", error)
 		return
 	}
@@ -397,7 +397,7 @@ bqbPb06551Y4
 
 #test
 fn testDecoderGoIssue7733(t: &testing::T) {
-	StdEncoding.DecodeString("YWJjZA=====") else {
+	StdEncoding.DecodeString("YWJjZA=====") catch {
 		want := CorruptInputError(8)
 		if want != error {
 			t.Errorf("Error = {}; want CorruptInputError(8)", error)
@@ -410,17 +410,17 @@ fn testDecoderGoIssue7733(t: &testing::T) {
 #test
 fn testDecoderGoIssue15656(t: &testing::T) {
 	let mut err: any
-	StdEncoding.Clone().Strict().DecodeString("WvLTlMrX9NpYDQlEIFlnDB==") else {
+	StdEncoding.Clone().Strict().DecodeString("WvLTlMrX9NpYDQlEIFlnDB==") catch {
 		err = error
 	}
 	want := CorruptInputError(22)
 	if want != err {
 		t.Errorf("Error = {}; want CorruptInputError(22)", err)
 	}
-	StdEncoding.Clone().Strict().DecodeString("WvLTlMrX9NpYDQlEIFlnDA==") else {
+	StdEncoding.Clone().Strict().DecodeString("WvLTlMrX9NpYDQlEIFlnDA==") catch {
 		t.Errorf("Error = {}; want nil", error)
 	}
-	StdEncoding.DecodeString("WvLTlMrX9NpYDQlEIFlnDB==") else {
+	StdEncoding.DecodeString("WvLTlMrX9NpYDQlEIFlnDB==") catch {
 		t.Errorf("Error = {}; want nil", error)
 	}
 }

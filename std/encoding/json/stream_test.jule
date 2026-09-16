@@ -104,7 +104,7 @@ fn testDecoderDecode(t: &testing::T) {
 		mut n := test.n
 		for n > 0; n-- {
 			let mut err: any
-			dec.Decode(&v) else { err = error }
+			dec.Decode(&v) catch { err = error }
 			if n > 1 && err != nil {
 				t.Errorf("#{} unexpected error: {}", i, err)
 				break
@@ -115,7 +115,7 @@ fn testDecoderDecode(t: &testing::T) {
 			}
 		}
 		if !test.err {
-			dec.Decode(&v) else {
+			dec.Decode(&v) catch {
 				if error == io::EOF {
 					continue
 				}
@@ -185,7 +185,7 @@ fn testEncoderEncode(t: &testing::T) {
 	for i, test in encoderTests {
 		mut w := new(strings::Builder)
 		enc := Encoder.New(w)
-		test.encode(enc) else {
+		test.encode(enc) catch {
 			t.Errorf("#{} unexpected error: {}", i, error)
 			continue
 		}
@@ -208,11 +208,11 @@ fn testDisallowUnknownFields(t: &testing::T) {
 	s := `{"Foo": 120}{"Foo": 123, "bar": "baz"}`
 	dec := Decoder.New(strings::Reader.New(s))
 	dec.DisallowUnknownFields()
-	dec.Decode(&v) else {
+	dec.Decode(&v) catch {
 		t.Errorf("unexpected error at first read")
 		return
 	}
-	dec.Decode(&v) else {
+	dec.Decode(&v) catch {
 		return
 	}
 	t.Errorf("expected error at second read")

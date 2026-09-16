@@ -1215,7 +1215,7 @@ fn parseNanoseconds[bytes: []byte | string](value: bytes, mut nbytes: int)!: (ns
 		nbytes = 10
 	}
 
-	ns = atoi(value[1:nbytes]) else {
+	ns = atoi(value[1:nbytes]) catch {
 		return 0, ""
 	}
 	if ns < 0 {
@@ -1309,7 +1309,7 @@ fn parseSignedOffset(value: string): int {
 	if sign != '-' && sign != '+' {
 		return 0
 	}
-	x, rem := leadingInt(value[1:]) else { return 0 }
+	x, rem := leadingInt(value[1:]) catch { return 0 }
 
 	// fail if nothing consumed by leadingInt
 	if value[1:] == rem {
@@ -1385,7 +1385,7 @@ fn atoi[bytes: []byte | string](s: bytes)!: (x: int) {
 		neg = s[0] == '-'
 		unsafe { *(&s) = (*(&s))[1:] } // Break immutability for slicing.
 	}
-	q, rem := leadingInt(s) else { throw errAtoi }
+	q, rem := leadingInt(s) catch { throw errAtoi }
 	x = int(q)
 	if len(rem) > 0 {
 		throw errAtoi
@@ -1529,7 +1529,7 @@ fn ParseDuration(mut s: string): (Duration, bool) {
 		}
 		// Consume [0-9]*
 		mut pl := len(s)
-		v, s = leadingInt(s) else { return 0, false }
+		v, s = leadingInt(s) catch { return 0, false }
 		pre := pl != len(s) // whether we consumed anything before a period
 
 		// Consume (\.[0-9]*)?
