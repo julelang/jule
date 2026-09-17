@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/errors"
 use "std/integ"
 use "std/mem"
 use "std/runtime"
 use "std/sys"
-use "std/time"
 
 extern use "<netdb.h>"
 
@@ -41,7 +41,12 @@ fn integLookupIP(net: Network, host: string)!: (addrs: []IPAddr) {
 	let mut res: *extern.addrinfo
 	e := sys::Addrcall[int](uintptr(extern.getaddrinfo), uintptr(&hostb[0]), uintptr(0), uintptr(&hints), uintptr(&res))
 	if e != 0 {
-		throw sys::Errno(e)
+		match e {
+		| _EAI_NONAME | _EAI_NODATA:
+			throw errors::New("resolution failed for " + host)
+		|:
+			throw sys::Errno(e)
+		}
 	}
 
 	unsafe {

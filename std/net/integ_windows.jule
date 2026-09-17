@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/errors"
 use "std/integ"
 use "std/internal/sys/windows"
 use "std/sys"
-use "std/time"
 
 extern use "<ws2tcpip.h>"
 
@@ -13,6 +13,8 @@ const integAddrInfoFlags = windows::AI_CANONNAME | windows::AI_V4MAPPED | window
 
 extern let GetAddrInfoW: *unsafe
 extern let FreeAddrInfoW: *unsafe
+
+const _WSAHOST_NOT_FOUND = 11001
 
 #disable boundary
 fn integLookupIP(net: Network, host: string)!: (addrs: []IPAddr) {
@@ -31,6 +33,9 @@ fn integLookupIP(net: Network, host: string)!: (addrs: []IPAddr) {
 	let mut res: *windows::AddrinfoW
 	e := sys::Addrcall[int](uintptr(extern.GetAddrInfoW), uintptr(&utf16host[0]), uintptr(0), uintptr(&hints), uintptr(&res))
 	if e != 0 {
+		if e == _WSAHOST_NOT_FOUND {
+			throw errors::New("resolution failed for " + host)
+		}
 		throw sys::Errno(e)
 	}
 
