@@ -360,9 +360,8 @@ unsafe fn heapInitialize(mut block: *unsafe): *heap {
 // so a startup burst maps a single block instead of one block per thread. Ordinary requests reuse a
 // released heap first, then a pristine carved one.
 unsafe fn heapAllocateNew(): *heap {
-	if globalPageSize == 0 {
-		mut t := gett()
-		mallocThreadInit(&*t)
+	if intrinsic::Unlikely(globalPageSize == 0) {
+		panicString("runtime: heapAllocateNew called before global malloc initialization")
 	}
 
 	heapLockAcquire()
@@ -1318,11 +1317,8 @@ unsafe fn heapGetPageGeneric(mut _heap: *heap, sizeClass: u32): *page {
 			"runtime: free committed malloc page count out of sync")
 	}
 
-	if _heap.id == 0 {
-		// Thread has not yet initialized, assign heap and try again.
-		mut t := gett()
-		mallocThreadInit(&*t)
-		return heapGetPage(gett().heap, sizeClass)
+	if intrinsic::Unlikely(_heap.id == 0) {
+		panicString("runtime: malloc called before thread malloc initialization")
 	}
 
 	// Fallback path, find or allocate span for given size class.
@@ -1367,11 +1363,8 @@ unsafe fn heapAllocateBlockSmallToLarge(mut heap: *heap, sizeClass: u32, needzer
 #noinline
 #disable boundary
 unsafe fn heapAllocateBlockHuge(mut _heap: *heap, size: uintptr, needzero: bool): *block {
-	if _heap.id == 0 {
-		// Thread has not yet initialized, assign heap and try again.
-		mut t := gett()
-		mallocThreadInit(&*t)
-		_heap = t.heap
+	if intrinsic::Unlikely(_heap.id == 0) {
+		panicString("runtime: malloc called before thread malloc initialization")
 	}
 	allocSize := getPageAlignedSize(size + spanHeaderSize)
 	mut offset := uintptr(0)
