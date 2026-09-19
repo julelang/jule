@@ -155,6 +155,7 @@ impl decoder {
 	// and scan a literal's bytes much more quickly.
 	#disable nilptr boundary
 	fn rescanLiteral(*self)! {
+		self.scan.flags = 0
 		self.skipLiteral()?
 	}
 
@@ -248,6 +249,7 @@ impl decoder {
 			// We use it to select beginning of literal.
 			start := self.readIndex()
 			self.rescanLiteral()?
+			scanFlags := self.scan.flags
 			mut keylit := self.data[start:self.readIndex()]
 			// Read : before value.
 			if self.opcode == scanSkipSpace {
@@ -263,7 +265,7 @@ impl decoder {
 				// String type, assign directly to the key.
 				// Use decodeString method to efficient string handling.
 				mut s := ""
-				ok := decodeString(&s, keylit)
+				ok := decodeString(scanFlags, &s, keylit)
 				if !ok {
 					throw errors::New("json: invalid value for type " + keyT.String() + ": " + unsafe::BytesString(keylit))
 				}
@@ -278,9 +280,15 @@ impl decoder {
 				}
 			|:
 				// Quoted non-string type, parse unquoted value by type to assign.
-				key := unquoteBytes(keylit)
-				if key == nil {
-					throw errors::New("json: invalid value for object key type" + keyT.String() + ": " + unsafe::BytesString(keylit))
+				let mut key: []byte
+				if scanFlags&flagEscaped != 0 {
+					key, _ = unquoteBytes(keylit)
+					if key == nil {
+						throw errors::New("json: invalid value for object key:" + unsafe::BytesString(keylit))
+					}
+				} else {
+					// Get lireral mutable without quotes.
+					key = keylit[1 : len(keylit)-1]
 				}
 				let mut keyV: K
 				const match keyT.Kind() {
@@ -324,9 +332,17 @@ impl decoder {
 			// We use it to select beginning of literal.
 			start := self.readIndex()
 			self.rescanLiteral()?
-			keylit := unquoteBytes(self.data[start:self.readIndex()])
-			if keylit == nil {
-				throw errors::New("json: invalid value for DecodeText function:" + unsafe::BytesString(keylit))
+			scanFlags := self.scan.flags
+			let mut keylit: []byte
+			let mut escape: bool
+			if scanFlags&flagEscaped != 0 {
+				keylit, escape = unquoteBytes(self.data[start:self.readIndex()])
+				if keylit == nil {
+					throw errors::New("json: invalid value for object key:" + unsafe::BytesString(keylit))
+				}
+			} else {
+				// Get lireral mutable without quotes.
+				keylit = self.data[start+1 : self.readIndex()-1]
 			}
 			key := unsafe::StringFromBytes(keylit)
 			// Read : before value.
@@ -338,7 +354,7 @@ impl decoder {
 			// Compare it only escaped cached name, otherwise compere it with non-escape one.
 			// This is fast and safe way, backslash is reserved character.
 			// Therefore, a backslash always means literal is escaped.
-			if strings::ContainsRune(key, '\\') {
+			if escape {
 				for _, f in cache {
 					if f.nameEscHTML == key {
 						f.decode(self, p+f.offset)?
@@ -405,9 +421,15 @@ impl decoder {
 												// All bytes inside literal return scanContinue op code.
 												start := self.readIndex()
 												self.rescanLiteral()?
-												lit := unquoteBytes(self.data[start:self.readIndex()])
-												if lit == nil {
-													throw errors::New("json: invalid value for DecodeText function:" + unsafe::BytesString(lit))
+												let mut lit: []byte
+												if self.scan.flags&flagEscaped != 0 {
+													lit, _ = unquoteBytes(self.data[start:self.readIndex()])
+													if lit == nil {
+														throw errors::New("json: invalid value for DecodeText function:" + unsafe::BytesString(lit))
+													}
+												} else {
+													// Get lireral mutable without quotes.
+													lit = self.data[start+1 : self.readIndex()-1]
 												}
 												m.Unwrap()(lit)?
 												return true
@@ -476,7 +498,7 @@ impl decoder {
 			// All bytes inside literal return scanContinue op code.
 			start := self.readIndex()
 			self.rescanLiteral()?
-			decodeLiteral(self.data[start:self.readIndex()], v)?
+			decodeLiteral(self.scan.flags, self.data[start:self.readIndex()], v)?
 			return
 		|:
 			b := self.data[self.readIndex()]
@@ -523,21 +545,21 @@ impl decoder {
 }
 
 #disable nilptr boundary
-fn decodeLiteral[T](mut data: []byte, mut &v: *T)! {
+fn decodeLiteral[T](scanFlags: int, mut data: []byte, mut &v: *T)! {
 	const t = comptime::Typeof(T)
 	match data[0] {
 	| '"': // String literal.
 		const match {
 		| t == valueT | t == stringT:
 			mut s := ""
-			ok := decodeString(&s, data)
+			ok := decodeString(scanFlags, &s, data)
 			if !ok {
 				throw errors::New("json: invalid value for type " + t.String() + ": " + unsafe::BytesString(data))
 			}
 			*v = String(s)
 			return
 		| t.Kind() == comptime::String:
-			ok := decodeString(unsafe { &(*(*string)(v)) }, data)
+			ok := decodeString(scanFlags, unsafe { &(*(*string)(v)) }, data)
 			if !ok {
 				throw errors::New("json: invalid value for type " + t.String() + ": " + unsafe::BytesString(data))
 			}
@@ -545,7 +567,7 @@ fn decodeLiteral[T](mut data: []byte, mut &v: *T)! {
 		| t.Kind() == comptime::Slice:
 			const match t.Value().Kind() {
 			| comptime::U8:
-				mut s2 := unquoteBytes(data)
+				mut s2, _ := unquoteBytes(data)
 				if s2 == nil {
 					throw errors::New("json: invalid value for type " + t.String() + ": " + unsafe::BytesString(data))
 				}
@@ -1039,15 +1061,15 @@ fn decodeFloat[T](mut &v: *T, b: []byte)! {
 //
 // We use "#disable boundary" with slices.
 // However, [ubuf::Ubuf] was ~25% faster on a 64-bit MacBook Pro.
-fn unquoteBytes(s: []byte): []byte {
+fn unquoteBytes(s: []byte): ([]byte, escape: bool) {
 	ss := ubuf::Ubuf{}
 	ss.SetData(s)
 	if ss.Len() < 2 || ss.Get(0) != '"' || ss.Get(ss.Len()-1) != '"' {
-		return nil
+		return nil, false
 	}
 	// Empty literal.
 	if ss.Len() == 2 {
-		return make([]byte, 0)
+		return make([]byte, 0), false
 	}
 	ss.SetLen2(1, ss.Len()-1)
 
@@ -1074,7 +1096,7 @@ fn unquoteBytes(s: []byte): []byte {
 		// GC must be remain for the allocation.
 		// For memory efficiency, new allocation might be used as result or etc.
 		// Therefore avoid making allocation zero-reference and deallocation.
-		return ss.GetData()
+		return ss.GetData(), false
 	}
 
 	b := ubuf::Ubuf{}
@@ -1094,10 +1116,13 @@ fn unquoteBytes(s: []byte): []byte {
 		| c == '\\':
 			r++
 			if r >= ss.Len() {
-				return nil
+				return nil, false
 			}
 			match ss.Get(r) {
-			| '"' | '\\' | '/' | '\'':
+			| '\\':
+				escape = true
+				fall
+			| '"' | '/' | '\'':
 				b.Set(w, ss.Get(r))
 				r++
 				w++
@@ -1125,7 +1150,7 @@ fn unquoteBytes(s: []byte): []byte {
 				r--
 				mut rr := getu4(ss.Slice1(r))
 				if rr < 0 {
-					return nil
+					return nil, false
 				}
 				r += 6
 				if utf16::IsSurrogate(rr) {
@@ -1142,11 +1167,11 @@ fn unquoteBytes(s: []byte): []byte {
 				}
 				w += utf8::EncodeRune(b.Slice1(w), rr)
 			|:
-				return nil
+				return nil, false
 			}
 		| c == '"' | c < ' ':
 			// Quote, control characters are invalid.
-			return nil
+			return nil, false
 		| c < utf8::RuneSelf:
 			// ASCII
 			b.Set(w, c)
@@ -1162,14 +1187,19 @@ fn unquoteBytes(s: []byte): []byte {
 	// GC must be remain for the allocation, do not use b.Slice3 to slice.
 	// For memory efficiency, new allocation might be used as result or etc.
 	// Therefore avoid making allocation zero-reference and deallocation.
-	return b.GetData()[0:w]
+	return b.GetData()[0:w], escape
 }
 
 #disable nilptr boundary
-fn decodeString(mut &s: *string, mut lit: []byte): (ok: bool) {
-	mut s2 := unquoteBytes(lit)
-	if s2 == nil {
-		return false
+fn decodeString(scanFlags: int, mut &s: *string, mut lit: []byte): (ok: bool) {
+	let mut s2: []byte
+	if scanFlags&flagEscaped != 0 {
+		s2, _ = unquoteBytes(lit)
+		if s2 == nil {
+			return false
+		}
+	} else {
+		s2 = lit[1 : len(lit)-1]
 	}
 	if len(s2) == 0 {
 		*s = ""
