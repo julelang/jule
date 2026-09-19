@@ -43,7 +43,9 @@
 
 use "std/conv"
 use "std/errors"
+use "std/intrinsic"
 use "std/io"
+use "std/unicode/utf8"
 
 // This limits the max nesting depth to prevent stack overflow.
 // This is permitted by https://tools.ietf.org/html/rfc7159#section-9
@@ -86,6 +88,7 @@ const (
 
 const (
 	flagEscaped = 1 << iota
+	flagUnicode
 )
 
 // A scanner is a JSON scanning state machine.
@@ -349,8 +352,11 @@ fn stateInString(mut &s: *scanner, c: byte): int {
 		s.step = stateInStringEsc
 		return scanContinue
 	}
-	if c < 0x20 {
+	if intrinsic::Unlikely(c < 0x20) {
 		return s.onerror(c, "in string literal")
+	}
+	if c >= utf8::RuneSelf {
+		s.flags |= flagUnicode
 	}
 	return scanContinue
 }

@@ -14,6 +14,9 @@ use "std/unicode/utf16"
 use "std/unicode/utf8"
 use "std/unsafe"
 
+// Unquoting needed when this mask returns non-zero on scan flags.
+const unquoteMask = flagEscaped | flagUnicode
+
 // An internal JSON decoder specialized for a static buffer.
 // For streaming buffers, this decoder should be wrapped.
 // A decoder only decodes the buffer data.
@@ -281,7 +284,7 @@ impl decoder {
 			|:
 				// Quoted non-string type, parse unquoted value by type to assign.
 				let mut key: []byte
-				if scanFlags&flagEscaped != 0 {
+				if scanFlags&unquoteMask != 0 {
 					key, _ = unquoteBytes(keylit)
 					if key == nil {
 						throw errors::New("json: invalid value for object key:" + unsafe::BytesString(keylit))
@@ -335,7 +338,7 @@ impl decoder {
 			scanFlags := self.scan.flags
 			let mut keylit: []byte
 			let mut escape: bool
-			if scanFlags&flagEscaped != 0 {
+			if scanFlags&unquoteMask != 0 {
 				keylit, escape = unquoteBytes(self.data[start:self.readIndex()])
 				if keylit == nil {
 					throw errors::New("json: invalid value for object key:" + unsafe::BytesString(keylit))
@@ -422,7 +425,7 @@ impl decoder {
 												start := self.readIndex()
 												self.rescanLiteral()?
 												let mut lit: []byte
-												if self.scan.flags&flagEscaped != 0 {
+												if self.scan.flags&unquoteMask != 0 {
 													lit, _ = unquoteBytes(self.data[start:self.readIndex()])
 													if lit == nil {
 														throw errors::New("json: invalid value for DecodeText function:" + unsafe::BytesString(lit))
@@ -1193,7 +1196,7 @@ fn unquoteBytes(s: []byte): ([]byte, escape: bool) {
 #disable nilptr boundary
 fn decodeString(scanFlags: int, mut &s: *string, mut lit: []byte): (ok: bool) {
 	let mut s2: []byte
-	if scanFlags&flagEscaped != 0 {
+	if scanFlags&unquoteMask != 0 {
 		s2, _ = unquoteBytes(lit)
 		if s2 == nil {
 			return false
