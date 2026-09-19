@@ -7,8 +7,8 @@ use "std/conv"
 use "std/encoding/base64"
 use "std/errors"
 use "std/internal/ubuf"
+use "std/intrinsic"
 use "std/runtime"
-use "std/strings"
 use "std/unicode"
 use "std/unicode/utf16"
 use "std/unicode/utf8"
@@ -56,7 +56,7 @@ impl decoder {
 		depth := len(self.scan.parseState)
 		for i < len(self.data) {
 			op := self.scan.step(&self.scan, self.data[i])
-			if op == scanError {
+			if intrinsic::Unlikely(op == scanError) {
 				unsafe throw self.scan.err
 			}
 			i++
@@ -68,7 +68,7 @@ impl decoder {
 		}
 		self.opcode = self.scan.eof()
 		self.off = len(self.data) + 1 // mark processed EOF with len+1
-		if self.opcode != scanError {
+		if intrinsic::Unlikely(self.opcode != scanError) {
 			unsafe throw self.scan.err
 		}
 	}
@@ -80,7 +80,7 @@ impl decoder {
 		mut i := self.off
 		for i < len(self.data) {
 			op := self.scan.step(&self.scan, self.data[i])
-			if op == scanError {
+			if intrinsic::Unlikely(op == scanError) {
 				unsafe throw self.scan.err
 			}
 			i++
@@ -92,7 +92,7 @@ impl decoder {
 		}
 		self.opcode = self.scan.eof()
 		self.off = len(self.data) + 1 // mark processed EOF with len+1
-		if self.opcode != scanError {
+		if intrinsic::Unlikely(self.opcode != scanError) {
 			unsafe throw self.scan.err
 		}
 	}
@@ -130,7 +130,7 @@ impl decoder {
 		mut i := self.off
 		for i < len(self.data) {
 			newOp := self.scan.step(&self.scan, self.data[i])
-			if newOp == scanError {
+			if intrinsic::Unlikely(newOp == scanError) {
 				unsafe throw self.scan.err
 			}
 			i++
@@ -143,7 +143,7 @@ impl decoder {
 
 		self.off = len(self.data) + 1 // mark processed EOF with len+1
 		self.opcode = self.scan.eof()
-		if self.opcode == scanError {
+		if intrinsic::Unlikely(self.opcode == scanError) {
 			unsafe throw self.scan.err
 		}
 	}
@@ -245,7 +245,7 @@ impl decoder {
 				// closing } - can only happen on first iteration.
 				break
 			}
-			if self.opcode != scanBeginLiteral {
+			if intrinsic::Unlikely(self.opcode != scanBeginLiteral) {
 				throw errors::New("json: invalid character " + quoteChar(self.data[self.readIndex()]) + " looking for beginning of object key string")
 			}
 			// Save the current position of decoder.
@@ -269,7 +269,7 @@ impl decoder {
 				// Use decodeString method to efficient string handling.
 				mut s := ""
 				ok := decodeString(scanFlags, &s, keylit)
-				if !ok {
+				if intrinsic::Unlikely(!ok) {
 					throw errors::New("json: invalid value for type " + keyT.String() + ": " + unsafe::BytesString(keylit))
 				}
 				if *v == nil {
@@ -286,7 +286,7 @@ impl decoder {
 				let mut key: []byte
 				if scanFlags&unquoteMask != 0 {
 					key, _ = unquoteBytes(keylit)
-					if key == nil {
+					if intrinsic::Unlikely(key == nil) {
 						throw errors::New("json: invalid value for object key:" + unsafe::BytesString(keylit))
 					}
 				} else {
@@ -328,7 +328,7 @@ impl decoder {
 				// closing } - can only happen on first iteration.
 				break
 			}
-			if self.opcode != scanBeginLiteral {
+			if intrinsic::Unlikely(self.opcode != scanBeginLiteral) {
 				throw errors::New("json: invalid character " + quoteChar(self.data[self.readIndex()]) + " looking for beginning of object key string")
 			}
 			// Save the current position of decoder.
@@ -340,7 +340,7 @@ impl decoder {
 			let mut escape: bool
 			if scanFlags&unquoteMask != 0 {
 				keylit, escape = unquoteBytes(self.data[start:self.readIndex()])
-				if keylit == nil {
+				if intrinsic::Unlikely(keylit == nil) {
 					throw errors::New("json: invalid value for object key:" + unsafe::BytesString(keylit))
 				}
 			} else {
@@ -427,7 +427,7 @@ impl decoder {
 												let mut lit: []byte
 												if self.scan.flags&unquoteMask != 0 {
 													lit, _ = unquoteBytes(self.data[start:self.readIndex()])
-													if lit == nil {
+													if intrinsic::Unlikely(lit == nil) {
 														throw errors::New("json: invalid value for DecodeText function:" + unsafe::BytesString(lit))
 													}
 												} else {
@@ -539,7 +539,7 @@ impl decoder {
 	#disable nilptr boundary
 	fn decode[T](*self, mut &v: *T)! {
 		self.scanWhile(scanSkipSpace)?
-		if self.opcode == scanEnd {
+		if intrinsic::Unlikely(self.opcode == scanEnd) {
 			throw errors::New("json: unexpected JSON input")
 		}
 		self.value(v)?
@@ -556,14 +556,14 @@ fn decodeLiteral[T](scanFlags: int, mut data: []byte, mut &v: *T)! {
 		| t == valueT | t == stringT:
 			mut s := ""
 			ok := decodeString(scanFlags, &s, data)
-			if !ok {
+			if intrinsic::Unlikely(!ok) {
 				throw errors::New("json: invalid value for type " + t.String() + ": " + unsafe::BytesString(data))
 			}
 			*v = String(s)
 			return
 		| t.Kind() == comptime::String:
 			ok := decodeString(scanFlags, unsafe { &(*(*string)(v)) }, data)
-			if !ok {
+			if intrinsic::Unlikely(!ok) {
 				throw errors::New("json: invalid value for type " + t.String() + ": " + unsafe::BytesString(data))
 			}
 			return
@@ -571,7 +571,7 @@ fn decodeLiteral[T](scanFlags: int, mut data: []byte, mut &v: *T)! {
 			const match t.Value().Kind() {
 			| comptime::U8:
 				mut s2, _ := unquoteBytes(data)
-				if s2 == nil {
+				if intrinsic::Unlikely(s2 == nil) {
 					throw errors::New("json: invalid value for type " + t.String() + ": " + unsafe::BytesString(data))
 				}
 				mut r := base64::StdEncoding.AppendDecode(nil, s2)?
@@ -721,7 +721,7 @@ fn decodeLiteral[T](scanFlags: int, mut data: []byte, mut &v: *T)! {
 // If you require absolute accuracy beforehand,
 // validate the JSON data using the `Valid` function.
 fn Decode[T](data: []byte, mut &v: *T)! {
-	if v == nil {
+	if intrinsic::Unlikely(v == nil) {
 		panic("std/encoding/json: destination type reference pointer is nil")
 	}
 	d := decoder{}
@@ -991,19 +991,19 @@ fn decodeUInt[T](mut &v: *T, b: []byte)! {
 	const t = comptime::Typeof(T)
 
 	// Negative value for unsigned type.
-	if b[0] == '-' {
+	if intrinsic::Unlikely(b[0] == '-') {
 		throw errors::New("json: invalid value for type " + t.String() + ": " + unsafe::BytesString(b))
 	}
 
 	z, ok := decodeUintRaw(b)
-	if !ok {
+	if intrinsic::Unlikely(!ok) {
 		if z != u64.Max {
 			throw errors::New("json: invalid value for type " + t.String() + ": " + unsafe::BytesString(b))
 		}
 		throw errors::New("json: value overflows type " + t.String() + ": " + unsafe::BytesString(b))
 	}
 	const maxUint = u64(1)<<t.Bits() - 1
-	if z > maxUint {
+	if intrinsic::Unlikely(z > maxUint) {
 		throw errors::New("json: value overflows type " + t.String() + ": " + unsafe::BytesString(b))
 	}
 
@@ -1016,25 +1016,25 @@ fn decodeInt[T](mut &v: *T, b: []byte)! {
 	const Max = 1 << (t.Bits() - 1)
 	if b[0] == '-' {
 		z, ok := decodeUintRaw(b[1:])
-		if !ok {
+		if intrinsic::Unlikely(!ok) {
 			if z != u64.Max {
 				throw errors::New("json: invalid value for type " + t.String() + ": " + unsafe::BytesString(b))
 			}
 			throw errors::New("json: value overflows type " + t.String() + ": " + unsafe::BytesString(b))
 		}
-		if z > Max {
+		if intrinsic::Unlikely(z > Max) {
 			throw errors::New("json: value overflows type " + t.String() + ": " + unsafe::BytesString(b))
 		}
 		*v = -T(z)
 	} else {
 		z, ok := decodeUintRaw(b)
-		if !ok {
+		if intrinsic::Unlikely(!ok) {
 			if z != u64.Max {
 				throw errors::New("json: invalid value for type " + t.String() + ": " + unsafe::BytesString(b))
 			}
 			throw errors::New("json: value overflows type " + t.String() + ": " + unsafe::BytesString(b))
 		}
-		if z >= Max {
+		if intrinsic::Unlikely(z >= Max) {
 			throw errors::New("json: value overflows type " + t.String() + ": " + unsafe::BytesString(b))
 		}
 		*v = T(z)
@@ -1198,7 +1198,7 @@ fn decodeString(scanFlags: int, mut &s: *string, mut lit: []byte): (ok: bool) {
 	let mut s2: []byte
 	if scanFlags&unquoteMask != 0 {
 		s2, _ = unquoteBytes(lit)
-		if s2 == nil {
+		if intrinsic::Unlikely(s2 == nil) {
 			return false
 		}
 	} else {
