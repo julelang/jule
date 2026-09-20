@@ -14,6 +14,11 @@ use "std/unicode/utf16"
 use "std/unicode/utf8"
 use "std/unsafe"
 
+const (
+	flagEscaped = 1 << iota
+	flagUnicode
+)
+
 // Unquoting needed when this mask returns non-zero on scan flags.
 const unquoteMask = flagEscaped | flagUnicode
 
@@ -183,11 +188,10 @@ impl decoder {
 	// ambiguity falls back to the original FSM-driven skipLiteral untouched,
 	// so error messages and rare edge cases stay byte-for-byte identical.
 	#disable nilptr boundary
-	fn rescanLiteral(*self)! {
-		self.scan.flags = 0
+	fn rescanLiteral(*self)!: int {
 		match self.data[self.off-1] {
 		| '"':
-			self.rescanStringFast()?
+			return self.rescanStringFast()?
 		| '-' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9':
 			self.rescanNumberFast()?
 		|:
@@ -196,12 +200,13 @@ impl decoder {
 			// of a hand-rolled fast path for such short fixed literals.
 			self.skipLiteral()?
 		}
+		return 0
 	}
 
 	// Fast path for string literals. self.off points at the byte right
 	// after the opening '"' (self.data[self.off-1] == '"').
 	#disable nilptr boundary
-	fn rescanStringFast(*self)! {
+	fn rescanStringFast(*self)!: (flags: int) {
 		data := self.data
 		n := len(data)
 		mut i := self.off
@@ -218,7 +223,7 @@ impl decoder {
 				return
 			}
 			if c == '\\' {
-				self.scan.flags |= flagEscaped
+				flags |= flagEscaped
 				i++
 				if intrinsic::Unlikely(i >= n) {
 					goto Fallback
@@ -252,7 +257,7 @@ impl decoder {
 				goto Fallback
 			}
 			if c >= utf8::RuneSelf {
-				self.scan.flags |= flagUnicode
+				flags |= flagUnicode
 			}
 			i++
 		}
@@ -263,6 +268,7 @@ impl decoder {
 		// just not fast. scan.step is still stateInString, as the
 		// FSM left it, so no manual reset is needed.
 		self.skipLiteral()?
+		return
 	}
 
 	// Fast path for number literals. self.off points at the byte right
@@ -417,8 +423,7 @@ impl decoder {
 			// Save the current position of decoder.
 			// We use it to select beginning of literal.
 			start := self.readIndex()
-			self.rescanLiteral()?
-			scanFlags := self.scan.flags
+			scanFlags := self.rescanLiteral()?
 			mut keylit := self.data[start:self.readIndex()]
 			// Read : before value.
 			if self.opcode == scanSkipSpace {
@@ -500,8 +505,7 @@ impl decoder {
 			// Save the current position of decoder.
 			// We use it to select beginning of literal.
 			start := self.readIndex()
-			self.rescanLiteral()?
-			scanFlags := self.scan.flags
+			scanFlags := self.rescanLiteral()?
 			let mut keylit: []byte
 			let mut escape: bool
 			if scanFlags&unquoteMask != 0 {
@@ -589,9 +593,9 @@ impl decoder {
 												// DecodeText is suitable.
 												// All bytes inside literal return scanContinue op code.
 												start := self.readIndex()
-												self.rescanLiteral()?
+												flags := self.rescanLiteral()?
 												let mut lit: []byte
-												if self.scan.flags&unquoteMask != 0 {
+												if flags&unquoteMask != 0 {
 													lit, _ = unquoteBytes(self.data[start:self.readIndex()])
 													if intrinsic::Unlikely(lit == nil) {
 														throw errors::New("json: invalid value for DecodeText function:" + unsafe::BytesString(lit))
@@ -666,8 +670,8 @@ impl decoder {
 		| scanBeginLiteral:
 			// All bytes inside literal return scanContinue op code.
 			start := self.readIndex()
-			self.rescanLiteral()?
-			decodeLiteral(self.scan.flags, self.data[start:self.readIndex()], v)?
+			flags := self.rescanLiteral()?
+			decodeLiteral(flags, self.data[start:self.readIndex()], v)?
 			return
 		|:
 			b := self.data[self.readIndex()]

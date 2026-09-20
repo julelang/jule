@@ -86,11 +86,6 @@ const (
 	parseArrayValue         // parsing array value
 )
 
-const (
-	flagEscaped = 1 << iota
-	flagUnicode
-)
-
 // A scanner is a JSON scanning state machine.
 // Callers call scan.reset and then pass bytes in one at a time
 // by calling scan.step(&scan, c) for each byte.
@@ -122,9 +117,6 @@ struct scanner {
 
 	// Max depth.
 	maxDepth: int
-
-	// Flags of the last scan.
-	flags: int
 }
 
 impl scanner {
@@ -348,15 +340,11 @@ fn stateInString(mut &s: *scanner, c: byte): int {
 		return scanContinue
 	}
 	if c == '\\' {
-		s.flags |= flagEscaped
 		s.step = stateInStringEsc
 		return scanContinue
 	}
 	if intrinsic::Unlikely(c < 0x20) {
 		return s.onerror(c, "in string literal")
-	}
-	if c >= utf8::RuneSelf {
-		s.flags |= flagUnicode
 	}
 	return scanContinue
 }
