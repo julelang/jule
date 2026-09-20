@@ -148,6 +148,24 @@ impl decoder {
 		}
 	}
 
+	// Processes bytes in data[off:] until it read a non-space byte.
+	#disable nilptr boundary
+	fn skipSpace(*self)! {
+		mut i := self.off
+		for i < len(self.data) {
+			c := self.data[i]
+			if c != ' ' && c != '\t' && c != '\n' && c != '\r' {
+				break
+			}
+			i++
+		}
+		self.off = i
+		self.scanNext()
+		if intrinsic::Unlikely(self.opcode == scanError) {
+			unsafe throw self.scan.err
+		}
+	}
+
 	// Similar to scanWhile(scanContinue), but it specialises the
 	// common case where we're decoding a literal. The decoder scans the input
 	// twice, once for syntax errors and to check the length of the value, and the
@@ -168,7 +186,7 @@ impl decoder {
 		mut i := 0
 		for {
 			// Look ahead for ] - can only happen on first iteration.
-			self.scanWhile(scanSkipSpace)?
+			self.skipSpace()?
 			if self.opcode == scanEndArray {
 				// closing ] - can only happen on first iteration.
 				break
@@ -192,7 +210,7 @@ impl decoder {
 			i++
 			// Next token must be , or ].
 			if self.opcode == scanSkipSpace {
-				self.scanWhile(scanSkipSpace)?
+				self.skipSpace()?
 			}
 			if self.opcode == scanEndArray {
 				break
@@ -240,7 +258,7 @@ impl decoder {
 		const quoted = keyT.Kind() == comptime::String || keyT == valueT || keyT == stringT
 		for {
 			// Read opening " of string key or closing }.
-			self.scanWhile(scanSkipSpace)?
+			self.skipSpace()?
 			if self.opcode == scanEndObject {
 				// closing } - can only happen on first iteration.
 				break
@@ -256,9 +274,9 @@ impl decoder {
 			mut keylit := self.data[start:self.readIndex()]
 			// Read : before value.
 			if self.opcode == scanSkipSpace {
-				self.scanWhile(scanSkipSpace)?
+				self.skipSpace()?
 			}
-			self.scanWhile(scanSkipSpace)?
+			self.skipSpace()?
 			// Decode value.
 			let mut value: V
 			self.value(&value)?
@@ -309,7 +327,7 @@ impl decoder {
 			}
 			// Next token must be , or }.
 			if self.opcode == scanSkipSpace {
-				self.scanWhile(scanSkipSpace)?
+				self.skipSpace()?
 			}
 			if self.opcode == scanEndObject {
 				break
@@ -323,7 +341,7 @@ impl decoder {
 		p := uintptr(v)
 		for {
 			// Read opening " of string key or closing }.
-			self.scanWhile(scanSkipSpace)?
+			self.skipSpace()?
 			if self.opcode == scanEndObject {
 				// closing } - can only happen on first iteration.
 				break
@@ -350,9 +368,9 @@ impl decoder {
 			key := unsafe::StringFromBytes(keylit)
 			// Read : before value.
 			if self.opcode == scanSkipSpace {
-				self.scanWhile(scanSkipSpace)?
+				self.skipSpace()?
 			}
-			self.scanWhile(scanSkipSpace)?
+			self.skipSpace()?
 			// If literal have escape characters, it is escaped literal.
 			// Compare it only escaped cached name, otherwise compere it with non-escape one.
 			// This is fast and safe way, backslash is reserved character.
@@ -381,7 +399,7 @@ impl decoder {
 		FieldDecoded:
 			// Next token must be , or }.
 			if self.opcode == scanSkipSpace {
-				self.scanWhile(scanSkipSpace)?
+				self.skipSpace()?
 			}
 			if self.opcode == scanEndObject {
 				break
@@ -538,12 +556,12 @@ impl decoder {
 
 	#disable nilptr boundary
 	fn decode[T](*self, mut &v: *T)! {
-		self.scanWhile(scanSkipSpace)?
+		self.skipSpace()?
 		if intrinsic::Unlikely(self.opcode == scanEnd) {
 			throw errors::New("json: unexpected JSON input")
 		}
 		self.value(v)?
-		self.scanWhile(scanSkipSpace)?
+		self.skipSpace()?
 	}
 }
 
