@@ -174,10 +174,158 @@ impl decoder {
 	// Only in the second step do we use decodeState to tokenize literals, so we
 	// know there aren't any syntax errors. We can take advantage of that knowledge,
 	// and scan a literal's bytes much more quickly.
+	//
+	// Fast-path note: strings and numbers bypass the per-byte FSM dispatch
+	// entirely for their "safe" interior bytes. The byte that actually decides
+	// the literal's end (the one fed to stateEndValue) is always routed through
+	// the real scan.step/scanNext, exactly as the FSM would have done, so
+	// opcode, off, and parseState stay perfectly in sync. Any escape/grammar
+	// ambiguity falls back to the original FSM-driven skipLiteral untouched,
+	// so error messages and rare edge cases stay byte-for-byte identical.
 	#disable nilptr boundary
 	fn rescanLiteral(*self)! {
 		self.scan.flags = 0
+		match self.data[self.off-1] {
+		| '"':
+			self.rescanStringFast()?
+		| '-' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9':
+			self.rescanNumberFast()?
+		|:
+			// true / false / null: 3-4 bytes total, the FSM's per-byte
+			// dispatch overhead here is negligible. Not worth the risk
+			// of a hand-rolled fast path for such short fixed literals.
+			self.skipLiteral()?
+		}
+	}
+
+	// Fast path for string literals. self.off points at the byte right
+	// after the opening '"' (self.data[self.off-1] == '"').
+	#disable nilptr boundary
+	fn rescanStringFast(*self)! {
+		data := self.data
+		n := len(data)
+		mut i := self.off
+		for i < n {
+			c := data[i]
+			if c == '"' {
+				// Closing quote consumed here (mirrors stateInString
+				// returning scanContinue on '"' while updating step).
+				// The byte AFTER the quote is the real decision point,
+				// so it goes through the genuine FSM.
+				self.off = i + 1
+				self.scan.step = stateEndValue
+				self.scanNext()
+				return
+			}
+			if c == '\\' {
+				self.scan.flags |= flagEscaped
+				i++
+				if intrinsic::Unlikely(i >= n) {
+					goto Fallback
+				}
+				match data[i] {
+				| 'b' | 'f' | 'n' | 'r' | 't' | '\\' | '/' | '"':
+					i++
+				| 'u':
+					i++
+					mut k := 0
+					for k < 4 {
+						if intrinsic::Unlikely(i >= n) {
+							goto Fallback
+						}
+						h := data[i]
+						if !('0' <= h && h <= '9' || 'a' <= h && h <= 'f' || 'A' <= h && h <= 'F') {
+							goto Fallback
+						}
+						i++
+						k++
+					}
+				|:
+					// Invalid escape sequence, let the slow path
+					// produce the exact original error.
+					goto Fallback
+				}
+				continue
+			}
+			if intrinsic::Unlikely(c < 0x20) {
+				// Control character, invalid; slow path reports it.
+				goto Fallback
+			}
+			if c >= utf8::RuneSelf {
+				self.scan.flags |= flagUnicode
+			}
+			i++
+		}
+	Fallback:
+		// Unterminated string, bad escape, or truncated \uXXXX.
+		// self.off was never mutated above, so this replays from
+		// exactly where the fast path started, fully correct,
+		// just not fast. scan.step is still stateInString, as the
+		// FSM left it, so no manual reset is needed.
 		self.skipLiteral()?
+	}
+
+	// Fast path for number literals. self.off points at the byte right
+	// after the first literal byte (self.data[self.off-1] is '-' or a digit).
+	#disable nilptr boundary
+	fn rescanNumberFast(*self)! {
+		data := self.data
+		n := len(data)
+		mut i := self.off
+		mut firstDigit := data[self.off-1]
+		if firstDigit == '-' {
+			if intrinsic::Unlikely(i >= n || !('0' <= data[i] && data[i] <= '9')) {
+				self.skipLiteral()?
+				return
+			}
+			firstDigit = data[i]
+		}
+		if firstDigit == '0' {
+			// Leading zero must not be followed by another digit
+			// (e.g. "01" is invalid JSON), let the slow path decide.
+			if intrinsic::Unlikely(i < n && '0' <= data[i] && data[i] <= '9') {
+				self.skipLiteral()?
+				return
+			}
+		} else {
+			for i < n && '0' <= data[i] && data[i] <= '9' {
+				i++
+			}
+		}
+		// Fractional part.
+		if i < n && data[i] == '.' {
+			j := i + 1
+			if intrinsic::Unlikely(j >= n || !('0' <= data[j] && data[j] <= '9')) {
+				self.skipLiteral()?
+				return
+			}
+			i = j
+			for i < n && '0' <= data[i] && data[i] <= '9' {
+				i++
+			}
+		}
+		// Exponent part.
+		if i < n && (data[i] == 'e' || data[i] == 'E') {
+			mut j := i + 1
+			if j < n && (data[j] == '+' || data[j] == '-') {
+				j++
+			}
+			if intrinsic::Unlikely(j >= n || !('0' <= data[j] && data[j] <= '9')) {
+				self.skipLiteral()?
+				return
+			}
+			i = j
+			for i < n && '0' <= data[i] && data[i] <= '9' {
+				i++
+			}
+		}
+		// data[i] is the byte that actually ends the number (',', '}',
+		// ']', space, or EOF). Feed it to the real FSM via stateEndValue,
+		// exactly as state0/state1/stateDot0/stateE0 would have done
+		// inline for that same byte.
+		self.off = i
+		self.scan.step = stateEndValue
+		self.scanNext()
 	}
 
 	#disable nilptr boundary
