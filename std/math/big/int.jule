@@ -29,10 +29,8 @@ let mut intOne = Int{abs: wordOne}
 // the big package is considered a security vulnerability might depend on the
 // impact on the standard library.
 struct Int {
-	// Mutability is for just copy-by-reference uses cases,
-	// any mutation on abs must be done in a mutable scope for the owner.
-	mut abs: []Word
-	neg:     bool
+	abs: []Word
+	neg: bool
 }
 
 impl Int {
@@ -217,11 +215,11 @@ impl Int {
 		// (-x) * y == -(x * y)
 		// (-x) * (-y) == x * y
 		if x == y {
-			sqrW(&self.abs, x.abs)
+			sqrW(&self.abs, unsafe { *&x.abs })
 			self.neg = false
 			return
 		}
-		mulW(&self.abs, x.abs, y.abs)
+		mulW(&self.abs, unsafe { *&x.abs }, unsafe { *&y.abs })
 		self.neg = len(self.abs) > 0 && x.neg != y.neg // 0 has no sign
 	}
 
@@ -288,7 +286,7 @@ impl Int {
 	// Implements Euclidean modulus (unlike Jule); see [Int.DivMod] for more details.
 	fn Mod(mut *self, &x: *Int, &y: *Int) {
 		if self == y || aliasW(self.abs, y.abs) {
-			mut y0 := *y
+			mut y0 := unsafe { **&y }
 			y0.abs = cloneW(y.abs)
 			self.Mod(x, &y0)
 			return
@@ -470,7 +468,7 @@ impl Int {
 
 	fn exp(mut *self, &x: *Int, &y: *Int, &m: *Int, slow: bool) {
 		// See Knuth, volume 2, section 4.6.3.
-		mut xWords := x.abs
+		mut xWords := unsafe { *&x.abs }
 		if y.neg {
 			if m == nil || len(m.abs) == 0 {
 				setWU64(&self.abs, 1)
@@ -495,7 +493,7 @@ impl Int {
 				tm.Set(m)
 				unsafe { *(&m) = &tm }
 			}
-			mWords = m.abs // m.abs may be nil for m == 0
+			mWords = unsafe { *&m.abs } // m.abs may be nil for m == 0
 		}
 		expWW(&self.abs, xWords, yWords, mWords, slow)
 		self.neg = len(self.abs) > 0 && x.neg && len(yWords) > 0 && yWords[0]&1 == 1 // 0 has no sign
@@ -618,7 +616,7 @@ impl Int {
 			if aliasW(y.abs, b.abs) {
 				B.Set(b)
 			} else {
-				B = *b
+				B = unsafe { **&b }
 			}
 			// y = (self - a*x)/b
 			y.Mul(a, &Ua) // y can safely alias a
@@ -787,7 +785,8 @@ impl Int {
 			return false
 		}
 
-		return probablyPrimeMillerRabinW(self.abs, n+1, true) && probablyPrimeLucasW(self.abs)
+		return probablyPrimeMillerRabinW(self.abs, n+1, true) &&
+			probablyPrimeLucasW(unsafe { *&self.abs })
 	}
 
 	// Returns the number of consecutive least significant zero bits of |self|.
