@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // The Jule code is a modified version of the original Go code from
-// https://github.com/golang/go/blob/go1.19/src/strconv/itoa.go and came with this notice.
+// https://github.com/golang/go/blob/go1.26.4/src/internal/strconv/itoa.go and came with this notice.
 //
 // ====================================================
 // Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -36,6 +36,7 @@
 // ====================================================
 
 use "std/math/bits"
+use "std/unsafe"
 
 // Returns the string representation of i in the given base,
 // for 2 <= base <= 36. The result uses the lower-case letters 'a' to 'z'
@@ -46,7 +47,7 @@ fn FormatUint(i: u64, base: int): string {
 			return small(int(i))
 		}
 		let mut a: [24]byte
-		j := formatBase10(&a, i)
+		j := formatBase10(unsafe::Slice(&a[0], len(a), len(a)), i)
 		return string(a[j:])
 	}
 	_, s := formatBits(nil, i, base, false, false)
@@ -66,7 +67,7 @@ fn FormatInt(i: i64, base: int): string {
 		if i < 0 {
 			u = -u
 		}
-		mut j := formatBase10(&a, u)
+		mut j := formatBase10(unsafe::Slice(&a[0], len(a), len(a)), u)
 		if i < 0 {
 			j--
 			a[j] = '-'
@@ -101,7 +102,7 @@ fn AppendUint(mut dst: []byte, i: u64, base: int): []byte {
 			return append(dst, small(int(i))...)
 		}
 		let mut a: [24]byte
-		j := formatBase10(&a, i)
+		j := formatBase10(unsafe::Slice(&a[0], len(a), len(a)), i)
 		return append(dst, a[j:]...)
 	}
 	dst, _ = formatBits(dst, i, base, false, true)
@@ -214,13 +215,13 @@ fn small(i: int): string {
 //
 // the decimal representation is in a[i:].
 #disable nilptr boundary
-fn formatBase10(mut &a: *[24]byte, mut u: u64): int {
+fn formatBase10(mut a: []byte, mut u: u64): int {
 	// Split into 9-digit chunks that fit in u32s
 	// and convert each chunk using u32 math instead of u64 math.
 	// The obvious way to write the outer loop is "for u >= 1e9", but most numbers are small,
 	// so the setup for the comparison u >= 1e9 is usually pure overhead.
 	// Instead, we approximate it by u>>29 != 0, which is usually faster and good enough.
-	mut i := len(*a)
+	mut i := len(a)
 	for (host64bit && u>>29 != 0) || (!host64bit && u32(u)>>29|u32(u>>32) != 0) {
 		let mut lo: u32
 		u, lo = u/1e9, u32(u%1e9)
@@ -231,10 +232,10 @@ fn formatBase10(mut &a: *[24]byte, mut u: u64): int {
 			let mut dd: u32
 			lo, dd = lo/100, (lo%100)*2
 			i -= 2
-			(*a)[i+0], (*a)[i+1] = smalls[dd+0], smalls[dd+1]
+			a[i+0], a[i+1] = smalls[dd+0], smalls[dd+1]
 		}
 		i--
-		(*a)[i] = smalls[lo*2+1]
+		a[i] = smalls[lo*2+1]
 
 		// If we'd been using u >= 1e9 then we would be guaranteed that u/1e9 > 0,
 		// but since we used u>>29 != 0, u/1e9 might be 0, so we might be done.
@@ -251,14 +252,14 @@ fn formatBase10(mut &a: *[24]byte, mut u: u64): int {
 		let mut dd: u32
 		lo, dd = lo/100, (lo%100)*2
 		i -= 2
-		(*a)[i+0], (*a)[i+1] = smalls[dd+0], smalls[dd+1]
+		a[i+0], a[i+1] = smalls[dd+0], smalls[dd+1]
 	}
 	i--
 	dd := lo * 2
-	(*a)[i] = smalls[dd+1]
+	a[i] = smalls[dd+1]
 	if lo >= 10 {
 		i--
-		(*a)[i] = smalls[dd+0]
+		a[i] = smalls[dd+0]
 	}
 	return i
 }

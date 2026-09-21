@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // The Jule code is a modified version of the original Go code from
-// https://github.com/golang/go/blob/go1.19/src/strconv/decimal.go and came with this notice.
+// https://github.com/golang/go/blob/go1.26.4/src/internal/strconv/decimal.go and came with this notice.
 //
 // ====================================================
 // Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -44,28 +44,265 @@
 
 use "std/unsafe"
 
+struct decimal {
+	d:     [800]byte // digits, big-endian representation
+	nd:    int       // number of digits used
+	dp:    int       // decimal point
+	neg:   bool      // negative flag
+	trunc: bool      // discarded nonzero digits beyond d[:nd]
+}
+
+impl decimal {
+	#disable nilptr boundary
+	fn String(*self): string {
+		mut n := 10 + self.nd
+		if self.dp > 0 {
+			n += self.dp
+		}
+		if self.dp < 0 {
+			n += -self.dp
+		}
+
+		mut buf := make([]byte, n)
+		mut w := 0
+		match {
+		| self.nd == 0:
+			return "0"
+		| self.dp <= 0:
+			// zeros fill space between decimal point and digits
+			buf[w] = '0'
+			w++
+			buf[w] = '.'
+			w++
+			w += digitZero(buf[w : w+-self.dp])
+			w += copy(buf[w:], self.d[0:self.nd])
+		| self.dp < self.nd:
+			// decimal point in middle of digits
+			w += copy(buf[w:], self.d[0:self.dp])
+			buf[w] = '.'
+			w++
+			w += copy(buf[w:], self.d[self.dp:self.nd])
+		|:
+			// zeros fill space between digits and decimal point
+			w += copy(buf[w:], self.d[0:self.nd])
+			w += digitZero(buf[w : w+self.dp-self.nd])
+		}
+		return unsafe::StringFromBytes(buf[0:w])
+	}
+
+	// Assign v to self.
+	#disable nilptr boundary
+	fn Assign(mut *self, mut v: u64) {
+		let mut buf: [24]byte
+
+		// Write reversed decimal in buf.
+		mut n := 0
+		for v > 0 {
+			v1 := v / 10
+			v -= 10 * v1
+			buf[n] = byte(v + '0')
+			n++
+			v = v1
+		}
+
+		// Reverse again to produce forward decimal in self.d.
+		self.nd = 0
+		n--
+		for n >= 0; n-- {
+			self.d[self.nd] = buf[n]
+			self.nd++
+		}
+		self.dp = self.nd
+		trim(self)
+	}
+
+	// Binary shift left (k > 0) or right (k < 0).
+	#disable nilptr
+	fn Shift(mut *self, mut k: int) {
+		match {
+		| self.nd == 0:
+			// nothing to do: self == 0
+		| k > 0:
+			for k > maxShift {
+				leftShift(self, maxShift)
+				k -= maxShift
+			}
+			leftShift(self, uint(k))
+		| k < 0:
+			for k < -maxShift {
+				rightShift(self, maxShift)
+				k += maxShift
+			}
+			rightShift(self, uint(-k))
+		}
+	}
+
+	// Round self to nd digits (or fewer).
+	// If nd is zero, it means we're rounding
+	// just to the left of the digits, as in
+	// 0.09 -> 0.1.
+	fn Round(mut *self, nd: int) {
+		if nd < 0 || nd >= self.nd {
+			return
+		}
+		if shouldRoundUp(self, nd) {
+			self.RoundUp(nd)
+		} else {
+			self.RoundDown(nd)
+		}
+	}
+
+	// Round self down to nd digits (or fewer).
+	fn RoundDown(mut *self, nd: int) {
+		if nd < 0 || nd >= self.nd {
+			return
+		}
+		self.nd = nd
+		trim(self)
+	}
+
+	// Round self up to nd digits (or fewer).
+	fn RoundUp(mut *self, nd: int) {
+		if nd < 0 || nd >= self.nd {
+			return
+		}
+
+		// round up
+		mut i := nd - 1
+		for i >= 0; i-- {
+			c := self.d[i]
+			if c < '9' { // can stop after this digit
+				self.d[i]++
+				self.nd = i + 1
+				return
+			}
+		}
+
+		// Number is all 9s.
+		// Change to single 1 with adjusted decimal point.
+		self.d[0] = '1'
+		self.nd = 1
+		self.dp++
+	}
+
+	// Extract integer part, rounded appropriately.
+	// No guarantees about overflow.
+	fn RoundedInteger(mut *self): u64 {
+		if self.dp > 20 {
+			return 0xFFFFFFFFFFFFFFFF
+		}
+		let mut i: int
+		mut n := u64(0)
+		for i < self.dp && i < self.nd; i++ {
+			n = n*10 + u64(self.d[i]-'0')
+		}
+		for i < self.dp; i++ {
+			n *= 10
+		}
+		if shouldRoundUp(self, self.dp) {
+			n++
+		}
+		return n
+	}
+}
+
+#disable boundary
+fn digitZero(mut dst: []byte): int {
+	for i in dst {
+		dst[i] = '0'
+	}
+	return len(dst)
+}
+
+// Trim trailing zeros from number.
+// (They are meaningless; the decimal point is tracked
+// independent of the number of digits.)
+#disable nilptr boundary
+fn trim(mut &a: *decimal) {
+	for a.nd > 0 && a.d[a.nd-1] == '0' {
+		a.nd--
+	}
+	if a.nd == 0 {
+		a.dp = 0
+	}
+}
+
 // Maximum shift that we can do in one pass without overflow.
 // A uint has 32 or 64 bits, and we have to be able to accommodate 9<<k.
-const (
-	uintSize = 32 << (^uint(0) >> 63)
-	maxShift = uintSize - 4
-)
+const uintSize = 32 << (^uint(0) >> 63)
+const maxShift = uintSize - 4
+
+// Binary shift right (/ 2) by k bits.  k <= maxShift to avoid overflow.
+#disable nilptr boundary
+fn rightShift(mut &a: *decimal, k: uint) {
+	mut r := 0 // read pointer
+	mut w := 0 // write pointer
+
+	// Pick up enough leading digits to cover first shift.
+	let mut n: uint
+	for n>>k == 0; r++ {
+		if r >= a.nd {
+			if n == 0 {
+				// a == 0; shouldn't get here, but handle anyway.
+				a.nd = 0
+				return
+			}
+			for n>>k == 0 {
+				n = n * 10
+				r++
+			}
+			break
+		}
+		c := uint(a.d[r])
+		n = n*10 + c - '0'
+	}
+	a.dp -= r - 1
+
+	let mask: uint = (1 << k) - 1
+
+	// Pick up a digit, put down a digit.
+	for r < a.nd; r++ {
+		c := uint(a.d[r])
+		dig := n >> k
+		n &= mask
+		a.d[w] = byte(dig + '0')
+		w++
+		n = n*10 + c - '0'
+	}
+
+	// Put down extra digits.
+	for n > 0 {
+		dig := n >> k
+		n &= mask
+		if w < len(a.d) {
+			a.d[w] = byte(dig + '0')
+			w++
+		} else if dig > 0 {
+			a.trunc = true
+		}
+		n = n * 10
+	}
+
+	a.nd = w
+	trim(a)
+}
 
 // Cheat sheet for left shift: table indexed by shift count giving
 // number of new digits that will be introduced by that shift.
 //
-// For example, LEFTCHEATS[4] = {2, "625"}.  That means that
+// For example, leftcheats[4] = {2, "625"}.  That means that
 // if we are shifting by 4 (multiplying by 16), it will add 2 digits
 // when the string prefix is "625" through "999", and one fewer digit
 // if the string prefix is "000" through "624".
 //
 // Credit for this trick goes to Ken.
+
 struct leftCheat {
 	delta:  int    // number of new digits
 	cutoff: string // minus one digit if original < a.
 }
 
-let leftCheats: []leftCheat = [
+let leftcheats: []leftCheat = [
 	// Leading digits of 1/2^i = 5^i.
 	// 5^23 is not an exact 64-bit floating point number,
 	// so have to use bc for the math.
@@ -142,243 +379,12 @@ let leftCheats: []leftCheat = [
 	{19, "867361737988403547205962240695953369140625"}, // * 1152921504606846976
 ]
 
-struct decimal {
-	d:     [800]byte // digits, big-endian representation
-	nd:    int       // number of digits used
-	dp:    int       // decimal point
-	neg:   bool      // negative flag
-	trunc: bool      // discarded nonzero digits beyond d[:nd]
-}
-
-impl decimal {
-	// Assign v.
-	fn Assign(mut *self, mut v: u64) {
-		let mut buf: [24]byte
-
-		// Write reversed decimal in buf.
-		mut n := 0
-		for v > 0 {
-			v1 := v / 10
-			v -= 10 * v1
-			buf[n] = byte(v + '0')
-			n++
-			v = v1
-		}
-
-		// Reverse again to produce forward decimal in a.d.
-		self.nd = 0
-		n--
-		for n >= 0; n-- {
-			self.d[self.nd] = buf[n]
-			self.nd++
-		}
-		self.dp = self.nd
-		trim(self)
-	}
-
-	// Binary shift left (k > 0) or right (k < 0).
-	fn Shift(mut *self, mut k: int) {
-		match {
-		| self.nd == 0:
-			// nothing to do: a == 0
-		| k > 0:
-			for k > maxShift {
-				leftShift(self, maxShift)
-				k -= maxShift
-			}
-			leftShift(self, uint(k))
-		| k < 0:
-			for k < -maxShift {
-				rightShift(self, maxShift)
-				k += maxShift
-			}
-			rightShift(self, uint(-k))
-		}
-	}
-
-	// Round a down to nd digits (or fewer).
-	fn RoundDown(mut *self, nd: int) {
-		if nd < 0 || nd >= self.nd {
-			return
-		}
-		self.nd = nd
-		trim(self)
-	}
-
-	// Round a up to nd digits (or fewer).
-	fn RoundUp(mut *self, nd: int) {
-		if nd < 0 || nd >= self.nd {
-			return
-		}
-
-		// round up
-		mut i := nd - 1
-		for i >= 0; i-- {
-			c := self.d[i]
-			if c < '9' { // can stop after this digit
-				self.d[i]++
-				self.nd = i + 1
-				return
-			}
-		}
-
-		// Number is all 9s.
-		// Change to single 1 with adjusted decimal point.
-		self.d[0] = '1'
-		self.nd = 1
-		self.dp++
-	}
-
-	// Round a to nd digits (or fewer).
-	// If nd is zero, it means we're rounding
-	// just to the left of the digits, as in
-	// 0.09 -> 0.1.
-	fn Round(mut *self, nd: int) {
-		if nd < 0 || nd >= self.nd {
-			return
-		}
-		if shouldRoundUp(self, nd) {
-			self.RoundUp(nd)
-		} else {
-			self.RoundDown(nd)
-		}
-	}
-
-	// Extract integer part, rounded appropriately.
-	// No guarantees about overflow.
-	fn RoundedInteger(mut *self): u64 {
-		if self.dp > 20 {
-			return 0xFFFFFFFFFFFFFFFF
-		}
-		mut i := 0
-		mut n := u64(0)
-		for i < self.dp && i < self.nd; i++ {
-			n = (n << 3) + (n << 1) + u64(self.d[i]-'0')
-		}
-		for i < self.dp; i++ {
-			n *= 10
-		}
-		if shouldRoundUp(self, self.dp) {
-			n++
-		}
-		return n
-	}
-
-	fn String(*self): string {
-		mut n := 10 + self.nd
-		if self.dp > 0 {
-			n += self.dp
-		}
-		if self.dp < 0 {
-			n += -self.dp
-		}
-
-		mut buf := make([]byte, n)
-		mut w := 0
-		match {
-		| self.nd == 0:
-			return "0"
-		| self.dp <= 0:
-			// zeros fill space between decimal point and digits
-			buf[w] = '0'
-			w++
-			buf[w] = '.'
-			w++
-			w += digitZero(buf[w : w+-self.dp])
-			w += copy(buf[w:], self.d[0:self.nd])
-		| self.dp < self.nd:
-			// decimal point in middle of digits
-			w += copy(buf[w:], self.d[0:self.dp])
-			buf[w] = '.'
-			w++
-			w += copy(buf[w:], self.d[self.dp:self.nd])
-		|:
-			// zeros fill space between digits and decimal point
-			w += copy(buf[w:], self.d[0:self.nd])
-			w += digitZero(buf[w : w+self.dp-self.nd])
-		}
-		return unsafe::StringFromBytes(buf[0:w])
-	}
-}
-
-fn digitZero(mut dst: []byte): int {
-	for i in dst {
-		dst[i] = '0'
-	}
-	return len(dst)
-}
-
-// Trailing zeros from number.
-// (They are meaningless; the decimal point is tracked
-// independent of the number of digits.)
-fn trim(mut &a: *decimal) {
-	for a.nd > 0 && a.d[a.nd-1] == '0' {
-		a.nd--
-	}
-	if a.nd == 0 {
-		a.dp = 0
-	}
-}
-
-// Binary shift right (/ 2) by k bits.  k <= maxShift to avoid overflow.
-fn rightShift(mut &a: *decimal, k: uint) {
-	mut r := 0 // read pointer
-	mut w := 0 // write pointer
-
-	// Pick up enough leading digits to cover first shift.
-	mut n := uint(0)
-	for n>>k == 0; r++ {
-		if r >= a.nd {
-			if n == 0 {
-				// a == 0; shouldn't get here, but handle anyway.
-				a.nd = 0
-				return
-			}
-			for n>>k == 0 {
-				n = (n << 3) + (n << 1) // n = n * 10
-				r++
-			}
-			break
-		}
-		c := uint(a.d[r])
-		n = (n << 3) + (n << 1) + c - '0'
-	}
-	a.dp -= r - 1
-
-	mask := uint(1<<k) - 1
-
-	// Pick up a digit, put down a digit.
-	for r < a.nd; r++ {
-		c := uint(a.d[r])
-		dig := n >> k
-		n &= mask
-		a.d[w] = byte(dig + '0')
-		w++
-		n = (n << 3) + (n << 1) + c - '0'
-	}
-
-	// Put down extra digits.
-	for n > 0 {
-		dig := n >> k
-		n &= mask
-		if w < len(a.d) {
-			a.d[w] = byte(dig + '0')
-			w++
-		} else if dig > 0 {
-			a.trunc = true
-		}
-		n = (n << 3) + (n << 1) // n = n * 10
-	}
-
-	a.nd = w
-	trim(a)
-}
-
 // Is the leading prefix of b lexicographically less than s?
-fn prefixIsLessThan(b: [800]byte, end: int, s: string): bool {
+#disable boundary
+fn prefixIsLessThan(b: []byte, s: string): bool {
 	mut i := 0
 	for i < len(s); i++ {
-		if i >= end {
+		if i >= len(b) {
 			return true
 		}
 		if b[i] != s[i] {
@@ -389,9 +395,10 @@ fn prefixIsLessThan(b: [800]byte, end: int, s: string): bool {
 }
 
 // Binary shift left (* 2) by k bits.  k <= maxShift to avoid overflow.
+#disable nilptr boundary
 fn leftShift(mut &a: *decimal, k: uint) {
-	mut delta := leftCheats[k].delta
-	if prefixIsLessThan(a.d, a.nd, unsafe { *(&leftCheats[k].cutoff) }) {
+	mut delta := leftcheats[k].delta
+	if prefixIsLessThan(a.d[0:a.nd], leftcheats[k].cutoff) {
 		delta--
 	}
 
@@ -399,7 +406,7 @@ fn leftShift(mut &a: *decimal, k: uint) {
 	mut w := a.nd + delta // write index
 
 	// Pick up a digit, put down a digit.
-	mut n := uint(0)
+	let mut n: uint
 	r--
 	for r >= 0; r-- {
 		n += (uint(a.d[r]) - '0') << k
@@ -436,6 +443,7 @@ fn leftShift(mut &a: *decimal, k: uint) {
 }
 
 // If we chop a at nd digits, should we round up?
+#disable nilptr boundary
 fn shouldRoundUp(&a: *decimal, nd: int): bool {
 	if nd < 0 || nd >= a.nd {
 		return false

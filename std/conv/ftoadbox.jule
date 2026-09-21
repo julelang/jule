@@ -1,0 +1,382 @@
+// Copyright 2026 The Jule Project Contributors. All rights reserved.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// The Jule code is a modified version of the original Go code from
+// https://github.com/golang/go/blob/go1.26.4/src/internal/strconv/ftoadbox.go and came with this notice.
+//
+// ====================================================
+// Copyright (c) 2009 The Go Authors. All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// ====================================================
+
+// Binary to decimal conversion using the Dragonbox algorithm by Junekey Jeon.
+//
+// Fixed precision format is not supported by the Dragonbox algorithm
+// so we continue to use Ryū-printf for this purpose.
+// See https://github.com/jk-jeon/dragonbox/issues/38 for more details.
+//
+// For binary to decimal rounding, uses round to nearest, tie to even.
+// For decimal to binary rounding, assumes round to nearest, tie to even.
+//
+// The original paper by Junekey Jeon can be found at:
+// https://github.com/jk-jeon/dragonbox/blob/d5dc40ae6a3f1a4559cda816738df2d6255b4e24/other_files/Dragonbox.pdf
+//
+// The reference implementation in C++ by Junekey Jeon can be found at:
+// https://github.com/jk-jeon/dragonbox/blob/6c7c925b571d54486b9ffae8d9d18a822801cbda/subproject/simple/include/simple_dragonbox.h
+
+// Computes the decimal significand and exponent
+// from the binary significand and exponent using the Dragonbox algorithm
+// and formats the decimal floating point number in d.
+fn dboxFtoa(mut &d: *decimalSlice, mant: u64, exp: int, denorm: bool, bitSize: int) {
+	if bitSize == 32 {
+		dboxFtoa32(d, u32(mant), exp, denorm)
+	} else {
+		dboxFtoa64(d, mant, exp, denorm)
+	}
+}
+
+#disable nilptr
+fn dboxFtoa64(mut &d: *decimalSlice, mant: u64, exp: int, denorm: bool) {
+	if mant == 1<<f64MantBits && !denorm {
+		// Algorithm 5.6 (page 24).
+		k0 := -mulLog10_2MinusLog10_4Over3(exp)
+		φ, β := dboxPow64(k0, exp)
+		mut xi, zi := dboxRange64(φ, β)
+		if exp != 2 && exp != 3 {
+			xi++
+		}
+		q := zi / 10
+		if xi <= q*10 {
+			q2, zeros := trimZeros(q)
+			dboxDigits(d, q2, -k0+1+zeros)
+			return
+		}
+		mut yru := dboxRoundUp64(φ, β)
+		if exp == -77 && yru%2 != 0 {
+			yru--
+		} else if yru < xi {
+			yru++
+		}
+		dboxDigits(d, yru, -k0)
+		return
+	}
+
+	// κ = 2 for f64 (section 5.1.3)
+	const (
+		κ     = 2
+		p10κ  = 100       // 10**κ
+		p10κ1 = p10κ * 10 // 10**(κ+1)
+	)
+
+	// Algorithm 5.2 (page 15).
+	k0 := -mulLog10_2(exp)
+	φ, β := dboxPow64(κ+k0, exp)
+	zi, mut exact := dboxMulPow64(u64(mant*2+1)<<β, φ)
+	mut s, mut r := zi/p10κ1, u32(zi%p10κ1)
+	δi := dboxDelta64(φ, β)
+
+	if r < δi {
+		if r != 0 || !exact || mant%2 == 0 {
+			s2, zeros := trimZeros(s)
+			dboxDigits(d, s2, -k0+1+zeros)
+			return
+		}
+		s--
+		r = p10κ * 10
+	} else if r == δi {
+		parity, (exact) := dboxParity64(u64(mant*2-1), φ, β)
+		if parity || (exact && mant%2 == 0) {
+			s2, zeros := trimZeros(s)
+			dboxDigits(d, s2, -k0+1+zeros)
+			return
+		}
+	}
+
+	// Algorithm 5.4 (page 18).
+	D := r + p10κ/2 - δi/2
+	t, ρ := D/p10κ, D%p10κ
+	mut yru := 10*s + u64(t)
+	if ρ == 0 {
+		parity, (exact) := dboxParity64(mant*2, φ, β)
+		if parity != ((D-p10κ/2)%2 != 0) || exact && yru%2 != 0 {
+			yru--
+		}
+	}
+	dboxDigits(d, yru, -k0)
+}
+
+// Almost identical to dragonboxFtoa64.
+// This is kept as a separate copy to minimize runtime overhead.
+#disable nilptr
+fn dboxFtoa32(mut &d: *decimalSlice, mant: u32, exp: int, denorm: bool) {
+	if mant == 1<<f32MantBits && !denorm {
+		// Algorithm 5.6 (page 24).
+		k0 := -mulLog10_2MinusLog10_4Over3(exp)
+		φ, β := dboxPow32(k0, exp)
+		mut xi, zi := dboxRange32(φ, β)
+		if exp != 2 && exp != 3 {
+			xi++
+		}
+		q := zi / 10
+		if xi <= q*10 {
+			q2, zeros := trimZeros(u64(q))
+			dboxDigits(d, q2, -k0+1+zeros)
+			return
+		}
+		mut yru := dboxRoundUp32(φ, β)
+		if exp == -77 && yru%2 != 0 {
+			yru--
+		} else if yru < xi {
+			yru++
+		}
+		dboxDigits(d, u64(yru), -k0)
+		return
+	}
+
+	// κ = 1 for f32 (section 5.1.3)
+	const (
+		κ     = 1
+		p10κ  = 10
+		p10κ1 = p10κ * 10
+	)
+
+	// Algorithm 5.2 (page 15).
+	k0 := -mulLog10_2(exp)
+	φ, β := dboxPow32(κ+k0, exp)
+	zi, mut exact := dboxMulPow32(u32(mant*2+1)<<β, φ)
+	mut s, mut r := zi/p10κ1, u32(zi%p10κ1)
+	δi := dboxDelta32(φ, β)
+
+	if r < δi {
+		if r != 0 || !exact || mant%2 == 0 {
+			s2, zeros := trimZeros(u64(s))
+			dboxDigits(d, s2, -k0+1+zeros)
+			return
+		}
+		s--
+		r = p10κ * 10
+	} else if r == δi {
+		parity, (exact) := dboxParity32(u32(mant*2-1), φ, β)
+		if parity || (exact && mant%2 == 0) {
+			s2, zeros := trimZeros(u64(s))
+			dboxDigits(d, s2, -k0+1+zeros)
+			return
+		}
+	}
+
+	// Algorithm 5.4 (page 18).
+	D := r + p10κ/2 - δi/2
+	t, ρ := D/p10κ, D%p10κ
+	mut yru := 10*s + u32(t)
+	if ρ == 0 {
+		parity, (exact) := dboxParity32(mant*2, φ, β)
+		if parity != ((D-p10κ/2)%2 != 0) || exact && yru%2 != 0 {
+			yru--
+		}
+	}
+	dboxDigits(d, u64(yru), -k0)
+}
+
+// Emits decimal digits of mant in d for f64
+// and adjusts the decimal point based on exp.
+#disable nilptr boundary
+fn dboxDigits(mut &d: *decimalSlice, mant: u64, exp: int) {
+	i := formatBase10(d.d, mant)
+	d.d = d.d[i:]
+	d.nd = len(d.d)
+	d.dp = d.nd + exp
+}
+
+// Returns the full 128 bits of u + n.
+fn uadd128(mut u: u128, n: u64): u128 {
+	sum := u64(u.Lo + n)
+	// Check if lo is wrapped around.
+	if sum < u.Lo {
+		u.Hi++
+	}
+	u.Lo = sum
+	return u
+}
+
+// Returns the full 64 bits of x * y.
+fn umul64(x: u32, y: u32): u64 {
+	return u64(x) * u64(y)
+}
+
+// Returns the upper 64 bits (out of 96 bits) of x * y.
+fn umul96Upper64(x: u32, y: u64): u64 {
+	yh := u32(y >> 32)
+	yl := u32(y)
+
+	xyh := umul64(x, yh)
+	xyl := umul64(x, yl)
+
+	return xyh + (xyl >> 32)
+}
+
+// Returns the lower 64 bits (out of 96 bits) of x * y.
+fn umul96Lower64(x: u32, y: u64): u64 {
+	return u64(u64(x) * y)
+}
+
+// Returns the upper 64 bits (out of 128 bits) of x * y.
+fn umul128Upper64(x: u64, y: u64): u64 {
+	a := u32(x >> 32)
+	b := u32(x)
+	c := u32(y >> 32)
+	d := u32(y)
+
+	ac := umul64(a, c)
+	bc := umul64(b, c)
+	ad := umul64(a, d)
+	bd := umul64(b, d)
+
+	intermediate := (bd >> 32) + u64(u32(ad)) + u64(u32(bc))
+
+	return ac + (intermediate >> 32) + (ad >> 32) + (bc >> 32)
+}
+
+// Returns the upper 128 bits (out of 192 bits) of x * y.
+fn umul192Upper128(x: u64, y: u128): u128 {
+	r := umul128(x, y.Hi)
+	t := umul128Upper64(x, y.Lo)
+	return uadd128(r, t)
+}
+
+// Returns the lower 128 bits (out of 192 bits) of x * y.
+fn umul192Lower128(x: u64, y: u128): u128 {
+	high := x * y.Hi
+	highLow := umul128(x, y.Lo)
+	return u128{u64(high + highLow.Hi), highLow.Lo}
+}
+
+// Computes x^(i), y^(i), z^(i)
+// from the precomputed value of φ̃k for f64
+// and also checks if x^(f), y^(f), z^(f) == 0 (section 5.2.1).
+fn dboxMulPow64(u: u64, phi: u128): (intPart: u64, isInt: bool) {
+	r := umul192Upper128(u, phi)
+	intPart = r.Hi
+	isInt = r.Lo == 0
+	return
+}
+
+// Computes x^(i), y^(i), z^(i)
+// from the precomputed value of φ̃k for f32
+// and also checks if x^(f), y^(f), z^(f) == 0 (section 5.2.1).
+fn dboxMulPow32(u: u32, phi: u64): (intPart: u32, isInt: bool) {
+	r := umul96Upper64(u, phi)
+	intPart = u32(r >> 32)
+	isInt = u32(r) == 0
+	return
+}
+
+// Computes only the parity of x^(i), y^(i), z^(i)
+// from the precomputed value of φ̃k for f64
+// and also checks if x^(f), y^(f), z^(f) = 0 (section 5.2.1).
+fn dboxParity64(mant2: u64, phi: u128, beta: int): (parity: bool, isInt: bool) {
+	r := umul192Lower128(mant2, phi)
+	parity = ((r.Hi>>(64-beta))&1) != 0
+	isInt = ((u64(r.Hi<<beta))|(r.Lo>>(64-beta))) == 0
+	return
+}
+
+// Computes only the parity of x^(i), y^(i), z^(i)
+// from the precomputed value of φ̃k for f32
+// and also checks if x^(f), y^(f), z^(f) = 0 (section 5.2.1).
+fn dboxParity32(mant2: u32, phi: u64, beta: int): (parity: bool, isInt: bool) {
+	r := umul96Lower64(mant2, phi)
+	parity = ((r>>(64-beta))&1) != 0
+	isInt = u32(r>>(32-beta)) == 0
+	return
+}
+
+// Returns δ^(i) from the precomputed value of φ̃k for f64.
+fn dboxDelta64(φ: u128, β: int): u32 {
+	return u32(φ.Hi >> (64 - 1 - β))
+}
+
+// Returns δ^(i) from the precomputed value of φ̃k for f32.
+fn dboxDelta32(φ: u64, β: int): u32 {
+	return u32(φ >> (64 - 1 - β))
+}
+
+// Computes ⌊e*log10(2)-log10(4/3)⌋ = ⌊log10(2^e)-log10(4/3)⌋ (section 6.3).
+fn mulLog10_2MinusLog10_4Over3(e: int): int {
+	// e should be in the range [-2985, 2936].
+	return (e*631305 - 261663) >> 21
+}
+
+const (
+	floatMantBits64 = 52 // p = 52 for f64.
+	floatMantBits32 = 23 // p = 23 for f32.
+)
+
+// Returns the left and right f64 endpoints.
+fn dboxRange64(φ: u128, β: int): (left: u64, right: u64) {
+	left = (φ.Hi - (φ.Hi >> (f64MantBits + 2))) >> (64 - f64MantBits - 1 - β)
+	right = (φ.Hi + (φ.Hi >> (f64MantBits + 1))) >> (64 - f64MantBits - 1 - β)
+	return left, right
+}
+
+// Returns the left and right f32 endpoints.
+fn dboxRange32(φ: u64, β: int): (left: u32, right: u32) {
+	left = u32((φ - (φ >> (floatMantBits32 + 2))) >> (64 - floatMantBits32 - 1 - β))
+	right = u32((φ + (φ >> (floatMantBits32 + 1))) >> (64 - floatMantBits32 - 1 - β))
+	return left, right
+}
+
+// Computes the round up of y (i.e., y^(ru)).
+fn dboxRoundUp64(phi: u128, beta: int): u64 {
+	return (phi.Hi>>(128/2-floatMantBits64-2-beta) + 1) / 2
+}
+
+// Computes the round up of y (i.e., y^(ru)).
+fn dboxRoundUp32(phi: u64, beta: int): u32 {
+	return u32(phi>>(64-floatMantBits32-2-beta)+1) / 2
+}
+
+// Gets the precomputed value of φ̃̃k for f64.
+fn dboxPow64(k: int, e: int): (φ: u128, β: int) {
+	φ, e1, _ := pow10(k)
+	if k < 0 || k > 55 {
+		φ.Lo++
+	}
+	β = e + e1 - 1
+	return φ, β
+}
+
+// Gets the precomputed value of φ̃̃k for f32.
+fn dboxPow32(k: int, e: int): (mant: u64, exp: int) {
+	mut m, e1, _ := pow10(k)
+	if k < 0 || k > 27 {
+		m.Hi++
+	}
+	exp = e + e1 - 1
+	return m.Hi, exp
+}

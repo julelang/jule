@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // The Jule code is a modified version of the original Go code from
-// https://github.com/golang/go/blob/go1.19/src/strconv/ftoa.go and came with this notice.
+// https://github.com/golang/go/blob/go1.26.4/src/internal/strconv/ftoa.go and came with this notice.
 //
 // ====================================================
 // Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -35,6 +35,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ====================================================
 
+// Binary to decimal floating point conversion.
+// Algorithm:
+//   1) store mantissa in multiprecision decimal
+//   2) shift decimal by exponent
+//   3) read digits out & format
+
 use "std/math"
 use "std/unsafe"
 
@@ -44,17 +50,17 @@ struct floatInfo {
 	bias:     int
 }
 
-// Data is mutable to avoid using Unsafe Jule.
-// But any mutation is unnecessary and unsafe.
-let mut f32info = floatInfo{23, 8, -127}
-let mut f64info = floatInfo{52, 11, -1023}
+const (
+	f32MantBits = 23
+	f32ExpBits  = 8
+	f32Bias     = -127
+	f64MantBits = 52
+	f64ExpBits  = 11
+	f64Bias     = -1023
+)
 
-struct decimalSlice {
-	d:   []byte
-	nd:  int
-	dp:  int
-	neg: bool
-}
+let f32info = floatInfo{f32MantBits, f32ExpBits, f32Bias}
+let f64info = floatInfo{f64MantBits, f64ExpBits, f64Bias}
 
 // Converts the floating-point number f to a string,
 // according to the format fmt and precision prec. It rounds the
@@ -62,14 +68,14 @@ struct decimalSlice {
 // value of bitSize bits (32 for f32, 64 for f64).
 //
 // The format fmt is one of
-// 'b' (-ddddp±ddd, a binary exponent),
-// 'e' (-d.dddde±dd, a decimal exponent),
-// 'E' (-d.ddddE±dd, a decimal exponent),
-// 'f' (-ddd.dddd, no exponent),
-// 'g' ('e' for large exponents, 'f' otherwise),
-// 'G' ('E' for large exponents, 'f' otherwise),
-// 'x' (-0xd.ddddp±ddd, a hexadecimal fraction and binary exponent), or
-// 'X' (-0Xd.ddddP±ddd, a hexadecimal fraction and binary exponent).
+//   - 'b' (-ddddp±ddd, a binary exponent),
+//   - 'e' (-d.dddde±dd, a decimal exponent),
+//   - 'E' (-d.ddddE±dd, a decimal exponent),
+//   - 'f' (-ddd.dddd, no exponent),
+//   - 'g' ('e' for large exponents, 'f' otherwise),
+//   - 'G' ('E' for large exponents, 'f' otherwise),
+//   - 'x' (-0xd.ddddp±ddd, a hexadecimal fraction and binary exponent), or
+//   - 'X' (-0Xd.ddddP±ddd, a hexadecimal fraction and binary exponent).
 //
 // The precision prec controls the number of digits (excluding the exponent)
 // printed by the 'e', 'E', 'f', 'g', 'G', 'x', and 'X' formats.
@@ -78,12 +84,11 @@ struct decimalSlice {
 // zeros are removed).
 // The special precision -1 uses the smallest number of digits
 // necessary such that ParseFloat will return f exactly.
+// The exponent is written as a decimal integer;
+// for all formats other than 'b', it will be at least two digits.
 fn FormatFloat(f: f64, fmt: byte, prec: int, bitSize: int): string {
-	// Return value of [genericFtoa] can be converted with [unsafe::StringFromBytes] safely.
-	// It returns always head pointer of slice, so deallocation is safe.
-	// There is no need to make new allocation for string.
 	return unsafe::StringFromBytes(
-		genericFtoa(make([]byte, 0, max(prec+4+1, 24+1)), f, fmt, prec, bitSize))
+		genericFtoa(make([]byte, 0, max(prec+4, 24)), f, fmt, prec, bitSize))
 }
 
 // Appends the string form of the floating-point number f,
@@ -92,8 +97,9 @@ fn AppendFloat(mut dst: []byte, f: f64, fmt: byte, prec: int, bitSize: int): []b
 	return genericFtoa(dst, f, fmt, prec, bitSize)
 }
 
+#disable nilptr boundary
 fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int): []byte {
-	mut bits := u64(0)
+	let mut bits: u64
 	let mut &flt: *floatInfo = nil
 	match bitSize {
 	| 32:
@@ -107,12 +113,13 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int
 	}
 
 	neg := bits>>(flt.expbits+flt.mantbits) != 0
-	mut exp := int(bits>>flt.mantbits) & int(1<<flt.expbits-1)
+	mut exp := int(bits>>flt.mantbits) & (1<<flt.expbits - 1)
 	mut mant := bits & (u64(1)<<flt.mantbits - 1)
+	mut denorm := false
 
 	match exp {
-	| int(1<<flt.expbits - 1):
-		// +Inf, NaN
+	| 1<<flt.expbits - 1:
+		// Inf, NaN
 		match {
 		| mant != 0:
 			return append(dst, "NaN"...)
@@ -124,6 +131,7 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int
 	| 0:
 		// denormalized
 		exp++
+		denorm = true
 	|:
 		// add implicit top bit
 		mant |= u64(1) << flt.mantbits
@@ -132,26 +140,27 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int
 
 	// Pick off easy binary, hex formats.
 	if fmt == 'b' {
-		return formatB(dst, neg, mant, exp, flt)
+		return fmtB(dst, neg, mant, exp, flt)
 	}
 	if fmt == 'x' || fmt == 'X' {
-		return formatX(dst, prec, fmt, neg, mant, exp, flt)
+		return fmtX(dst, prec, fmt, neg, mant, exp, flt)
 	}
 
 	if !optimize {
 		return bigFtoa(dst, prec, fmt, neg, mant, exp, flt)
 	}
 
-	mut digs := decimalSlice{}
-	mut ok := false
 	// Negative precision means "only as much as needed to be exact."
 	shortest := prec < 0
+	let mut digs: decimalSlice
+	if mant == 0 {
+		return formatDigits(dst, shortest, neg, digs, prec, fmt)
+	}
 	if shortest {
-		// Use Ryu algorithm.
+		// Use the Dragonbox algorithm.
 		let mut buf: [32]byte
 		digs.d = unsafe::Slice(&buf[0], len(buf), len(buf))
-		ryuFtoaShortest(&digs, mant, exp-int(flt.mantbits), flt)
-		ok = true
+		dboxFtoa(&digs, mant, exp-int(flt.mantbits), denorm, bitSize)
 		// Precision for shortest representation mode.
 		match fmt {
 		| 'e' | 'E':
@@ -161,50 +170,57 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int
 		| 'g' | 'G':
 			prec = digs.nd
 		}
-	} else if fmt != 'f' {
-		// Fixed number of digits.
-		mut digits := prec
-		match fmt {
-		| 'e' | 'E':
-			digits++
-		| 'g' | 'G':
-			if prec == 0 {
-				prec = 1
-			}
-			digits = prec
-		|:
-			// Invalid mode.
-			digits = 1
+		return formatDigits(dst, shortest, neg, digs, prec, fmt)
+	}
+
+	// Fixed number of digits.
+	mut digits := prec
+	match fmt {
+	| 'f':
+		// %f precision specifies digits after the decimal point.
+		// Estimate an upper bound on the total number of digits needed.
+		// ftoaFixed will shorten as needed according to prec.
+		if exp >= 0 {
+			digits = 1 + mulLog10_2(1+exp) + prec
+		} else {
+			digits = 1 + prec - mulLog10_2(-exp)
 		}
-		if bitSize == 32 && digits <= 9 {
+	| 'e' | 'E':
+		digits++
+	| 'g' | 'G':
+		if prec == 0 {
+			prec = 1
+		}
+		digits = prec
+	|:
+		// Invalid mode.
+		digits = 1
+	}
+	if digits <= 18 {
+		// digits <= 0 happens for %f on very small numbers
+		// and means that we're guaranteed to print all zeros.
+		if digits > 0 {
 			let mut buf: [24]byte
 			digs.d = unsafe::Slice(&buf[0], len(buf), len(buf))
-			ryuFtoaFixed32(&digs, u32(mant), exp-int(flt.mantbits), digits)
-			ok = true
-		} else if digits <= 18 {
-			let mut buf: [24]byte
-			digs.d = unsafe::Slice(&buf[0], len(buf), len(buf))
-			ryuFtoaFixed64(&digs, mant, exp-int(flt.mantbits), digits)
-			ok = true
+			fixedFtoa(&digs, mant, exp-int(flt.mantbits), digits, prec, fmt)
 		}
+		return formatDigits(dst, false, neg, digs, prec, fmt)
 	}
-	if !ok {
-		return bigFtoa(dst, prec, fmt, neg, mant, exp, flt)
-	}
-	return formatDigits(dst, shortest, neg, digs, prec, fmt)
+	return bigFtoa(dst, prec, fmt, neg, mant, exp, flt)
 }
 
 // Uses multiprecision computations to format a float.
-fn bigFtoa(mut dst: []byte, mut prec: int, fmt: byte, neg: bool,
-	mant: u64, exp: int, &flt: *floatInfo): []byte {
-	mut d := decimal{}
+#disable nilptr boundary
+fn bigFtoa(mut dst: []byte, mut prec: int, fmt: byte, neg: bool, mant: u64, exp: int, &flt: *floatInfo): []byte {
+	let mut d: decimal
+	mut dd := unsafe::Slice(&d.d[0], len(d.d), len(d.d))
 	d.Assign(mant)
 	d.Shift(exp - int(flt.mantbits))
-	mut digs := decimalSlice{}
+	let mut digs: decimalSlice
 	shortest := prec < 0
 	if shortest {
 		roundShortest(&d, mant, exp, flt)
-		digs = decimalSlice{d: d.d[:], nd: d.nd, dp: d.dp}
+		digs = decimalSlice{d: dd, nd: d.nd, dp: d.dp}
 		// Precision for shortest representation mode.
 		match fmt {
 		| 'e' | 'E':
@@ -227,18 +243,17 @@ fn bigFtoa(mut dst: []byte, mut prec: int, fmt: byte, neg: bool,
 			}
 			d.Round(prec)
 		}
-		digs = decimalSlice{d: d.d[:], nd: d.nd, dp: d.dp}
+		digs = decimalSlice{d: dd, nd: d.nd, dp: d.dp}
 	}
 	return formatDigits(dst, shortest, neg, digs, prec, fmt)
 }
 
-fn formatDigits(mut dst: []byte, shortest: bool, neg: bool,
-	digs: decimalSlice, mut prec: int, fmt: byte): []byte {
+fn formatDigits(mut dst: []byte, shortest: bool, neg: bool, digs: decimalSlice, mut prec: int, fmt: byte): []byte {
 	match fmt {
 	| 'e' | 'E':
-		return formatE(dst, neg, digs, prec, fmt)
+		return fmtE(dst, neg, digs, prec, fmt)
 	| 'f':
-		return formatF(dst, neg, digs, prec)
+		return fmtF(dst, neg, digs, prec)
 	| 'g' | 'G':
 		// trailing fractional zeros in 'e' form will be trimmed.
 		mut eprec := prec
@@ -256,12 +271,12 @@ fn formatDigits(mut dst: []byte, shortest: bool, neg: bool,
 			if prec > digs.nd {
 				prec = digs.nd
 			}
-			return formatE(dst, neg, digs, prec-1, fmt+'e'-'g')
+			return fmtE(dst, neg, digs, prec-1, fmt+'e'-'g')
 		}
 		if prec > digs.dp {
 			prec = digs.nd
 		}
-		return formatF(dst, neg, digs, max(prec-digs.dp, 0))
+		return fmtF(dst, neg, digs, max(prec-digs.dp, 0))
 	}
 
 	// unknown format
@@ -270,6 +285,7 @@ fn formatDigits(mut dst: []byte, shortest: bool, neg: bool,
 
 // Rounds d (= mant * 2^exp) to the shortest number of digits
 // that will let the original floating point value be precisely reconstructed.
+#disable nilptr boundary
 fn roundShortest(mut &d: *decimal, mant: u64, exp: int, &flt: *floatInfo) {
 	// If mantissa is zero, the number is zero; stop now.
 	if mant == 0 {
@@ -300,7 +316,7 @@ fn roundShortest(mut &d: *decimal, mant: u64, exp: int, &flt: *floatInfo) {
 	// d = mant << (exp - mantbits)
 	// Next highest floating point number is mant+1 << exp-mantbits.
 	// Our upper bound is halfway between, mant*2+1 << exp-mantbits-1.
-	mut upper := decimal{}
+	let mut upper: decimal
 	upper.Assign(mant*2 + 1)
 	upper.Shift(exp - int(flt.mantbits) - 1)
 
@@ -310,8 +326,8 @@ fn roundShortest(mut &d: *decimal, mant: u64, exp: int, &flt: *floatInfo) {
 	// in which case the next lowest is mant*2-1 << exp-mantbits-1.
 	// Either way, call it mantlo << explo-mantbits.
 	// Our lower bound is halfway between, mantlo*2+1 << explo-mantbits-1.
-	mut mantlo := u64(0)
-	mut explo := 0
+	let mut mantlo: u64
+	let mut explo: int
 	if mant > 1<<flt.mantbits || exp == minexp {
 		mantlo = mant - 1
 		explo = exp
@@ -319,7 +335,7 @@ fn roundShortest(mut &d: *decimal, mant: u64, exp: int, &flt: *floatInfo) {
 		mantlo = mant*2 - 1
 		explo = exp - 1
 	}
-	mut lower := decimal{}
+	let mut lower: decimal
 	lower.Assign(mantlo*2 + 1)
 	lower.Shift(explo - int(flt.mantbits) - 1)
 
@@ -339,7 +355,7 @@ fn roundShortest(mut &d: *decimal, mant: u64, exp: int, &flt: *floatInfo) {
 	//
 	// If upperdelta == 2, then the difference is greater than 1
 	// and we know that rounding up falls within the bound.
-	mut upperdelta := u8(0)
+	let mut upperdelta: u8
 
 	// Now we can figure out the minimum number of digits required.
 	// Walk along until d has distinguished itself from upper and lower.
@@ -408,8 +424,15 @@ fn roundShortest(mut &d: *decimal, mant: u64, exp: int, &flt: *floatInfo) {
 	}
 }
 
+struct decimalSlice {
+	d:  []byte
+	nd: int
+	dp: int
+}
+
 // %e: -d.ddddde±dd
-fn formatE(mut dst: []byte, neg: bool, d: decimalSlice, prec: int, fmt: byte): []byte {
+#disable boundary
+fn fmtE(mut dst: []byte, neg: bool, d: decimalSlice, prec: int, fmt: byte): []byte {
 	// sign
 	if neg {
 		dst = append(dst, '-')
@@ -464,7 +487,8 @@ fn formatE(mut dst: []byte, neg: bool, d: decimalSlice, prec: int, fmt: byte): [
 }
 
 // %f: -ddddddd.ddddd
-fn formatF(mut dst: []byte, neg: bool, d: decimalSlice, prec: int): []byte {
+#disable boundary
+fn fmtF(mut dst: []byte, neg: bool, d: decimalSlice, prec: int): []byte {
 	// sign
 	if neg {
 		dst = append(dst, '-')
@@ -480,6 +504,7 @@ fn formatF(mut dst: []byte, neg: bool, d: decimalSlice, prec: int): []byte {
 	} else {
 		dst = append(dst, '0')
 	}
+
 	// fraction
 	if prec > 0 {
 		dst = append(dst, '.')
@@ -493,18 +518,20 @@ fn formatF(mut dst: []byte, neg: bool, d: decimalSlice, prec: int): []byte {
 			dst = append(dst, ch)
 		}
 	}
+
 	return dst
 }
 
 // %b: -ddddddddp±ddd
-fn formatB(mut dst: []byte, neg: bool, mant: u64, mut exp: int, &flt: *floatInfo): []byte {
+#disable nilptr
+fn fmtB(mut dst: []byte, neg: bool, mant: u64, mut exp: int, &flt: *floatInfo): []byte {
 	// sign
 	if neg {
 		dst = append(dst, '-')
 	}
 
 	// mantissa
-	dst, _ = formatBits(dst, mant, 10, false, true)
+	dst = AppendUint(dst, mant, 10)
 
 	// p
 	dst = append(dst, 'p')
@@ -514,13 +541,14 @@ fn formatB(mut dst: []byte, neg: bool, mant: u64, mut exp: int, &flt: *floatInfo
 	if exp >= 0 {
 		dst = append(dst, '+')
 	}
-	dst, _ = formatBits(dst, u64(exp), 10, exp < 0, true)
+	dst = AppendInt(dst, i64(exp), 10)
+
 	return dst
 }
 
 // %x: -0x1.yyyyyyyyp±ddd or -0x0p+0. (y is hex digit, d is decimal digit)
-fn formatX(mut dst: []byte, prec: int, fmt: byte, neg: bool,
-	mut mant: u64, mut exp: int, &flt: *floatInfo): []byte {
+#disable nilptr boundary
+fn fmtX(mut dst: []byte, prec: int, fmt: byte, neg: bool, mut mant: u64, mut exp: int, &flt: *floatInfo): []byte {
 	if mant == 0 {
 		exp = 0
 	}
@@ -548,11 +576,9 @@ fn formatX(mut dst: []byte, prec: int, fmt: byte, neg: bool,
 		}
 	}
 
-	mut hex := ""
+	mut hex := lowerhex
 	if fmt == 'X' {
 		hex = upperhex
-	} else {
-		hex = lowerhex
 	}
 
 	// sign, 0x, leading digit
@@ -601,18 +627,19 @@ fn formatX(mut dst: []byte, prec: int, fmt: byte, neg: bool,
 	|:
 		dst = append(dst, byte(exp/1000)+'0', byte(exp/100)%10+'0', byte((exp/10)%10)+'0', byte(exp%10)+'0')
 	}
+
 	return dst
 }
 
-fn min(a: int, b: int): int {
-	if a < b {
+fn max(a: int, b: int): int {
+	if a > b {
 		return a
 	}
 	return b
 }
 
-fn max(a: int, b: int): int {
-	if a > b {
+fn min(a: int, b: int): int {
+	if a < b {
 		return a
 	}
 	return b
