@@ -8,6 +8,7 @@ use "std/encoding/base64"
 use "std/errors"
 use "std/internal/ubuf"
 use "std/intrinsic"
+use "std/math"
 use "std/runtime"
 use "std/unicode"
 use "std/unicode/utf16"
@@ -1218,12 +1219,24 @@ fn decodeFloat[T](mut &v: *T, b: []byte)! {
 	// Use [unsafe::BytesString] instead of casting.
 	// The byte buffer will not change, so it's safe and efficient.
 	const t = comptime::Typeof(T)
-	n := conv::ParseFloat(unsafe::BytesString(b), t.Bits()) catch {
+	mut n := conv::ParseFloat(unsafe::BytesString(b), t.Bits()) catch {
 		numErr, ok := error.(&conv::NumError)
 		if ok && numErr.Err == conv::ErrRange {
 			throw errors::New("json: value overflows type " + t.String() + ": " + unsafe::BytesString(b))
 		}
 		throw errors::New("json: invalid value for type " + t.String() + ": " + unsafe::BytesString(b))
+	}
+	if math::IsInf(n, 0) {
+		match {
+		| t.Bits() == 32 && math::IsInf(n, +1):
+			n = +f32.Max
+		| t.Bits() == 64 && math::IsInf(n, +1):
+			n = +f64.Max
+		| t.Bits() == 32 && math::IsInf(n, -1):
+			n = -f32.Max
+		| t.Bits() == 64 && math::IsInf(n, -1):
+			n = -f32.Max
+		}
 	}
 	*v = (T)(n)
 }
