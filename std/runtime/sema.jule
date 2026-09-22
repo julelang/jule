@@ -258,12 +258,12 @@ fn semtable_rootFor(&sema: *u32): &semaRoot {
 
 #disable nilptr
 fn cansemacquire(mut &sema: *u32): bool {
+	mut v := atomic::Load(sema, atomic::Acquire)
 	for {
-		v := atomic::Load(sema, atomic::Acquire)
 		if v == 0 {
 			return false
 		}
-		if atomic::CompareAndSwap(sema, v, v-1, atomic::AcqRel, atomic::Relaxed) {
+		if atomic::CompareAndSwap(sema, &v, v-1, atomic::AcqRel, atomic::Acquire) {
 			return true
 		}
 	}

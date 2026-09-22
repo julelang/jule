@@ -64,7 +64,8 @@ impl mutex {
 	// blocks until the mutex is available.
 	fn lock(*self) {
 		// Fast path: grab unlocked mutex.
-		if atomic::CompareAndSwap(&self.state, 0, mutexLocked, atomic::Acquire, atomic::Relaxed) {
+		mut lock := i32(0)
+		if atomic::CompareAndSwap(&self.state, &lock, mutexLocked, atomic::Acquire, atomic::Relaxed) {
 			return
 		}
 		// Slow path (outlined so that the fast path may be inlined).
@@ -85,7 +86,7 @@ impl mutex {
 				// Try to set mutexWoken flag to inform Unlock
 				// to not wake other blocked threads.
 				if !awoke && old&mutexWoken == 0 && old>>mutexWaiterShift != 0 {
-					awoke = atomic::CompareAndSwap(&self.state, old, old|mutexWoken, atomic::AcqRel, atomic::Relaxed)
+					awoke = atomic::CompareAndSwap(&self.state, &old, old|mutexWoken, atomic::AcqRel, atomic::Relaxed)
 				}
 				doSpin()
 				iter++
@@ -115,7 +116,7 @@ impl mutex {
 				}
 				new &= ^mutexWoken
 			}
-			if atomic::CompareAndSwap(&self.state, old, new, atomic::AcqRel, atomic::Relaxed) {
+			if atomic::CompareAndSwap(&self.state, &old, new, atomic::AcqRel, atomic::Relaxed) {
 				if old&(mutexLocked|mutexStarving) == 0 {
 					break // locked the mutex with CAS
 				}
@@ -149,8 +150,6 @@ impl mutex {
 				}
 				awoke = true
 				iter = 0
-			} else {
-				old = self.state
 			}
 		}
 	}
@@ -161,7 +160,7 @@ impl mutex {
 	// and use of TryLock is often a sign of a deeper problem
 	// in a particular use of mutexes.
 	fn tryLock(*self): bool {
-		old := self.state
+		mut old := self.state
 		if old&(mutexLocked|mutexStarving) != 0 {
 			return false
 		}
@@ -169,7 +168,7 @@ impl mutex {
 		// There may be a thread waiting for the mutex, but we are
 		// running now and can try to grab the mutex before that
 		// thread wakes up.
-		return atomic::CompareAndSwap(&self.state, old, old|mutexLocked, atomic::Acquire, atomic::Relaxed)
+		return atomic::CompareAndSwap(&self.state, &old, old|mutexLocked, atomic::Acquire, atomic::Relaxed)
 	}
 
 	// Unlocks mutex.
@@ -201,13 +200,10 @@ impl mutex {
 				}
 				// Grab the right to wake someone.
 				new = (old - 1<<mutexWaiterShift) | mutexWoken
-				{
-					if atomic::CompareAndSwap(&self.state, old, new, atomic::AcqRel, atomic::Relaxed) {
-						semrelease(&self.sema, false)
-						return
-					}
+				if atomic::CompareAndSwap(&self.state, &old, new, atomic::AcqRel, atomic::Relaxed) {
+					semrelease(&self.sema, false)
+					return
 				}
-				old = self.state
 			}
 		} else {
 			// Starving mode: handoff mutex ownership to the next waiter,
@@ -249,7 +245,8 @@ impl qmutex {
 
 	#disable nilptr
 	fn tryLock(*self): bool {
-		return atomic::CompareAndSwap(&self.state, 0, 1, atomic::Acquire, atomic::Relaxed)
+		mut state := i32(0)
+		return atomic::CompareAndSwap(&self.state, &state, 1, atomic::Acquire, atomic::Relaxed)
 	}
 }
 

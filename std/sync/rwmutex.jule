@@ -55,12 +55,12 @@ impl RWMutex {
 	// and use of TryRLock is often a sign of a deeper problem
 	// in a particular use of mutexes.
 	fn TryRLock(*self): bool {
+		mut c := self.readerCount.Load(atomic::Acquire)
 		for {
-			c := self.readerCount.Load(atomic::Acquire)
 			if c < 0 {
 				return false
 			}
-			if self.readerCount.CompareAndSwap(c, c+1, atomic::AcqRel, atomic::Acquire) {
+			if self.readerCount.CompareAndSwap(&c, c+1, atomic::AcqRel, atomic::Acquire) {
 				return true
 			}
 		}
@@ -113,7 +113,8 @@ impl RWMutex {
 		if !self.w.TryLock() {
 			return false
 		}
-		if !self.readerCount.CompareAndSwap(0, -rwmutexMaxReaders, atomic::AcqRel, atomic::Acquire) {
+		mut c := i32(0)
+		if !self.readerCount.CompareAndSwap(&c, -rwmutexMaxReaders, atomic::AcqRel, atomic::Acquire) {
 			self.w.Unlock()
 			return false
 		}

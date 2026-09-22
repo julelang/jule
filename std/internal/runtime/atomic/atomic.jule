@@ -41,17 +41,19 @@ fn Load[T](p: *T, mo: MemoryOrder): T {
 	return LoadZ[T, T](p, mo)
 }
 
-// Atomically reads value of the p and compares it with old.
-// If comparison results with true, it atomically stores new value into p.
-// Reports whether swap succeeded.
-fn CompareAndSwap[T](mut p: *T, old: T, new: T, succ: MemoryOrder, fail: MemoryOrder): (swapped: bool) {
+// Performs an atomic compare-and-swap (CAS) operation on a memory location.
+//
+// Compares the value at p with old. If equal, replaces it with new and returns true.
+// If unequal, writes the current value at p into old and returns false.
+fn CompareAndSwap[T](mut p: *T, mut old: *T, new: T, succ: MemoryOrder, fail: MemoryOrder): (swapped: bool) {
 	return CompareAndSwapZ(p, old, new, succ, fail)
 }
 
-// Atomically reads value of the p and compares it with old.
-// If comparison results with true, it atomically stores new value into p.
-// Reports whether swap succeeded.
-fn CompareAndSwapWeak[T](mut p: *T, old: T, new: T, succ: MemoryOrder, fail: MemoryOrder): (swapped: bool) {
+// Performs an atomic compare-and-swap (CAS) operation on a memory location.
+//
+// Compares the value at p with old. If equal, replaces it with new and returns true.
+// If unequal, writes the current value at p into old and returns false.
+fn CompareAndSwapWeak[T](mut p: *T, mut old: *T, new: T, succ: MemoryOrder, fail: MemoryOrder): (swapped: bool) {
 	return CompareAndSwapWeakZ(p, old, new, succ, fail)
 }
 
@@ -81,22 +83,26 @@ fn LoadZ[T1, T2](p: *T1, mo: MemoryOrder): T2 {
 	return tmp
 }
 
-// Atomically reads value of the p and compares it with old.
-// If comparison results with true, it atomically stores new value into p.
-// Reports whether swap succeeded.
+// Performs an atomic compare-and-swap (CAS) operation on a memory location.
+//
+// Compares the value at p with old. If equal, replaces it with new and returns true.
+// If unequal, writes the current value at p into old and returns false.
+//
 // T1 is a base pointer type, T2 is the output type.
-fn CompareAndSwapZ[T1, T2](mut p: *T1, old: T2, new: T2, succ: MemoryOrder, fail: MemoryOrder): (swapped: bool) {
+fn CompareAndSwapZ[T1, T2](mut p: *T1, mut old: *T2, new: T2, succ: MemoryOrder, fail: MemoryOrder): (swapped: bool) {
 	const Strong = 0 // strong atomicity
-	return unsafe { extern.__atomic_compare_exchange_n[T2](p, &old, new, Strong, succ, fail) }
+	return unsafe { extern.__atomic_compare_exchange_n[T2](p, old, new, Strong, succ, fail) }
 }
 
-// Atomically reads value of the p and compares it with old.
-// If comparison results with true, it atomically stores new value into p.
-// Reports whether swap succeeded.
+// Performs an atomic compare-and-swap (CAS) operation on a memory location.
+//
+// Compares the value at p with old. If equal, replaces it with new and returns true.
+// If unequal, writes the current value at p into old and returns false.
+//
 // T1 is a base pointer type, T2 is the output type.
-fn CompareAndSwapWeakZ[T1, T2](mut p: *T1, old: T2, new: T2, succ: MemoryOrder, fail: MemoryOrder): (swapped: bool) {
+fn CompareAndSwapWeakZ[T1, T2](mut p: *T1, mut old: *T2, new: T2, succ: MemoryOrder, fail: MemoryOrder): (swapped: bool) {
 	const Weak = 1 // weak atomicity
-	return unsafe { extern.__atomic_compare_exchange_n[T2](p, &old, new, Weak, succ, fail) }
+	return unsafe { extern.__atomic_compare_exchange_n[T2](p, old, new, Weak, succ, fail) }
 }
 
 // Atomically adds delta to p with memory order mo and returns the new value.

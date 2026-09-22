@@ -509,7 +509,8 @@ impl waitq {
 			// If the state is not zero, thread is consumed.
 			// Set state as consumed to prevent false dequeue.
 			if p.ticket&parkerSelect != 0 {
-				if !atomic::CompareAndSwap(&(*p.state), parkerSelectWaiting, parkerSelectConsumed, atomic::AcqRel, atomic::Relaxed) {
+				mut old := parkerSelectWaiting
+				if !atomic::CompareAndSwap(&(*p.state), &old, parkerSelectConsumed, atomic::AcqRel, atomic::Relaxed) {
 					// Lost race, skip.
 					continue
 				}

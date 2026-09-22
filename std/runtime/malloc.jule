@@ -326,7 +326,10 @@ let mut globalSizeClass: [sizeClassCount]sizeClass
 fn heapLockAcquire() {
 	thisLock := uintptr(gett())
 	mut spin := u32(0)
-	for !atomic::CompareAndSwap(&globalHeapLock, 0, thisLock, atomic::SeqCst, atomic::SeqCst) {
+	mut lock := uintptr(0)
+	for !atomic::CompareAndSwap(&globalHeapLock, &lock, thisLock, atomic::SeqCst, atomic::SeqCst) {
+		lock = 0
+		spin = 0
 		waitSpin(&spin)
 	}
 }
@@ -474,7 +477,10 @@ unsafe fn heapRelease(mut heap: *heap) {
 #inline
 fn hugeCacheLockAcquire() {
 	mut spin := u32(0)
-	for !atomic::CompareAndSwapWeak(&globalHugeCache.lock, 0, 1, atomic::Acquire, atomic::Relaxed) {
+	mut lock := uintptr(0)
+	for !atomic::CompareAndSwapWeak(&globalHugeCache.lock, &lock, 1, atomic::Acquire, atomic::Relaxed) {
+		spin = 0
+		lock = 0
 		waitSpin(&spin)
 	}
 }
@@ -869,8 +875,7 @@ unsafe fn pagePutThreadFreeBlock(page: *page, mut _block: *block) {
 		mut prevHead := atomic::Load(&heap.threadFree[page.pageType], atomic::Relaxed)
 		_block.next = (*block)(prevHead)
 		mut spin := u32(0)
-		for !atomic::CompareAndSwapWeak(&heap.threadFree[page.pageType], prevHead, uintptr(_block), atomic::Release, atomic::Relaxed) {
-			prevHead = atomic::Load(&heap.threadFree[page.pageType], atomic::Relaxed)
+		for !atomic::CompareAndSwapWeak(&heap.threadFree[page.pageType], &prevHead, uintptr(_block), atomic::Release, atomic::Relaxed) {
 			_block.next = (*block)(prevHead)
 			waitSpin(&spin)
 		}
@@ -885,8 +890,7 @@ unsafe fn pagePutThreadFreeBlock(page: *page, mut _block: *block) {
 		mut listSize := pageBlockFromThreadFreeList(page, prevThreadFree, &_block.next) + 1
 		mut threadFree := pageBlockToThreadFreeList(blockIndex, listSize)
 		mut spin := u32(0)
-		for !atomic::CompareAndSwapWeak(&page.threadFree, prevThreadFree, threadFree, atomic::Release, atomic::Relaxed) {
-			prevThreadFree = atomic::Load(&page.threadFree, atomic::Relaxed)
+		for !atomic::CompareAndSwapWeak(&page.threadFree, &prevThreadFree, threadFree, atomic::Release, atomic::Relaxed) {
 			listSize = pageBlockFromThreadFreeList(page, prevThreadFree, &_block.next) + 1
 			threadFree = pageBlockToThreadFreeList(blockIndex, listSize)
 			waitSpin(&spin)
@@ -973,8 +977,7 @@ unsafe fn pageAdoptThreadFreeBlockList(mut page: *page) {
 	if threadFree != 0 {
 		// Other threads can only replace with another valid list head, this will never change to 0 in other threads.
 		mut spin := u32(0)
-		for !atomic::CompareAndSwapWeak(&page.threadFree, threadFree, 0, atomic::Acquire, atomic::Relaxed) {
-			threadFree = atomic::Load(&page.threadFree, atomic::Relaxed)
+		for !atomic::CompareAndSwapWeak(&page.threadFree, &threadFree, 0, atomic::Acquire, atomic::Relaxed) {
 			waitSpin(&spin)
 		}
 		page.localFreeCount = pageBlockFromThreadFreeList(page, threadFree, &page.localFree)
@@ -1281,8 +1284,7 @@ unsafe fn heapGetPageGeneric(mut _heap: *heap, sizeClass: u32): *page {
 	mut blockMt := atomic::Load(&_heap.threadFree[pageType], atomic::Relaxed)
 	if intrinsic::Unlikely(blockMt != 0) {
 		mut spin := u32(0)
-		for !atomic::CompareAndSwapWeak(&_heap.threadFree[pageType], blockMt, 0, atomic::Acquire, atomic::Relaxed) {
-			blockMt = atomic::Load(&_heap.threadFree[pageType], atomic::Relaxed)
+		for !atomic::CompareAndSwapWeak(&_heap.threadFree[pageType], &blockMt, 0, atomic::Acquire, atomic::Relaxed) {
 			waitSpin(&spin)
 		}
 		mut block := (*block)(blockMt)
