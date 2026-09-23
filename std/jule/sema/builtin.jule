@@ -155,17 +155,6 @@ fn findBuiltinDefStdRuntime(name: string): any {
 }
 
 // Initialized by the init function.
-let mut builtinFuncsStdMem = map[string]&FuncIns{}
-
-fn findBuiltinDefStdMem(name: string): any {
-	mut r, ok := builtinFuncsStdMem[name]
-	if ok {
-		return r
-	}
-	return nil
-}
-
-// Initialized by the init function.
 let mut builtinFuncsStdComptime = map[string]&FuncIns{}
 
 fn findBuiltinDefStdComptime(name: string): any {
@@ -220,8 +209,6 @@ fn findPackageBuiltinDef(linkPath: string, name: string): any {
 		return findBuiltinDefStdComptime(name)
 	| "std/runtime":
 		return findBuiltinDefStdRuntime(name)
-	| "std/mem":
-		return findBuiltinDefStdMem(name)
 	| "std/integ":
 		return findBuiltinDefStdInteg(name)
 	| "std/sys":
@@ -1535,60 +1522,6 @@ fn builtinCallerStdComptimeHasTag(mut e: &eval, mut fc: &ast::CallExpr, _: &Valu
 	}
 }
 
-fn builtinCallerStdMemSizeof(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
-	mut result := &Value{
-		Type: primUint,
-	}
-
-	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, "type or expression is missing for Sizeof")
-		e.pushSuggestion("call like; Sizeof(typeOrValue)")
-		return result
-	}
-	if len(fc.Args) > 1 {
-		e.pushErr(fc.Token, "passed more argument than expected to Sizeof")
-		e.pushSuggestion("call like; Sizeof(typeOrValue)")
-	}
-
-	mut v := e.eval(fc.Args[0], evalDefault)
-	if v == nil {
-		return result
-	}
-	if !validTypeForXof(v.Type) {
-		e.pushErr(fc.Args[0].Token, "type @ is invalid for function Sizeof", v.Type.String())
-	}
-
-	result.Model = &SizeofExpr{Expr: v.Type}
-	return result
-}
-
-fn builtinCallerStdMemAlignof(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
-	mut result := &Value{
-		Type: primUint,
-	}
-
-	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, "type or expression is missing for AlignOf")
-		e.pushSuggestion("call like; AlignOf(typeOrValue)")
-		return result
-	}
-	if len(fc.Args) > 1 {
-		e.pushErr(fc.Token, "passed more argument than expected to AlignOf")
-		e.pushSuggestion("call like; AlignOf(typeOrValue)")
-	}
-
-	mut v := e.eval(fc.Args[0], evalDefault)
-	if v == nil {
-		return result
-	}
-	if !validTypeForXof(v.Type) {
-		e.pushErr(fc.Args[0].Token, "type @ is invalid for function AlignOf", v.Type.String())
-	}
-
-	result.Model = &AlignofExpr{Expr: v.Type}
-	return result
-}
-
 fn builtinCallerStdIntegEmit(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Value {
 	if !e.isUnsafe() {
 		e.pushErr(fc.Token, "Emit function cannot be used without Unsafe Jule")
@@ -1752,10 +1685,6 @@ fn init() {
 	builtinFuncs["clear"] = &FuncIns{caller: builtinCallerClear}
 	builtinFuncs["sizeof"] = &FuncIns{caller: builtinCallerSizeof}
 	builtinFuncs["alignof"] = &FuncIns{caller: builtinCallerAlignof}
-
-	// Initialize built-in functions of the "std/mem" package.
-	builtinFuncsStdMem["Sizeof"] = &FuncIns{caller: builtinCallerStdMemSizeof}
-	builtinFuncsStdMem["Alignof"] = &FuncIns{caller: builtinCallerStdMemAlignof}
 
 	// Initialize built-in functions of the "std/comptime" package.
 	builtinFuncsStdComptime["Typeof"] = &FuncIns{caller: builtinCallerStdComptimeTypeof}
