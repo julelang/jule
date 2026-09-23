@@ -1168,6 +1168,33 @@ fn builtinCallerClear(mut e: &eval, mut fc: &ast::CallExpr, mut v: &Value): &Val
 	}
 }
 
+fn builtinCallerSizeof(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
+	mut result := &Value{
+		Type: primUintptr,
+	}
+
+	if len(fc.Args) < 1 {
+		e.pushErr(fc.Token, "type or expression is missing for sizeof")
+		e.pushSuggestion("call like; sizeof(typeOrValue)")
+		return result
+	}
+	if len(fc.Args) > 1 {
+		e.pushErr(fc.Token, "passed more argument than expected to sizeof")
+		e.pushSuggestion("call like; sizeof(typeOrValue)")
+	}
+
+	mut v := e.eval(fc.Args[0], evalDefault)
+	if v == nil {
+		return result
+	}
+	if !validTypeForXof(v.Type) {
+		e.pushErr(fc.Args[0].Token, "type @ is invalid for function sizeof", v.Type.String())
+	}
+
+	result.Model = &SizeofExpr{Expr: v.Type}
+	return result
+}
+
 fn builtinCallerStdComptimeTypeof(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, "type or expression is missing for Typeof")
@@ -1696,6 +1723,7 @@ fn init() {
 	builtinFuncs["imag"] = &FuncIns{caller: builtinCallerImag}
 	builtinFuncs["cmplx"] = &FuncIns{caller: builtinCallerCmplx}
 	builtinFuncs["clear"] = &FuncIns{caller: builtinCallerClear}
+	builtinFuncs["sizeof"] = &FuncIns{caller: builtinCallerSizeof}
 
 	// Initialize built-in functions of the "std/mem" package.
 	builtinFuncsStdMem["Sizeof"] = &FuncIns{caller: builtinCallerStdMemSizeof}
