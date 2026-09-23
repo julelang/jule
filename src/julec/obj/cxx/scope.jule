@@ -729,13 +729,18 @@ impl scopeCoder {
 	}
 
 	fn postfix(mut &self, mut p: &sema::Postfix) {
+		// Postfix operators in Jule are standalone statements,
+		// we can generate C++ prefix syntax for them.
+		// Prefix avoids the overhead of post-increment copies (better performance).
+		// Modern compilers may optimize the use of postfix notation.
+		// However, do not rely on this.
+		self.oc.write(p.Op)
 		self.oc.write("(")
 		ok := self.tryMapSet(p.Expr)
 		if !ok {
 			self.oc.ec.possibleRefExpr(p.Expr)
 		}
 		self.oc.write(")")
-		self.oc.write(p.Op)
 	}
 
 	fn assignLeft(mut &self, mut model: cst::Expr) {
