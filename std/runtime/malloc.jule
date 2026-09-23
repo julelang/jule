@@ -346,7 +346,7 @@ fn heapLockRelease() {
 #inline
 unsafe fn heapInitialize(mut block: *unsafe): *heap {
 	mut heap := (*heap)(block)
-	memset(heap, 0, mem::Sizeof(heap))
+	memset(heap, 0, sizeof(heap))
 	heap.id = atomic::Add(&globalHeapID, 1, atomic::Relaxed)
 	return heap
 }
@@ -391,7 +391,7 @@ unsafe fn heapAllocateNew(): *heap {
 	globalHeapCreating = true
 	heapLockRelease()
 
-	alignedHeapSize := heapAlignment * ((uintptr(mem::Sizeof(heap)) + (heapAlignment - 1)) / heapAlignment)
+	alignedHeapSize := heapAlignment * ((sizeof(heap) + (heapAlignment - 1)) / heapAlignment)
 	blockSize := getPageAlignedSize(alignedHeapSize)
 	mut offset := uintptr(0)
 	mut mappedSize := uintptr(0)
@@ -694,7 +694,7 @@ unsafe fn pageCommitMemoryPages(mut page: *page): bool {
 		// will be zeroed out by OS - take advantage in zalloc/calloc calls and make sure
 		// blocks in first page is zeroed out.
 		mut firstPage := add(page, pageHeaderSize)
-		memset(firstPage, 0, uint(commitPrefix-pageHeaderSize))
+		memset(firstPage, 0, commitPrefix-pageHeaderSize)
 		page.state |= _PAGE_IS_ZERO
 	}
 	return false
@@ -1239,7 +1239,7 @@ unsafe fn pageAllocateBlock(mut page: *page, needzero: bool): *block {
 
 	if needzero {
 		if !isZero {
-			memset(block, 0, uint(page.blockSize))
+			memset(block, 0, uintptr(page.blockSize))
 		} else {
 			*(*uintptr)(block) = 0
 		}
@@ -1410,7 +1410,7 @@ unsafe fn heapAllocateBlockHuge(mut _heap: *heap, size: uintptr, needzero: bool)
 		_heap.spanUsed[pageHuge] = span
 		mut ptr := add(_block, spanHeaderSize)
 		if needzero {
-			memset(ptr, 0, uint(size))
+			memset(ptr, 0, size)
 		}
 		return (*block)(ptr)
 	}
@@ -1427,7 +1427,7 @@ unsafe fn heapAllocateBlockGeneric(mut heap: *heap, size: uintptr, needzero: boo
 			// Fast track with small block available in heap level local free list; a hit means this
 			// heap owns the block.
 			if needzero {
-				memset(block, 0, uint(globalSizeClass[sizeClass].blockSize))
+				memset(block, 0, uintptr(globalSizeClass[sizeClass].blockSize))
 			}
 			return block
 		}
@@ -1446,7 +1446,7 @@ unsafe fn heapAllocateBlock(mut heap: *heap, size: uintptr, needzero: bool): *bl
 		if intrinsic::Likely(block != nil) {
 			// Fast track with small block available in heap level local free list.
 			if needzero {
-				memset(block, 0, uint(globalSizeClass[sizeClass].blockSize))
+				memset(block, 0, uintptr(globalSizeClass[sizeClass].blockSize))
 			}
 			return block
 		}
@@ -1462,9 +1462,9 @@ unsafe fn heapAllocateBlock(mut heap: *heap, size: uintptr, needzero: bool): *bl
 fn mallocinit() {
 	const match {
 	| mallocAsserts:
-		assert(mem::Sizeof(page) <= pageHeaderSize, "runtime: invalid page header size for malloc")
-		assert(mem::Sizeof(span) <= spanHeaderSize, "runtime: invalid span header size for malloc")
-		assert(mem::Sizeof(heap) <= 4096, "runtime: invalid heap size for malloc")
+		assert(sizeof(page) <= pageHeaderSize, "runtime: invalid page header size for malloc")
+		assert(sizeof(span) <= spanHeaderSize, "runtime: invalid span header size for malloc")
+		assert(sizeof(heap) <= 4096, "runtime: invalid heap size for malloc")
 	}
 
 	globalHugeCache = hugeCache{}
