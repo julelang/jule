@@ -259,13 +259,21 @@ fn cmplx(r: Float, i: Float): Cmplx
 // mutable array slices on built-in functions.
 fn clear[T: ~[]Type | ~map[Type]Key](mut t: T)
 
-// Takes an expression of any type or type declaration and returns the size in bytes
-// of a hypothetical variable v as if v was declared via v := x.
-// The size does not include any memory possibly referenced by x.
-// For instance, if x is a slice, it returns the size of the slice
-// descriptor, not the size of the memory referenced by the slice;
-// if x is a dynamic type, it returns the size of the dynamic value itself,
-// not the size of the value stored in the dynamic type.
-// For a struct, the size includes any padding introduced by field alignment.
-// The return value of is not a Jule constant.
+// Takes an expression of any type or a type declaration and returns the size in bytes
+// of the corresponding type. For an expression x, this is equivalent to the size of
+// an object of the type of x. The result includes any padding required by the type's
+// object representation, including padding between and after fields of a struct.
+// The size does not include any storage or memory referenced by the object.
+// For example, if x is a pointer, the size of the pointer itself is returned, not
+// the size of the object it points to. If x is a slice, the size of the slice
+// descriptor is returned, not the size of the memory referenced by the slice.
+// The return value is not a Jule constant.
 fn sizeof[T: type | expr](x: T): uintptr
+
+// Takes an expression of any type or a type declaration and returns the alignment
+// requirement of the corresponding type. For an expression x, this is equivalent
+// to the alignment requirement of the type of x. The result specifies the required
+// alignment for objects of that type; an object must be placed at an address that
+// satisfies this alignment requirement.
+// The return value is not a Jule constant.
+fn alignof[T: type | expr](x: T): uintptr

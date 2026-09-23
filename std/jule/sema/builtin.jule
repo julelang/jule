@@ -1195,6 +1195,33 @@ fn builtinCallerSizeof(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value 
 	return result
 }
 
+fn builtinCallerAlignof(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
+	mut result := &Value{
+		Type: primUintptr,
+	}
+
+	if len(fc.Args) < 1 {
+		e.pushErr(fc.Token, "type or expression is missing for alignof")
+		e.pushSuggestion("call like; alignof(typeOrValue)")
+		return result
+	}
+	if len(fc.Args) > 1 {
+		e.pushErr(fc.Token, "passed more argument than expected to alignof")
+		e.pushSuggestion("call like; alignof(typeOrValue)")
+	}
+
+	mut v := e.eval(fc.Args[0], evalDefault)
+	if v == nil {
+		return result
+	}
+	if !validTypeForXof(v.Type) {
+		e.pushErr(fc.Args[0].Token, "type @ is invalid for function alignof", v.Type.String())
+	}
+
+	result.Model = &AlignofExpr{Expr: v.Type}
+	return result
+}
+
 fn builtinCallerStdComptimeTypeof(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, "type or expression is missing for Typeof")
@@ -1724,6 +1751,7 @@ fn init() {
 	builtinFuncs["cmplx"] = &FuncIns{caller: builtinCallerCmplx}
 	builtinFuncs["clear"] = &FuncIns{caller: builtinCallerClear}
 	builtinFuncs["sizeof"] = &FuncIns{caller: builtinCallerSizeof}
+	builtinFuncs["alignof"] = &FuncIns{caller: builtinCallerAlignof}
 
 	// Initialize built-in functions of the "std/mem" package.
 	builtinFuncsStdMem["Sizeof"] = &FuncIns{caller: builtinCallerStdMemSizeof}
