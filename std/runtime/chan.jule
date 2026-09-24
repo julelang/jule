@@ -94,11 +94,13 @@ impl pchan {
 					//
 					// This is needed because all receivers might be parked.
 					// Queue is full and no reader, deadlock. Bad.
-					self.lock.lock()
-					mut recvp := self.recvq.dequeue()
-					self.lock.unlock()
-					if recvp != nil {
-						recvp.t.parker.unpark()
+					if !self.recvq.empty() {
+						self.lock.lock()
+						mut recvp := self.recvq.dequeue()
+						self.lock.unlock()
+						if recvp != nil {
+							recvp.t.parker.unpark()
+						}
 					}
 					return
 				}
@@ -121,10 +123,14 @@ impl pchan {
 					//
 					// This is needed because all receivers might be parked.
 					// Queue is full and no reader, deadlock. Bad.
-					mut recvp := self.recvq.dequeue()
-					self.lock.unlock()
-					if recvp != nil {
-						recvp.t.parker.unpark()
+					if !self.recvq.empty() {
+						mut recvp := self.recvq.dequeue()
+						self.lock.unlock()
+						if recvp != nil {
+							recvp.t.parker.unpark()
+						}
+					} else {
+						self.lock.unlock()
 					}
 					return
 				}
@@ -271,11 +277,13 @@ impl pchan {
 					//
 					// This is needed because all senders might be parked.
 					// Queue is empty and no sender, deadlock. Bad.
-					self.lock.lock()
-					mut sendp := self.sendq.dequeue()
-					self.lock.unlock()
-					if sendp != nil {
-						sendp.t.parker.unpark()
+					if !self.sendq.empty() {
+						self.lock.lock()
+						mut sendp := self.sendq.dequeue()
+						self.lock.unlock()
+						if sendp != nil {
+							sendp.t.parker.unpark()
+						}
 					}
 					if ok != nil {
 						*ok = true
@@ -315,13 +323,15 @@ impl pchan {
 					//
 					// This is needed because all senders might be parked.
 					// Queue is empty and no sender, deadlock. Bad.
-					self.lock.lock()
-					mut sendp := self.sendq.dequeue()
-					self.lock.unlock()
-					if sendp != nil {
-						sendp.t.parker.unpark()
+					if !self.sendq.empty() {
+						mut sendp := self.sendq.dequeue()
+						self.lock.unlock()
+						if sendp != nil {
+							sendp.t.parker.unpark()
+						}
+					} else {
+						self.lock.unlock()
 					}
-					self.lock.unlock()
 					if ok != nil {
 						*ok = true
 					}
@@ -485,9 +495,15 @@ struct chanlist {
 struct waitq {
 	mut head: &chanlist
 	tail:     &chanlist
+	_empty:   u32
 }
 
 impl waitq {
+	#disable nilptr
+	fn empty(*self): bool {
+		return atomic::Load(&self._empty, atomic::Acquire) == 1
+	}
+
 	#disable nilptr
 	fn exist(*self, p: &chanlist): bool {
 		mut i := self.head
@@ -507,6 +523,7 @@ impl waitq {
 			self.tail.link = p
 		}
 		self.tail = p
+		atomic::Store(&self._empty, 0, atomic::Release)
 	}
 
 	#disable nilptr
@@ -526,6 +543,7 @@ impl waitq {
 			self.head = p.link
 			if self.head == nil {
 				self.tail = nil
+				atomic::Store(&self._empty, 1, atomic::Release)
 			}
 			p.link = nil
 			// If waiter is a select statement, check if it is consumed.
