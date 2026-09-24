@@ -1209,6 +1209,36 @@ fn builtinCallerAlignof(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value
 	return result
 }
 
+fn builtinCallerOffsetof(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
+	mut result := &Value{
+		Type: primUintptr,
+	}
+
+	if len(fc.Args) < 1 {
+		e.pushErr(fc.Token, "type or expression is missing for offsetnof")
+		e.pushSuggestion("call like; offsetof(structValue.field)")
+		return result
+	}
+	if len(fc.Args) > 1 {
+		e.pushErr(fc.Token, "passed more argument than expected to offsetof")
+		e.pushSuggestion("call like; offsetof(structValue.field)")
+	}
+
+	mut v := e.eval(fc.Args[0], evalDefault)
+	if v == nil {
+		return result
+	}
+	mut s, ok := v.Model.(&StructSubIdentExpr)
+	if !ok || s.Field == nil {
+		e.pushErr(fc.Args[0].Token, "expression is not a selector expressio for field")
+		e.pushSuggestion("call like; offsetof(structValue.field)")
+		return result
+	}
+
+	result.Model = &OffsetofExpr{Struct: s.Owner, Field: s.Field}
+	return result
+}
+
 fn builtinCallerStdComptimeTypeof(mut e: &eval, mut fc: &ast::CallExpr, _: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, "type or expression is missing for Typeof")
@@ -1685,6 +1715,7 @@ fn init() {
 	builtinFuncs["clear"] = &FuncIns{caller: builtinCallerClear}
 	builtinFuncs["sizeof"] = &FuncIns{caller: builtinCallerSizeof}
 	builtinFuncs["alignof"] = &FuncIns{caller: builtinCallerAlignof}
+	builtinFuncs["offsetof"] = &FuncIns{caller: builtinCallerOffsetof}
 
 	// Initialize built-in functions of the "std/comptime" package.
 	builtinFuncsStdComptime["Typeof"] = &FuncIns{caller: builtinCallerStdComptimeTypeof}
