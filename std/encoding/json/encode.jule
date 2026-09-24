@@ -608,11 +608,7 @@ fn cachedFields[T](): []field {
 		fieldMapLock.Unlock()
 		return cache
 	}
-	// Computing a field offset via a nil (zero) pointer is undefined behavior in C/C++.
-	// The standard does not permit pointer arithmetic or member access relative to a nil pointer,
-	// even if the resulting value is never dereferenced.
-	// This works now but fragile.
-	p := unsafe { (*T)(0) }
+	p := unsafe { (*T)(0) } // Used for offsetof.
 	const pv = comptime::Valueof(unsafe { *p })
 	const fields = t.Fields()
 	mut n := 0
@@ -631,7 +627,11 @@ fn cachedFields[T](): []field {
 				// Initialize directly the slice's memory.
 				// This is efficient than appending a temporary cache object.
 				mut &fieldCache := unsafe { &(*&cache[n]) }
-				fieldCache.offset = uintptr(&pv.FieldByIndex(i).Unwrap())
+				// In code, `pv.FieldByIndex(i).Unwrap` seems it will dereference pv.
+				// However, it is safe because it will not generate any dereferencing,
+				// it will just generate an offsetof expression.
+				// There is no risk for nil pointer dereferencing.
+				fieldCache.offset = offsetof(pv.FieldByIndex(i).Unwrap())
 				n++
 
 				// Cache name for non-escape.
