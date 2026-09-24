@@ -265,6 +265,18 @@ impl pchan {
 				mut deq, mut closed := self.queue.dequeue(&data)
 				// Dequeued, return.
 				if deq {
+					// There is empty space in queue now, wake a sender.
+					// This is a spurious wake, do not read the data from it's stack pointer.
+					// It must be try to send it from the queue.
+					//
+					// This is needed because all senders might be parked.
+					// Queue is empty and no sender, deadlock. Bad.
+					self.lock.lock()
+					mut sendp := self.sendq.dequeue()
+					self.lock.unlock()
+					if sendp != nil {
+						sendp.t.parker.unpark()
+					}
 					if ok != nil {
 						*ok = true
 					}
@@ -297,6 +309,18 @@ impl pchan {
 				deq, _ := self.queue.dequeue(&data)
 				// Dequeued, lucky. Return.
 				if deq {
+					// There is empty space in queue now, wake a sender.
+					// This is a spurious wake, do not read the data from it's stack pointer.
+					// It must be try to send it from the queue.
+					//
+					// This is needed because all senders might be parked.
+					// Queue is empty and no sender, deadlock. Bad.
+					self.lock.lock()
+					mut sendp := self.sendq.dequeue()
+					self.lock.unlock()
+					if sendp != nil {
+						sendp.t.parker.unpark()
+					}
 					self.lock.unlock()
 					if ok != nil {
 						*ok = true
