@@ -56,7 +56,7 @@ impl decoder {
 
 	// Scans to the end of what was started.
 	// Suitable for only arrays and objects.
-	#disable nilptr boundary
+	#disable boundary nilptr
 	fn skipDepth(*self)! {
 		mut i := self.off
 		depth := len(self.scan.parseState)
@@ -81,7 +81,7 @@ impl decoder {
 
 	// Scans to the end of what was started.
 	// Suitable for only literals.
-	#disable nilptr boundary
+	#disable boundary nilptr
 	fn skipLiteral(*self)! {
 		mut i := self.off
 		for i < len(self.data) {
@@ -104,7 +104,7 @@ impl decoder {
 	}
 
 	// Scans to the end of what was started.
-	#disable nilptr boundary
+	#disable boundary nilptr
 	fn skip(*self)! {
 		match self.opcode {
 		| scanBeginArray | scanBeginObject:
@@ -118,7 +118,7 @@ impl decoder {
 	}
 
 	// Processes the byte at data[off].
-	#disable nilptr boundary
+	#disable boundary nilptr
 	fn scanNext(*self) {
 		if self.off < len(self.data) {
 			self.opcode = self.scan.step(&self.scan, self.data[self.off])
@@ -131,7 +131,7 @@ impl decoder {
 
 	// Processes bytes in data[off:] until it
 	// receives a scan code not equal to op.
-	#disable nilptr boundary
+	#disable boundary nilptr
 	fn scanWhile(*self, op: int)! {
 		mut i := self.off
 		for i < len(self.data) {
@@ -155,7 +155,7 @@ impl decoder {
 	}
 
 	// Processes bytes in data[off:] until it read a non-space byte.
-	#disable nilptr boundary
+	#disable boundary nilptr
 	fn skipSpace(*self)! {
 		mut i := self.off
 		for i < len(self.data) {
@@ -188,7 +188,7 @@ impl decoder {
 	// opcode, off, and parseState stay perfectly in sync. Any escape/grammar
 	// ambiguity falls back to the original FSM-driven skipLiteral untouched,
 	// so error messages and rare edge cases stay byte-for-byte identical.
-	#disable nilptr boundary
+	#disable boundary nilptr
 	fn rescanLiteral(*self)!: int {
 		match self.data[self.off-1] {
 		| '"':
@@ -206,7 +206,7 @@ impl decoder {
 
 	// Fast path for string literals. self.off points at the byte right
 	// after the opening '"' (self.data[self.off-1] == '"').
-	#disable nilptr boundary
+	#disable boundary nilptr
 	fn rescanStringFast(*self)!: (flags: int) {
 		data := self.data
 		n := len(data)
@@ -274,7 +274,7 @@ impl decoder {
 
 	// Fast path for number literals. self.off points at the byte right
 	// after the first literal byte (self.data[self.off-1] is '-' or a digit).
-	#disable nilptr boundary
+	#disable boundary nilptr
 	fn rescanNumberFast(*self)! {
 		data := self.data
 		n := len(data)
@@ -335,7 +335,7 @@ impl decoder {
 		self.scanNext()
 	}
 
-	#disable nilptr boundary
+	#disable boundary nilptr
 	fn array[T](*self, mut &v: *T)! {
 		const t = comptime::Typeof(T)
 		mut i := 0
@@ -385,7 +385,7 @@ impl decoder {
 		}
 	}
 
-	#disable nilptr boundary
+	#disable boundary nilptr
 	fn objectMap[Map](*self, mut &v: *Map)! {
 		const mapT = comptime::Typeof(Map)
 		comptime::TypeAlias(K, mapT.Key())
@@ -489,7 +489,7 @@ impl decoder {
 		}
 	}
 
-	#disable nilptr boundary
+	#disable boundary nilptr
 	fn objectStruct[T](*self, mut &v: *T)! {
 		cache := cachedFields[T]()
 		p := uintptr(v)
@@ -564,7 +564,7 @@ impl decoder {
 	// Reports whether it found and decoded successfully.
 	// Forwards any error, all errors are forwarded.
 	// So, any error means custom decode method found and it threw error.
-	#disable nilptr boundary
+	#disable boundary nilptr
 	fn tryCustomDecode[T](*self, mut &v: *T)!: bool {
 		const t = comptime::Typeof(T)
 		const match {
@@ -622,7 +622,7 @@ impl decoder {
 		return false
 	}
 
-	#disable nilptr boundary
+	#disable boundary nilptr
 	fn value1[T](*self, mut &v: *T)! {
 		// Before using the default decoding strategy, look for the custom decoder
 		// methods and use it, if any. If not exist any custom decoder method,
@@ -680,7 +680,7 @@ impl decoder {
 		}
 	}
 
-	#disable nilptr boundary
+	#disable boundary nilptr
 	fn value[T](*self, mut &v: *T)! {
 		// Before using the default decoding strategy, look for the custom decoder
 		// methods and use it, if any. If not exist any custom decoder method,
@@ -707,7 +707,7 @@ impl decoder {
 		}
 	}
 
-	#disable nilptr boundary
+	#disable boundary nilptr
 	fn decode[T](*self, mut &v: *T)! {
 		self.skipSpace()?
 		if intrinsic::Unlikely(self.opcode == scanEnd) {
@@ -718,7 +718,7 @@ impl decoder {
 	}
 }
 
-#disable nilptr boundary
+#disable boundary nilptr
 fn decodeLiteral[T](scanFlags: int, mut data: []byte, mut &v: *T)! {
 	const t = comptime::Typeof(T)
 	match data[0] {
@@ -1159,7 +1159,7 @@ fn decodeUintRaw(b: []byte): (u64, ok: bool) {
 	return z, true
 }
 
-#disable nilptr boundary
+#disable boundary nilptr
 fn decodeUInt[T](mut &v: *T, b: []byte)! {
 	const t = comptime::Typeof(T)
 
@@ -1183,7 +1183,7 @@ fn decodeUInt[T](mut &v: *T, b: []byte)! {
 	*v = T(z)
 }
 
-#disable nilptr boundary
+#disable boundary nilptr
 fn decodeInt[T](mut &v: *T, b: []byte)! {
 	const t = comptime::Typeof(T)
 	const Max = 1 << (t.Bits() - 1)
@@ -1378,7 +1378,7 @@ fn unquoteBytes(s: []byte): ([]byte, escape: bool) {
 	return b.GetData()[0:w], escape
 }
 
-#disable nilptr boundary
+#disable boundary nilptr
 fn decodeString(scanFlags: int, mut &s: *string, mut lit: []byte): (ok: bool) {
 	let mut s2: []byte
 	if scanFlags&unquoteMask != 0 {
