@@ -9,6 +9,9 @@ use "std/jule/directive"
 use "std/jule/log"
 use "std/jule/token"
 
+// Temporary buffer for the disable directive argument analysis.
+let mut disableArgs = make(map[string]bool, 3)
+
 struct directiveChecker {
 	s: &sema
 	d: &[]&ast::Directive
@@ -151,19 +154,19 @@ impl directiveChecker {
 			self.s.pushErr(d.Tag, "the #disable directive requires at least one argument")
 			return
 		}
-		mut args := map[string]bool{
-			"boundary": false,
-			"nilptr":   false,
-			"shift":    false,
-		}
+		// Clear to defaults.
+		disableArgs["boundary"] = false
+		disableArgs["nilptr"] = false
+		disableArgs["shift"] = false
+		// Check for arguments.
 		for _, arg in d.Args {
-			r, ok := args[arg.Kind]
+			r, ok := disableArgs[arg.Kind]
 			if r {
 				self.s.pushErr(arg, "argument is already passed for the #disable directive: "+arg.Kind)
 			} else if !ok {
 				self.s.pushErr(arg, "invalid argument for the #disable directive: "+arg.Kind)
 			}
-			args[arg.Kind] = true
+			disableArgs[arg.Kind] = true
 		}
 	}
 
