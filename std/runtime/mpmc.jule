@@ -5,6 +5,14 @@
 use "std/internal/cpu"
 use "std/internal/runtime/atomic"
 
+const (
+	// The top bit of enqueuePos is the "closed" mark (like crossbeam's mark bit).
+	// Because it lives in the same word as the producer claim CAS,
+	// a claim on a closed queue fails atomically.
+	closedBit = u64(1) << 63
+	posMask   = closedBit - 1
+)
+
 // Holds one slot's sequence and the value.
 // Vyukov protocol:
 //	- Initially: sequence == index (EMPTY for the first pass)
@@ -19,12 +27,17 @@ struct mpmcCell[T] {
 // Primarily designed for channels.
 // Implementation based on the Dmitry Vyukov's MPMC queue.
 struct mpmcQueue[T] {
-	cap:        u64
-	capmask:    u64
-	closed:     u32
-	buf:        []mpmcCell[T]
-	enqueuePos: u64
-	dequeuePos: u64
+	// Read-mostly
+	cap:     u64
+	capmask: u64
+	closed:  u32
+	buf:     []mpmcCell[T]
+
+	_pad0:      [cpu::CacheLinePadSize]byte
+	enqueuePos: u64 // producers (+ closedBit)
+	_pad1:      [cpu::CacheLinePadSize]byte
+	dequeuePos: u64 // consumers
+	_pad2:      [cpu::CacheLinePadSize]byte
 }
 
 impl mpmcQueue {
@@ -51,21 +64,18 @@ impl mpmcQueue {
 		mut iter := u32(0)
 		for {
 			mut pos := atomic::Load(&self.enqueuePos, atomic::Relaxed)
+			if pos&closedBit != 0 {
+				return false, true
+			}
+
 			mut &c := unsafe { &(*(&self.buf[pos&self.capmask])) }
 			seq := atomic::Load(&c.seq, atomic::Acquire)
 			dif := i64(seq - pos)
 
 			if dif == 0 {
-				// Try to claim slot
-				newPos := pos + 1
-				if atomic::CompareAndSwapWeak(&self.enqueuePos, &pos, newPos, atomic::AcqRel, atomic::Relaxed) {
-					// Slot is ours — now check closed
-					if closed {
-						// Roll back publication by marking slot empty again
-						atomic::Store(&c.seq, pos, atomic::Release)
-						return false, true
-					}
-
+				// Try to claim slot. Fails if another producer advanced
+				// enqueuePos or if close() set the closed bit meanwhile.
+				if atomic::CompareAndSwapWeak(&self.enqueuePos, &pos, pos+1, atomic::AcqRel, atomic::Relaxed) {
 					c.val = *val
 					atomic::Store(&c.seq, pos+1, atomic::Release)
 					return true, false
@@ -74,9 +84,10 @@ impl mpmcQueue {
 			}
 
 			if dif < 0 {
-				// Slot not ready — MAY be full, confirm via cursors
+				// Slot not ready — MAY be full, confirm via cursors.
+				// Signed compare: pos may be stale (deq can be ahead of pos).
 				deq := atomic::Load(&self.dequeuePos, atomic::Acquire)
-				if pos-deq >= self.cap {
+				if i64(pos-deq) >= i64(self.cap) {
 					return false, false // FULL
 				}
 				// Not guaranteed full → retry
@@ -89,15 +100,12 @@ impl mpmcQueue {
 		}
 	}
 
-	// Attempts to pop one element; returns (zero, false) if empty.
+	// Attempts to pop one element; returns (false, closed) if empty.
 	// Non-blocking; uses polite backoff on contention.
 	#disable boundary nilptr
 	fn dequeue(mut *self, mut &val: *T): (ok: bool, closed: bool) {
 		mut iter := u32(0)
 		for {
-			// do not immediately return even if isclosed is true
-			// we have to consume all queued data even if it is closed
-			closed = atomic::Load(&self.closed, atomic::Relaxed) != 0
 			mut pos := atomic::Load(&self.dequeuePos, atomic::Relaxed)
 			mut &c := unsafe { &(*(&self.buf[pos&self.capmask])) }
 			seq := atomic::Load(&c.seq, atomic::Acquire)
@@ -113,12 +121,24 @@ impl mpmcQueue {
 					c.val = zero
 					// mark EMPTY for the next wrap-around pass
 					atomic::Store(&c.seq, pos+self.cap, atomic::Release)
+					closed = atomic::Load(&self.closed, atomic::Relaxed) != 0
 					return true, closed
 				}
 				// lost race → retry
 			} else if dif < 0 {
-				// seq < pos+1 ⇒ producer hasn't published yet; queue appears EMPTY
-				return false, closed
+				// seq < pos+1 ⇒ producer hasn't published (or claimed) yet.
+				closed = atomic::Load(&self.closed, atomic::Acquire) != 0
+				if !closed {
+					return false, false // EMPTY
+				}
+				// Closed: the queue is really empty only if no producer
+				// claimed a slot that is still being written.
+				tail := atomic::Load(&self.enqueuePos, atomic::Acquire)
+				if tail&posMask == pos {
+					return false, true // EMPTY and closed
+				}
+				// In-flight element: wait for its publication so it is not lost.
+				waitSpin(&iter)
 			} else {
 				// another consumer is ahead / not our turn yet → polite backoff
 				waitSpin(&iter)
@@ -128,6 +148,14 @@ impl mpmcQueue {
 
 	#disable nilptr
 	fn close(mut *self) {
+		// Set the mark bit in enqueuePos first (linearizes with producer claims),
+		// then publish the flag that consumers read cheaply.
+		mut pos := atomic::Load(&self.enqueuePos, atomic::Relaxed)
+		for pos&closedBit == 0 {
+			if atomic::CompareAndSwapWeak(&self.enqueuePos, &pos, pos|closedBit, atomic::AcqRel, atomic::Relaxed) {
+				break
+			}
+		}
 		atomic::Store(&self.closed, 1, atomic::Release)
 	}
 }
