@@ -691,7 +691,7 @@ impl symBuilder {
 			e.FullName, e.AST.Name = self.getFullName(e.AST.Name, e.AST.Token)
 			self.table.TypeEnums = append(self.table.TypeEnums, e)
 		|:
-			self.pushErr(node.Token, "invalid syntax")
+			self.pushErr(node.Token, "unexpected declaration")
 		}
 	}
 
@@ -703,7 +703,7 @@ impl symBuilder {
 
 	fn pushDirectivePass(mut *self, mut d: &ast::Directive) {
 		if len(d.Args) == 0 {
-			self.pushErr(d.Tag, "missing expression")
+			self.pushErr(d.Tag, "expected argument")
 			self.pushSuggestion(`use like; #pass "-arg"`)
 			return
 		}
@@ -711,7 +711,8 @@ impl symBuilder {
 		mut args := make([]string, len(d.Args))
 		for i, arg in d.Args {
 			if arg.ID != token::STRING || arg.Kind[0] != '"' {
-				self.pushErr(arg, "invalid syntax")
+				self.pushErr(arg, "argument expected as a string literal")
+				self.pushSuggestion(`use like; #pass "-arg"`)
 				return
 			}
 			args[i] = arg.Kind[1 : len(arg.Kind)-1] // Remove literal quotes.

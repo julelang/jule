@@ -2049,7 +2049,7 @@ impl eval {
 			if m != nil {
 				return self.evalMap(m, t, lit.Lit)
 			}
-			self.pushErr(lit.Type.Token, "invalid syntax")
+			self.pushErr(lit.Type.Token, "invalid composite literal type: @", t.String())
 			return nil
 		}
 
@@ -3108,7 +3108,7 @@ impl eval {
 		for (_, mut expr) in lit.X {
 			mut pair, ok := expr.Data.(&ast::KeyValueExpr)
 			if !ok {
-				self.pushErr(lit.Token, "invalid syntax")
+				self.pushErr(lit.Token, "missing key in map literal")
 				return nil
 			}
 
@@ -3153,14 +3153,14 @@ impl eval {
 	fn evalBraceLit(mut &self, mut lit: &ast::BraceLit): &Value {
 		match {
 		| self.prefix == nil:
-			self.pushErr(lit.Token, "invalid syntax")
+			self.pushErr(lit.Token, "explicit type needed for composite literal")
 			return nil
 		| self.prefix.Map() != nil:
 			return self.evalMap(self.prefix.Map(), self.prefix, lit)
 		| self.prefix.Struct() != nil:
 			return self.evalStructLitExplicit(self.prefix.Struct(), self.prefix, lit, lit.Token)
 		}
-		self.pushErr(lit.Token, "invalid syntax")
+		self.pushErr(lit.Token, "invalid composite literal type: @", self.prefix.String())
 		return nil
 	}
 

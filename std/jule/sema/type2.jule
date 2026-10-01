@@ -1358,7 +1358,7 @@ impl structLitChecker {
 			if isPair {
 				_, isName := pair.Key.Data.(&ast::NameExpr)
 				if !isName {
-					self.pushErr(pair.Colon, "invalid syntax")
+					self.pushErr(pair.Colon, "expected field name")
 					ok = false
 				}
 			}
@@ -1379,14 +1379,13 @@ impl structLitChecker {
 			| &ast::KeyValueExpr:
 				mut pair := expr.Data.(&ast::KeyValueExpr)
 				if i > 0 && !paired {
-					self.pushErr(pair.Key.Token, "invalid syntax")
+					self.pushErr(pair.Key.Token, "mixture of field:value and value elements in struct literal")
 				}
 				paired = true
 				self.checkPair(pair, exprs)
 			|:
 				if paired {
-					self.pushErr(expr.Token, "argument must target a field")
-					self.pushSuggestion("like; field:value")
+					self.pushErr(expr.Token, "mixture of field:value and value elements in struct literal")
 				}
 				if i >= len(self.s.Fields) {
 					self.pushErr(expr.Token, "expression exceeded field count of type")
