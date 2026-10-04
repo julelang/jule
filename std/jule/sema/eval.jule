@@ -4,6 +4,7 @@
 
 use "std/conv"
 use "std/internal/jule/mod"
+use "std/intrinsic"
 use "std/jule"
 use "std/jule/ast"
 use "std/jule/build"
@@ -4409,26 +4410,25 @@ impl binaryEval {
 		lp := self.l.Type.Prim()
 		rp := self.r.Type.Prim()
 
+		mut ok := true
+
 		// Special case: complex numbers.
 		// Always use complex number type of the operand.
 		if lp.IsCmplx64() || lp.IsCmplx128() {
 			self.r.Type = self.l.Type
 			if self.r.IsConst() {
-				self.r.Constant.Kind = lp.Kind
+				ok = castConstByType(self.e.s, self.op, self.l.Type, self.r)
 			}
-			return
-		}
-
-		if self.l.untyped && !self.r.untyped {
+		} else if self.l.untyped && !self.r.untyped {
 			self.l.Type = self.r.Type
 			if self.l.IsConst() {
-				self.l.Constant.Kind = rp.Kind
+				ok = castConstByType(self.e.s, self.op, self.r.Type, self.l)
 			}
 			self.l.untyped = false
 		} else if !self.l.untyped && self.r.untyped {
 			self.r.Type = self.l.Type
 			if self.r.IsConst() {
-				self.r.Constant.Kind = lp.Kind
+				ok = castConstByType(self.e.s, self.op, self.l.Type, self.r)
 			}
 			self.r.untyped = false
 		} else if self.l.untyped && self.r.untyped {
@@ -4436,9 +4436,18 @@ impl binaryEval {
 			rs := getUntypedCmpScore(rp.Kind)
 			if ls > rs {
 				self.r.Type = self.l.Type
+				if self.r.IsConst() {
+					ok = castConstByType(self.e.s, self.op, self.l.Type, self.r)
+				}
 			} else if ls < rs {
 				self.l.Type = self.r.Type
+				if self.l.IsConst() {
+					ok = castConstByType(self.e.s, self.op, self.r.Type, self.l)
+				}
 			}
+		}
+		if intrinsic::Unlikely(!ok) {
+			panic("sema: internal constant casting failed in setTypeToGreater")
 		}
 	}
 
