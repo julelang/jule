@@ -301,58 +301,6 @@ let mut parseInt32Tests: []parseInt32Test = [
 	{"123%45", 0, conv::ErrSyntax},
 ]
 
-struct numErrorTest {
-	num:  string
-	want: string
-}
-
-let numErrorTests: []numErrorTest = [
-	{"0", `conv::ParseFloat: parsing "0": failed`},
-	{"`", "conv::ParseFloat: parsing \"`\": failed"},
-	{"1\x00.2", `conv::ParseFloat: parsing "1\x00.2": failed`},
-]
-
-fn init() {
-	// The parse routines return NumErrors wrapping
-	// the error and the string. Convert the tables above.
-	for i in parseUint64Tests {
-		mut &test := unsafe { &(*(&parseUint64Tests[i])) }
-		if test.err != nil {
-			test.err = &conv::NumError{"ParseUint", test.input, test.err}
-		}
-	}
-	for i in parseUint64BaseTests {
-		mut &test := unsafe { &(*(&parseUint64BaseTests[i])) }
-		if test.err != nil {
-			test.err = &conv::NumError{"ParseUint", test.input, test.err}
-		}
-	}
-	for i in parseInt64Tests {
-		mut &test := unsafe { &(*(&parseInt64Tests[i])) }
-		if test.err != nil {
-			test.err = &conv::NumError{"ParseInt", test.input, test.err}
-		}
-	}
-	for i in parseInt64BaseTests {
-		mut &test := unsafe { &(*(&parseInt64BaseTests[i])) }
-		if test.err != nil {
-			test.err = &conv::NumError{"ParseInt", test.input, test.err}
-		}
-	}
-	for i in parseUint32Tests {
-		mut &test := unsafe { &(*(&parseUint32Tests[i])) }
-		if test.err != nil {
-			test.err = &conv::NumError{"ParseUint", test.input, test.err}
-		}
-	}
-	for i in parseInt32Tests {
-		mut &test := unsafe { &(*(&parseInt32Tests[i])) }
-		if test.err != nil {
-			test.err = &conv::NumError{"ParseInt", test.input, test.err}
-		}
-	}
-}
-
 #test
 fn testParseU32(t: &testing::T) {
 	for i in parseUint32Tests {
@@ -363,7 +311,7 @@ fn testParseU32(t: &testing::T) {
 			use u64(test.out)
 		}
 		if u64(test.out) != out || !equalErr(test.err, err) {
-			t.Errorf("ParseUint({}, 10, 32) = {}, {} want {}, {}",
+			t.Errorf("ParseU32({}, 10, 32) = {}, {} want {}, {}",
 				test.input, out, err, test.out, test.err)
 		}
 	}
@@ -379,14 +327,14 @@ fn testParseU64(t: &testing::T) {
 			use test.out
 		}
 		if test.out != out || !equalErr(test.err, err) {
-			t.Errorf("ParseUint({}, 10, 64) = {}, {} want {}, {}",
+			t.Errorf("ParseU64({}, 10, 64) = {}, {} want {}, {}",
 				test.input, out, err, test.out, test.err)
 		}
 	}
 }
 
 #test
-fn testParseUint64Base(t: &testing::T) {
+fn testParseU64Base(t: &testing::T) {
 	for i in parseUint64BaseTests {
 		test := parseUint64BaseTests[i]
 		let mut err: any
@@ -395,14 +343,14 @@ fn testParseUint64Base(t: &testing::T) {
 			use test.out
 		}
 		if test.out != out || !equalErr(test.err, err) {
-			t.Errorf("ParseUint({}, {}, 64) = {}, {} want {}, {}",
+			t.Errorf("ParseU64Base({}, {}, 64) = {}, {} want {}, {}",
 				test.input, test.base, out, err, test.out, test.err)
 		}
 	}
 }
 
 #test
-fn testParseInt32(t: &testing::T) {
+fn testParseI32(t: &testing::T) {
 	for i in parseInt32Tests {
 		test := parseInt32Tests[i]
 		let mut err: any
@@ -411,14 +359,14 @@ fn testParseInt32(t: &testing::T) {
 			use i64(test.out)
 		}
 		if i64(test.out) != out || !equalErr(test.err, err) {
-			t.Errorf("ParseInt({}, 10 ,32) = {}, {} want {}, {}",
+			t.Errorf("ParseI32({}, 10 ,32) = {}, {} want {}, {}",
 				test.input, out, err, test.out, test.err)
 		}
 	}
 }
 
 #test
-fn testParseInt64(t: &testing::T) {
+fn testParseI64(t: &testing::T) {
 	for i in parseInt64Tests {
 		test := parseInt64Tests[i]
 		let mut err: any
@@ -427,14 +375,14 @@ fn testParseInt64(t: &testing::T) {
 			use test.out
 		}
 		if test.out != out || !equalErr(test.err, err) {
-			t.Errorf("ParseInt({}, 10, 64) = {}, {} want {}, {}",
+			t.Errorf("ParseI64({}, 10, 64) = {}, {} want {}, {}",
 				test.input, out, err, test.out, test.err)
 		}
 	}
 }
 
 #test
-fn testParseInt64Base(t: &testing::T) {
+fn testParseI64Base(t: &testing::T) {
 	for i in parseInt64BaseTests {
 		test := parseInt64BaseTests[i]
 		let mut err: any
@@ -443,7 +391,7 @@ fn testParseInt64Base(t: &testing::T) {
 			use test.out
 		}
 		if test.out != out || !equalErr(test.err, err) {
-			t.Errorf("ParseInt({}, {}, 64) = {}, {} want {}, {}",
+			t.Errorf("ParseI64({}, {}, 64) = {}, {} want {}, {}",
 				test.input, test.base, out, err, test.out, test.err)
 		}
 	}
@@ -524,13 +472,9 @@ fn testAtoi(t: &testing::T) {
 				err = error
 				use int(test.out)
 			}
-			let mut testErr: any
-			if test.err != nil {
-				testErr = &conv::NumError{"Atoi", test.input, test.err.(&conv::NumError).Err}
-			}
-			if int(test.out) != out || !equalErr(testErr, err) {
+			if int(test.out) != out || !equalErr(test.err, err) {
 				t.Errorf("Atoi({}) = {}, {} want {}, {}",
-					test.input, out, err, test.out, testErr)
+					test.input, out, err, test.out, test.err)
 			}
 		}
 	| 64:
@@ -541,24 +485,20 @@ fn testAtoi(t: &testing::T) {
 				err = error
 				use int(test.out)
 			}
-			let mut testErr: any
-			if test.err != nil {
-				testErr = &conv::NumError{"Atoi", test.input, test.err.(&conv::NumError).Err}
-			}
-			if test.out != i64(out) || !equalErr(testErr, err) {
+			if test.out != i64(out) || !equalErr(test.err, err) {
 				t.Errorf("Atoi({}) = {}, {} want {}, {}",
-					test.input, out, err, test.out, testErr)
+					test.input, out, err, test.out, test.err)
 			}
 		}
 	}
 }
 
 fn bitSizeErrStub(name: string, bitSize: int): any {
-	return conv::BitSizeError(name, "0", bitSize)
+	return conv::ErrBitSize
 }
 
 fn baseErrStub(name: string, base: int): any {
-	return conv::BaseError(name, "0", base)
+	return conv::ErrBase
 }
 
 fn noErrStub(name: string, arg: int): any {
@@ -650,37 +590,8 @@ fn testParseUintBase(t: &testing::T) {
 	}
 }
 
-#test
-fn testNumError(t: &testing::T) {
-	for _, test in numErrorTests {
-		err := &conv::NumError{
-			Func: "ParseFloat",
-			Num:  test.num,
-			Err:  errors::New("failed"),
-		}
-		got := err.String()
-		if got != test.want {
-			t.Errorf(`(&NumError{"ParseFloat", {}, "failed"}).String() = {}, want {}`, test.num, got, test.want)
-		}
-	}
-}
-
 fn equalErr(e1: any, e2: any): bool {
-	if e1 == nil {
-		return e2 == nil
-	}
-	if e2 == nil {
-		return e1 == nil
-	}
-	e1n, mut ok := e1.(&conv::NumError)
-	if !ok {
-		return false
-	}
-	e2n, ok := e2.(&conv::NumError)
-	if !ok {
-		return false
-	}
-	return cmp::DeepEqual(e1n, e2n)
+	return e1 == e2
 }
 
 fn equalErr2(a: any, b: any): bool {

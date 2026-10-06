@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // The Jule code is a modified version of the original Go code from
-// https://github.com/golang/go/blob/go1.26.4/src/internal/strconv/atoi.go and came with this notice.
+// https://github.com/golang/go/blob/go1.27.1/src/internal/strconv/atoi.go and came with this notice.
 //
 // ====================================================
 // Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -51,11 +51,12 @@ fn lower(c: byte): byte {
 // Is like [ParseInt] but for unsigned numbers.
 //
 // A sign prefix is not permitted.
+#disable boundary
 fn ParseUint(mut s: string, mut base: int, mut bitSize: int)!: u64 {
 	const fnParseUint = "ParseUint"
 
 	if s == "" {
-		throw syntaxError(fnParseUint, s)
+		throw ErrSyntax
 	}
 
 	base0 := base == 0
@@ -84,13 +85,13 @@ fn ParseUint(mut s: string, mut base: int, mut bitSize: int)!: u64 {
 			}
 		}
 	|:
-		throw baseError(fnParseUint, s0, base)
+		throw ErrBase
 	}
 
 	if bitSize == 0 {
 		bitSize = IntSize
 	} else if bitSize < 0 || bitSize > 64 {
-		throw bitSizeError(fnParseUint, s0, bitSize)
+		throw ErrBitSize
 	}
 
 	// Cutoff is the smallest number such that cutoff*base > u64.Max.
@@ -109,7 +110,9 @@ fn ParseUint(mut s: string, mut base: int, mut bitSize: int)!: u64 {
 
 	mut underscores := false
 	let mut n: u64
-	for _, c in []byte(s) {
+	mut i := 0
+	for i < len(s); i++ {
+		c := s[i]
 		let mut d: byte
 		match {
 		| c == '_' && base0:
@@ -120,29 +123,29 @@ fn ParseUint(mut s: string, mut base: int, mut bitSize: int)!: u64 {
 		| 'a' <= lower(c) && lower(c) <= 'z':
 			d = lower(c) - 'a' + 10
 		|:
-			throw syntaxError(fnParseUint, s0)
+			throw ErrSyntax
 		}
 
 		if d >= byte(base) {
-			throw syntaxError(fnParseUint, s0)
+			throw ErrSyntax
 		}
 
 		if n >= cutoff {
 			// n*base overflows
-			throw rangeError(fnParseUint, s0)
+			throw ErrRange
 		}
 		n *= u64(base)
 
 		n1 := n + u64(d)
 		if n1 < n || n1 > maxVal {
 			// n+d overflows
-			throw rangeError(fnParseUint, s0)
+			throw ErrRange
 		}
 		n = n1
 	}
 
 	if underscores && !underscoreOK(s0) {
-		throw syntaxError(fnParseUint, s0)
+		throw ErrSyntax
 	}
 
 	return n
@@ -164,21 +167,20 @@ fn ParseUint(mut s: string, mut base: int, mut bitSize: int)!: u64 {
 // correspond to int, i8, i16, i32, and i64.
 // If bitSize is below 0 or above 64, an error is returned.
 //
-// The errors that it returns have concrete type [&NumError]
-// and include err.Num = s. If s is empty or contains invalid  digits,
-// err.Err = [ErrSyntax]; if the value corresponding to s cannot be
-// represented by a signed integer of the given size,  err.Err = [ErrRange].
+// If s is empty or contains invalid digits, throws ErrSyntax;
+// if the value corresponding to s cannot be represented by a signed integer of
+// the given size, throws ErrRange.
 //
 // [integer literals]: https://manual.jule.dev/introduction/data-types#integer-literals
+#disable boundary
 fn ParseInt(mut s: string, base: int, mut bitSize: int)!: i64 {
 	const fnParseInt = "ParseInt"
 
 	if s == "" {
-		throw syntaxError(fnParseInt, s)
+		throw ErrSyntax
 	}
 
 	// Pick off leading sign.
-	s0 := s
 	mut neg := false
 	if s[0] == '+' {
 		s = s[1:]
@@ -189,10 +191,7 @@ fn ParseInt(mut s: string, base: int, mut bitSize: int)!: i64 {
 
 	// Convert unsigned and check range.
 	un := ParseUint(s, base, bitSize) catch {
-		mut nerr := error.(&NumError)
-		if nerr.Err != ErrRange {
-			nerr.Func = fnParseInt
-			nerr.Num = s0
+		if error != ErrRange {
 			throw error
 		}
 		maxVal := u64(1)<<uint(bitSize) - 1
@@ -205,10 +204,10 @@ fn ParseInt(mut s: string, base: int, mut bitSize: int)!: i64 {
 
 	cutoff := u64(1 << uint(bitSize-1))
 	if !neg && un >= cutoff {
-		throw rangeError(fnParseInt, s0)
+		throw ErrRange
 	}
 	if neg && un > cutoff {
-		throw rangeError(fnParseInt, s0)
+		throw ErrRange
 	}
 	mut n := i64(un)
 	if neg {
@@ -218,9 +217,8 @@ fn ParseInt(mut s: string, base: int, mut bitSize: int)!: i64 {
 }
 
 // Is equivalent to ParseInt(s, 10, 0), converted to int.
+#disable boundary
 fn Atoi(mut s: string)!: int {
-	const fnAtoi = "Atoi"
-
 	sLen := len(s)
 	if intSize == 32 && (0 < sLen && sLen < 10) ||
 		intSize == 64 && (0 < sLen && sLen < 19) {
@@ -229,15 +227,17 @@ fn Atoi(mut s: string)!: int {
 		if s[0] == '-' || s[0] == '+' {
 			s = s[1:]
 			if len(s) < 1 {
-				throw syntaxError(fnAtoi, s0)
+				throw ErrSyntax
 			}
 		}
 
 		mut n := 0
-		for (_, mut ch) in []byte(s) {
+		mut i := 0
+		for i < len(s); i++ {
+			mut ch := s[i]
 			ch -= '0'
 			if ch > 9 {
-				throw syntaxError(fnAtoi, s0)
+				throw ErrSyntax
 			}
 			n = (n << 3) + (n << 1) + int(ch)
 		}
@@ -248,19 +248,14 @@ fn Atoi(mut s: string)!: int {
 	}
 
 	// Slow path for invalid, big, or underscored integers.
-	int64 := ParseInt(s, 10, 0) catch {
-		mut nerr, ok := error.(&NumError)
-		if ok {
-			nerr.Func = fnAtoi
-		}
-		throw error
-	}
+	int64 := ParseInt(s, 10, 0)?
 	return int(int64)
 }
 
 // Reports whether the underscores in s are allowed.
 // Checking them in this one function lets all the parsers skip over them simply.
 // Underscore must appear only between digits or between a base prefix and a digit.
+#disable boundary
 fn underscoreOK(mut s: string): bool {
 	// saw tracks the last character (class) we saw:
 	// ^ for beginning of number,

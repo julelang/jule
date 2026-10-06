@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // The Jule code is a modified version of the original Go code from
-// https://github.com/golang/go/blob/go1.26.4/src/internal/strconv/itoa.go and came with this notice.
+// https://github.com/golang/go/blob/go1.27.1/src/internal/strconv/itoa.go and came with this notice.
 //
 // ====================================================
 // Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -47,8 +47,9 @@ fn FormatUint(i: u64, base: int): string {
 			return small(int(i))
 		}
 		let mut a: [24]byte
-		j := formatBase10(unsafe::Slice(&a[0], len(a), len(a)), i)
-		return string(a[j:])
+		nd := numDigits(i)
+		formatBase10(unsafe::Slice(&a[0], len(a), len(a))[:nd], i)
+		return unsafe::StringFromBytes(a[:nd])
 	}
 	_, s := formatBits(nil, i, base, false, false)
 	return s
@@ -67,12 +68,13 @@ fn FormatInt(i: i64, base: int): string {
 		if i < 0 {
 			u = -u
 		}
-		mut j := formatBase10(unsafe::Slice(&a[0], len(a), len(a)), u)
+		nd := numDigits(u)
+		formatBase10(unsafe::Slice(&a[0], len(a), len(a))[1:1+nd], u)
 		if i < 0 {
-			j--
-			a[j] = '-'
+			a[0] = '-'
+			return unsafe::StringFromBytes(a[:1+nd])
 		}
-		return string(a[j:])
+		return unsafe::StringFromBytes(a[1 : 1+nd])
 	}
 	_, s := formatBits(nil, u64(i), base, i < 0, false)
 	return s
@@ -102,8 +104,9 @@ fn AppendUint(mut dst: []byte, i: u64, base: int): []byte {
 			return append(dst, small(int(i))...)
 		}
 		let mut a: [24]byte
-		j := formatBase10(unsafe::Slice(&a[0], len(a), len(a)), i)
-		return append(dst, a[j:]...)
+		nd := numDigits(i)
+		formatBase10(unsafe::Slice(&a[0], len(a), len(a))[:nd], i)
+		return append(dst, a[:nd]...)
 	}
 	dst, _ = formatBits(dst, i, base, false, true)
 	return dst
@@ -208,58 +211,44 @@ fn small(i: int): string {
 	return smalls[i*2 : i*2+2]
 }
 
-// Formats the decimal representation of u into the tail of a
-// and returns the offset of the first byte written to a. That is, after
-//
-//	i := formatBase10(a, u)
-//
-// the decimal representation is in a[i:].
+// Formats the decimal representation of u into a.
+// The caller is responsible for ensuring that a is big enough to hold u.
+// If a is too big, leading zeros will be filled in as needed.
 #disable boundary nilptr
-fn formatBase10(mut a: []byte, mut u: u64): int {
-	// Split into 9-digit chunks that fit in u32s
-	// and convert each chunk using u32 math instead of u64 math.
-	// The obvious way to write the outer loop is "for u >= 1e9", but most numbers are small,
-	// so the setup for the comparison u >= 1e9 is usually pure overhead.
-	// Instead, we approximate it by u>>29 != 0, which is usually faster and good enough.
-	mut i := len(a)
-	for (host64bit && u>>29 != 0) || (!host64bit && u32(u)>>29|u32(u>>32) != 0) {
-		let mut lo: u32
-		u, lo = u/1e9, u32(u%1e9)
-
-		// Convert 9 digits.
-		mut j := 0
-		for j < 4; j++ {
-			let mut dd: u32
-			lo, dd = lo/100, (lo%100)*2
-			i -= 2
-			a[i+0], a[i+1] = smalls[dd+0], smalls[dd+1]
-		}
-		i--
-		a[i] = smalls[lo*2+1]
-
-		// If we'd been using u >= 1e9 then we would be guaranteed that u/1e9 > 0,
-		// but since we used u>>29 != 0, u/1e9 might be 0, so we might be done.
-		// (If u is now 0, then at the start we had 2²⁹ ≤ u < 10⁹, so it was still correct
-		// to write 9 digits; we have not accidentally written any leading zeros.)
-		if u == 0 {
-			return i
-		}
+fn formatBase10(mut a: []byte, mut u: u64) {
+	mut nd := len(a)
+	for nd >= 8 {
+		// Format last 8 digits (4 pairs).
+		x3210 := u32(u % 1e8)
+		u /= 1e8
+		x32, x10 := x3210/1e4, x3210%1e4
+		x1, x0 := (x10/100)*2, (x10%100)*2
+		x3, x2 := (x32/100)*2, (x32%100)*2
+		a[nd-1], a[nd-2] = smalls[x0+1], smalls[x0]
+		a[nd-3], a[nd-4] = smalls[x1+1], smalls[x1]
+		a[nd-5], a[nd-6] = smalls[x2+1], smalls[x2]
+		a[nd-7], a[nd-8] = smalls[x3+1], smalls[x3]
+		nd -= 8
 	}
-
-	// Convert final chunk, at most 8 digits.
-	mut lo := u32(u)
-	for lo >= 100 {
-		let mut dd: u32
-		lo, dd = lo/100, (lo%100)*2
-		i -= 2
-		a[i+0], a[i+1] = smalls[dd+0], smalls[dd+1]
+	mut x := u32(u)
+	if nd >= 4 {
+		// Format last 4 digits (2 pairs).
+		x10 := x % 1e4
+		x /= 1e4
+		x1, x0 := (x10/100)*2, (x10%100)*2
+		a[nd-1], a[nd-2] = smalls[x0+1], smalls[x0]
+		a[nd-3], a[nd-4] = smalls[x1+1], smalls[x1]
+		nd -= 4
 	}
-	i--
-	dd := lo * 2
-	a[i] = smalls[dd+1]
-	if lo >= 10 {
-		i--
-		a[i] = smalls[dd+0]
+	if nd >= 2 {
+		// Format last 2 digits.
+		x0 := (x % 1e2) * 2
+		x /= 1e2
+		a[nd-1], a[nd-2] = smalls[x0+1], smalls[x0]
+		nd -= 2
 	}
-	return i
+	if nd > 0 {
+		// Format final digit.
+		a[0] = byte('0' + x)
+	}
 }

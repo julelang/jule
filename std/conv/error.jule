@@ -2,42 +2,28 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use "std/errors"
-use "std/runtime"
+type Error: int
 
-// Indicates that a value does not have the right syntax for the target type.
-// Mutation is undefined behavior.
-let mut ErrSyntax = errors::New("invalid syntax")
+const (
+	_: Error = iota
+	ErrRange
+	ErrSyntax
+	ErrBase
+	ErrBitSize
+)
 
-// That a value is out of range for the target type.
-// Mutation is undefined behavior.
-let mut ErrRange = errors::New("value out of range")
-
-// Records a failed conversion.
-struct NumError {
-	Func: string // the failing function (ParseBool, ParseInt, ParseUint, ParseFloat, ParseComplex)
-	Num:  string // the input
-	Err:  any    // the reason the conversion failed (e.g. ErrRange, ErrSyntax, etc.)
-}
-
-impl NumError {
-	fn String(*self): string {
-		return "conv::" + self.Func + ": " + "parsing " + Quote(self.Num) + ": " + runtime::toString(self.Err)
+impl Error {
+	fn Error(*self): string {
+		match *self {
+		| ErrRange:
+			return "value out of range"
+		| ErrSyntax:
+			return "invalid syntax"
+		| ErrBase:
+			return "invalid base"
+		| ErrBitSize:
+			return "invalid bit size"
+		}
+		return "unknown error"
 	}
-}
-
-fn syntaxError(f: string, s: string): &NumError {
-	return &NumError{f, s, ErrSyntax}
-}
-
-fn rangeError(f: string, s: string): &NumError {
-	return &NumError{f, s, ErrRange}
-}
-
-fn baseError(f: string, s: string, base: int): &NumError {
-	return &NumError{f, s, errors::New("invalid base " + Itoa(base))}
-}
-
-fn bitSizeError(f: string, s: string, bitSize: int): &NumError {
-	return &NumError{f, s, errors::New("invalid bit size " + Itoa(bitSize))}
 }

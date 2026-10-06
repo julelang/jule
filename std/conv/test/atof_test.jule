@@ -75,11 +75,10 @@ let atoftests: []atofTest = [
 	{"-0x0p+01234567890123456789", "-0", nil},
 	{"-0x0.00p-01234567890123456789", "-0", nil},
 
-	// ...
-	{"0e291", "0", nil},
-	{"0e292", "0", nil},
-	{"0e347", "0", nil},
-	{"0e348", "0", nil},
+	{"0e291", "0", nil}, // Go's issue 15364
+	{"0e292", "0", nil}, // Go's issue 15364
+	{"0e347", "0", nil}, // Go's issue 15364
+	{"0e348", "0", nil}, // Go's issue 15364
 	{"-0e291", "-0", nil},
 	{"-0e292", "-0", nil},
 	{"-0e347", "-0", nil},
@@ -193,6 +192,9 @@ let atoftests: []atofTest = [
 	// way too small
 	{"1e-350", "0", nil},
 	{"1e-400000", "0", nil},
+	{"1e-345", "0", nil}, // picked off in atof64
+	{"1e-343", "0", nil}, // large c.s in parseF64
+	{"9.999999999999999999e-343", "0", nil},
 
 	// Near denormals and denormals.
 	{"0x2.00000000000000p-1010", "1.8227805048890994e-304", nil}, // 0x00e0000000000000
@@ -300,7 +302,7 @@ let atoftests: []atofTest = [
 	{"0x1.00000000000018p0", "1.0000000000000004", nil},
 
 	// Halfway between 1090544144181609278303144771584 and 1090544144181609419040633126912
-	// (15497564393479157p+46, should round to even 15497564393479156p+46
+	// (15497564393479157p+46, should round to even 15497564393479156p+46, Go's issue 36657)
 	{"1090544144181609348671888949248", "1.0905441441816093e+30", nil},
 	// slightly above, rounds up
 	{"1090544144181609348835077142190", "1.0905441441816094e+30", nil},
@@ -322,7 +324,6 @@ let atoftests: []atofTest = [
 	{"123.5e+1__2", "0", conv::ErrSyntax},
 	{"123.5e+12_", "0", conv::ErrSyntax},
 
-	// ...
 	{"0x_1_2.3_4_5p+1_2", "74565", nil},
 	{"-_0x12.345p+12", "0", conv::ErrSyntax},
 	{"+_0x12.345p+12", "0", conv::ErrSyntax},
@@ -340,7 +341,6 @@ let atoftests: []atofTest = [
 	{"0x12.345p+1__2", "0", conv::ErrSyntax},
 	{"0x12.345p+12_", "0", conv::ErrSyntax},
 
-	// ...
 	{"1e100x", "0", conv::ErrSyntax},
 	{"1e1000x", "0", conv::ErrSyntax},
 ]
@@ -419,6 +419,11 @@ let atof32tests: []atofTest = [
 	{"0x0.0000008p-125", "0", nil},             // rounded down
 	{"0x0.0000007p-125", "0", nil},             // rounded down
 
+	{"1e-70", "0", nil}, // picked off in atof32
+	{"1e-65", "0", nil}, // picked off in atof32
+	{"1e-64", "0", nil}, // large c.s in parseF32
+	{"9.999999999999999999e-64", "0", nil},
+
 	// 2^92 = 8388608p+69 = 4951760157141521099596496896 (4.9517602e27)
 	// is an exact power of two that needs 8 decimal digits to be correctly
 	// parsed back.
@@ -441,21 +446,6 @@ fn initAtof() {
 }
 
 fn initAtofOnce() {
-	// The atof routines return NumErrors wrapping
-	// the error and the string. Convert the table above.
-	for i in atoftests {
-		mut &test := unsafe { &(*(&atoftests[i])) }
-		if test.err != nil {
-			test.err = &conv::NumError{"ParseFloat", test.input, test.err}
-		}
-	}
-	for i in atof32tests {
-		mut &test := unsafe { &(*(&atof32tests[i])) }
-		if test.err != nil {
-			test.err = &conv::NumError{"ParseFloat", test.input, test.err}
-		}
-	}
-
 	// Generate random inputs for tests
 	atofRandomTests = make([]atofSimpleTest, 10000)
 	for i in atofRandomTests {
@@ -479,7 +469,7 @@ fn testParseFloatPrefix(t: &testing::T) {
 		for _, suffix in [" ", "q", "+", "-", "<", "=", ">", "(", ")", "i", "init"] {
 			input := test.input + suffix
 			_, n, err := conv::ParseFloatPrefix(input, 64)
-			if err != nil {
+			if err != conv::Error(0) {
 				t.Errorf("ParseFloatPrefix({}, 64): err = {}; want no error", input, err)
 			}
 			if n != len(test.input) {

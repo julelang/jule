@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // The Jule code is a modified version of the original Go code from
-// https://github.com/golang/go/blob/go1.24.3/src/strconv/atoc.go and came with this notice.
+// https://github.com/golang/go/blob/go1.27.1/src/strconv/atoc.go and came with this notice.
 //
 // ====================================================
 // Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -37,13 +37,6 @@
 
 const fnParseCmplx = "ParseCmplx"
 
-// Handles error returned by parseFloatPrefix for ParseCmplx.
-fn handleErr(mut err: &NumError, s: string): &NumError {
-	err.Func = fnParseCmplx
-	err.Num = s
-	return err
-}
-
 // Converts the string s to a complex number
 // with the precision specified by bitSize: 64 for cmplx64, or 128 for cmplx128.
 // When bitSize=64, the result still has type cmplx128, but it will be
@@ -70,8 +63,6 @@ fn ParseCmplx(mut s: string, bitSize: int)!: cmplx128 {
 		size = 32 // cmplx64 uses f32 parts
 	}
 
-	orig := s
-
 	// Remove parentheses, if any.
 	if len(s) >= 2 && s[0] == '(' && s[len(s)-1] == ')' {
 		s = s[1 : len(s)-1]
@@ -79,8 +70,8 @@ fn ParseCmplx(mut s: string, bitSize: int)!: cmplx128 {
 
 	// Read real part (possibly imaginary part if followed by 'i').
 	mut re, mut n, mut err := parseFloatPrefix(s, size)
-	if err != nil {
-		throw handleErr(err, orig)
+	if err != 0 {
+		throw err
 	}
 
 	s = s[n:]
@@ -107,17 +98,17 @@ fn ParseCmplx(mut s: string, bitSize: int)!: cmplx128 {
 		}
 		fall
 	|:
-		throw syntaxError(fnParseCmplx, orig)
+		throw ErrSyntax
 	}
 
 	// Read imaginary part.
 	im, n, err := parseFloatPrefix(s, size)
-	if err != nil {
-		throw handleErr(err, orig)
+	if err != 0 {
+		throw err
 	}
 	s = s[n:]
 	if s != "i" {
-		throw syntaxError(fnParseCmplx, orig)
+		throw ErrSyntax
 	}
 	return cmplx(re, im)
 }

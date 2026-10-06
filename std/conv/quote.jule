@@ -397,7 +397,7 @@ fn UnquoteChar(mut s: string, quote: byte)!: (value: rune, multibyte: bool, tail
 // If s does not start with a valid quoted string, it returns an error.
 fn QuotedPrefix(s: string)!: string {
 	out, _, mut err := unquote(s, false)
-	if err != nil {
+	if err != 0 {
 		throw err
 	}
 	return out
@@ -414,7 +414,7 @@ fn Unquote(s: string)!: string {
 	if len(rem) > 0 {
 		throw ErrSyntax
 	}
-	if err != nil {
+	if err != 0 {
 		throw err
 	}
 	return out
@@ -424,7 +424,7 @@ fn Unquote(s: string)!: string {
 // returning the parsed prefix, the remaining suffix, and any parse errors.
 // If unescape is true, the parsed prefix is unescaped,
 // otherwise the input prefix is provided verbatim.
-fn unquote(mut input: string, unescape: bool): (out: string, rem: string, err: &errors::Error) {
+fn unquote(mut input: string, unescape: bool): (out: string, rem: string, err: Error) {
 	// Determine the quote form and optimistically find the terminating quote.
 	if len(input) < 2 {
 		return "", input, ErrSyntax
@@ -459,7 +459,7 @@ fn unquote(mut input: string, unescape: bool): (out: string, rem: string, err: &
 		// The Jule specification does not explicitly require valid UTF-8,
 		// but only mention that it is implicitly valid for Jule source code
 		// (which must be valid UTF-8).
-		return out, input[end:], nil
+		return out, input[end:], 0
 	| '"' | '\'':
 		// Handle quoted strings without any escape sequences.
 		if !contains(input[:end], '\\') && !contains(input[:end], '\n') {
@@ -476,7 +476,7 @@ fn unquote(mut input: string, unescape: bool): (out: string, rem: string, err: &
 				if unescape {
 					out = out[1 : end-1] // exclude quotes
 				}
-				return out, input[end:], nil
+				return out, input[end:], 0
 			}
 		}
 
@@ -520,9 +520,9 @@ fn unquote(mut input: string, unescape: bool): (out: string, rem: string, err: &
 		input = input[1:] // skip terminating quote
 
 		if unescape {
-			return unsafe::StringFromBytes(buf), input, nil
+			return unsafe::StringFromBytes(buf), input, 0
 		}
-		return in0[:len(in0)-len(input)], input, nil
+		return in0[:len(in0)-len(input)], input, 0
 	|:
 		return "", input, ErrSyntax
 	}
