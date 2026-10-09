@@ -11,6 +11,7 @@ A maintainer is responsible for following these processes when publishing a rele
 - The `Version` constant in the `std/jule` package must be set correctly.
 - [julec-ir](https://github.com/julelang/julec-ir) must be updated to the latest IR version, including the steps mentioned above.
 - The Manual must be fully updated according to the latest release (do not forget to update the version table in the [backend](https://manual.jule.dev/compiler/backend/) section).
+- The runtime malloc implementation must be updated to the latest version of the adopted memory allocator. Information regarding the adopted memory allocator is specified in the malloc implementation source file.
 
 **Make sure the required dependencies are installed specified for the platform.**
 
