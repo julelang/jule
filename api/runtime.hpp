@@ -97,7 +97,7 @@ static inline void __jule_doSpin(void) noexcept {
 #elif defined(__sparc__)
     __asm__ volatile("rd %ccr, %g0 \n\trd %ccr, %g0 \n\trd %ccr, %g0");
 #else
-#error "unsupported target for __jule_spin"
+#error "unsupported target for __jule_doSpin"
 #endif
 }
 
