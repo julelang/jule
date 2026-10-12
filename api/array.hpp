@@ -25,6 +25,12 @@ public:
         std::fill(this->begin(), this->end(), def);
     }
 
+    static __jule_Array<Item, N> filled(const Item &item) {
+        __jule_Array<Item, N> array;
+        std::fill(array.begin(), array.end(), item);
+        return array;
+    }
+
     using Iterator = Item *;
     using ConstIterator = const Item *;
 
