@@ -21,10 +21,6 @@ public:
 
     __jule_Array(void) = default;
 
-    __jule_Array(const Item &def) {
-        std::fill(this->begin(), this->end(), def);
-    }
-
     static __jule_Array<Item, N> filled(const Item &item) {
         __jule_Array<Item, N> array;
         std::fill(array.begin(), array.end(), item);
