@@ -21,6 +21,14 @@ public:
 
     __jule_Array(void) = default;
 
+    static __jule_Array<Item, N> make(std::initializer_list<Item> src) {
+        __jule_Array<Item, N> array;
+        if (N != 0) {
+            std::copy_n(src.begin(), N, array.begin());
+        }
+        return array;
+    }
+
     static __jule_Array<Item, N> filled(const Item &item) {
         __jule_Array<Item, N> array;
         std::fill(array.begin(), array.end(), item);
