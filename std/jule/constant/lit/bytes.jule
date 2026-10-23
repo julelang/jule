@@ -28,7 +28,7 @@ fn ToRune(mut lit: string): (rune, errors: []Error) {
 	lit = lit[1 : len(lit)-1]
 	if lit[0] == '\\' && len(lit) > 1 {
 		mut i := 0
-		r, _ = runeFromEsqSeq(lit, &i, &errors)
+		r, _ = runeFromEscapeSequence(lit, &i, &errors)
 	} else {
 		r, _ = utf8::DecodeRuneString(lit)
 	}
@@ -44,7 +44,7 @@ fn GetRune(mut lit: string): (r: rune, length: int, errors: []Error) {
 		if !ok {
 			return 0, 0, errors
 		}
-		r, _ = runeFromEsqSeq(lit, &length, &errors)
+		r, _ = runeFromEscapeSequence(lit, &length, &errors)
 	} else {
 		r, length = utf8::DecodeRuneString(lit)
 	}
@@ -219,7 +219,7 @@ fn tryBtoaCommonEsq(s: string): (seq: byte, ok: bool) {
 // Decodes the first escape sequence rune from ltieral s, i is the start position of the decoding.
 // Advances the i by size of decoded rune.
 // Assumes literal is syntactically correct.
-fn runeFromEsqSeq(s: string, mut &i: *int, mut &errors: *[]Error): (r: rune, isByte: bool) {
+fn runeFromEscapeSequence(s: string, mut &i: *int, mut &errors: *[]Error): (r: rune, isByte: bool) {
 	b, ok := tryBtoaCommonEsq(s[*i:])
 	*i++ // Skip escape sequence solidus.
 	if ok {
@@ -274,7 +274,7 @@ fn runeFromEsqSeq(s: string, mut &i: *int, mut &errors: *[]Error): (r: rune, isB
 // Assumes literal is syntactically correct.
 // The decoded rune will be appended to buf.
 fn stringEscapeSequence(mut &buf: *[]byte, s: string, mut &i: *int, mut &errors: *[]Error) {
-	r, isByte := runeFromEsqSeq(s, i, errors)
+	r, isByte := runeFromEscapeSequence(s, i, errors)
 	if isByte {
 		*buf = append(*buf, byte(r))
 		return
