@@ -47,6 +47,10 @@ public:
         return buffer;
     }
 
+    static __jule_Slice<Item> alloc(const __jule_Int &len) noexcept {
+        return __jule_Slice<Item>::alloc(len, len);
+    }
+
     static __jule_Slice<Item> make(std::initializer_list<Item> src) {
         const std::size_t n = src.size();
 
@@ -296,8 +300,8 @@ public:
         this->_slice[this->_len++] = item;
     }
 
-    inline void fill(const Item &def) noexcept {
-        std::fill(this->begin(), this->end(), def);
+    inline void fill(const Item &item) noexcept {
+        std::fill(this->begin(), this->end(), item);
     }
 
     inline void push(const Item &item) {
