@@ -51,6 +51,13 @@ public:
         return __jule_Slice<Item>::alloc(len, len);
     }
 
+    static __jule_Slice<Item> filled(const __jule_Int &len,
+                                     const __jule_Int &cap, const Item &item) {
+        __jule_Slice<Item> slice = __jule_Slice<Item>::alloc(len, cap);
+        std::uninitialized_fill_n(slice.begin(), slice.cap(), item);
+        return slice;
+    }
+
     static __jule_Slice<Item> make(std::initializer_list<Item> src) {
         const std::size_t n = src.size();
 
