@@ -58,6 +58,10 @@ public:
         return slice;
     }
 
+    static __jule_Slice<Item> filled(const __jule_Int &len, const Item &item) {
+        return __jule_Slice<Item>::filled(len, len, item);
+    }
+
     static __jule_Slice<Item> make(std::initializer_list<Item> src) {
         const std::size_t n = src.size();
 
