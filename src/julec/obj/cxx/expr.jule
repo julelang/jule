@@ -1932,44 +1932,29 @@ impl exprCoder {
 	}
 
 	fn makeCallSlice(mut &self, mut m: &sema::BuiltinMakeCallExpr) {
-		mut cachedLen := false
 		mut slice := m.Type.Slice()
-		init := ableToInit(slice.Value)
-		if init {
-			self.oc.write("({ ")
-			// Capacity value is nil, so length value will be used as capacity.
-			// To avoid double computation, store the value in a temporary
-			// variable if needed.
-			cachedLen = m.Cap == nil && !m.Len.IsConst()
-			if cachedLen {
-				self.oc.write(typeInt)
-				self.oc.write(" " + collectionIdent + "_len = ")
-				self.possibleRefExpr(m.Len.Model)
-				self.oc.write("; ")
-			}
+		// If we can not initialize the slice, return directly as raw.
+		if !ableToInit(slice.Value) {
 			self.oc.tc.slice(&self.oc.Buf, slice)
-			self.oc.write(" " + collectionIdent + " = ")
-		}
-		self.oc.tc.kind(&self.oc.Buf, m.Type)
-		self.oc.write("::alloc(")
-		if cachedLen {
-			self.oc.write(collectionIdent + "_len, " + collectionIdent + "_len")
-		} else {
+			self.oc.write("::alloc(")
 			self.possibleRefExpr(m.Len.Model)
-			self.oc.write(", ")
 			if m.Cap != nil {
+				self.oc.write(", ")
 				self.possibleRefExpr(m.Cap.Model)
-			} else {
-				self.possibleRefExpr(m.Len.Model)
 			}
-		}
-		self.oc.write(")")
-		if !init {
+			self.oc.write(")")
 			return
 		}
-		self.oc.write("; ")
-		self.initCollection(slice.Value, collectionIdent+"._cap", true)
-		self.oc.write(" " + collectionIdent + "; })")
+		self.oc.tc.slice(&self.oc.Buf, slice)
+		self.oc.write("::filled(")
+		self.possibleRefExpr(m.Len.Model)
+		if m.Cap != nil {
+			self.oc.write(", ")
+			self.possibleRefExpr(m.Cap.Model)
+		}
+		self.oc.write(", ")
+		self.initExpr(slice.Value)
+		self.oc.write(")")
 	}
 
 	fn makeCallChan(mut &self, mut m: &sema::BuiltinMakeCallExpr) {
