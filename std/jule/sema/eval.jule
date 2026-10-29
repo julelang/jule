@@ -1828,9 +1828,12 @@ impl eval {
 			return nil
 		}
 
-		// if actual types are equal, allow casting
-		// otherwise check casting in more detail
-		if !v.Type.deepActualEqual(t) {
+		// If actual types are equal, allow casting
+		// otherwise check casting in more detail.
+		// If types are equal, value should be untyped.
+		// Otherwise it may be constant with possibly overflow-causing value.
+		// Handle casting to catch constant value overflows and etc.
+		if v.untyped || !v.Type.deepActualEqual(t) {
 			match {
 			| v.IsNil():
 				if !t.NilCompatible() {
