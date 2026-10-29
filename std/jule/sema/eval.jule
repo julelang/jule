@@ -1948,6 +1948,12 @@ impl eval {
 		mut prefix := self.prefix
 		self.prefix = t
 		defer { self.prefix = prefix }
+		mut noCastNeeded := false
+		if t.Slice() != nil || t.Array() != nil {
+			_, noCastNeeded = e.Data.(&ast::SliceExpr)
+		} else if t.Map() != nil {
+			_, noCastNeeded = e.Data.(&ast::BraceLit)
+		}
 		// Do not allow arbitrary large literals for casting.
 		// Because casting will result as a valid memory type.
 		// If we do not eval with the physical memory constraint,
@@ -1961,7 +1967,7 @@ impl eval {
 			flags |= evalPhysicalMem | evalUnwrapUntyped
 		}
 		mut v := self.evalExpr(e, flags)
-		if v == nil {
+		if v == nil || noCastNeeded {
 			return v
 		}
 		return self.evalCastByTypeNData(t, v, et)
