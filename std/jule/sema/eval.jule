@@ -1582,7 +1582,7 @@ impl eval {
 					})
 				}
 				v.Model = model
-				v.Decl = true // Prevent model changing.
+				v.Decl = canCastImplicitly(t) // Prevent model changing.
 			| prim.IsI32():
 				s := c.ReadString()
 				mut model := &SliceExpr{
@@ -1599,7 +1599,7 @@ impl eval {
 					})
 				}
 				v.Model = model
-				v.Decl = true // Prevent model changing.
+				v.Decl = canCastImplicitly(t) // Prevent model changing.
 			}
 		}
 	}
@@ -1637,11 +1637,11 @@ impl eval {
 				| prim.IsU8():
 					v.Constant = constant::NewString(string(byte(c.AsU64())))
 					v.Model = v.Constant
-					v.Decl = true // Prevent model changing.
+					v.Decl = canCastImplicitly(t) // Prevent model changing.
 				| prim.IsI32():
 					v.Constant = constant::NewString(string(rune(c.AsI64())))
 					v.Model = v.Constant
-					v.Decl = true // Prevent model changing.
+					v.Decl = canCastImplicitly(t) // Prevent model changing.
 				}
 			}
 			return
@@ -1664,7 +1664,7 @@ impl eval {
 	fn castCmplx(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		if v.IsConst() {
 			_ = castConstByType(self.s, errorToken, t, v)
-			v.Decl = true // Do not use casting model. See developer reference (11).
+			v.Decl = canCastImplicitly(t) // Do not use casting model. See developer reference (11).
 		} else {
 			v.Constant = nil
 			v.untyped = false
@@ -1691,7 +1691,7 @@ impl eval {
 	fn castInt(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		if v.IsConst() {
 			_ = castConstByType(self.s, errorToken, t, v)
-			v.Decl = true // Do not use casting model. See developer reference (11).
+			v.Decl = canCastImplicitly(t) // Do not use casting model. See developer reference (11).
 		} else {
 			v.Constant = nil
 			v.untyped = false
@@ -1734,7 +1734,7 @@ impl eval {
 	fn castNum(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		if v.IsConst() {
 			_ = castConstByType(self.s, errorToken, t, v)
-			v.Decl = true // Do not use casting model. See developer reference (11).
+			v.Decl = canCastImplicitly(t) // Do not use casting model. See developer reference (11).
 		} else {
 			v.Constant = nil
 			v.untyped = false
@@ -5624,4 +5624,11 @@ fn deepIsRef(mut v: &Value): (isRef: bool, mutable: bool) {
 		return false, false
 	}
 	return deepIsRef(unary.Expr)
+}
+
+// Intended for casting handling.
+// If type is external, then cast explicitly to ensure type safety at
+// back-end compiler's comptime.
+fn canCastImplicitly(t: &Type): bool {
+	return !t.Extern()
 }
