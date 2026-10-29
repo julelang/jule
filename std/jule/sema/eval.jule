@@ -1663,7 +1663,7 @@ impl eval {
 
 	fn castCmplx(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		if v.IsConst() {
-			castConstByType(self.s, errorToken, t, v)
+			_ = castConstByType(self.s, errorToken, t, v)
 			v.Decl = true // Do not use casting model. See developer reference (11).
 		} else {
 			v.Constant = nil
@@ -1690,7 +1690,7 @@ impl eval {
 
 	fn castInt(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		if v.IsConst() {
-			castConstByType(self.s, errorToken, t, v)
+			_ = castConstByType(self.s, errorToken, t, v)
 			v.Decl = true // Do not use casting model. See developer reference (11).
 		} else {
 			v.Constant = nil
@@ -1733,7 +1733,7 @@ impl eval {
 
 	fn castNum(mut *self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		if v.IsConst() {
-			castConstByType(self.s, errorToken, t, v)
+			_ = castConstByType(self.s, errorToken, t, v)
 			v.Decl = true // Do not use casting model. See developer reference (11).
 		} else {
 			v.Constant = nil
@@ -1946,19 +1946,8 @@ impl eval {
 
 	fn evalCastT(mut &self, mut t: &Type, mut e: &ast::Expr, mut et: &token::Token): &Value {
 		mut prefix := self.prefix
-		self.prefix = nil
+		self.prefix = t
 		defer { self.prefix = prefix }
-		if t.Slice() != nil || t.Array() != nil {
-			_, isSlice := e.Data.(&ast::SliceExpr)
-			if isSlice {
-				self.prefix = t
-			}
-		} else if t.Map() != nil {
-			_, isBrace := e.Data.(&ast::BraceLit)
-			if isBrace {
-				self.prefix = t
-			}
-		}
 		// Do not allow arbitrary large literals for casting.
 		// Because casting will result as a valid memory type.
 		// If we do not eval with the physical memory constraint,
@@ -1972,7 +1961,7 @@ impl eval {
 			flags |= evalPhysicalMem | evalUnwrapUntyped
 		}
 		mut v := self.evalExpr(e, flags)
-		if v == nil || self.prefix != nil {
+		if v == nil {
 			return v
 		}
 		return self.evalCastByTypeNData(t, v, et)
@@ -5008,7 +4997,7 @@ impl binaryEval {
 				}
 			}
 		} else {
-			castConstByType(self.e.s, nil, (*v).Type, *v)
+			_ = castConstByType(self.e.s, nil, (*v).Type, *v)
 		}
 		(*v).Model = (*v).Constant
 		applyCastModelByEnum(self.e.s, *v, (*v).Type.Enum(), self.op, self.e.getOwnerRefers())
