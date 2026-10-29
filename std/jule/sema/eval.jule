@@ -1828,12 +1828,7 @@ impl eval {
 			return nil
 		}
 
-		// If actual types are equal, allow casting
-		// otherwise check casting in more detail.
-		// If types are equal, value should be untyped.
-		// Otherwise it may be constant with possibly overflow-causing value.
-		// Handle casting to catch constant value overflows and etc.
-		if v.untyped || !v.Type.deepActualEqual(t) {
+		if castingNeeded(t, v) {
 			match {
 			| v.IsNil():
 				if !t.NilCompatible() {
@@ -1901,7 +1896,8 @@ impl eval {
 		}
 		// casting applied successfully
 
-		if t.Extern() || v.Type.Extern() {
+		_extern := t.Extern() || v.Type.Extern()
+		if _extern {
 			// if destination or expression type is external, it requires Unsafe Jule for this.
 			// Push error if Unsafe Jule is not available. But do not return nil data,
 			// casting is valid, just Unsafe Jule is missing. Push only information error for that.
@@ -1916,7 +1912,7 @@ impl eval {
 		// Even if the data is not mutable, set as mutable if the type is not mutable-type.
 		v.Mutable = v.Mutable || !v.Type.Mutable()
 
-		if !v.Decl && (v.Type.Enum() == nil || !v.Type.Enum().Type.Equal(t)) {
+		if _extern || !v.Decl && (v.Type.Enum() == nil || !v.Type.Enum().Type.Equal(t)) {
 			applyCastKind(self.s, v, t, errorToken, self.getOwnerRefers())
 			v.Model.(&CastingExpr).Token = errorToken
 		} else {
@@ -5631,4 +5627,15 @@ fn deepIsRef(mut v: &Value): (isRef: bool, mutable: bool) {
 // back-end compiler's comptime.
 fn canCastImplicitly(t: &Type): bool {
 	return !t.Extern()
+}
+
+// Intended for casting handling.
+// Reports casting needed for the expression.
+fn castingNeeded(t: &Type, v: &Value): bool {
+	// If actual types are equal, allow casting
+	// otherwise check casting in more detail.
+	// If types are equal, value should be untyped.
+	// Otherwise it may be constant with possibly overflow-causing value.
+	// Handle casting to catch constant value overflows and etc.
+	return v.untyped || !v.Type.deepActualEqual(t)
 }

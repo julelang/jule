@@ -834,6 +834,19 @@ impl exprCoder {
 	//	Otherwise, code generation might be wrong because <any> the
 	//	uses special casting algorithms.
 	fn casting(mut &self, mut m: &sema::CastingExpr) {
+		// According to the specification, we should cast external types directly.
+		if m.Type.Extern() || m.Expr.Type.Extern() {
+			self.oc.write("static_cast<")
+			self.oc.tc.kind(&self.oc.Buf, m.Type)
+			self.oc.write(">(")
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write(")")
+			return
+		}
+		if m.Type.ActualEqual(m.Expr.Type) {
+			self.possibleRefExpr(m.Expr.Model)
+			return
+		}
 		if obj::IsAny(m.Type) {
 			// Casted from nil literal, make nil initialization.
 			if m.Expr.Type.IsNil() {
