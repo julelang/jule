@@ -6,6 +6,7 @@
 #define __JULE_ARRAY_HPP
 
 #include <algorithm>
+#include <initializer_list>
 #include <memory>
 
 #include "error.hpp"

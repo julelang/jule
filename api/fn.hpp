@@ -6,6 +6,7 @@
 #define __JULE_FN_HPP
 
 #include <cstddef>
+#include <utility>
 
 #include "error.hpp"
 #include "ptr.hpp"

@@ -14,7 +14,6 @@ static_assert(std::numeric_limits<double>::is_iec559,
               "Jule needs IEEE 754 compliance");
 #endif
 
-#include <cstddef>
 #include <cstdint>
 
 #include "platform.hpp"

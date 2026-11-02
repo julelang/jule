@@ -5,6 +5,7 @@
 #ifndef __JULE_ANY_HPP
 #define __JULE_ANY_HPP
 
+#include <cstddef>
 #include <memory>
 
 #include "string.hpp"

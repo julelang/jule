@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <initializer_list>
 #include <memory>
+#include <type_traits>
 
 #include "error.hpp"
 #include "ptr.hpp"

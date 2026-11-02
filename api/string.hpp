@@ -11,6 +11,7 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "error.hpp"
 #include "impl_flag.hpp"
