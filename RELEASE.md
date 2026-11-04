@@ -79,6 +79,6 @@ Like this: `sh ./.devcontainers/release/build.sh`
 
 ## Post Release
 
-- The `Version` constant in the `std/jule` package must be set to the new planned version with `@master` tag, like `jule0.2.1 @master`.
+- The `Version` constant in the `std/jule` package must be set to the `@master` tag, like `jule @master`.
 - The Manual is always updated against the `@master` branch. Therefore, a link to the released version should be added to the list of older versions in the [Foreword](https://manual.jule.dev/foreword) section.
 - Update the `latest` and `current` options to the latest version of [setup-jule](https://github.com/julelang/setup-jule).
