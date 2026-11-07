@@ -106,17 +106,13 @@ impl Scanner {
 		self.col = 0
 	}
 
-	// Returns the next rune without advance scanning.
-	fn peek(mut *self): rune {
-		if self.rdOffset >= self.buf.Len() {
-			return eof
+	// Returns the byte following the most recently read character without
+	// advancing the scanner. If the scanner is at EOF, peek returns 0.
+	fn peek(mut *self): byte {
+		if self.rdOffset < self.buf.Len() {
+			return self.buf.Get(self.rdOffset)
 		}
-		mut r := rune(self.buf.Get(self.rdOffset))
-		// not ASCII
-		if r >= utf8::RuneSelf {
-			r, _ = utf8::DecodeRune(self.buf.Slice1(self.rdOffset))
-		}
-		return r
+		return 0
 	}
 
 	// Read the next Unicode char into self.r.
@@ -144,7 +140,18 @@ impl Scanner {
 			// not ASCII
 			r, w = utf8::DecodeRune(self.buf.Slice1(self.rdOffset))
 			if r == utf8::RuneError && w == 1 {
-				self.pushErr(self.col, "illegal UTF-8 encoding")
+				_in := self.buf.Slice1(self.rdOffset)
+				if self.offset == 0 &&
+					len(_in) >= 2 &&
+					(_in[0] == 0xFF && _in[1] == 0xFE || _in[0] == 0xFE && _in[1] == 0xFF) {
+					// U+FEFF BOM at start of file, encoded as big- or little-endian
+					// UCS-2 (i.e. 2-byte UTF-16). Give specific error.
+					// See Go's issue (go.dev/issue/71950) for more detail.
+					self.pushErr(self.col, "illegal UTF-8 encoding (got UTF-16)")
+					self.rdOffset += len(_in) // concume all input to avoid error cascade
+				} else {
+					self.pushErr(self.col, "illegal UTF-8 encoding")
+				}
 			} else if r == bom && self.offset > 0 {
 				self.pushErr(self.col, "illegal byte order mask")
 			}
@@ -545,7 +552,7 @@ impl Scanner {
 			if isKeyword {
 				token.ID = id
 			}
-		| isDecimal(self.r) || self.r == '.' && isDecimal(self.peek()):
+		| isDecimal(self.r) || self.r == '.' && isDecimal(rune(self.peek())):
 			self.scanNumber(token)
 		|:
 			// Save the current rune and advance.
@@ -774,7 +781,16 @@ impl Scanner {
 					token.Kind = "="
 				}
 			|:
-				self.pushErr(col, "invalid token "+conv::QuoteRune(r))
+				// next reports unexpected BOMs - don't repeat
+				if r != bom {
+					// Report an informative error for U+201[CD] quotation
+					// marks, which are easily introduced via copy and paste.
+					if r == '“' || r == '”' {
+						self.pushErr(col, "curly quotation mark @ (use neutral @)", r, '"')
+					} else {
+						self.pushErr(col, "illegal character @", conv::QuoteRune(r))
+					}
+				}
 			}
 		}
 		EOF = self.r == eof
