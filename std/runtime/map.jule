@@ -742,7 +742,7 @@ impl table {
 						// holds the element which was at target.
 						targetGroup.ctrls.set(target, ctrl(h2(h)))
 						mut &targetKey := &targetGroup.keys[target]
-						mut &targetValue := &targetGroup.values[j]
+						mut &targetValue := &targetGroup.values[target]
 						*key, *targetKey = *targetKey, *key
 						*value, *targetValue = *targetValue, *value
 						// Repeat processing of the j'th slot which now holds a
@@ -1041,7 +1041,7 @@ impl hmap {
 					// sequence.
 					mut seq2 := probeSeq.make(h1(h), t.groupMask)
 					for ; seq2 = seq2.next() {
-						g2 := &t.groups[seq2.offset]
+						mut g2 := &t.groups[seq2.offset]
 						_match = g2.ctrls.matchEmptyOrDeleted()
 						if _match != 0 {
 							i := _match.first()
@@ -1049,15 +1049,15 @@ impl hmap {
 							// is deleted (and thus we're overwriting it and not
 							// changing growthLeft) we can insert the entry here.
 							// Otherwise we need to rehash the table.
-							if t.growthLeft > 0 || g.ctrls.get(i) == ctrlDeleted {
-								g.keys[i] = key
-								if g.ctrls.get(i) == ctrlEmpty {
+							if t.growthLeft > 0 || g2.ctrls.get(i) == ctrlDeleted {
+								g2.keys[i] = key
+								if g2.ctrls.get(i) == ctrlEmpty {
 									t.growthLeft--
 								}
-								g.ctrls.set(i, ctrl(h2(h)))
+								g2.ctrls.set(i, ctrl(h2(h)))
 								t.used++
 								self.used++
-								return &g.values[i]
+								return &g2.values[i]
 							}
 							break
 						}
