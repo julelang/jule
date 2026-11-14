@@ -20,8 +20,18 @@ use "std/os/filepath"
 use "std/strings"
 use "std/unsafe"
 
-// Bitsize limit of comptime arbitrary large literals.
-const bitLimit = 256
+const (
+	// Maximum bit length of an integer constant evaluated at comptime.
+	// Keep this platform-independent so 32-bit and 64-bit targets behave identically.
+	bitLimit = 65536
+
+	// Conservative maximum digit counts for a bitLimit-bit unsigned integer.
+	// The exact bit length is checked after parsing as well.
+	maxBinaryDigits  = bitLimit
+	maxOctalDigits   = (bitLimit + 2) / 3
+	maxDecimalDigits = 19729 // ceil(bitLimit * log10(2))
+	maxHexDigits     = (bitLimit + 3) / 4
+)
 
 // Value.
 struct Value {
@@ -251,59 +261,36 @@ impl eval {
 	}
 
 	fn litInt(mut *self, l: &ast::LitExpr): &Value {
-		// Maximum value of bitLimit integer.
-		const (
-			maxbinary  = "1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
-			maxoctal   = "17777777777777777777777777777777777777777777777777777777777777777777777777777777777777"
-			maxdecimal = "115792089237316195423570985008687907853269984665640564039457584007913129639935"
-			maxhex     = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-		)
-		match {
-		| strings::HasPrefix(l.Value, "0x"): // Hexadecimal
-			lit := l.Value[2:]
-			n := len(lit) - strings::Count(lit, "_")
-			if n > len(maxhex) {
-				self.pushErr(l.Token, "untyped value @ overflows integer type", l.Value)
-				return nil
-			}
-		| strings::HasPrefix(l.Value, "0b"): // Binary
-			lit := l.Value[2:]
-			n := len(lit) - strings::Count(lit, "_")
-			if n > len(maxbinary) {
-				self.pushErr(l.Token, "untyped value @ overflows integer type", l.Value)
-				return nil
-			}
-		| strings::HasPrefix(l.Value, "0o"): // Ocatal
-			lit := l.Value[2:]
-			n := len(lit) - strings::Count(lit, "_")
-			if n > len(maxoctal) {
-				self.pushErr(l.Token, "untyped value @ overflows integer type", l.Value)
-				return nil
-			}
-		| l.Value[0] == '0' && len(l.Value) > 1: // Octal
-			lit := l.Value[1:]
-			n := len(lit) - strings::Count(lit, "_")
-			if n > len(maxoctal) {
-				self.pushErr(l.Token, "untyped value @ overflows integer type", l.Value)
-				return nil
-			}
-		|:
-			// Decimal
-			lit := l.Value[1:]
-			n := len(lit) - strings::Count(lit, "_")
-			if n > len(maxdecimal) {
-				self.pushErr(l.Token, "untyped value @ overflows integer type", l.Value)
-				return nil
-			}
+		// Reject excessively long source literals before SetString allocates
+		// storage proportional to their size. Underscores do not count as digits.
+		mut digits := l.Value
+		mut maxDigits := maxDecimalDigits
+		if strings::HasPrefix(l.Value, "0x") || strings::HasPrefix(l.Value, "0X") {
+			digits = l.Value[2:]
+			maxDigits = maxHexDigits
+		} else if strings::HasPrefix(l.Value, "0b") || strings::HasPrefix(l.Value, "0B") {
+			digits = l.Value[2:]
+			maxDigits = maxBinaryDigits
+		} else if strings::HasPrefix(l.Value, "0o") || strings::HasPrefix(l.Value, "0O") {
+			digits = l.Value[2:]
+			maxDigits = maxOctalDigits
+		} else if l.Value[0] == '0' && len(l.Value) > 1 {
+			digits = l.Value[1:]
+			maxDigits = maxOctalDigits
+		}
+		digitCount := len(digits) - strings::Count(digits, "_")
+		if digitCount > maxDigits {
+			self.pushErr(l.Token, "untyped value @ overflows integer type", l.Value)
+			return nil
 		}
 
-		mut v := new(Value)
 		let mut i: big::Int
 		i.SetString(l.Value, 0)
 		if i.BitLen() > bitLimit {
 			self.pushErr(l.Token, "untyped value @ overflows integer type", l.Value)
 			return nil
 		}
+		mut v := new(Value)
 		v.Constant = constant::NewInt(i)
 		v.Type = primInt // Default type for unwrap.
 		v.Model = v.Constant
@@ -4869,6 +4856,46 @@ impl binaryEval {
 			(*v).Constant = nil
 			(*v).untyped = false
 			return
+		}
+
+		// Preflight integer operations before mutating integer. A post-operation
+		// BitLen check alone is too late for huge multiplication and left shifts.
+		if self.l.Constant.IsInt() && self.r.Constant.IsInt() {
+			left := self.l.Constant.ReadInt()
+			right := self.r.Constant.ReadInt()
+			lb := left.BitLen()
+			rb := right.BitLen()
+			mut mayExceed := false
+			mut largest := lb
+			if rb > largest {
+				largest = rb
+			}
+			match self.op.ID {
+			| token::ADD
+			| token::SUB:
+				mayExceed = largest >= bitLimit
+			| token::MUL:
+				mayExceed = lb != 0 && rb != 0 && lb+rb > bitLimit
+			| token::SHL:
+				if right.Sign() != 0 {
+					if right.IsI64() && right.I64() >= 0 {
+						mayExceed = right.I64() > bitLimit || (left.Sign() != 0 && lb+int(right.I64()) > bitLimit)
+					} else if right.IsU64() {
+						mayExceed = left.Sign() != 0 && (right.U64() > u64(bitLimit) || lb+int(right.U64()) > bitLimit)
+					} else {
+						mayExceed = true
+					}
+				}
+			|:
+				// Division, remainder, right shift and bitwise operations cannot
+				// increase the magnitude beyond the left operand's bit length.
+			}
+			if mayExceed {
+				self.e.pushErr(self.op, "computation result is overflows compiler limits")
+				self.e.pushSuggestion("your big-integer is too big and reached to safety limit of compiler, try to compute at runtime")
+				*v = nil
+				return
+			}
 		}
 
 		match self.op.ID {
