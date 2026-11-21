@@ -323,7 +323,7 @@ public:
             __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end,
                                                           this->_len, "length");
             error += "\nruntime: string slicing with out of range indexes";
-            error += "\nfile:";
+            error += "\nfile: ";
             error += file;
             __jule_panicString(error);
         }
