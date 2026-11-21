@@ -74,6 +74,26 @@ impl Intrinsic {
 	}
 }
 
+// Metadata for the unsafe package.
+struct Unsafe {
+	BytesFromString: &sema::FuncIns
+	StringFromBytes: &sema::FuncIns
+}
+
+impl Unsafe {
+	// Collects Unsafe from IR if possible.
+	fn Collect(mut ir: &obj::IR): &Unsafe {
+		if ir.Unsafe == nil {
+			return nil
+		}
+		mut p := ir.Unsafe
+		mut meta := new(Unsafe)
+		meta.BytesFromString = obj::RuntimeFindFunc(p, "BytesFromString").Instances[0]
+		meta.StringFromBytes = obj::RuntimeFindFunc(p, "StringFromBytes").Instances[0]
+		return meta
+	}
+}
+
 // Metadata for the runtime package.
 struct Runtime {
 	Init: &sema::FuncIns // Hard initializer function of runtime.
@@ -209,6 +229,7 @@ impl Runtime {
 // Metadata for common objects.
 struct Meta {
 	Runtime:       &Runtime
+	Unsafe:        &Unsafe
 	Intrinsic:     &Intrinsic
 	StringBuilder: &StringBuilder
 
@@ -219,6 +240,7 @@ struct Meta {
 fn Collect(mut ir: &obj::IR): &Meta {
 	mut meta := new(Meta)
 	meta.Runtime = Runtime.Collect(ir)
+	meta.Unsafe = Unsafe.Collect(ir)
 	meta.Intrinsic = Intrinsic.Collect(ir)
 	meta.StringBuilder = StringBuilder.Collect(ir)
 	return meta
