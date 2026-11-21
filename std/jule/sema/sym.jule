@@ -239,6 +239,10 @@ impl symBuilder {
 		self.errors = append(self.errors, compilerErr(self.ast.File, token, false, fmt, args...))
 	}
 
+	fn pushErrFlat(mut *self, fmt: string, args: ...any) {
+		self.errors = append(self.errors, compilerErrFlat(fmt, args...))
+	}
+
 	// Push suggestion to last log.
 	fn pushSuggestion(mut *self, fmt: string, args: ...any) {
 		unsafe { pushSuggestion(&self.errors[len(self.errors)-1], fmt, args...) }
@@ -445,7 +449,11 @@ impl symBuilder {
 
 	fn checkImportCycles(mut &self, imp: &ImportInfo, decl: &ast::Use): bool {
 		if imp.Path == self.table.File.Dir() {
-			self.pushErr(decl.Token, "package @ cannot refer to itself", imp.LinkPath)
+			if isImplicitImport(imp) {
+				self.pushErrFlat("you cannot compile this path directly: @", imp.LinkPath)
+			} else {
+				self.pushErr(decl.Token, "package @ cannot refer to itself", imp.LinkPath)
+			}
 			return false
 		}
 		if self.owner == nil {
