@@ -669,6 +669,11 @@ impl scopeOptimizer {
 			assign.Left[0] == nil || assign.Left[1] == nil {
 			return false
 		}
+		// Ignore map assignments.
+		// We cannot optimize them as swap.
+		if isMapAssign(assign.Left[0]) || isMapAssign(assign.Left[1]) {
+			return
+		}
 		// Catch swaps.
 		if !obj::EqualModels(assign.Left[0].Model, tup.Values[1].Model) ||
 			!obj::EqualModels(assign.Left[1].Model, tup.Values[0].Model) {
@@ -1107,4 +1112,12 @@ fn isUnreachableMatchCase(case: &sema::Case): bool {
 		}
 	}
 	return true
+}
+
+fn isMapAssign(mut v: &sema::Value): bool {
+	mut idx, ok := v.Model.(&sema::IndexingExpr)
+	if !ok {
+		return false
+	}
+	return idx.Expr.Type.Map() != nil
 }
