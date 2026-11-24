@@ -198,8 +198,13 @@ public:
         if (this->_len != n) {
             return false;
         }
-        return std::strncmp(reinterpret_cast<const char *>(this->begin()), s,
-                            this->_len) == 0;
+        // The strings may contain the NUL byte, so the comparison must not stop
+        // at it (strncmp does). The empty strings may have the null pointers.
+        if (n == 0) {
+            return true;
+        }
+        return std::memcmp(reinterpret_cast<const char *>(this->begin()), s,
+                           static_cast<size_t>(n)) == 0;
     }
 
     inline __jule_U8 &operator[](const __jule_Int &index) noexcept {
